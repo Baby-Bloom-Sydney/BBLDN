@@ -1,0 +1,22 @@
+# gitleaks configuration — BabyBloom London (07 §10.2; 06 §4.3; 08 §2.1 step 0 (i))
+#
+# Extends the default ruleset. The only allowlist entries are recorded false
+# positives; each carries the reason and the commit that reviewed it. Adding an
+# entry is a review item (security-reviewer), never a silent edit.
+
+title = "bbldn"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Recorded false positives — reviewed at S0 bootstrap (BB-LDN-Planner-070926/S0, 2026-09-15)"
+regexTarget = "match"
+regexes = [
+  # Token-alphabet constants for invite tokens (Crockford-like set, no ambiguous
+  # characters). Not a credential: a fixed public alphabet, identical in three
+  # files. Flagged by `generic-api-key` on entropy alone at the initial copy
+  # (Sydney @ 7fd88b1): src/lib/invite/mint.ts · src/lib/payments/subscribe-invite-token.ts ·
+  # tests/e2e/payments-smoke.spec.ts.
+  '''(TOKEN_ALPHABET|SUBSCRIBE_INVITE_TOKEN_ALPHABET|tokenAlphabet)\s*=\s*"ABCDEFGHJKMNPQRSTUVWXYZ23456789"''',
+]
