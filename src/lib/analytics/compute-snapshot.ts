@@ -117,7 +117,7 @@ export async function computeSnapshot(): Promise<SectionSnapshot[]> {
 
   const [
     connectionsRes, userStatsRes, verificationsRes,
-    dfyNotificationsRes, viralSharesRes, dfyPositionsRes,
+    dfyNotificationsRes, dfyPositionsRes,
     testFlagRes, testEmailRes,
     visitsRes, applyVisitsRes, nanniesRes, parentsRes, placementsRes, positionsRes, leadsRes,
   ] = await Promise.all([
@@ -125,13 +125,12 @@ export async function computeSnapshot(): Promise<SectionSnapshot[]> {
     admin.from("user_stats").select("user_id, user_type, lead_id, lead_created_at, lead_status, account_created_at, first_connection_at, first_accepted_at, first_meetup_at, first_placement_at, first_position_at, updated_at"),
     admin.from("verifications").select("user_id, identity_status, wwcc_status, created_at"),
     admin.from("dfy_match_notifications").select("id, position_id, nanny_id, status, wave, notified_at, viewed_at, responded_at, created_at").then((r: any) => r, () => ({ data: null })),
-    admin.from("viral_shares").select("id, user_id, case_type, share_status, created_at, shared_at, submitted_at, approved_at, failed_at, bypassed_at").then((r: any) => r, () => ({ data: null })),
     admin.from("nanny_positions").select("id, parent_id, dfy_activated_at, dfy_tier, dfy_expires_at, source, created_at").not('dfy_activated_at', 'is', null).eq("source", "parent").then((r: any) => r, () => ({ data: null })),
     admin.from("user_profiles").select("user_id").eq("is_test", true).then((r: any) => r, () => ({ data: [] })),
     admin.from("user_profiles").select("user_id").ilike("email", "%babybloomsydney.com.au"),
     admin.from("page_visits").select("visitor_id, referrer_source, page_path, created_at"),
     admin.from("page_visits").select("visitor_id, created_at").or("page_path.like./apply/nanny%,page_path.eq./apply"),
-    admin.from("nannies").select("id, user_id, verification_level, visible_in_bsr, created_at, updated_at"),
+    admin.from("nannies").select("id, user_id, verification_level, created_at, updated_at"),
     admin.from("parents").select("id, user_id, signup_source, created_at, updated_at"),
     admin.from("nanny_placements").select("id, nanny_id, parent_id, created_at"),
     admin.from("nanny_positions").select("id, parent_id, status, source, created_at").eq("source", "parent"),
@@ -158,7 +157,6 @@ export async function computeSnapshot(): Promise<SectionSnapshot[]> {
   const userStats = rawUS.filter((us: any) => !testUserIds.has(us.user_id));
   const verifs = ((verificationsRes.data || []) as any[]).filter((v: any) => !testUserIds.has(v.user_id));
   const dfyNotifs = ((dfyNotificationsRes.data || []) as any[]).filter((n: any) => !testNannyIds.has(n.nanny_id) && !testPosIds.has(n.position_id));
-  const viralAll = ((viralSharesRes.data || []) as any[]).filter((s: any) => !testUserIds.has(s.user_id));
   const dfyPos = rawDfyPos.filter((p: any) => !testParentIds.has(p.parent_id));
 
   const visits = (visitsRes.data || []) as any[];
@@ -484,43 +482,6 @@ export async function computeSnapshot(): Promise<SectionSnapshot[]> {
   sections.push({ section_key: 'dc', stages: snap(dcStages, ['N']) });
 
   // ═══════════════════════════════════════════════
-  // VIRAL SHARES (vn, vp, vb)
-  // ═══════════════════════════════════════════════
-  function viralStages(shares: any[]): IntStage[] {
-    return [
-      { label: "Created", records: shares, liveRecords: shares.filter((s: any) => s.share_status === 10), idKey: 'user_id' },
-      { label: "Shared", records: shares.filter((s: any) => s.share_status >= 20), liveRecords: shares.filter((s: any) => s.share_status === 20), idKey: 'user_id' },
-      { label: "Submitted", records: shares.filter((s: any) => s.share_status >= 30), liveRecords: shares.filter((s: any) => s.share_status === 30 || s.share_status === 40), idKey: 'user_id' },
-      { label: "Approved", records: shares.filter((s: any) => s.share_status === 50 || s.share_status === 90), idKey: 'user_id' },
-      { label: "Failed", records: shares.filter((s: any) => s.share_status === 60), idKey: 'user_id' },
-      { label: "Bypassed", records: shares.filter((s: any) => s.share_status === 90), idKey: 'user_id' },
-    ];
-  }
-
-  function viralTS(shares: any[]): (number | null)[][] {
-    return shares.map((s: any) => [
-      toMs(s.created_at), toMs(s.shared_at), toMs(s.submitted_at),
-      toMs(s.approved_at || s.bypassed_at), toMs(s.failed_at), toMs(s.bypassed_at),
-    ]);
-  }
-
-  const vnS = viralAll.filter((s: any) => s.case_type === 'nanny_profile');
-  const vpS = viralAll.filter((s: any) => s.case_type === 'parent_position');
-  const vbS = viralAll.filter((s: any) => s.case_type === 'parent_bsr');
-
-  const vnStages = viralStages(vnS);
-  annotateDwell(vnStages, viralTS(vnS), [0, 1, 2, 3, 4, 5]);
-  sections.push({ section_key: 'vn', stages: snap(vnStages, ['N']) });
-
-  const vpStages = viralStages(vpS);
-  annotateDwell(vpStages, viralTS(vpS), [0, 1, 2, 3, 4, 5]);
-  sections.push({ section_key: 'vp', stages: snap(vpStages, ['P']) });
-
-  const vbStages = viralStages(vbS);
-  annotateDwell(vbStages, viralTS(vbS), [0, 1, 2, 3, 4, 5]);
-  sections.push({ section_key: 'vb', stages: snap(vbStages, ['P']) });
-
-  // ═══════════════════════════════════════════════
   // PARENT SIGNUP SOURCES (ps)
   // ═══════════════════════════════════════════════
   const SIGNUP_SOURCES = [
@@ -575,13 +536,11 @@ export async function computeSnapshot(): Promise<SectionSnapshot[]> {
   // KEY NANNY METRICS (kn)
   // ═══════════════════════════════════════════════
   const activeNannies = nannies.filter((n: any) => n.verification_level >= 2);
-  const babysitters = nannies.filter((n: any) => n.visible_in_bsr === true);
   const allActiveConns = connections.filter((c: any) => !TERMINAL_STAGES.has(c.connection_stage));
 
   const knStages: IntStage[] = [
     { label: "Nannies", records: nannies, idKey: 'user_id' },
     { label: "Active Nannies", records: activeNannies, idKey: 'user_id' },
-    { label: "Babysitters", records: babysitters, idKey: 'user_id' },
     { label: "Placements", records: placements, idKey: 'nanny_id' },
   ];
   sections.push({ section_key: 'kn', stages: snap(knStages, ['N']) });

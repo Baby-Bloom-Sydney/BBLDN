@@ -15,7 +15,7 @@ describe("parseFunnelSource", () => {
   });
 
   it("returns null for unknown strings (silent fallback to legacy)", () => {
-    expect(parseFunnelSource("viral")).toBeNull();
+    expect(parseFunnelSource("bogus")).toBeNull();
     expect(parseFunnelSource("STD")).toBeNull();
     expect(parseFunnelSource("")).toBeNull();
   });

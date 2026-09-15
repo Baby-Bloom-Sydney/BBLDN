@@ -233,7 +233,7 @@ export default async function NannyHubPage() {
     admin
       .from("nannies")
       .select(
-        "id, verification_level, visible_in_bsr, ai_content, nationality, total_experience_years, nanny_experience_years, under_3_experience_years, newborn_experience_years, role_types_preferred, level_of_support_offered, hourly_rate_min, max_children, min_child_age_months, max_child_age_months, drivers_license, has_car, comfortable_with_pets, vaccination_status, non_smoker, languages, hobbies_interests, strengths_traits, skills_training, verification_tier, motivation, personality_traits, professional_values, childcare_roles, photo_1_url, photo_2_url, photo_3_url, immediate_start_available, additional_needs_ok",
+        "id, verification_level, ai_content, nationality, total_experience_years, nanny_experience_years, under_3_experience_years, newborn_experience_years, role_types_preferred, level_of_support_offered, hourly_rate_min, max_children, min_child_age_months, max_child_age_months, drivers_license, has_car, comfortable_with_pets, vaccination_status, non_smoker, languages, hobbies_interests, strengths_traits, skills_training, verification_tier, motivation, personality_traits, professional_values, childcare_roles, photo_1_url, photo_2_url, photo_3_url, immediate_start_available, additional_needs_ok",
       )
       .eq("user_id", user.id)
       .single(),
@@ -282,7 +282,6 @@ export default async function NannyHubPage() {
     getPendingInvitesForUser(),
   ]);
 
-  const shareUnlocked = nannyRes.data?.visible_in_bsr === true;
 
   // DSS §8 Q8 (Bailey 2026-05-12) — small green tick on each child
   // tile whose family is currently subscribed. Resolve in one batched
@@ -389,7 +388,6 @@ export default async function NannyHubPage() {
         dfyNotifications={dfyRes.data || []}
         openPositions={openPositions}
         nannyApplications={nannyApplications}
-        shareUnlocked={shareUnlocked}
         educationChildren={educationChildrenRows}
         subscribedChildIds={subscribedChildIds}
         pendingInvites={pendingInvitesResult.data ?? []}

@@ -121,7 +121,6 @@ interface NannyHubClientProps {
   dfyNotifications: DfyNotification[];
   openPositions: OpenPosition[];
   nannyApplications: NannyApplication[];
-  shareUnlocked: boolean;
   educationChildren: ChildClient[];
   /** Subscribed-family tick state per child — DSS §8 Q8. */
   subscribedChildIds?: string[];
@@ -159,7 +158,6 @@ export function NannyHubClient({
   dfyNotifications,
   openPositions,
   nannyApplications,
-  shareUnlocked,
   educationChildren,
   subscribedChildIds,
   pendingInvites = [],
@@ -1047,7 +1045,6 @@ export function NannyHubClient({
               placements={placements}
               upcomingIntros={upcomingIntros}
               dfyNotificationsInitial={dfyNotifications}
-              shareUnlocked={shareUnlocked}
               embedded
             />
           )}

@@ -19,7 +19,7 @@ interface InviteBannerProps {
    * The invite token (XXXX-XXXX). The full share URL is composed
    * client-side from `window.location.origin` so the link is always
    * clean regardless of NEXT_PUBLIC_INVITE_BASE_URL env-paste
-   * artefacts. Mirrors the pattern in BsrShareClient et al.
+   * artefacts. Mirrors the pattern of the share pages (removed at S1).
    */
   inviteToken: string;
   role: "nanny" | "parent";
@@ -71,7 +71,7 @@ export function InviteBanner({
   // Compose the share URL from the current browser origin. SSR guard
   // returns a relative path during initial render; hydration upgrades
   // it to the absolute URL before any user click fires. Mirrors the
-  // pattern in BsrShareClient / PositionShareClient / NannyShareClient.
+  // pattern of the share pages (removed at S1).
   const inviteUrl = `${
     typeof window !== "undefined" ? window.location.origin : ""
   }/invite/${inviteToken}`;

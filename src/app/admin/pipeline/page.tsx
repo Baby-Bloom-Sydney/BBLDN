@@ -83,7 +83,6 @@ const TABLE_NAMES: Record<string, string> = {
   nw: 'WWCC Verification', pv: 'Parent Verification',
   kn: 'Key Nanny Metrics', kp: 'Key Parent Metrics',
   df: 'DFY Matchmaking', dc: 'DFY Connections',
-  vn: 'Nanny Shares', vp: 'Position Shares', vb: 'BSR Shares',
 };
 
 const ENTITY_TAGS: Record<string, ('N' | 'P' | 'T' | 'V')[] | undefined> = {
@@ -93,7 +92,6 @@ const ENTITY_TAGS: Record<string, ('N' | 'P' | 'T' | 'V')[] | undefined> = {
   pf: ['P'], pc: ['P'], pv: ['V', 'P'],
   kn: ['N'], kp: ['P'],
   df: undefined, dc: ['N'],
-  vn: ['N'], vp: ['P'], vb: ['P'],
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -379,7 +377,7 @@ async function fetchCohort(admin: any, range: DateRange) {
     await Promise.all([
       wd(admin.from("page_visits").select("visitor_id, referrer, page_path, created_at")),
       wd(admin.from("page_visits").select("visitor_id, created_at").or("page_path.like./apply/nanny%,page_path.eq./apply")),
-      wd(admin.from("nannies").select("id, user_id, verification_level, visible_in_bsr, created_at, updated_at")),
+      wd(admin.from("nannies").select("id, user_id, verification_level, created_at, updated_at")),
       wd(admin.from("parents").select("id, user_id, signup_source, created_at, updated_at")),
       wd(admin.from("nanny_placements").select("id, nanny_id, parent_id, created_at")),
       wd(admin.from("nanny_positions").select("id, parent_id, status, source, created_at").eq("source", "parent")),
@@ -400,7 +398,7 @@ async function fetchCohort(admin: any, range: DateRange) {
 /** Fetch non-date-filtered shared data (run once) */
 async function fetchShared(admin: any) {
   const [connectionsRes, userStatsRes, connectionStatsRes, verificationsRes,
-         dfyNotificationsRes, viralSharesRes, dfyPositionsRes,
+         dfyNotificationsRes, dfyPositionsRes,
          testFlagRes, testEmailRes, allNanniesRes, allParentsRes] =
     await Promise.all([
       admin.from("connection_requests").select("id, nanny_id, parent_id, position_id, connection_stage, created_at"),
@@ -412,7 +410,6 @@ async function fetchShared(admin: any) {
       ),
       admin.from("verifications").select("user_id, identity_status, wwcc_status, identity_status_at, wwcc_status_at, verification_status, created_at"),
       admin.from("dfy_match_notifications").select("id, position_id, nanny_id, status, wave, notified_at, viewed_at, responded_at, created_at").then((r: any) => r).catch(() => ({ data: null })),
-      admin.from("viral_shares").select("id, user_id, case_type, reference_id, share_status, created_at, shared_at, submitted_at, approved_at, failed_at, bypassed_at, retry_count").then((r: any) => r).catch(() => ({ data: null })),
       admin.from("nanny_positions").select("id, parent_id, dfy_activated_at, dfy_tier, dfy_expires_at, source, created_at").not('dfy_activated_at', 'is', null).eq("source", "parent").then((r: any) => r).catch(() => ({ data: null })),
       // Test account identification (is_test flag + email domain fallback)
       admin.from("user_profiles").select("user_id").eq("is_test", true).then((r: any) => r).catch(() => ({ data: [] })),
@@ -446,7 +443,6 @@ async function fetchShared(admin: any) {
     connectionStatsData: ((connectionStatsRes.data || []) as any[]).filter((cs: any) => !testNannyIds.has(cs.nanny_id) && !testParentIds.has(cs.parent_id)),
     verificationsData: ((verificationsRes.data || []) as any[]).filter((v: any) => !testUserIds.has(v.user_id)),
     dfyNotifications: ((dfyNotificationsRes.data || []) as any[]).filter((n: any) => !testNannyIds.has(n.nanny_id) && !testPositionIds.has(n.position_id)),
-    viralShares: ((viralSharesRes.data || []) as any[]).filter((s: any) => !testUserIds.has(s.user_id)),
     dfyPositions: rawDfyPositions.filter((p: any) => !testParentIds.has(p.parent_id)),
     testUserIds,
     testNannyIds,
@@ -533,7 +529,7 @@ async function getPipelineData(
 
   const cohort = (section: keyof typeof eff) => cohortCache.get(rk(eff[section]))!;
 
-  const { connections, userStats, verificationsData, dfyNotifications, viralShares: viralSharesData, dfyPositions } = shared;
+  const { connections, userStats, verificationsData, dfyNotifications, dfyPositions } = shared;
 
   // Build user-activity maps from user_stats (keyed by user_id and lead_id)
   const userLastActive = new Map<string, number>();
@@ -1284,87 +1280,13 @@ async function getPipelineData(
     ...buildConnInternalStages(dcConns, 'nanny_id'),
   ]);
 
-  // ── Viral Shares ──
-  const vnShares = viralSharesData.filter((s: any) => s.case_type === 'nanny_profile');
-  const vpShares = viralSharesData.filter((s: any) => s.case_type === 'parent_position');
-  const vbShares = viralSharesData.filter((s: any) => s.case_type === 'parent_bsr');
-
-  function buildViralCatalog(shares: any[]): InternalStage[] {
-    return [
-      { label: "Created", tooltip: "Share record created", records: shares, liveRecords: shares.filter((s: any) => s.share_status === 10), idKey: 'user_id' },
-      { label: "Shared", tooltip: "User confirmed sharing to Facebook", records: shares.filter((s: any) => s.share_status >= 20), liveRecords: shares.filter((s: any) => s.share_status === 20), idKey: 'user_id' },
-      { label: "Submitted", tooltip: "Screenshot uploaded for verification", records: shares.filter((s: any) => s.share_status >= 30), liveRecords: shares.filter((s: any) => s.share_status === 30 || s.share_status === 40), idKey: 'user_id' },
-      { label: "Approved", tooltip: "Share verified and access granted", records: shares.filter((s: any) => s.share_status === 50 || s.share_status === 90), idKey: 'user_id' },
-      { label: "Failed", tooltip: "Screenshot verification failed", records: shares.filter((s: any) => s.share_status === 60), idKey: 'user_id' },
-      { label: "Bypassed", tooltip: "Admin override — access granted manually", records: shares.filter((s: any) => s.share_status === 90), idKey: 'user_id' },
-    ];
-  }
-
-  function buildViralMetrics(shares: any[], cfg: SectionConfig) {
-    const ro = cfg.rows || {};
-    const cnt = (idx: number, records: any[], idKey: string) =>
-      countWithOverride(records, idKey, cfg.count, ro[idx]);
-    return [
-      { label: "Created", tooltip: "Share record created", total: cnt(0, shares, 'user_id'), override: ro[0] },
-      { label: "Shared", tooltip: "User confirmed sharing to Facebook", total: cnt(1, shares.filter((s: any) => s.share_status >= 20), 'user_id'), override: ro[1] },
-      { label: "Submitted", tooltip: "Screenshot uploaded for verification", total: cnt(2, shares.filter((s: any) => s.share_status >= 30), 'user_id'), override: ro[2] },
-      { label: "Approved", tooltip: "Share verified and access granted", total: cnt(3, shares.filter((s: any) => s.share_status === 50 || s.share_status === 90), 'user_id'), override: ro[3] },
-      { label: "Failed", tooltip: "Screenshot verification failed", total: cnt(4, shares.filter((s: any) => s.share_status === 60), 'user_id'), override: ro[4] },
-      { label: "Bypassed", tooltip: "Admin override — access granted manually", total: cnt(5, shares.filter((s: any) => s.share_status === 90), 'user_id'), override: ro[5] },
-    ];
-  }
-
-  function buildViralLive(shares: any[]) {
-    return [
-      { label: "Created", total: shares.filter((s: any) => s.share_status === 10).length },
-      { label: "Shared", total: shares.filter((s: any) => s.share_status === 20).length },
-      { label: "Submitted", total: shares.filter((s: any) => s.share_status === 30 || s.share_status === 40).length },
-      { label: "Approved", total: shares.filter((s: any) => s.share_status === 50).length },
-      { label: "Failed", total: shares.filter((s: any) => s.share_status === 60).length },
-      { label: "Bypassed", total: shares.filter((s: any) => s.share_status === 90).length },
-    ];
-  }
-
-  function buildViralTimestamps(shares: any[]): (number | null)[][] {
-    return shares.map((s: any) => [
-      toMs(s.created_at),   // Created
-      toMs(s.shared_at),    // Shared
-      toMs(s.submitted_at), // Submitted
-      toMs(s.approved_at || s.bypassed_at), // Approved
-      toMs(s.failed_at),    // Failed
-      toMs(s.bypassed_at),  // Bypassed
-    ]);
-  }
-
-  const vnCfg = configs.vn || { count: 'unique' as const };
-  const vpCfg = configs.vp || { count: 'unique' as const };
-  const vbCfg = configs.vb || { count: 'unique' as const };
-
-  const nannySharesMetrics = buildViralMetrics(vnShares, vnCfg);
-  const nannySharesLive = buildViralLive(vnShares);
-  const nannySharesTimestamps = buildViralTimestamps(vnShares);
-
-  const positionSharesMetrics = buildViralMetrics(vpShares, vpCfg);
-  const positionSharesLive = buildViralLive(vpShares);
-  const positionSharesTimestamps = buildViralTimestamps(vpShares);
-
-  const bsrSharesMetrics = buildViralMetrics(vbShares, vbCfg);
-  const bsrSharesLive = buildViralLive(vbShares);
-  const bsrSharesTimestamps = buildViralTimestamps(vbShares);
-
-  internalCatalog.set('vn', buildViralCatalog(vnShares));
-  internalCatalog.set('vp', buildViralCatalog(vpShares));
-  internalCatalog.set('vb', buildViralCatalog(vbShares));
-
   // ── Key Metrics (broad summary stages for custom tab dropdown) ──
   const activeNannies = g.nannies.filter((n: any) => n.verification_level >= 2);
-  const babysitters = g.nannies.filter((n: any) => n.visible_in_bsr === true);
   const activeConnsAll = connections.filter((c: any) => !TERMINAL_STAGES.has(c.connection_stage));
 
   internalCatalog.set('kn', [
     { label: "Nannies", tooltip: "Total nanny accounts", records: g.nannies, idKey: 'user_id' },
     { label: "Active Nannies", tooltip: "Verified for matchmaking (Level 2+)", records: activeNannies, idKey: 'user_id' },
-    { label: "Babysitters", tooltip: "Approved for babysitting (visible_in_bsr)", records: babysitters, idKey: 'user_id' },
     { label: "Placements", tooltip: "Nannies with a confirmed placement", records: g.placements, idKey: 'nanny_id' },
   ]);
 
@@ -1386,10 +1308,6 @@ async function getPipelineData(
   annotateTimings(internalCatalog.get('nc')!, nannyConnTimestamps, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
   // df: 12 stages → dfyTimestamps[0-11]
   annotateTimings(internalCatalog.get('df')!, dfyTimestamps, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
-  // vn/vp/vb: 6 stages each → viral timestamps[0-5]
-  annotateTimings(internalCatalog.get('vn')!, nannySharesTimestamps, [0, 1, 2, 3, 4, 5]);
-  annotateTimings(internalCatalog.get('vp')!, positionSharesTimestamps, [0, 1, 2, 3, 4, 5]);
-  annotateTimings(internalCatalog.get('vb')!, bsrSharesTimestamps, [0, 1, 2, 3, 4, 5]);
 
   // ── Compute custom stages ──
   const customCfg = configs.custom || { count: 'unique' as const };
@@ -1458,9 +1376,6 @@ async function getPipelineData(
     parentIdentityCumulative, parentIdentityLive,
     dfyMatchmaking, dfyMatchmakingLive, dfyTimestamps,
     dfyConnectionsCumulative, dfyConnectionsLive,
-    nannySharesMetrics, nannySharesLive, nannySharesTimestamps,
-    positionSharesMetrics, positionSharesLive, positionSharesTimestamps,
-    bsrSharesMetrics, bsrSharesLive, bsrSharesTimestamps,
     catalog,
     customStages,
   };
@@ -1804,51 +1719,6 @@ export default async function AdminPipelinePage({
             stages={data.dfyConnectionsCumulative}
             liveStages={data.dfyConnectionsLive}
             tableKey="dc"
-          />
-        </CardContent>
-      </Card>
-
-      {/* Viral Shares — Nanny */}
-      <Card>
-        <CardContent className="pt-5">
-          <PipelineTable
-            title="Nanny Profile Shares"
-            subtitle="Nannies sharing their profile to Facebook groups"
-            metricType="cumulative"
-            stages={data.nannySharesMetrics}
-            liveStages={data.nannySharesLive}
-            timestamps={data.nannySharesTimestamps.length > 0 ? data.nannySharesTimestamps : undefined}
-            tableKey="vn"
-          />
-        </CardContent>
-      </Card>
-
-      {/* Viral Shares — Position */}
-      <Card>
-        <CardContent className="pt-5">
-          <PipelineTable
-            title="Position Shares"
-            subtitle="Parents sharing their nanny position to Facebook groups"
-            metricType="cumulative"
-            stages={data.positionSharesMetrics}
-            liveStages={data.positionSharesLive}
-            timestamps={data.positionSharesTimestamps.length > 0 ? data.positionSharesTimestamps : undefined}
-            tableKey="vp"
-          />
-        </CardContent>
-      </Card>
-
-      {/* Viral Shares — BSR */}
-      <Card>
-        <CardContent className="pt-5">
-          <PipelineTable
-            title="BSR Shares"
-            subtitle="Parents sharing their babysitting request to Facebook groups"
-            metricType="cumulative"
-            stages={data.bsrSharesMetrics}
-            liveStages={data.bsrSharesLive}
-            timestamps={data.bsrSharesTimestamps.length > 0 ? data.bsrSharesTimestamps : undefined}
-            tableKey="vb"
           />
         </CardContent>
       </Card>
