@@ -1,0 +1,52 @@
+// 02 §3 — cluster "leads". Values verbatim, add-only; tuple index = ordinal (02 C-1).
+export const LEADS_ENUMS = Object.freeze({
+  nanny_lead_status: Object.freeze([
+    "applied",
+    "ai_generated",
+    "converted",
+    "abandoned",
+    "rejected",
+  ] as const),
+  lead_rtw_status: Object.freeze([
+    "citizen",
+    "settled",
+    "visa_with_rtw",
+    "no_rtw",
+    "unknown",
+  ] as const), // provisional (T-3.1)
+  lead_contact_status: Object.freeze([
+    "untouched",
+    "called",
+    "texted",
+    "emailed",
+    "voicemail_left",
+    "no_response",
+    "replied",
+    "in_conversation",
+    "booked",
+    "activated",
+    "dormant",
+    "do_not_contact",
+  ] as const),
+  contact_method: Object.freeze([
+    "call",
+    "sms",
+    "email",
+    "whatsapp",
+    "instagram",
+    "in_person",
+    "manual",
+    "other",
+  ] as const),
+  contact_direction: Object.freeze(["outbound", "inbound"] as const),
+  contact_outcome: Object.freeze([
+    "answered",
+    "voicemail",
+    "no_answer",
+    "replied",
+    "booked",
+    "not_interested",
+    "bounced",
+    "pending",
+  ] as const),
+});
