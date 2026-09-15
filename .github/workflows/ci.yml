@@ -1,0 +1,262 @@
+# CI — BabyBloom London (HANDOFF §9; 05 §9; 06 §3.4; 07 §10.2)
+#
+# One job per protection-check name. `main` requires all eight (06 §3.4):
+#   typecheck · lint · test · build · allowed-imports · banned-literals · types-drift · gitleaks
+#
+# Stage → job → what runs (05 §9 numbering):
+#   1 lint            → lint            eslint · prettier --check · CLAUDE.md = CODE-CLAUDE.md (local gate, see below)
+#   1 lint            → allowed-imports scripts/gen-boundary-rules.ts --check + eslint.boundaries.js   [red until S6]
+#   1 lint            → banned-literals scripts/check-config-literals.ts [S2] · banned-words static pre-check ·
+#                                        gen-env-example.ts --check [S2] · process.env grep outside config/env.ts
+#   2 typecheck       → typecheck       tsc --noEmit --pretty false
+#   3–6 tests         → test            vitest --coverage → diff-cover ≥ 80 % changed lines · contract · integration
+#                                        (supabase start) · e2e (next build → playwright)              [red until S2–S5, E1]
+#   7 build + budgets → build           next build · size-limit [Phase 1 baseline] · prod-guard · bundle string scan
+#   7 types           → types-drift     supabase gen types ↔ src/modules/shared-types/database.types.ts [red until S2/S5]
+#   sec               → gitleaks        gitleaks (pinned binary, .gitleaks.toml) · npm audit --audit-level=high ·
+#                                        exact-version pins + lockfile
+#   8 preview + lhci  → (Vercel preview, warn-only day one; wired once bb-ldn exists — HANDOFF §2 row 6)
+#
+# Rules applied: every action and tool pinned (commit SHA / exact version); `npm ci` with cache; artefacts uploaded
+# `if: always()`; minimal token permissions; no secrets in this file — the CI env below is placeholder-only so
+# `next build` can collect page data (07 §7: real values live in Vercel env + the keychain, never here).
+# Steps that cannot be green on the raw Sydney copy are NOT disabled (HANDOFF §11 S0) — they run and go red; the unit
+# that turns each green is named inline.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  # Placeholder-only build env (non-secret; module-load guards in the legacy tree need a value to exist).
+  NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+  SUPABASE_URL: https://placeholder.supabase.co
+  SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role
+  NEXT_PUBLIC_APP_URL: http://localhost:3000
+  NEXT_PUBLIC_SITE_URL: http://localhost:3000
+  NEXT_PUBLIC_INVITE_BASE_URL: http://localhost:3000
+  RESEND_API_KEY: re_placeholder
+  STRIPE_SECRET_KEY: sk_test_ci-dummy # hyphen keeps the gitleaks stripe rule from matching a placeholder
+  STRIPE_WEBHOOK_SECRET: whsec_placeholder
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+  CRON_SECRET: placeholder-cron-secret
+  ADMIN_API_TOKEN: placeholder-admin-token
+  GOOGLE_AI_API_KEY: placeholder-google
+  OPENAI_API_KEY: placeholder-openai
+  EMAIL_DEV_DRY_RUN: "true"
+
+jobs:
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: tsc --noEmit --pretty false (05 §9 stage 2)
+        run: npm run typecheck
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: eslint (05 §9 stage 1; §7 boundary + platform rules once S6 lands)
+        run: npm run lint
+      - name: prettier --check (05 §9 stage 1) — red on the raw copy until S1 formats the legacy tree
+        if: ${{ !cancelled() }}
+        run: npm run format:check
+      - name: CLAUDE.md = CODE-CLAUDE.md — LOCAL GATE (HANDOFF §3.3 (ii))
+        # CODE-CLAUDE.md lives in ../LDN/SPECS/00-foundations/ (workspace repo), not in this checkout, so the byte
+        # diff cannot run here. The script passes with a notice when CI=true and the source is absent; locally
+        # (`npm run check:claude-md`, part of `npm run gates`) it is mandatory and a missing source is an error.
+        if: ${{ !cancelled() }}
+        run: npm run check:claude-md
+
+  allowed-imports:
+    name: allowed-imports
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: gen-boundary-rules --check (05 §7 rule 1, §10) — red until S6 lands the generator + eslint.boundaries.js
+        run: npm run check:allowed-imports
+      - name: eslint boundaries over src/modules (05 §7 rules 1–5) — red until S6
+        if: ${{ !cancelled() }}
+        run: npx eslint --config eslint.boundaries.js "src/modules/**/*.{ts,tsx}"
+
+  banned-literals:
+    name: banned-literals
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: check-config-literals (05 §6; AC-X-23) — red until S2 lands the script; legacy hits cleared by F-d
+        run: npm run check:config-literals
+      - name: banned-words static pre-check (05 §5) — red on the legacy parent surfaces until F-d
+        if: ${{ !cancelled() }}
+        run: npm run check:banned-words
+      - name: gen-env-example --check (06 §2.5; HANDOFF §5.4) — red until S2
+        if: ${{ !cancelled() }}
+        run: npm run check:env-example
+      - name: process.env only in config/env.ts (01 §1.3 rule 1; 07 §10.2) — red until S2 + F-d
+        if: ${{ !cancelled() }}
+        run: npm run check:env-reads
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0 # diff-cover needs origin/main
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - name: unit + coverage (05 §9 stage 3)
+        run: npx vitest run --coverage --coverage.reporter=lcov
+      - name: changed-line coverage ≥ 80 % (05 §9 stage 3; 07 §10.2)
+        # Follow-up (security-reviewer, S0): move to `pip install --require-hashes -r requirements-ci.txt` once S2
+        # stabilises the test job — version-pinned today, hash-pinned then.
+        if: ${{ !cancelled() }}
+        run: |
+          python -m pip install --quiet diff-cover==10.0.0
+          git fetch --no-tags origin main
+          diff-cover coverage/lcov.info --compare-branch=origin/main --fail-under=80
+      - name: contract suites (05 §9 stage 4; 05 §3) — red until S2 adds the `contract` vitest project
+        if: ${{ !cancelled() }}
+        run: npx vitest run --project contract
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        if: ${{ !cancelled() }}
+        with:
+          version: 2.117.0
+      - name: integration (05 §9 stage 5) — red until S5 lands supabase/ + migrations + the `integration` project
+        if: ${{ !cancelled() }}
+        run: |
+          supabase start
+          supabase db reset
+          npx vitest run --project integration
+      - name: e2e (05 §9 stage 6) — shell smoke + responsive + a11y from E1; single shard at S0
+        if: ${{ !cancelled() }}
+        run: |
+          npx playwright install --with-deps chromium
+          npm run build
+          npx playwright test
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: test-artefacts
+          path: |
+            coverage/
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: next build (05 §9 stage 7)
+        run: npm run build
+      - name: size-limit (05 §8.1 budgets) — red until the Phase-1-exit baseline lands a .size-limit config
+        if: ${{ !cancelled() }}
+        run: npx --no-install size-limit
+      - name: bundle string scan — server-only names + stub-stripe absent from client chunks (AC-X-35 / 36)
+        if: ${{ !cancelled() }}
+        run: npm run check:bundle-secrets
+      - name: prod-guard — production boot with PURCHASE_PROVIDER=stub-stripe must exit non-zero (07 §5.5) — red until F-c
+        if: ${{ !cancelled() }}
+        run: npm run check:prod-guard
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: build-manifests
+          path: |
+            .next/build-manifest.json
+            .next/app-build-manifest.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  types-drift:
+    name: types-drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: 2.117.0
+      - name: generated types drift-free (05 §10; HANDOFF §6.4) — red until S2 (file) + S5 (migrations)
+        run: |
+          supabase start
+          supabase gen types typescript --local > /tmp/database.types.generated.ts
+          diff /tmp/database.types.generated.ts src/modules/shared-types/database.types.ts
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks — pinned binary, checksum-verified, full history, .gitleaks.toml allowlist (07 §10.2; 06 §4.3)
+        run: |
+          set -euo pipefail
+          curl -sSL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check --strict
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks git . --no-banner --redact --config .gitleaks.toml
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        if: ${{ !cancelled() }}
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: npm audit --audit-level=high (07 §10.2) — expiring allow-list file lands with S1
+        if: ${{ !cancelled() }}
+        run: npm audit --audit-level=high
+      - name: exact-version pins + lockfile (07 §10.2) — red on the raw copy (Sydney `^` ranges) until S1
+        if: ${{ !cancelled() }}
+        run: npm run check:pins
