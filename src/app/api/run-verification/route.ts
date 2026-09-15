@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { runIdentityPhase, runWWCCDocPhase } from '@/lib/ai/verification-pipeline';
+import { runIdentityPhase } from '@/lib/ai/verification-pipeline';
 import { runParentIdentityPhase } from '@/lib/ai/parent-verification-pipeline';
 
 export const maxDuration = 120;
@@ -30,9 +30,6 @@ export async function POST(request: NextRequest) {
     if (phase === 'identity') {
       console.log(`[run-verification] Starting identity phase for ${verificationId}`);
       await runIdentityPhase(verificationId);
-    } else if (phase === 'wwcc') {
-      console.log(`[run-verification] Starting WWCC doc phase for ${verificationId}`);
-      await runWWCCDocPhase(verificationId);
     } else if (phase === 'parent-identity') {
       console.log(`[run-verification] Starting parent identity phase for ${verificationId}`);
       await runParentIdentityPhase(verificationId);

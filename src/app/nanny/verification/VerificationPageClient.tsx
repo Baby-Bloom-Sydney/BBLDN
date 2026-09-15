@@ -8,7 +8,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { IdentitySection } from "./sections/IdentitySection";
-import { WWCCSection } from "./sections/WWCCSection";
 import { ContactSection } from "./sections/ContactSection";
 import { SectionStatusBadge } from "./sections/SectionStatusBadge";
 import { Shield, Check, CheckCircle } from "lucide-react";
@@ -114,7 +113,6 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
   }, [identityStatus, wwccStatus, contactStatus, wwccLocked, identityInReview]);
 
   const [openSections, setOpenSections] = useState<string[]>(getDefaultOpen());
-  const [pendingWwccFire, setPendingWwccFire] = useState<{ verificationId: string } | null>(null);
 
   // Poll for status updates when sections are processing or pending
   const isProcessing =
@@ -156,40 +154,13 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
             verification_status: data.status ?? prev.verification_status,
           };
         });
-
-        // Fire queued WWCC verification once identity is verified
-        if (data.identity_status === "verified" && pendingWwccFire) {
-          fetch("/api/run-verification", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ verificationId: pendingWwccFire.verificationId, phase: "wwcc" }),
-          }).catch(() => {});
-          setPendingWwccFire(null);
-        }
       } catch {
         // Ignore polling errors
       }
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [isProcessing, pendingWwccFire]);
-
-  // On mount: fire WWCC if it was queued before a page refresh
-  useEffect(() => {
-    if (
-      initialData?.identity_status === "verified" &&
-      initialData?.wwcc_status === "pending" &&
-      initialData?.wwcc_verification_method === "service_nsw_app" &&
-      initialData?.id
-    ) {
-      fetch("/api/run-verification", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ verificationId: initialData.id, phase: "wwcc" }),
-      }).catch(() => {});
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isProcessing]);
 
   const handleIdentitySaved = (verificationId: string, data: { surname: string; givenNames: string; dob: string }) => {
     setVerification((prev) => {
@@ -261,18 +232,6 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
       };
     });
     setOpenSections(["identity"]);
-  };
-
-  const handleWWCCSaved = (verificationId: string, wwccMethod: string) => {
-    setVerification((prev) => {
-      if (!prev) return prev;
-      return { ...prev, wwcc_status: "pending", wwcc_user_guidance: null, wwcc_verification_method: wwccMethod };
-    });
-    // Queue WWCC AI fire if identity isn't verified yet
-    if (identityStatus !== "verified" && wwccMethod === "service_nsw_app") {
-      setPendingWwccFire({ verificationId });
-    }
-    setOpenSections([]);
   };
 
   const handleContactSaved = () => {
@@ -415,11 +374,7 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
                 </div>
               </AccordionTrigger>
               <AccordionContent forceMount>
-                <WWCCSection
-                  verification={verification}
-                  identityVerified={identityStatus === "verified"}
-                  onSaved={handleWWCCSaved}
-                />
+                {/* WWCC method UI removed at S1 (N-4, SEQUENCE 05.06–05.08); the DBS step lands in Phase 2b. */}
               </AccordionContent>
             </AccordionItem>
           </div>

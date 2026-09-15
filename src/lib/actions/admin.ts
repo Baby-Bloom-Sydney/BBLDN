@@ -17,7 +17,7 @@ import {
   type WwccStatus,
   type CrossCheckStatus,
 } from '@/lib/verification';
-import { runCrossCheckPhase, runWWCCDocPhase } from '@/lib/ai/verification-pipeline';
+import { runCrossCheckPhase } from '@/lib/ai/verification-pipeline';
 import { syncNannyVerificationState } from '@/lib/actions/verification';
 import { sendEmail } from '@/lib/email/resend';
 import { getUserEmailInfo } from '@/lib/email/helpers';
@@ -99,11 +99,6 @@ export async function adminVerifyIdentity(
 
     runCrossCheckPhase(verificationId).catch(err => {
       console.error('[adminVerifyIdentity] Cross-check error:', err);
-    });
-  } else if (verification.wwcc_status === WWCC_STATUS.PENDING) {
-    // Auto-fire WWCC AI if Service NSW screenshot is waiting
-    runWWCCDocPhase(verificationId).catch(err => {
-      console.error('[adminVerifyIdentity] Auto WWCC doc phase error:', err);
     });
   }
 

@@ -3,7 +3,6 @@ import { sendEmail } from '@/lib/email/resend';
 import { getUserEmailInfo } from '@/lib/email/helpers';
 import {
   VERIFICATION_LEVEL,
-  VERIFICATION_STATUS,
   IDENTITY_STATUS,
   WWCC_STATUS,
   CROSS_CHECK_STATUS,
@@ -17,7 +16,6 @@ import {
 import { capitalizeName } from '@/lib/utils';
 import { syncNannyVerificationState } from '@/lib/actions/verification';
 import { verifyPassport } from './verify-passport';
-import { verifyWWCC } from './verify-wwcc';
 
 /** Race a promise against a timeout. Throws on timeout. */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -154,13 +152,6 @@ export async function runIdentityPhase(verificationId: string): Promise<void> {
       // Always attempt cross-check — triggerCrossCheck re-reads current DB state,
       // so it handles the race where WWCC was submitted during identity processing
       await triggerCrossCheck(verificationId);
-
-      // Auto-fire WWCC AI if Service NSW screenshot is waiting (PENDING = not yet processed)
-      if (claimed.wwcc_status === WWCC_STATUS.PENDING) {
-        runWWCCDocPhase(verificationId).catch(err => {
-          console.error('[Identity] Auto WWCC doc phase error:', err);
-        });
-      }
       return;
 
     } catch (error) {
@@ -188,128 +179,6 @@ export async function runIdentityPhase(verificationId: string): Promise<void> {
 
       await syncNannyVerificationState(claimed.user_id);
       console.log(`[Identity] Both attempts failed technically — set back to pending`);
-      return;
-    }
-  }
-}
-
-// ── Phase 2: WWCC Document Verification (Service NSW AI only) ──
-
-export async function runWWCCDocPhase(verificationId: string): Promise<void> {
-  const supabase = createAdminClient();
-
-  // Atomic claim
-  const { data: claimed } = await supabase
-    .from('verifications')
-    .update({
-      wwcc_status: WWCC_STATUS.PROCESSING,
-      wwcc_status_at: new Date().toISOString(),
-      verification_status: VERIFICATION_STATUS.WWCC_PROCESSING,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', verificationId)
-    .eq('wwcc_status', WWCC_STATUS.PENDING)
-    .select('id, user_id, surname, given_names, wwcc_number, wwcc_verification_method, wwcc_service_nsw_screenshot_url, identity_status')
-    .single();
-
-  if (!claimed) {
-    console.log(`[WWCC] Skipping — could not claim`);
-    return;
-  }
-
-  const wwccDocPath = claimed.wwcc_service_nsw_screenshot_url;
-  if (!wwccDocPath) {
-    await setWwccFailed(supabase, verificationId, ['Missing WWCC document'], null, claimed.identity_status as IdentityStatus, claimed.user_id);
-    return;
-  }
-
-  const wwccUrlResult = await supabase.storage
-    .from('verification-documents')
-    .createSignedUrl(wwccDocPath, 3600);
-
-  if (wwccUrlResult.error || !wwccUrlResult.data?.signedUrl) {
-    await setWwccFailed(supabase, verificationId, ['Could not access WWCC document'], null, claimed.identity_status as IdentityStatus, claimed.user_id);
-    return;
-  }
-
-  const submittedData = {
-    surname: claimed.surname ?? '',
-    given_names: claimed.given_names ?? '',
-    wwcc_number: claimed.wwcc_number ?? '',
-  };
-
-  // ── 2-attempt retry ──
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      const result = await withTimeout(
-        verifyWWCC(wwccUrlResult.data.signedUrl, 'service_nsw_app', submittedData, false),
-        AI_ATTEMPT_TIMEOUT,
-        `WWCC AI (attempt ${attempt})`
-      );
-
-      // Write extraction results
-      await supabase.from('verifications').update({
-        extracted_wwcc_surname: capitalizeName(result.extracted.surname),
-        extracted_wwcc_first_name: capitalizeName(result.extracted.first_name),
-        extracted_wwcc_other_names: capitalizeName(result.extracted.other_names),
-        extracted_wwcc_number: result.extracted.wwcc_number,
-        extracted_wwcc_clearance_type: result.extracted.clearance_type,
-        extracted_wwcc_expiry: result.extracted.expiry,
-        wwcc_ai_reasoning: result.reasoning,
-        wwcc_ai_issues: JSON.stringify(result.issues),
-        ...(result.extracted.wwcc_number ? { wwcc_number: result.extracted.wwcc_number } : {}),
-        ...(result.extracted.expiry ? { wwcc_expiry_date: result.extracted.expiry } : {}),
-        updated_at: new Date().toISOString(),
-      }).eq('id', verificationId);
-
-      if (!result.pass) {
-        await setWwccFailed(supabase, verificationId, result.issues, result.user_guidance ?? null, claimed.identity_status as IdentityStatus, claimed.user_id);
-        console.log(`[WWCC] FAILED — AI found issues`);
-        return;
-      }
-
-      // WWCC doc passed
-      await supabase.from('verifications').update({
-        wwcc_status: WWCC_STATUS.DOC_VERIFIED,
-        wwcc_status_at: new Date().toISOString(),
-        wwcc_doc_verified: true,
-        wwcc_doc_verified_at: new Date().toISOString(),
-        wwcc_user_guidance: null,
-        verification_status: deriveOverallStatus(claimed.identity_status as IdentityStatus, WWCC_STATUS.DOC_VERIFIED as WwccStatus, CROSS_CHECK_STATUS.NOT_STARTED as CrossCheckStatus),
-        updated_at: new Date().toISOString(),
-      }).eq('id', verificationId);
-
-      console.log(`[WWCC] Doc PASSED`);
-
-      // Always attempt cross-check — triggerCrossCheck re-reads current DB state,
-      // so it handles the race where identity finished during WWCC processing
-      await triggerCrossCheck(verificationId);
-      return;
-
-    } catch (error) {
-      console.error(`[WWCC] Attempt ${attempt} error:`, error);
-
-      if (attempt === 1) {
-        await supabase.from('verifications').update({
-          wwcc_ai_issues: JSON.stringify(['Taking a little longer than usual...']),
-          updated_at: new Date().toISOString(),
-        }).eq('id', verificationId);
-        await delay(RETRY_DELAY);
-        continue;
-      }
-
-      // Both attempts failed — set back to pending with retry guidance
-      await supabase.from('verifications').update({
-        wwcc_status: WWCC_STATUS.PENDING,
-        wwcc_status_at: new Date().toISOString(),
-        wwcc_ai_issues: JSON.stringify([`Technical error: ${error instanceof Error ? error.message : 'Unknown'}`]),
-        wwcc_user_guidance: GUIDANCE_MESSAGES.TECHNICAL_RETRY,
-        verification_status: deriveOverallStatus(claimed.identity_status as IdentityStatus, WWCC_STATUS.PENDING as WwccStatus, CROSS_CHECK_STATUS.NOT_STARTED as CrossCheckStatus),
-        updated_at: new Date().toISOString(),
-      }).eq('id', verificationId);
-
-      await syncNannyVerificationState(claimed.user_id);
-      console.log(`[WWCC] Both attempts failed technically — set back to pending`);
       return;
     }
   }
@@ -460,20 +329,6 @@ async function setIdentityReview(supabase: any, verificationId: string, issues: 
     identity_ai_issues: JSON.stringify(issues),
     identity_user_guidance: guidance,
     verification_status: deriveOverallStatus(IDENTITY_STATUS.REVIEW as IdentityStatus, wwccStatus, CROSS_CHECK_STATUS.NOT_STARTED as CrossCheckStatus),
-    updated_at: new Date().toISOString(),
-  }).eq('id', verificationId);
-
-  if (userId) await syncNannyVerificationState(userId);
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function setWwccFailed(supabase: any, verificationId: string, issues: string[], guidance: UserGuidance | null, identityStatus: IdentityStatus = IDENTITY_STATUS.VERIFIED as IdentityStatus, userId?: string) {
-  await supabase.from('verifications').update({
-    wwcc_status: WWCC_STATUS.FAILED,
-    wwcc_status_at: new Date().toISOString(),
-    wwcc_ai_issues: JSON.stringify(issues),
-    wwcc_user_guidance: guidance,
-    verification_status: deriveOverallStatus(identityStatus, WWCC_STATUS.FAILED as WwccStatus, CROSS_CHECK_STATUS.NOT_STARTED as CrossCheckStatus),
     updated_at: new Date().toISOString(),
   }).eq('id', verificationId);
 
