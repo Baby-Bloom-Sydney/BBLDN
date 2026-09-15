@@ -256,7 +256,6 @@ async function renderParentHub(admin: any, targetUserId: string) {
   }
 
   const parentId = parentData.id;
-  const parentVerified = (parentData.verification_level ?? 0) >= 1;
 
   // Get position
   const { data: position } = await admin
@@ -358,7 +357,6 @@ async function renderParentHub(admin: any, targetUserId: string) {
         dfyTier={dfyStatusRes.tier}
         dfyExpiresAt={dfyStatusRes.expiresAt}
         dfyActivated={dfyStatusRes.activated}
-        parentVerified={parentVerified}
       />
     </div>
   );

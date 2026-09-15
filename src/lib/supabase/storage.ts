@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 
-export type StorageBucket = "profile-pictures" | "verification-documents" | "parent-verifications";
+export type StorageBucket = "profile-pictures" | "verification-documents";
 
 interface UploadResult {
   url: string | null;

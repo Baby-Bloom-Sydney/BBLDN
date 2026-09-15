@@ -91,20 +91,3 @@ describe("ConnectModal — T-041 POSITION_REQUIRED surface", () => {
     expect(screen.queryByText(/\d+\/5 ongoing/)).not.toBeInTheDocument();
   });
 });
-
-describe("ConnectModal — regression: VERIFICATION_REQUIRED still works after T-041", () => {
-  beforeEach(() => {
-    state.createReturn = { success: false, error: "VERIFICATION_REQUIRED" };
-  });
-
-  it("still renders the verification-required surface when the action returns VERIFICATION_REQUIRED", async () => {
-    renderModal();
-    await submit();
-
-    expect(
-      screen.getByText("Identity Verification Required"),
-    ).toBeInTheDocument();
-    const cta = screen.getByRole("link", { name: "Verify Now" });
-    expect(cta).toHaveAttribute("href", "/parent/verification");
-  });
-});

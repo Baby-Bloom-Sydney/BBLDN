@@ -34,7 +34,6 @@ import {
   Mail,
   Sparkles,
   Baby,
-  Lock,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -120,7 +119,6 @@ interface ParentHubClientProps {
   dfyTier?: "standard" | "priority" | null;
   dfyExpiresAt?: string | null;
   dfyActivated?: boolean;
-  parentVerified?: boolean;
   initialTab?: string;
   initialSub?: string;
   initialView?: string;
@@ -218,51 +216,6 @@ function getParentStageBadge(
   }
 }
 
-// ── Verification Modal ──
-function VerificationModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  if (!open) return null;
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-sm">
-        <div className="flex flex-col items-center gap-4 py-2 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 ring-1 ring-emerald-200">
-            <Lock className="h-6 w-6 text-emerald-600" />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900">
-              Verify your account
-            </h3>
-            <p className="mt-1.5 text-sm text-slate-500 leading-relaxed">
-              You must verify your account to gain full access to childcare and
-              babysitting.
-            </p>
-          </div>
-          <div className="flex w-full gap-2 mt-1">
-            <Button variant="outline" className="flex-1" onClick={onClose}>
-              Later
-            </Button>
-            <Button
-              asChild
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Link href="/parent/verification">
-                <ShieldCheck className="h-4 w-4 mr-1.5" />
-                Verify Now
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // ── Tab definitions ──
 //
 // `"children"` was previously named `"education"` (amendment A-02). The
@@ -314,7 +267,6 @@ export function ParentHubClient({
   dfyTier = null,
   dfyExpiresAt = null,
   dfyActivated = false,
-  parentVerified = false,
   initialTab,
   initialSub,
   initialView,
@@ -456,7 +408,6 @@ export function ParentHubClient({
   const [positionEditing, setPositionEditing] = useState(false);
   const [showPositionMenu, setShowPositionMenu] = useState(false);
   const [showContactPopup, setShowContactPopup] = useState(false);
-  const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [dfyConnections, setDfyConnections] = useState<DfyConnection[]>([]);
   const [dfyLoading, setDfyLoading] = useState(false);
   const [dfyLoaded, setDfyLoaded] = useState(false);
@@ -699,17 +650,9 @@ export function ParentHubClient({
         { id: "connections" as const, label: "Connections" },
       ];
 
-  // Show verify banner when unverified AND has any responses that would be locked
-  const hasLockedCards =
-    !parentVerified &&
-    (dfyConnections.length > 0 || upcomingIntros.length > 0);
-
   return (
     <>
-      {/* T-039 Slice E-prime — no-position banner; primary nudge to `/parent/request`.
-          Takes precedence over the verification banner: a parent without a
-          position can't yet have locked verification-gated content in a
-          user-actionable way, so we render the more actionable nudge alone. */}
+      {/* T-039 Slice E-prime — no-position banner; primary nudge to `/parent/request`. */}
       {!hasPosition && (
         <aside
           role="region"
@@ -740,47 +683,6 @@ export function ParentHubClient({
                   aria-label="Complete your position"
                 >
                   Complete
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </aside>
-      )}
-
-      {/* Sticky verification banner — full viewport width. Suppressed when the
-          no-position banner above is showing (avoids stacking the two sticky
-          regions; the no-position state is the more actionable nudge). */}
-      {hasLockedCards && hasPosition && (
-        <aside
-          role="region"
-          aria-label="Verification required notice"
-          className="sticky top-16 z-30 -mt-4 lg:-mt-6 mb-4 lg:mb-6"
-          style={{
-            marginLeft: "calc(-50vw + 50%)",
-            marginRight: "calc(-50vw + 50%)",
-            width: "100vw",
-          }}
-        >
-          <div className="border-b border-emerald-100 bg-emerald-50 px-4 lg:px-6 py-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs sm:text-sm text-emerald-800">
-                <ShieldCheck
-                  aria-hidden="true"
-                  className="inline h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5 -mt-0.5 text-emerald-600"
-                />
-                Verify your account to be matched with a professional childcare
-                provider
-              </p>
-              <Button
-                asChild
-                size="sm"
-                className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-xs h-8 px-3"
-              >
-                <Link
-                  href="/parent/verification"
-                  aria-label="Verify your account now"
-                >
-                  Verify Now
                 </Link>
               </Button>
             </div>
@@ -1453,34 +1355,22 @@ export function ParentHubClient({
                                       )
                                     : null;
 
-                                  const isLocked = !parentVerified;
-
                                   return (
                                     <div
                                       key={conn.connectionId}
-                                      className={`relative rounded-lg border border-slate-100 bg-white p-3 space-y-3 ${isScheduled && !isLocked ? "cursor-pointer hover:bg-violet-50 hover:border-violet-200 transition-colors" : ""} ${isLocked ? "cursor-pointer" : ""}`}
+                                      className={`relative rounded-lg border border-slate-100 bg-white p-3 space-y-3 ${isScheduled ? "cursor-pointer hover:bg-violet-50 hover:border-violet-200 transition-colors" : ""}`}
                                       onClick={
-                                        isLocked
-                                          ? () => setShowVerifyModal(true)
-                                          : isScheduled && matchingIntro
-                                            ? () =>
-                                                setSelectedDfyIntro(
-                                                  matchingIntro,
-                                                )
-                                            : undefined
+                                        isScheduled && matchingIntro
+                                          ? () =>
+                                              setSelectedDfyIntro(
+                                                matchingIntro,
+                                              )
+                                          : undefined
                                       }
                                     >
-                                      {isLocked && (
-                                        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-                                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 shadow-sm">
-                                            <Lock className="h-4 w-4 text-slate-400" />
-                                          </div>
-                                        </div>
-                                      )}
                                       <div
-                                        className={`flex items-center gap-3 ${!isLocked && !isScheduled && matchingIntro ? "cursor-pointer" : ""}`}
+                                        className={`flex items-center gap-3 ${!isScheduled && matchingIntro ? "cursor-pointer" : ""}`}
                                         onClick={
-                                          !isLocked &&
                                           !isScheduled &&
                                           matchingIntro
                                             ? (e) => {
@@ -1580,8 +1470,7 @@ export function ParentHubClient({
                                         />
                                       )}
 
-                                      {!isLocked &&
-                                        !isScheduled &&
+                                      {!isScheduled &&
                                         !isScheduling && (
                                           <div className="flex gap-2">
                                             <Button
@@ -1681,24 +1570,12 @@ export function ParentHubClient({
                                   intro.fillInitiatedBy,
                                   intro.trialDate,
                                 );
-                                const isLocked = !parentVerified;
                                 return (
                                   <div
                                     key={intro.connectionId}
                                     className="relative flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-white p-3 cursor-pointer hover:bg-violet-50 hover:border-violet-200 transition-colors"
-                                    onClick={
-                                      isLocked
-                                        ? () => setShowVerifyModal(true)
-                                        : () => setSelectedIntro(intro)
-                                    }
+                                    onClick={() => setSelectedIntro(intro)}
                                   >
-                                    {isLocked && (
-                                      <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 shadow-sm">
-                                          <Lock className="h-4 w-4 text-slate-400" />
-                                        </div>
-                                      </div>
-                                    )}
                                     <div className="flex items-center gap-3">
                                       {intro.otherPartyPhoto ? (
                                         <img
@@ -1799,12 +1676,6 @@ export function ParentHubClient({
       {/* ═══════════════════════════════════════════════════
           MODALS — Connection Popups, etc.
          ═══════════════════════════════════════════════════ */}
-
-      {/* Verification Modal */}
-      <VerificationModal
-        open={showVerifyModal}
-        onClose={() => setShowVerifyModal(false)}
-      />
 
       {/* Connection Detail Popup */}
       <ConnectionDetailPopup
