@@ -89,6 +89,8 @@ export type TransactionOpener<H> = {
  * What `createUnitOfWork(opener)` returns: the `withUnitOfWork` of 03 §1.4 (commit on ok, roll back on error /
  * throw; nested calls join the outer) and `transactionOf`, the one way the opener's owner gets its handle back for
  * a token a caller passed as `{ uow }` — typed by the same `H` it minted, so no cast crosses a connector.
+ * `UnitOfWork` is one opaque type for every binding: a token another binding minted resolves to `undefined` at
+ * run time (a WeakMap miss), not at compile time — the port must handle `undefined`.
  */
 export type UnitOfWorkBinding<H> = {
   readonly withUnitOfWork: WithUnitOfWork;
@@ -97,9 +99,18 @@ export type UnitOfWorkBinding<H> = {
   readonly current: () => UnitOfWork | undefined;
 };
 
+/** A boot-time registration slot (see `lib/create-registry.ts`). */
+export type Registry<T> = {
+  readonly get: () => T;
+  readonly set: (next: T) => void;
+};
+
 /** How a memory opener reports what happened — the stub's observable state for the swap tests. */
 export type MemoryTransactionState = "open" | "committed" | "rolled-back";
 export type MemoryTransaction = {
   readonly id: number;
   readonly state: MemoryTransactionState;
+};
+export type MemoryTransactionOpener = TransactionOpener<MemoryTransaction> & {
+  readonly transactions: ReadonlyArray<MemoryTransaction>;
 };

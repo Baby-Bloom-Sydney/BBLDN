@@ -1,12 +1,18 @@
 // platform/log — the structured logger's type surface (01 §4b). One `log` helper; JSON lines to stdout in
 // production, a readable line in development; every line carries the request id; PII never (07 §9.2).
-import type { ErrorCode, Instant, ModuleName, Uuid } from "@/modules/shared-types";
+import type {
+  ErrorCode,
+  Instant,
+  ModuleName,
+  Uuid,
+} from "@/modules/shared-types";
 
 /** `debug` is dev-only (01 §4b); the console sink drops it when the format is `json`. */
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 /** 01 §4b alert hooks (+ `ALERT_UPLOAD_MALWARE`, 07 §5.3 rule 3 "list to append"). Values: `ALERT_NAMES`. */
-export type AlertName = (typeof import("./lib/alert-names").ALERT_NAMES)[number];
+export type AlertName =
+  (typeof import("./lib/alert-names").ALERT_NAMES)[number];
 
 /**
  * 01 §4b field list. Anything beyond the named fields is allowed (a provider request id, a count) but is

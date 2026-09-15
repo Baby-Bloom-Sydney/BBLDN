@@ -48,6 +48,12 @@ export type RateLimitStore = {
   ): Promise<Result<BucketState>>;
 };
 
+export type PolicyWindow = {
+  readonly window: RateLimitWindow;
+  readonly seconds: number;
+  readonly limit: number;
+};
+
 export type RateLimiterDeps = {
   readonly store: RateLimitStore;
   readonly clock?: () => Instant;

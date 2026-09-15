@@ -4,7 +4,6 @@
 import type { z } from "zod";
 import type {
   Actor,
-  AppErrorDetails,
   EntityRef,
   EventId,
   EventName,
@@ -59,7 +58,7 @@ export type Attribution = {
   readonly fbclid?: string;
 };
 
-export type EventEnvelope<N extends EventName = EventName> = {
+type EnvelopeShape<N extends EventName> = {
   /** = Meta event_id for pixel / CAPI dedup */
   readonly id: EventId;
   readonly name: N;
@@ -74,10 +73,14 @@ export type EventEnvelope<N extends EventName = EventName> = {
   readonly idempotencyKey?: string;
 };
 
-export type EmitInput<N extends EventName> = Omit<
-  EventEnvelope<N>,
-  "id" | "ts" | "source"
-> & { readonly ts?: Instant };
+/** Distributive over `N`: an unpinned `EventEnvelope` is a discriminated union on `name`, so `props` narrows with it. */
+export type EventEnvelope<N extends EventName = EventName> = N extends EventName
+  ? EnvelopeShape<N>
+  : never;
+
+export type EmitInput<N extends EventName = EventName> = N extends EventName
+  ? Omit<EnvelopeShape<N>, "id" | "ts" | "source"> & { readonly ts?: Instant }
+  : never;
 
 export type EmitOptions = {
   readonly uow?: UnitOfWork;
@@ -124,13 +127,21 @@ export type CountRow = {
   readonly count: number;
 };
 
-/** 03 §9.2 `details.reason` for `VALIDATION`: unknown name, props schema, or a client emit of a server-only name. */
+/**
+ * `details.reason`: `VALIDATION` — unknown name · props schema · a client emit of a server-only name (03 §9.2);
+ * `INTERNAL` — the event-log write failed under `opts.uow` (`event-log`) or `emit` itself threw (`unexpected`).
+ */
 export type EmitErrorDetails = {
-  readonly reason: "unknown-name" | "props" | "server-only-name";
+  readonly reason:
+    | "unknown-name"
+    | "props"
+    | "server-only-name"
+    | "event-log"
+    | "unexpected";
   readonly issues?: ReadonlyArray<string>;
 };
 
-export type Events = {
+export type EventsConnector = {
   emit<N extends EventName>(
     input: EmitInput<N>,
     opts?: EmitOptions,
@@ -173,6 +184,13 @@ export type EventsDeps = {
   readonly defaultTimeoutMs?: number;
 };
 
+/** `withTimeout` — how a post-commit sink's failure is classified (03 §9.2 rule 1). */
+export type TimeoutDetails = {
+  readonly reason: "timeout" | "INTERNAL";
+  readonly timeoutMs?: number;
+};
+export type FanOutOutcome = { readonly id: SinkId; readonly ok: boolean };
+
 export type MemorySink = Sink & {
   readonly envelopes: ReadonlyArray<EventEnvelope>;
   readonly reset: () => void;
@@ -181,7 +199,6 @@ export type MemorySink = Sink & {
 /** Per-event zod schema (03 §9.3 "Props" column); `.strict()`, ids only, PII-shaped strings rejected. */
 export type EventSchemas = typeof EVENT_SCHEMAS;
 export type InferredProps<N extends EventName> = z.infer<EventSchemas[N]>;
-export type EventValidationDetails = AppErrorDetails & EmitErrorDetails;
 
 // ── EventPropsMap augmentation (shared-types/events.ts asks platform/events to narrow each entry) ──
 // Members are declared one per name (not `extends`) so each overrides the wide base entry; the events suite

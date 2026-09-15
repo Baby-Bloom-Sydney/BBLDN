@@ -4,7 +4,6 @@
 // sink reads `hasMarketing`. The inside behind `ConsentStore` is S5 / Phase 3; `memoryConsentStore` is the stub.
 import type {
   ConsentRecordId,
-  CustomerRole,
   EnumValue,
   Instant,
   Result,
@@ -39,7 +38,8 @@ export type ConsentPurpose = LegalDocumentId | "vaccination-status";
 /** `AGR-nn` (02 §4.1 `agreement_id`). */
 export type AgreementId = `AGR-${string}`;
 
-export type ConsentParty = CustomerRole;
+/** The two customer roles of `user_role` (02 §3) — an admin never consents on a party's behalf. */
+export type ConsentParty = Exclude<EnumValue<"user_role">, "admin">;
 
 /** Stored on the row (02 §4.1: `ip_address` · `user_agent` · `session_id`) — never logged (01 §4b). */
 export type ConsentContext = {
@@ -53,27 +53,39 @@ export type DocumentVersion = {
   readonly version: number;
 };
 
-export type RecordConsentInput = {
+type ConsentInputBase = {
   readonly userId: UserId;
   readonly party: ConsentParty;
-  readonly purpose: ConsentPurpose;
   readonly agreementId: AgreementId;
   readonly checkpointId: string;
   readonly checkpointText: string;
-  /** the document accepted; absent for `vaccination-status` and for informed actions (nullable in 02) */
-  readonly document?: DocumentVersion;
-  /** a decline is a new row with `false` (02 §4.1 "a decline is a new row") */
-  readonly consentGiven: boolean;
   readonly context: ConsentContext;
   /** the child for per-child consents (02 `related_entity_id`) */
   readonly relatedEntityId?: Uuid;
 };
 
-/** 07 §2.8: an *informed action* (parent-app, nanny-attestation) — a fairness record, always `consentGiven: true`. */
-export type InformedActionInput = Omit<RecordConsentInput, "consentGiven">;
+/** A document purpose carries the document accepted; `vaccination-status` (ADR-103) carries none. */
+export type ConsentPurposeInput =
+  | { readonly purpose: LegalDocumentId; readonly document: DocumentVersion }
+  | { readonly purpose: "vaccination-status"; readonly document?: never };
 
-export type ConsentRecord = RecordConsentInput & {
+export type RecordConsentInput = ConsentInputBase &
+  ConsentPurposeInput & {
+    /** a decline is a new row with `false` (02 §4.1 "a decline is a new row") */
+    readonly consentGiven: boolean;
+  };
+
+/** 07 §2.8: an *informed action* (parent-app, nanny-attestation) — a fairness record, always `consentGiven: true`; document nullable (02 §4.1). */
+export type InformedActionInput = ConsentInputBase & {
+  readonly purpose: LegalDocumentId;
+  readonly document?: DocumentVersion;
+};
+
+export type ConsentRecord = ConsentInputBase & {
   readonly id: ConsentRecordId;
+  readonly purpose: ConsentPurpose;
+  readonly document?: DocumentVersion;
+  readonly consentGiven: boolean;
   readonly createdAt: Instant;
 };
 
@@ -121,12 +133,18 @@ export type ConsentSubject =
   | { readonly kind: "visitor"; readonly id: VisitorId };
 
 /** `getPolicy(purpose)`: the current document version (if any) and whether re-acceptance is pending. */
+export type CurrentDocument = DocumentVersion &
+  (
+    | { readonly requiresReacceptance: false }
+    | {
+        readonly requiresReacceptance: true;
+        readonly reacceptanceDeadline: Instant;
+      }
+  );
+
 export type ConsentPolicy = {
   readonly purpose: ConsentPurpose;
-  readonly currentDocument?: DocumentVersion & {
-    readonly requiresReacceptance: boolean;
-    readonly reacceptanceDeadline?: Instant;
-  };
+  readonly currentDocument?: CurrentDocument;
 };
 
 /** `details.reason` of a `VALIDATION` from the connector. */
@@ -192,9 +210,14 @@ export type ConsentStore = {
   currentCookie(
     subject: ConsentSubject,
   ): Promise<Result<CookieConsentRecord | null>>;
-  currentDocument(
-    id: LegalDocumentId,
-  ): Promise<Result<ConsentPolicy["currentDocument"] | null>>;
+  currentDocument(id: LegalDocumentId): Promise<Result<CurrentDocument | null>>;
+};
+
+/** The stub's observable state (`consent.stub.ts`). */
+export type MemoryConsentStore = ConsentStore & {
+  readonly consents: ReadonlyArray<ConsentRecord>;
+  readonly biometrics: ReadonlyArray<BiometricConsentRecord>;
+  readonly cookies: ReadonlyArray<CookieConsentRecord>;
 };
 
 export type ConsentDeps = {
