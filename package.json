@@ -24,6 +24,7 @@
     "check:env-example": "node scripts/gen-env-example.ts --check",
     "check:env-reads": "node scripts/ci/check-env-reads.mjs",
     "check:pins": "node scripts/ci/check-exact-pins.mjs",
+    "check:audit": "node scripts/ci/check-audit.mjs",
     "check:bundle-secrets": "node scripts/ci/scan-client-bundle.mjs",
     "check:prod-guard": "bash scripts/ci/prod-guard-boot.sh",
     "gates": "npm run typecheck && npm run lint && npm test && npm run check:claude-md"

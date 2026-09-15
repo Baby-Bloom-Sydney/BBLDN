@@ -1,0 +1,98 @@
+[
+  {
+    "package": "next",
+    "reason": "critical + high advisories fixed only in next@16 — the Next major bump is its own unit after the ADR-104 version row (HANDOFF §12); S1 makes no version changes",
+    "expires": "2026-10-15",
+    "owner": "ADR-104 Next-upgrade unit"
+  },
+  {
+    "package": "eslint-config-next",
+    "reason": "moves with next (fix = eslint-config-next@16)",
+    "expires": "2026-10-15",
+    "owner": "ADR-104 Next-upgrade unit"
+  },
+  {
+    "package": "@next/eslint-plugin-next",
+    "reason": "transitive of eslint-config-next; moves with next",
+    "expires": "2026-10-15",
+    "owner": "ADR-104 Next-upgrade unit"
+  },
+  {
+    "package": "glob",
+    "reason": "transitive of @next/eslint-plugin-next (CLI-only advisory); moves with next",
+    "expires": "2026-10-15",
+    "owner": "ADR-104 Next-upgrade unit"
+  },
+  {
+    "package": "postcss",
+    "reason": "fix only via next@16 / postcss major; moves with next",
+    "expires": "2026-10-15",
+    "owner": "ADR-104 Next-upgrade unit"
+  },
+  {
+    "package": "sharp",
+    "reason": "fix is sharp@0.35 (major); bumped with the toolchain unit, not at S1",
+    "expires": "2026-10-15",
+    "owner": "ADR-104 Next-upgrade unit"
+  },
+  {
+    "package": "brace-expansion",
+    "reason": "transitive; non-breaking fix via lockfile refresh — S1 makes no version changes (decision logged in L-005 PROGRESS)",
+    "expires": "2026-10-15",
+    "owner": "S2 toolchain refresh"
+  },
+  {
+    "package": "flatted",
+    "reason": "transitive (eslint cache); non-breaking fix via lockfile refresh at S2",
+    "expires": "2026-10-15",
+    "owner": "S2 toolchain refresh"
+  },
+  {
+    "package": "js-yaml",
+    "reason": "transitive; non-breaking fix via lockfile refresh at S2",
+    "expires": "2026-10-15",
+    "owner": "S2 toolchain refresh"
+  },
+  {
+    "package": "minimatch",
+    "reason": "transitive; non-breaking fix via lockfile refresh at S2",
+    "expires": "2026-10-15",
+    "owner": "S2 toolchain refresh"
+  },
+  {
+    "package": "nanoid",
+    "reason": "transitive; non-breaking fix via lockfile refresh at S2",
+    "expires": "2026-10-15",
+    "owner": "S2 toolchain refresh"
+  },
+  {
+    "package": "picomatch",
+    "reason": "transitive; non-breaking fix via lockfile refresh at S2",
+    "expires": "2026-10-15",
+    "owner": "S2 toolchain refresh"
+  },
+  {
+    "package": "protobufjs",
+    "reason": "transitive (@google/genai); non-breaking fix via lockfile refresh at S2",
+    "expires": "2026-10-15",
+    "owner": "S2 toolchain refresh"
+  },
+  {
+    "package": "undici",
+    "reason": "transitive; non-breaking fix via lockfile refresh at S2",
+    "expires": "2026-10-15",
+    "owner": "S2 toolchain refresh"
+  },
+  {
+    "package": "vite",
+    "reason": "transitive (vitest); non-breaking fix via lockfile refresh at S2",
+    "expires": "2026-10-15",
+    "owner": "S2 toolchain refresh"
+  },
+  {
+    "package": "ws",
+    "reason": "transitive; non-breaking fix via lockfile refresh at S2",
+    "expires": "2026-10-15",
+    "owner": "S2 toolchain refresh"
+  }
+]
