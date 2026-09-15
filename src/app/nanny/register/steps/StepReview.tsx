@@ -76,7 +76,7 @@ function truncate(str: string | undefined | null, len = 80): string {
 
 function formatDayTimes(
   days: string[] | undefined,
-  timesMap: Record<string, string[] | undefined>
+  timesMap: Record<string, string[] | undefined>,
 ): string {
   if (!days || days.length === 0) return "None selected";
   const parts = days.map((day) => {
@@ -87,19 +87,24 @@ function formatDayTimes(
       t.includes("Morning")
         ? "AM"
         : t.includes("Midday")
-        ? "Mid"
-        : t.includes("Afternoon")
-        ? "PM"
-        : t.includes("Evening")
-        ? "Eve"
-        : t
+          ? "Mid"
+          : t.includes("Afternoon")
+            ? "PM"
+            : t.includes("Evening")
+              ? "Eve"
+              : t,
     );
     return `${day.slice(0, 3)}: ${abbrevs.join(", ")}`;
   });
   return parts.join(" | ");
 }
 
-export function StepReview({ data, goBack, onComplete, isSubmitting }: ReviewProps) {
+export function StepReview({
+  data,
+  goBack,
+  onComplete,
+  isSubmitting,
+}: ReviewProps) {
   const timesMap: Record<string, string[] | undefined> = {
     monday: data.monday_times,
     tuesday: data.tuesday_times,
@@ -121,12 +126,12 @@ export function StepReview({ data, goBack, onComplete, isSubmitting }: ReviewPro
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-
         {/* AI bio info box */}
         <div className="flex gap-3 p-4 rounded-lg bg-violet-50 border border-violet-200">
           <Info className="h-5 w-5 text-violet-600 shrink-0 mt-0.5" />
           <p className="text-sm text-violet-800">
-            After you complete registration, we&apos;ll generate a professional bio for your profile using AI. You can edit it anytime.
+            After you complete registration, we&apos;ll generate a professional
+            bio for your profile using AI. You can edit it anytime.
           </p>
         </div>
 
@@ -136,12 +141,18 @@ export function StepReview({ data, goBack, onComplete, isSubmitting }: ReviewPro
           <Row label="Nanny experience" value={data.nanny_experience} />
           <Row label="Under 3 experience" value={data.under_3_experience} />
           <Row label="Newborn experience" value={data.newborn_experience} />
-          <Row label="Experience details" value={truncate(data.experience_details)} />
+          <Row
+            label="Experience details"
+            value={truncate(data.experience_details)}
+          />
         </SectionCard>
 
         {/* Qualifications */}
         <SectionCard icon={User} title="Qualifications">
-          <Row label="Highest qualification" value={data.highest_qualification} />
+          <Row
+            label="Highest qualification"
+            value={data.highest_qualification}
+          />
           <Row label="Assurances" value={data.assurances?.join(", ")} />
           <Row label="Certificates" value={data.certificates?.join(", ")} />
         </SectionCard>
@@ -149,7 +160,10 @@ export function StepReview({ data, goBack, onComplete, isSubmitting }: ReviewPro
         {/* Preferences */}
         <SectionCard icon={Heart} title="Preferences">
           <Row label="Role types" value={data.role_types?.join(", ")} />
-          <Row label="Support levels" value={data.level_of_support?.join(", ")} />
+          <Row
+            label="Support levels"
+            value={data.level_of_support?.join(", ")}
+          />
           <Row label="Max children" value={data.max_children} />
           <Row
             label="Child age range"
@@ -162,7 +176,8 @@ export function StepReview({ data, goBack, onComplete, isSubmitting }: ReviewPro
           <Row
             label="Additional needs"
             value={
-              data.additional_needs !== null && data.additional_needs !== undefined ? (
+              data.additional_needs !== null &&
+              data.additional_needs !== undefined ? (
                 <BooleanBadge value={data.additional_needs} />
               ) : undefined
             }
@@ -199,7 +214,8 @@ export function StepReview({ data, goBack, onComplete, isSubmitting }: ReviewPro
           <Row
             label="Driver's license"
             value={
-              data.drivers_license !== null && data.drivers_license !== undefined ? (
+              data.drivers_license !== null &&
+              data.drivers_license !== undefined ? (
                 <BooleanBadge value={data.drivers_license} />
               ) : undefined
             }
@@ -215,7 +231,8 @@ export function StepReview({ data, goBack, onComplete, isSubmitting }: ReviewPro
           <Row
             label="Comfortable with pets"
             value={
-              data.comfortable_with_pets !== null && data.comfortable_with_pets !== undefined ? (
+              data.comfortable_with_pets !== null &&
+              data.comfortable_with_pets !== undefined ? (
                 <BooleanBadge value={data.comfortable_with_pets} />
               ) : undefined
             }
@@ -223,7 +240,8 @@ export function StepReview({ data, goBack, onComplete, isSubmitting }: ReviewPro
           <Row
             label="Vaccinated"
             value={
-              data.vaccination_status !== null && data.vaccination_status !== undefined ? (
+              data.vaccination_status !== null &&
+              data.vaccination_status !== undefined ? (
                 <BooleanBadge value={data.vaccination_status} />
               ) : undefined
             }
@@ -245,7 +263,8 @@ export function StepReview({ data, goBack, onComplete, isSubmitting }: ReviewPro
           <Row
             label="Right to work"
             value={
-              data.right_to_work !== null && data.right_to_work !== undefined ? (
+              data.right_to_work !== null &&
+              data.right_to_work !== undefined ? (
                 <BooleanBadge value={data.right_to_work} />
               ) : undefined
             }
@@ -253,7 +272,8 @@ export function StepReview({ data, goBack, onComplete, isSubmitting }: ReviewPro
           <Row
             label="Sydney resident"
             value={
-              data.sydney_resident !== null && data.sydney_resident !== undefined ? (
+              data.sydney_resident !== null &&
+              data.sydney_resident !== undefined ? (
                 <BooleanBadge value={data.sydney_resident} />
               ) : undefined
             }

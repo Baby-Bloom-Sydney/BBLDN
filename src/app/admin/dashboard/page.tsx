@@ -335,20 +335,6 @@ export default async function AdminDashboardPage() {
             </Card>
           </Link>
 
-          <Link href="/admin/analytics">
-            <Card className="cursor-pointer transition-shadow hover:shadow-md">
-              <CardContent className="flex items-center gap-4 p-6">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-100">
-                  <BarChart3 className="h-6 w-6 text-violet-500" />
-                </div>
-                <div>
-                  <h3 className="font-medium">Analytics</h3>
-                  <p className="text-sm text-slate-500">View metrics</p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-
           <Link href="/admin/settings">
             <Card className="cursor-pointer transition-shadow hover:shadow-md">
               <CardContent className="flex items-center gap-4 p-6">

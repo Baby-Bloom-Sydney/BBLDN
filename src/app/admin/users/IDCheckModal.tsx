@@ -15,7 +15,14 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { adminVerifyIdentity, adminRejectIdentity } from "@/lib/actions/admin";
 import { formatRelativeTime } from "@/lib/utils";
-import { AlertTriangle, CheckCircle2, X, Loader2, ImageOff, Pencil } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  X,
+  Loader2,
+  ImageOff,
+  Pencil,
+} from "lucide-react";
 import type { PendingIdentityCheck } from "./page";
 
 interface IDCheckModalProps {
@@ -26,19 +33,22 @@ interface IDCheckModalProps {
 
 // Country/nationality equivalence — "United Kingdom" and "BRITISH CITIZEN" are the same
 const COUNTRY_NATIONALITY_MAP: Record<string, string[]> = {
-  'united kingdom': ['british', 'british citizen', 'gbr', 'uk'],
-  'australia': ['australian', 'aus'],
-  'new zealand': ['new zealander', 'nzl', 'kiwi'],
-  'united states': ['american', 'usa', 'us'],
-  'canada': ['canadian', 'can'],
-  'ireland': ['irish', 'irl'],
-  'south africa': ['south african', 'zaf'],
-  'india': ['indian', 'ind'],
-  'china': ['chinese', 'chn'],
-  'philippines': ['filipino', 'philippine', 'phl'],
+  "united kingdom": ["british", "british citizen", "gbr", "uk"],
+  australia: ["australian", "aus"],
+  "new zealand": ["new zealander", "nzl", "kiwi"],
+  "united states": ["american", "usa", "us"],
+  canada: ["canadian", "can"],
+  ireland: ["irish", "irl"],
+  "south africa": ["south african", "zaf"],
+  india: ["indian", "ind"],
+  china: ["chinese", "chn"],
+  philippines: ["filipino", "philippine", "phl"],
 };
 
-function isNationalityMatch(country: string | null, nationality: string | null): boolean {
+function isNationalityMatch(
+  country: string | null,
+  nationality: string | null,
+): boolean {
   if (!country || !nationality) return true; // no data = no mismatch
   const c = country.toLowerCase().trim();
   const n = nationality.toLowerCase().trim();
@@ -51,33 +61,45 @@ function isNationalityMatch(country: string | null, nationality: string | null):
   return false;
 }
 
-function isFirstNameMatch(submitted: string | null, extracted: string | null): boolean {
+function isFirstNameMatch(
+  submitted: string | null,
+  extracted: string | null,
+): boolean {
   if (!submitted || !extracted) return true;
   const subFirst = submitted.toLowerCase().trim().split(/\s+/)[0];
   const extFirst = extracted.toLowerCase().trim().split(/\s+/)[0];
   return subFirst === extFirst;
 }
 
-function DetailRow({ label, submitted, extracted, isNationality, isGivenNames }: {
+function DetailRow({
+  label,
+  submitted,
+  extracted,
+  isNationality,
+  isGivenNames,
+}: {
   label: string;
   submitted: string | null;
   extracted: string | null;
   isNationality?: boolean;
   isGivenNames?: boolean;
 }) {
-  const mismatch = submitted && extracted && (
-    isNationality
+  const mismatch =
+    submitted &&
+    extracted &&
+    (isNationality
       ? !isNationalityMatch(submitted, extracted)
       : isGivenNames
-      ? !isFirstNameMatch(submitted, extracted)
-      : submitted.toLowerCase().trim() !== extracted.toLowerCase().trim()
-  );
+        ? !isFirstNameMatch(submitted, extracted)
+        : submitted.toLowerCase().trim() !== extracted.toLowerCase().trim());
   return (
     <div className="flex justify-between">
       <span className="font-medium text-slate-500">{label}</span>
       <span className={mismatch ? "font-semibold text-red-600" : ""}>
         {extracted || "-"}
-        {mismatch && <span className="ml-1 text-xs text-red-400">(mismatch)</span>}
+        {mismatch && (
+          <span className="ml-1 text-xs text-red-400">(mismatch)</span>
+        )}
       </span>
     </div>
   );
@@ -86,7 +108,9 @@ function DetailRow({ label, submitted, extracted, isNationality, isGivenNames }:
 export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
   const router = useRouter();
   const [comments, setComments] = useState("");
-  const [confirmAction, setConfirmAction] = useState<"verify" | "reject" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<
+    "verify" | "reject" | null
+  >(null);
   const [loading, setLoading] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -94,13 +118,23 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
 
   if (!check) return null;
 
-  const name = `${check.first_name || ""} ${check.last_name || ""}`.trim() || "Unknown";
+  const name =
+    `${check.first_name || ""} ${check.last_name || ""}`.trim() || "Unknown";
 
   // AI data helpers
-  const hasAIData = !!(check.extracted_surname || check.extracted_given_names || check.extracted_dob || check.identity_ai_reasoning);
+  const hasAIData = !!(
+    check.extracted_surname ||
+    check.extracted_given_names ||
+    check.extracted_dob ||
+    check.identity_ai_reasoning
+  );
   const aiIssues: string[] = (() => {
     if (!check.identity_ai_issues) return [];
-    try { return JSON.parse(check.identity_ai_issues); } catch { return []; }
+    try {
+      return JSON.parse(check.identity_ai_issues);
+    } catch {
+      return [];
+    }
   })();
 
   function formatDate(dateStr: string | null): string {
@@ -180,7 +214,9 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
                     src={check.identification_photo_url}
                     alt="ID Photo"
                     className="w-full max-h-52 rounded-lg border-2 border-slate-200 object-contain cursor-zoom-in bg-slate-50"
-                    onClick={() => setZoomedImage(check.identification_photo_url!)}
+                    onClick={() =>
+                      setZoomedImage(check.identification_photo_url!)
+                    }
                   />
                 ) : (
                   <div className="flex h-52 items-center justify-center rounded-lg border-2 border-dashed border-slate-200 bg-slate-50">
@@ -218,22 +254,32 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
               {/* Submitted Details */}
               <Card>
                 <CardContent className="p-4">
-                  <h3 className="mb-2 text-sm font-semibold text-slate-700">Submitted Details</h3>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-700">
+                    Submitted Details
+                  </h3>
                   <div className="space-y-1.5 text-sm">
                     <div className="flex justify-between">
-                      <span className="font-medium text-slate-500">Surname</span>
+                      <span className="font-medium text-slate-500">
+                        Surname
+                      </span>
                       <span>{check.surname || "-"}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="font-medium text-slate-500">Given Name(s)</span>
+                      <span className="font-medium text-slate-500">
+                        Given Name(s)
+                      </span>
                       <span>{check.given_names || "-"}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="font-medium text-slate-500">Date of Birth</span>
+                      <span className="font-medium text-slate-500">
+                        Date of Birth
+                      </span>
                       <span>{formatDate(check.date_of_birth)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="font-medium text-slate-500">Country of Issue</span>
+                      <span className="font-medium text-slate-500">
+                        Country of Issue
+                      </span>
                       <span>{check.passport_country || "-"}</span>
                     </div>
                   </div>
@@ -241,22 +287,30 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
               </Card>
 
               {/* AI Extracted Details (editable) */}
-              <Card className={hasAIData ? "border-slate-200" : "border-dashed"}>
+              <Card
+                className={hasAIData ? "border-slate-200" : "border-dashed"}
+              >
                 <CardContent className="p-4">
                   <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-slate-700">AI Extracted Details</h3>
+                    <h3 className="text-sm font-semibold text-slate-700">
+                      AI Extracted Details
+                    </h3>
                     {hasAIData && (
                       <button
                         type="button"
                         onClick={() => {
                           if (!editing) {
                             setEditedFields({
-                              extracted_surname: check.extracted_surname ?? '',
-                              extracted_given_names: check.extracted_given_names ?? '',
-                              extracted_dob: check.extracted_dob ?? '',
-                              extracted_nationality: check.extracted_nationality ?? '',
-                              extracted_passport_number: check.extracted_passport_number ?? '',
-                              extracted_passport_expiry: check.extracted_passport_expiry ?? '',
+                              extracted_surname: check.extracted_surname ?? "",
+                              extracted_given_names:
+                                check.extracted_given_names ?? "",
+                              extracted_dob: check.extracted_dob ?? "",
+                              extracted_nationality:
+                                check.extracted_nationality ?? "",
+                              extracted_passport_number:
+                                check.extracted_passport_number ?? "",
+                              extracted_passport_expiry:
+                                check.extracted_passport_expiry ?? "",
                             });
                           }
                           setEditing(!editing);
@@ -264,7 +318,7 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
                         className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-800"
                       >
                         <Pencil className="h-3 w-3" />
-                        {editing ? 'Done' : 'Edit'}
+                        {editing ? "Done" : "Edit"}
                       </button>
                     )}
                   </div>
@@ -272,18 +326,34 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
                     editing ? (
                       <div className="space-y-2 text-sm">
                         {[
-                          { key: 'extracted_surname', label: 'Surname' },
-                          { key: 'extracted_given_names', label: 'Given Name(s)' },
-                          { key: 'extracted_dob', label: 'Date of Birth' },
-                          { key: 'extracted_nationality', label: 'Nationality' },
-                          { key: 'extracted_passport_number', label: 'Passport #' },
-                          { key: 'extracted_passport_expiry', label: 'Expiry' },
+                          { key: "extracted_surname", label: "Surname" },
+                          {
+                            key: "extracted_given_names",
+                            label: "Given Name(s)",
+                          },
+                          { key: "extracted_dob", label: "Date of Birth" },
+                          {
+                            key: "extracted_nationality",
+                            label: "Nationality",
+                          },
+                          {
+                            key: "extracted_passport_number",
+                            label: "Passport #",
+                          },
+                          { key: "extracted_passport_expiry", label: "Expiry" },
                         ].map(({ key, label }) => (
                           <div key={key} className="flex items-center gap-2">
-                            <span className="w-28 shrink-0 font-medium text-slate-500">{label}</span>
+                            <span className="w-28 shrink-0 font-medium text-slate-500">
+                              {label}
+                            </span>
                             <Input
-                              value={editedFields[key] ?? ''}
-                              onChange={(e) => setEditedFields(prev => ({ ...prev, [key]: e.target.value }))}
+                              value={editedFields[key] ?? ""}
+                              onChange={(e) =>
+                                setEditedFields((prev) => ({
+                                  ...prev,
+                                  [key]: e.target.value,
+                                }))
+                              }
                               className="h-7 text-sm"
                             />
                           </div>
@@ -291,24 +361,52 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
                       </div>
                     ) : (
                       <div className="space-y-1.5 text-sm">
-                        <DetailRow label="Surname" submitted={check.surname} extracted={check.extracted_surname} />
-                        <DetailRow label="Given Name(s)" submitted={check.given_names} extracted={check.extracted_given_names} isGivenNames />
-                        <DetailRow label="Date of Birth" submitted={check.date_of_birth} extracted={check.extracted_dob} />
-                        <DetailRow label="Nationality" submitted={check.passport_country} extracted={check.extracted_nationality} isNationality />
+                        <DetailRow
+                          label="Surname"
+                          submitted={check.surname}
+                          extracted={check.extracted_surname}
+                        />
+                        <DetailRow
+                          label="Given Name(s)"
+                          submitted={check.given_names}
+                          extracted={check.extracted_given_names}
+                          isGivenNames
+                        />
+                        <DetailRow
+                          label="Date of Birth"
+                          submitted={check.date_of_birth}
+                          extracted={check.extracted_dob}
+                        />
+                        <DetailRow
+                          label="Nationality"
+                          submitted={check.passport_country}
+                          extracted={check.extracted_nationality}
+                          isNationality
+                        />
                         <div className="flex justify-between">
-                          <span className="font-medium text-slate-500">Passport #</span>
+                          <span className="font-medium text-slate-500">
+                            Passport #
+                          </span>
                           <span>{check.extracted_passport_number || "-"}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="font-medium text-slate-500">Expiry</span>
-                          <span>{check.extracted_passport_expiry ? formatDate(check.extracted_passport_expiry) : "-"}</span>
+                          <span className="font-medium text-slate-500">
+                            Expiry
+                          </span>
+                          <span>
+                            {check.extracted_passport_expiry
+                              ? formatDate(check.extracted_passport_expiry)
+                              : "-"}
+                          </span>
                         </div>
                       </div>
                     )
                   ) : (
                     <div className="flex h-24 items-center justify-center">
                       <div className="rounded-lg bg-yellow-50 border border-yellow-200 px-3 py-2">
-                        <p className="text-sm text-yellow-700">AI analysis pending...</p>
+                        <p className="text-sm text-yellow-700">
+                          AI analysis pending...
+                        </p>
                       </div>
                     </div>
                   )}
@@ -339,9 +437,14 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
                           View AI reasoning
                         </summary>
                         <ul className="mt-2 text-xs text-red-600 rounded bg-red-100/50 p-2 space-y-1 list-disc list-inside">
-                          {check.identity_ai_reasoning.split(/\n|(?:\d+\.\s)/).filter(Boolean).map((line, i) => (
-                            <li key={i}>{line.replace(/^[-•]\s*/, '').trim()}</li>
-                          ))}
+                          {check.identity_ai_reasoning
+                            .split(/\n|(?:\d+\.\s)/)
+                            .filter(Boolean)
+                            .map((line, i) => (
+                              <li key={i}>
+                                {line.replace(/^[-•]\s*/, "").trim()}
+                              </li>
+                            ))}
                         </ul>
                       </details>
                     )}
@@ -355,7 +458,8 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
                       AI Check Passed
                     </h3>
                     <p className="mt-1 text-sm text-green-600">
-                      No issues detected. Document appears authentic and details match.
+                      No issues detected. Document appears authentic and details
+                      match.
                     </p>
                     {check.identity_ai_reasoning && (
                       <details className="mt-3">
@@ -363,9 +467,14 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
                           View AI reasoning
                         </summary>
                         <ul className="mt-2 text-xs text-green-700 rounded bg-green-100/50 p-2 space-y-1 list-disc list-inside">
-                          {check.identity_ai_reasoning.split(/\n|(?:\d+\.\s)/).filter(Boolean).map((line, i) => (
-                            <li key={i}>{line.replace(/^[-•]\s*/, '').trim()}</li>
-                          ))}
+                          {check.identity_ai_reasoning
+                            .split(/\n|(?:\d+\.\s)/)
+                            .filter(Boolean)
+                            .map((line, i) => (
+                              <li key={i}>
+                                {line.replace(/^[-•]\s*/, "").trim()}
+                              </li>
+                            ))}
                         </ul>
                       </details>
                     )}
@@ -380,7 +489,8 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
                     AI Analysis Pending
                   </h3>
                   <p className="text-sm text-yellow-600">
-                    AI analysis has not completed yet. You may wait for it to finish or proceed with manual review.
+                    AI analysis has not completed yet. You may wait for it to
+                    finish or proceed with manual review.
                   </p>
                 </CardContent>
               </Card>
@@ -393,7 +503,9 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
                   <h3 className="mb-1 text-sm font-semibold text-yellow-700">
                     Previous Rejection Reason
                   </h3>
-                  <p className="text-sm text-yellow-800">{check.identity_rejection_reason}</p>
+                  <p className="text-sm text-yellow-800">
+                    {check.identity_rejection_reason}
+                  </p>
                 </CardContent>
               </Card>
             )}
@@ -401,8 +513,12 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
             {/* Rejection Reason / Comments */}
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">
-                {confirmAction === "reject" ? "Rejection Reason" : "Admin Comments"}
-                {confirmAction === "reject" && <span className="text-red-500 ml-1">(required)</span>}
+                {confirmAction === "reject"
+                  ? "Rejection Reason"
+                  : "Admin Comments"}
+                {confirmAction === "reject" && (
+                  <span className="text-red-500 ml-1">(required)</span>
+                )}
               </label>
               {confirmAction === "reject" && (
                 <div className="flex flex-wrap gap-2 mb-2">
@@ -432,7 +548,11 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
               <Textarea
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
-                placeholder={confirmAction === "reject" ? "Select a reason above or type a custom reason..." : "Optional admin notes..."}
+                placeholder={
+                  confirmAction === "reject"
+                    ? "Select a reason above or type a custom reason..."
+                    : "Optional admin notes..."
+                }
                 className="resize-none"
                 rows={2}
               />
@@ -470,7 +590,11 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
                       disabled={loading}
                       onClick={handleVerify}
                     >
-                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Yes, Verify"}
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Yes, Verify"
+                      )}
                     </Button>
                     <Button
                       size="sm"
@@ -495,7 +619,11 @@ export function IDCheckModal({ check, open, onOpenChange }: IDCheckModalProps) {
                       disabled={loading || !comments.trim()}
                       onClick={handleReject}
                     >
-                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Yes, Reject"}
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Yes, Reject"
+                      )}
                     </Button>
                     <Button
                       size="sm"

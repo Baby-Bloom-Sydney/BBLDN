@@ -1,12 +1,14 @@
-import { renderToBuffer } from '@react-pdf/renderer';
-import { createElement } from 'react';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { ClientHireSummaryPDF } from './client-hire-summary';
-import { ProfessionalHireSummaryPDF } from './professional-hire-summary';
+import { renderToBuffer } from "@react-pdf/renderer";
+import { createElement } from "react";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ClientHireSummaryPDF } from "./client-hire-summary";
+import { ProfessionalHireSummaryPDF } from "./professional-hire-summary";
 
 function generateRefNumber(): string {
   const year = new Date().getFullYear();
-  const seq = Math.floor(Math.random() * 999999).toString().padStart(6, '0');
+  const seq = Math.floor(Math.random() * 999999)
+    .toString()
+    .padStart(6, "0");
   return `BB-${year}-${seq}`;
 }
 
@@ -26,7 +28,9 @@ interface GenerateProfessionalPDFParams {
   hireId: string;
 }
 
-export async function generateClientHirePDF(params: GenerateClientPDFParams): Promise<{
+export async function generateClientHirePDF(
+  params: GenerateClientPDFParams,
+): Promise<{
   buffer: Buffer;
   filename: string;
   referenceNumber: string;
@@ -48,24 +52,26 @@ export async function generateClientHirePDF(params: GenerateClientPDFParams): Pr
     // Upload to Supabase Storage
     const adminClient = createAdminClient();
     const { error } = await adminClient.storage
-      .from('hire-pdfs')
+      .from("hire-pdfs")
       .upload(`${params.hireId}/${filename}`, buffer, {
-        contentType: 'application/pdf',
+        contentType: "application/pdf",
         upsert: true,
       });
 
     if (error) {
-      console.error('Failed to upload client PDF:', error);
+      console.error("Failed to upload client PDF:", error);
     }
 
     return { buffer: Buffer.from(buffer), filename, referenceNumber };
   } catch (err) {
-    console.error('Failed to generate client hire PDF:', err);
+    console.error("Failed to generate client hire PDF:", err);
     return null;
   }
 }
 
-export async function generateProfessionalHirePDF(params: GenerateProfessionalPDFParams): Promise<{
+export async function generateProfessionalHirePDF(
+  params: GenerateProfessionalPDFParams,
+): Promise<{
   buffer: Buffer;
   filename: string;
   referenceNumber: string;
@@ -86,19 +92,19 @@ export async function generateProfessionalHirePDF(params: GenerateProfessionalPD
 
     const adminClient = createAdminClient();
     const { error } = await adminClient.storage
-      .from('hire-pdfs')
+      .from("hire-pdfs")
       .upload(`${params.hireId}/${filename}`, buffer, {
-        contentType: 'application/pdf',
+        contentType: "application/pdf",
         upsert: true,
       });
 
     if (error) {
-      console.error('Failed to upload professional PDF:', error);
+      console.error("Failed to upload professional PDF:", error);
     }
 
     return { buffer: Buffer.from(buffer), filename, referenceNumber };
   } catch (err) {
-    console.error('Failed to generate professional hire PDF:', err);
+    console.error("Failed to generate professional hire PDF:", err);
     return null;
   }
 }

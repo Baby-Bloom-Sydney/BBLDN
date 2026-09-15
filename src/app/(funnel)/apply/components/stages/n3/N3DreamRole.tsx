@@ -1,35 +1,42 @@
-'use client';
+"use client";
 
-import { useCallback, useMemo } from 'react';
-import { StageProps } from '../../FunnelOrchestrator';
-import { MultiSelectTags } from '../../shared/MultiSelectTags';
-import { SingleSelectTags } from '../../shared/SingleSelectTags';
-import { YesNoTags } from '../../shared/YesNoTags';
-import { AutoAdvance } from '../../shared/AutoAdvance';
-import { ProgressiveReveal } from '../../shared/ProgressiveReveal';
-import { NannyQuestionShell } from '../../shared/NannyQuestionShell';
-import { CompoundPageShell } from '../../shared/CompoundPageShell';
+import { useCallback, useMemo } from "react";
+import { StageProps } from "../../FunnelOrchestrator";
+import { MultiSelectTags } from "../../shared/MultiSelectTags";
+import { SingleSelectTags } from "../../shared/SingleSelectTags";
+import { YesNoTags } from "../../shared/YesNoTags";
+import { AutoAdvance } from "../../shared/AutoAdvance";
+import { ProgressiveReveal } from "../../shared/ProgressiveReveal";
+import { NannyQuestionShell } from "../../shared/NannyQuestionShell";
+import { CompoundPageShell } from "../../shared/CompoundPageShell";
 import {
   ROLE_TYPE_OPTIONS,
   MAX_CHILDREN_OPTIONS,
   MIN_AGE_OPTIONS,
   MAX_AGE_OPTIONS,
-} from '@/types/nanny-leads';
-import { Button } from '@/components/ui/button';
-
+} from "@/types/nanny-leads";
+import { Button } from "@/components/ui/button";
 
 interface N3DreamRoleProps extends StageProps {
   subPage: string;
 }
 
-export function N3DreamRole({ state, dispatch, goNext, goBack, subPage, progress, questionNumber }: N3DreamRoleProps) {
+export function N3DreamRole({
+  state,
+  dispatch,
+  goNext,
+  goBack,
+  subPage,
+  progress,
+  questionNumber,
+}: N3DreamRoleProps) {
   const { preferences } = state;
 
   const update = useCallback(
     (payload: Partial<typeof preferences>) => {
-      dispatch({ type: 'UPDATE_PREFERENCES', payload });
+      dispatch({ type: "UPDATE_PREFERENCES", payload });
     },
-    [dispatch]
+    [dispatch],
   );
 
   // Filter max_age options to only show values >= min_age
@@ -43,7 +50,7 @@ export function N3DreamRole({ state, dispatch, goNext, goBack, subPage, progress
   }, [preferences.min_age]);
 
   // Page 1: Services — multi-select with continue
-  if (subPage === 'n3-services') {
+  if (subPage === "n3-services") {
     return (
       <NannyQuestionShell
         question="Which services are you wanting to provide?"
@@ -75,7 +82,7 @@ export function N3DreamRole({ state, dispatch, goNext, goBack, subPage, progress
   }
 
   // Page 2: Children & Ages — compound with progressive reveal
-  if (subPage === 'n3-children') {
+  if (subPage === "n3-children") {
     return (
       <CompoundPageShell
         title="Your Ideal Family"
@@ -93,7 +100,13 @@ export function N3DreamRole({ state, dispatch, goNext, goBack, subPage, progress
             <SingleSelectTags
               options={MAX_CHILDREN_OPTIONS.map(String)}
               selected={preferences.max_children?.toString() ?? null}
-              onChange={(val) => update({ max_children: val ? parseInt(val) : null, min_age: null, max_age: null })}
+              onChange={(val) =>
+                update({
+                  max_children: val ? parseInt(val) : null,
+                  min_age: null,
+                  max_age: null,
+                })
+              }
               columns={3}
             />
           </div>
@@ -105,13 +118,17 @@ export function N3DreamRole({ state, dispatch, goNext, goBack, subPage, progress
                 What&apos;s the youngest age you want to care for?
               </label>
               <select
-                value={preferences.min_age ?? ''}
-                onChange={(e) => update({ min_age: e.target.value || null, max_age: null })}
+                value={preferences.min_age ?? ""}
+                onChange={(e) =>
+                  update({ min_age: e.target.value || null, max_age: null })
+                }
                 className="w-full h-11 rounded-lg border border-slate-200 text-sm text-slate-800 px-3 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none bg-white"
               >
                 <option value="">Select age...</option>
                 {MIN_AGE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
                 ))}
               </select>
             </div>
@@ -124,13 +141,15 @@ export function N3DreamRole({ state, dispatch, goNext, goBack, subPage, progress
                 What&apos;s the oldest age you&apos;d like to work with?
               </label>
               <select
-                value={preferences.max_age ?? ''}
+                value={preferences.max_age ?? ""}
                 onChange={(e) => update({ max_age: e.target.value || null })}
                 className="w-full h-11 rounded-lg border border-slate-200 text-sm text-slate-800 px-3 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none bg-white"
               >
                 <option value="">Select age...</option>
                 {filteredMaxAgeOptions.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
                 ))}
               </select>
             </div>
@@ -154,7 +173,7 @@ export function N3DreamRole({ state, dispatch, goNext, goBack, subPage, progress
   }
 
   // Page 3: Additional Needs — single question with auto-advance
-  if (subPage === 'n3-additional-needs') {
+  if (subPage === "n3-additional-needs") {
     return (
       <NannyQuestionShell
         question="Are you open to working with children who have additional needs?"
@@ -176,7 +195,7 @@ export function N3DreamRole({ state, dispatch, goNext, goBack, subPage, progress
   }
 
   // Page 4: Pets — single question with auto-advance
-  if (subPage === 'n3-pets') {
+  if (subPage === "n3-pets") {
     return (
       <NannyQuestionShell
         question="Are you happy to work with families that have pets?"

@@ -15,12 +15,14 @@ import {
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: 'Work as a Nanny in Sydney',
-  description: 'Join Baby Bloom as a childcare professional in Sydney. Get matched with local families who value quality early childhood education and care.',
-  alternates: { canonical: '/childcare-professionals' },
+  title: "Work as a Nanny in Sydney",
+  description:
+    "Join Baby Bloom as a childcare professional in Sydney. Get matched with local families who value quality early childhood education and care.",
+  alternates: { canonical: "/childcare-professionals" },
   openGraph: {
-    title: 'Work as a Nanny in Sydney | Baby Bloom',
-    description: 'Join Baby Bloom as a childcare professional in Sydney. Get matched with local families who value quality early childhood education and care.',
+    title: "Work as a Nanny in Sydney | Baby Bloom",
+    description:
+      "Join Baby Bloom as a childcare professional in Sydney. Get matched with local families who value quality early childhood education and care.",
   },
 };
 

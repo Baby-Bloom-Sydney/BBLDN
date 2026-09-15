@@ -358,7 +358,7 @@ export const feedWriterModule: BloomBotModule = {
           image_url: {
             type: "string",
             description:
-              "Optional image URL (Cloudinary preferred). Must be a photo relevant to the child (a photo of the child, of their work, of somewhere they went).",
+              "Optional image URL (Supabase Storage). Must be a photo relevant to the child (a photo of the child, of their work, of somewhere they went).",
           },
           badge: {
             type: "string",

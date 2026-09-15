@@ -7,7 +7,7 @@
  * file touches the dispatch.
  *
  * Architectural commitment (from the Phase 4 plan): for INTERACTIVE
- * tiles (interview_request, connection_request, bsr_job, etc.), the
+ * tiles (connection_request, job_match, etc.), the
  * branch below imports the EXACT SAME component rendered on the main
  * page — not a chat-specific copy. The tile component handles its own
  * data fetch + Realtime subscription + action handlers, so Katie's
@@ -19,7 +19,6 @@ import type { FeedItem } from "@/types/bapp";
 import { KatieNoteTile } from "./KatieNoteTile";
 import { VerificationStatusTile } from "./VerificationStatusTile";
 import { ConnectionRequestTile } from "./ConnectionRequestTile";
-import { BsrJobTile } from "./BsrJobTile";
 import { JobMatchTile } from "./JobMatchTile";
 import { PositionTile } from "./PositionTile";
 import { PlacementTile } from "./PlacementTile";
@@ -61,10 +60,6 @@ export function RenderTile({ tile }: { tile: ChatTile }) {
       // /api/chat/connections/[id] so the chat view never drifts from
       // the main-page view of the same connection.
       return <ConnectionRequestTile tile={tile} />;
-    case "bsr_job":
-      // Babysitting request live view — role-aware (nanny invitation
-      // vs parent's own request). Fetches /api/chat/bsr/[id].
-      return <BsrJobTile tile={tile} />;
     case "job_match":
       // DFY match notification live view — nanny-only. Fetches
       // /api/chat/job-matches/[id].

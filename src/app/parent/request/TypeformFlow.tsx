@@ -3,11 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { QuestionShell } from "./QuestionShell";
-import {
-  TypeformFormData,
-  INITIAL_FORM_DATA,
-  QUESTIONS,
-} from "./questions";
+import { TypeformFormData, INITIAL_FORM_DATA, QUESTIONS } from "./questions";
 import { SingleSelect } from "./renderers/SingleSelect";
 import { MultiSelect } from "./renderers/MultiSelect";
 import { TextInput } from "./renderers/TextInput";
@@ -20,9 +16,8 @@ import { Button } from "@/components/ui/button";
 export function TypeformFlow() {
   const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [formData, setFormData] = useState<Partial<TypeformFormData>>(
-    INITIAL_FORM_DATA
-  );
+  const [formData, setFormData] =
+    useState<Partial<TypeformFormData>>(INITIAL_FORM_DATA);
   const [isExiting, setIsExiting] = useState(false);
   const [showConditional, setShowConditional] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -37,10 +32,10 @@ export function TypeformFlow() {
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const interstitialTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
+    null,
   );
   const autoAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
+    null,
   );
 
   const updateData = useCallback((d: Partial<TypeformFormData>) => {
@@ -65,15 +60,14 @@ export function TypeformFlow() {
       }
       return Math.max(0, Math.min(idx, QUESTIONS.length - 1));
     },
-    []
+    [],
   );
 
   const transitionTo = useCallback((nextIndex: number) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (interstitialTimerRef.current)
       clearTimeout(interstitialTimerRef.current);
-    if (autoAdvanceTimerRef.current)
-      clearTimeout(autoAdvanceTimerRef.current);
+    if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
 
     setIsExiting(true);
 
@@ -95,7 +89,7 @@ export function TypeformFlow() {
         setCompleted(true);
       }
     },
-    [findNextIndex, transitionTo]
+    [findNextIndex, transitionTo],
   );
 
   const goNext = useCallback(() => {
@@ -160,7 +154,7 @@ export function TypeformFlow() {
         advanceOrComplete(currentIndex);
       }, 300);
     },
-    [currentIndex, showConditional, updateData, advanceOrComplete]
+    [currentIndex, showConditional, updateData, advanceOrComplete],
   );
 
   // Handle interstitial auto-advance
@@ -213,7 +207,10 @@ export function TypeformFlow() {
             <p className="text-red-600 text-sm">{submitError}</p>
             <button
               type="button"
-              onClick={() => { hasSaved.current = false; setSubmitError(null); }}
+              onClick={() => {
+                hasSaved.current = false;
+                setSubmitError(null);
+              }}
               className="px-5 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition-colors"
             >
               Try again
@@ -235,7 +232,7 @@ export function TypeformFlow() {
 
   // Render conditional content (appears BELOW the options)
   const renderConditional = (
-    cond: NonNullable<(typeof QUESTIONS)[number]["conditional"]>
+    cond: NonNullable<(typeof QUESTIONS)[number]["conditional"]>,
   ) => {
     if (cond.subType === "textarea") {
       return (
@@ -362,7 +359,7 @@ export function TypeformFlow() {
               options={currentQ.options ?? []}
               selected={
                 currentQ.field
-                  ? (formData[currentQ.field] as string | null) ?? null
+                  ? ((formData[currentQ.field] as string | null) ?? null)
                   : null
               }
               onSelect={(val) => {
@@ -496,9 +493,7 @@ export function TypeformFlow() {
         </div>
 
         {/* Content — top-down flow, options at top, expand below */}
-        <div className="flex-1 px-2 pb-6">
-          {renderQuestion()}
-        </div>
+        <div className="flex-1 px-2 pb-6">{renderQuestion()}</div>
       </div>
     );
   }

@@ -20,10 +20,8 @@ import {
   Calendar,
   CheckCircle,
   ChevronRight,
-  ChevronDown,
   ChevronUp,
   Loader2,
-  UserCheck,
   Users,
   XCircle,
   Search,
@@ -36,14 +34,6 @@ import {
   Mail,
   Sparkles,
   Baby,
-  ShoppingCart,
-  User,
-  Star,
-  Globe,
-  AlertCircle,
-  X,
-  Plus,
-  Lock,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -69,12 +59,6 @@ import {
 import type { UpcomingIntro } from "@/lib/actions/position-funnel";
 import { ConnectionDetailPopup } from "@/components/position/ConnectionDetailPopup";
 import { cancelConnectionRequest } from "@/lib/actions/connection";
-import {
-  cancelBabysittingRequest,
-  parentAcceptNanny,
-  type BabysittingRequestWithSlots,
-  type RequestingNanny,
-} from "@/lib/actions/babysitting";
 import {
   getDfyConnections,
   declineDfyConnection,
@@ -135,31 +119,11 @@ interface ParentHubClientProps {
   dfyTier?: "standard" | "priority" | null;
   dfyExpiresAt?: string | null;
   dfyActivated?: boolean;
-  babysittingRequests?: BabysittingRequestWithSlots[];
-  parentVerified?: boolean;
   initialTab?: string;
   initialSub?: string;
   initialView?: string;
   educationChildren?: ChildClient[];
   pendingInvites?: PendingInviteCard[];
-}
-
-function bsrFormatSlotDate(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-AU", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
-}
-
-function bsrFormatTime(time: string): string {
-  const [h, m] = time.split(":").map(Number);
-  const ampm = h >= 12 ? "pm" : "am";
-  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return m === 0
-    ? `${h12}${ampm}`
-    : `${h12}:${String(m).padStart(2, "0")}${ampm}`;
 }
 
 function formatStartWeekLabel(d: Date): string {
@@ -252,51 +216,6 @@ function getParentStageBadge(
   }
 }
 
-// ── Verification Modal ──
-function VerificationModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  if (!open) return null;
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-sm">
-        <div className="flex flex-col items-center gap-4 py-2 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 ring-1 ring-emerald-200">
-            <Lock className="h-6 w-6 text-emerald-600" />
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900">
-              Verify your account
-            </h3>
-            <p className="mt-1.5 text-sm text-slate-500 leading-relaxed">
-              You must verify your account to gain full access to childcare and
-              babysitting.
-            </p>
-          </div>
-          <div className="flex w-full gap-2 mt-1">
-            <Button variant="outline" className="flex-1" onClick={onClose}>
-              Later
-            </Button>
-            <Button
-              asChild
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Link href="/parent/verification">
-                <ShieldCheck className="h-4 w-4 mr-1.5" />
-                Verify Now
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // ── Tab definitions ──
 //
 // `"children"` was previously named `"education"` (amendment A-02). The
@@ -305,12 +224,11 @@ function VerificationModal({
 // URLs are aliased at the parse site below so deep links keep working.
 // Tab order — Children leftmost (per user spec 2026-05-07): the
 // connected-children list is the parent's most-used surface, so it
-// reads top-of-mind. Childcare and Babysitting follow as secondary
-// surfaces.
+// reads top-of-mind. Childcare follows as the secondary
+// surface.
 const TABS = [
   { id: "children" as const, label: "Children" },
   { id: "childcare" as const, label: "Childcare" },
-  { id: "babysitting" as const, label: "Babysitting" },
 ];
 type TabId = (typeof TABS)[number]["id"];
 
@@ -349,8 +267,6 @@ export function ParentHubClient({
   dfyTier = null,
   dfyExpiresAt = null,
   dfyActivated = false,
-  babysittingRequests = [],
-  parentVerified = false,
   initialTab,
   initialSub,
   initialView,
@@ -492,7 +408,6 @@ export function ParentHubClient({
   const [positionEditing, setPositionEditing] = useState(false);
   const [showPositionMenu, setShowPositionMenu] = useState(false);
   const [showContactPopup, setShowContactPopup] = useState(false);
-  const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [dfyConnections, setDfyConnections] = useState<DfyConnection[]>([]);
   const [dfyLoading, setDfyLoading] = useState(false);
   const [dfyLoaded, setDfyLoaded] = useState(false);
@@ -501,18 +416,6 @@ export function ParentHubClient({
   const [schedulingDfy, setSchedulingDfy] = useState(false);
   const [selectedDfyIntro, setSelectedDfyIntro] =
     useState<UpcomingIntro | null>(null);
-  const [selectedBsr, setSelectedBsr] =
-    useState<BabysittingRequestWithSlots | null>(null);
-  const [showBsrPast, setShowBsrPast] = useState(false);
-  const [bsrSelectedNanny, setBsrSelectedNanny] =
-    useState<RequestingNanny | null>(null);
-  const [bsrAccepting, setBsrAccepting] = useState(false);
-  const [bsrCancelling, setBsrCancelling] = useState(false);
-  const [bsrConfirmedInfo, setBsrConfirmedInfo] = useState<{
-    phone?: string;
-    firstName?: string;
-  } | null>(null);
-  const [bsrError, setBsrError] = useState<string | null>(null);
 
   // ── Computed values ──
   const hasDfy =
@@ -704,65 +607,6 @@ export function ParentHubClient({
     }
   };
 
-  // ── BSR categorization ──
-  const bsrSortBySlot = (
-    a: BabysittingRequestWithSlots,
-    b: BabysittingRequestWithSlots,
-  ) => {
-    const aSlot = a.slots?.[0]?.slot_date || "";
-    const bSlot = b.slots?.[0]?.slot_date || "";
-    return aSlot.localeCompare(bSlot);
-  };
-  const bsrPendingPayment = babysittingRequests
-    .filter((r) => r.status === "pending_payment")
-    .sort(bsrSortBySlot);
-  const bsrActive = babysittingRequests
-    .filter((r) => r.status === "open")
-    .sort(bsrSortBySlot);
-  const bsrFilled = babysittingRequests
-    .filter((r) => r.status === "filled")
-    .sort(bsrSortBySlot);
-  const bsrPast = babysittingRequests
-    .filter((r) =>
-      ["expired", "cancelled", "nanny_cancelled", "completed"].includes(
-        r.status,
-      ),
-    )
-    .sort(bsrSortBySlot);
-  const bsrHasActive =
-    bsrPendingPayment.length > 0 ||
-    bsrActive.length > 0 ||
-    bsrFilled.length > 0;
-
-  const handleBsrCancel = async (bsrId: string) => {
-    setBsrCancelling(true);
-    setBsrError(null);
-    const result = await cancelBabysittingRequest(bsrId);
-    setBsrCancelling(false);
-    if (result.success) {
-      setSelectedBsr(null);
-      router.refresh();
-    } else {
-      setBsrError(result.error || "Failed to cancel");
-    }
-  };
-
-  const handleBsrAcceptNanny = async (bsrId: string, nannyId: string) => {
-    setBsrAccepting(true);
-    setBsrError(null);
-    const result = await parentAcceptNanny(bsrId, nannyId);
-    setBsrAccepting(false);
-    if (result.success) {
-      setBsrConfirmedInfo({
-        phone: result.nannyPhone,
-        firstName: result.nannyFirstName,
-      });
-      setBsrSelectedNanny(null);
-    } else {
-      setBsrError(result.error || "Failed to accept");
-    }
-  };
-
   // ── Matchmaking computed ──
   const isMatchmakingActive =
     dfyActivated && dfyExpiresAt
@@ -806,21 +650,9 @@ export function ParentHubClient({
         { id: "connections" as const, label: "Connections" },
       ];
 
-  // Show verify banner when unverified AND has any responses that would be locked
-  const hasLockedCards =
-    !parentVerified &&
-    (dfyConnections.length > 0 ||
-      upcomingIntros.length > 0 ||
-      bsrActive.length > 0 ||
-      bsrFilled.length > 0 ||
-      bsrPendingPayment.length > 0);
-
   return (
     <>
-      {/* T-039 Slice E-prime — no-position banner; primary nudge to `/parent/request`.
-          Takes precedence over the verification banner: a parent without a
-          position can't yet have locked verification-gated content in a
-          user-actionable way, so we render the more actionable nudge alone. */}
+      {/* T-039 Slice E-prime — no-position banner; primary nudge to `/parent/request`. */}
       {!hasPosition && (
         <aside
           role="region"
@@ -851,47 +683,6 @@ export function ParentHubClient({
                   aria-label="Complete your position"
                 >
                   Complete
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </aside>
-      )}
-
-      {/* Sticky verification banner — full viewport width. Suppressed when the
-          no-position banner above is showing (avoids stacking the two sticky
-          regions; the no-position state is the more actionable nudge). */}
-      {hasLockedCards && hasPosition && (
-        <aside
-          role="region"
-          aria-label="Verification required notice"
-          className="sticky top-16 z-30 -mt-4 lg:-mt-6 mb-4 lg:mb-6"
-          style={{
-            marginLeft: "calc(-50vw + 50%)",
-            marginRight: "calc(-50vw + 50%)",
-            width: "100vw",
-          }}
-        >
-          <div className="border-b border-emerald-100 bg-emerald-50 px-4 lg:px-6 py-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs sm:text-sm text-emerald-800">
-                <ShieldCheck
-                  aria-hidden="true"
-                  className="inline h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5 -mt-0.5 text-emerald-600"
-                />
-                Verify your account to be matched with a professional childcare
-                provider
-              </p>
-              <Button
-                asChild
-                size="sm"
-                className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-xs h-8 px-3"
-              >
-                <Link
-                  href="/parent/verification"
-                  aria-label="Verify your account now"
-                >
-                  Verify Now
                 </Link>
               </Button>
             </div>
@@ -1564,36 +1355,21 @@ export function ParentHubClient({
                                       )
                                     : null;
 
-                                  const isLocked = !parentVerified;
-
                                   return (
                                     <div
                                       key={conn.connectionId}
-                                      className={`relative rounded-lg border border-slate-100 bg-white p-3 space-y-3 ${isScheduled && !isLocked ? "cursor-pointer hover:bg-violet-50 hover:border-violet-200 transition-colors" : ""} ${isLocked ? "cursor-pointer" : ""}`}
+                                      className={`relative rounded-lg border border-slate-100 bg-white p-3 space-y-3 ${isScheduled ? "cursor-pointer hover:bg-violet-50 hover:border-violet-200 transition-colors" : ""}`}
                                       onClick={
-                                        isLocked
-                                          ? () => setShowVerifyModal(true)
-                                          : isScheduled && matchingIntro
-                                            ? () =>
-                                                setSelectedDfyIntro(
-                                                  matchingIntro,
-                                                )
-                                            : undefined
+                                        isScheduled && matchingIntro
+                                          ? () =>
+                                              setSelectedDfyIntro(matchingIntro)
+                                          : undefined
                                       }
                                     >
-                                      {isLocked && (
-                                        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-                                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 shadow-sm">
-                                            <Lock className="h-4 w-4 text-slate-400" />
-                                          </div>
-                                        </div>
-                                      )}
                                       <div
-                                        className={`flex items-center gap-3 ${!isLocked && !isScheduled && matchingIntro ? "cursor-pointer" : ""}`}
+                                        className={`flex items-center gap-3 ${!isScheduled && matchingIntro ? "cursor-pointer" : ""}`}
                                         onClick={
-                                          !isLocked &&
-                                          !isScheduled &&
-                                          matchingIntro
+                                          !isScheduled && matchingIntro
                                             ? (e) => {
                                                 e.stopPropagation();
                                                 setSelectedDfyIntro(
@@ -1691,45 +1467,43 @@ export function ParentHubClient({
                                         />
                                       )}
 
-                                      {!isLocked &&
-                                        !isScheduled &&
-                                        !isScheduling && (
-                                          <div className="flex gap-2">
-                                            <Button
-                                              size="sm"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSchedulingDfyId(
-                                                  conn.connectionId,
-                                                );
-                                              }}
-                                              disabled={isDeclining}
-                                              className="flex-1 bg-violet-600 hover:bg-violet-700 text-xs"
-                                            >
-                                              <CheckCircle className="w-3.5 h-3.5 mr-1" />
-                                              Approve
-                                            </Button>
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeclineDfy(
-                                                  conn.connectionId,
-                                                );
-                                              }}
-                                              disabled={isDeclining}
-                                              className="flex-1 text-xs"
-                                            >
-                                              {isDeclining ? (
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-                                              ) : (
-                                                <XCircle className="w-3.5 h-3.5 mr-1" />
-                                              )}
-                                              Decline
-                                            </Button>
-                                          </div>
-                                        )}
+                                      {!isScheduled && !isScheduling && (
+                                        <div className="flex gap-2">
+                                          <Button
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSchedulingDfyId(
+                                                conn.connectionId,
+                                              );
+                                            }}
+                                            disabled={isDeclining}
+                                            className="flex-1 bg-violet-600 hover:bg-violet-700 text-xs"
+                                          >
+                                            <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                                            Approve
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeclineDfy(
+                                                conn.connectionId,
+                                              );
+                                            }}
+                                            disabled={isDeclining}
+                                            className="flex-1 text-xs"
+                                          >
+                                            {isDeclining ? (
+                                              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                                            ) : (
+                                              <XCircle className="w-3.5 h-3.5 mr-1" />
+                                            )}
+                                            Decline
+                                          </Button>
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -1792,24 +1566,12 @@ export function ParentHubClient({
                                   intro.fillInitiatedBy,
                                   intro.trialDate,
                                 );
-                                const isLocked = !parentVerified;
                                 return (
                                   <div
                                     key={intro.connectionId}
                                     className="relative flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-white p-3 cursor-pointer hover:bg-violet-50 hover:border-violet-200 transition-colors"
-                                    onClick={
-                                      isLocked
-                                        ? () => setShowVerifyModal(true)
-                                        : () => setSelectedIntro(intro)
-                                    }
+                                    onClick={() => setSelectedIntro(intro)}
                                   >
-                                    {isLocked && (
-                                      <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 shadow-sm">
-                                          <Lock className="h-4 w-4 text-slate-400" />
-                                        </div>
-                                      </div>
-                                    )}
                                     <div className="flex items-center gap-3">
                                       {intro.otherPartyPhoto ? (
                                         <img
@@ -1897,209 +1659,6 @@ export function ParentHubClient({
       </div>
 
       {/* ═══════════════════════════════════════════════════
-          TAB CONTENT — BABYSITTING
-         ═══════════════════════════════════════════════════ */}
-      <div
-        style={{ display: activeTab === "babysitting" ? undefined : "none" }}
-      >
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="flex items-center justify-end px-5 py-4">
-            {bsrHasActive && (
-              <Button
-                asChild
-                size="sm"
-                className="bg-violet-600 hover:bg-violet-700 text-xs h-8 px-3"
-              >
-                <Link href="/parent/babysitting">
-                  <Plus className="w-3.5 h-3.5 mr-1" />
-                  Find Babysitter
-                </Link>
-              </Button>
-            )}
-          </div>
-          <div className="px-5 pb-5">
-            {!bsrHasActive ? (
-              <div className="text-center py-4 space-y-4">
-                <Button asChild className="bg-violet-600 hover:bg-violet-700">
-                  <Link href="/parent/babysitting">
-                    <Plus className="w-3.5 h-3.5 mr-1.5" />
-                    Find Babysitter
-                  </Link>
-                </Button>
-                <p className="text-xs text-slate-400 max-w-md mx-auto">
-                  Need a sitter? We&apos;ll find you verified childcare
-                  professionals in your area
-                </p>
-
-                {bsrPast.length > 0 && (
-                  <div className="pt-3 border-t border-slate-100">
-                    <button
-                      onClick={() => setShowBsrPast(!showBsrPast)}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide hover:text-slate-600 transition-colors"
-                    >
-                      {showBsrPast ? (
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      ) : (
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      )}
-                      Past ({bsrPast.length})
-                    </button>
-                    {showBsrPast && (
-                      <div className="space-y-2 mt-2 text-left">
-                        {bsrPast.map((req) => (
-                          <BsrTileInline
-                            key={req.id}
-                            request={req}
-                            locked={!parentVerified}
-                            onLockedClick={() => setShowVerifyModal(true)}
-                            onClick={() => setSelectedBsr(req)}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-5">
-                {/* Pending Payment */}
-                {bsrPendingPayment.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-violet-600 uppercase tracking-wide flex items-center gap-1.5">
-                      <ShoppingCart className="h-3.5 w-3.5" />
-                      Cart ({bsrPendingPayment.length})
-                    </p>
-                    <div className="space-y-2">
-                      {bsrPendingPayment.map((req) => {
-                        const firstSlot = req.slots?.[0];
-                        const isLocked = !parentVerified;
-                        return (
-                          <div
-                            key={req.id}
-                            className="relative flex items-center justify-between gap-3 rounded-lg border border-violet-200 bg-white p-3 cursor-pointer hover:bg-violet-50 transition-colors"
-                            onClick={
-                              isLocked
-                                ? () => setShowVerifyModal(true)
-                                : () => {
-                                    window.location.href = `/parent/babysitting/${req.id}/payment`;
-                                  }
-                            }
-                          >
-                            {isLocked && (
-                              <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 shadow-sm">
-                                  <Lock className="h-4 w-4 text-slate-400" />
-                                </div>
-                              </div>
-                            )}
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-100">
-                                <ShoppingCart className="h-4 w-4 text-violet-600" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-slate-800">
-                                  {firstSlot
-                                    ? bsrFormatSlotDate(firstSlot.slot_date)
-                                    : "Babysitting Request"}
-                                  {firstSlot &&
-                                    ` · ${bsrFormatTime(firstSlot.start_time)}`}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                  {req.suburb}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700">
-                                Checkout
-                              </span>
-                              <ChevronRight className="h-4 w-4 text-slate-400" />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Active — awaiting nanny responses */}
-                {bsrActive.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" />
-                      Awaiting Response ({bsrActive.length})
-                    </p>
-                    <div className="space-y-2">
-                      {bsrActive.map((req) => (
-                        <BsrTileInline
-                          key={req.id}
-                          request={req}
-                          locked={!parentVerified}
-                          onLockedClick={() => setShowVerifyModal(true)}
-                          onClick={() => setSelectedBsr(req)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Filled — confirmed bookings */}
-                {bsrFilled.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-green-600 uppercase tracking-wide flex items-center gap-1.5">
-                      <CheckCircle className="h-3.5 w-3.5" />
-                      Bookings ({bsrFilled.length})
-                    </p>
-                    <div className="space-y-2">
-                      {bsrFilled.map((req) => (
-                        <BsrTileInline
-                          key={req.id}
-                          request={req}
-                          locked={!parentVerified}
-                          onLockedClick={() => setShowVerifyModal(true)}
-                          onClick={() => setSelectedBsr(req)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Past (collapsible) */}
-                {bsrPast.length > 0 && (
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => setShowBsrPast(!showBsrPast)}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide hover:text-slate-600 transition-colors"
-                    >
-                      {showBsrPast ? (
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      ) : (
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      )}
-                      Past ({bsrPast.length})
-                    </button>
-                    {showBsrPast && (
-                      <div className="space-y-2">
-                        {bsrPast.map((req) => (
-                          <BsrTileInline
-                            key={req.id}
-                            request={req}
-                            locked={!parentVerified}
-                            onLockedClick={() => setShowVerifyModal(true)}
-                            onClick={() => setSelectedBsr(req)}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════════════════
           TAB CONTENT — EDUCATION
          ═══════════════════════════════════════════════════ */}
       <div style={{ display: activeTab === "children" ? undefined : "none" }}>
@@ -2111,457 +1670,8 @@ export function ParentHubClient({
       </div>
 
       {/* ═══════════════════════════════════════════════════
-          MODALS — BSR Detail, Connection Popups, etc.
+          MODALS — Connection Popups, etc.
          ═══════════════════════════════════════════════════ */}
-
-      {/* Verification Modal */}
-      <VerificationModal
-        open={showVerifyModal}
-        onClose={() => setShowVerifyModal(false)}
-      />
-
-      {/* BSR Detail Modal */}
-      {selectedBsr && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">
-                  {selectedBsr.status === "filled"
-                    ? "Babysitting Booking"
-                    : "Babysitting Request"}
-                </CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedBsr(null);
-                    setBsrError(null);
-                    setBsrSelectedNanny(null);
-                    setBsrConfirmedInfo(null);
-                  }}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Status badge */}
-              {selectedBsr.status === "open" && (
-                <span className="inline-block rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                  Awaiting Babysitters
-                </span>
-              )}
-              {selectedBsr.status === "filled" && (
-                <span className="inline-block rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
-                  Confirmed
-                </span>
-              )}
-              {[
-                "expired",
-                "cancelled",
-                "nanny_cancelled",
-                "completed",
-              ].includes(selectedBsr.status) && (
-                <span
-                  className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium ${
-                    selectedBsr.status === "completed"
-                      ? "bg-green-100 text-green-700"
-                      : selectedBsr.status === "expired"
-                        ? "bg-amber-100 text-amber-800"
-                        : selectedBsr.status === "nanny_cancelled"
-                          ? "bg-red-100 text-red-700"
-                          : "bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  {selectedBsr.status === "completed"
-                    ? "Completed"
-                    : selectedBsr.status === "expired"
-                      ? "Expired"
-                      : selectedBsr.status === "nanny_cancelled"
-                        ? "Nanny Cancelled"
-                        : "Cancelled"}
-                </span>
-              )}
-
-              {/* Requesting Nannies */}
-              {selectedBsr.status === "open" &&
-                selectedBsr.requestingNannies.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-                      <User className="h-3.5 w-3.5" />
-                      Nannies Requesting ({selectedBsr.requestingNannies.length}
-                      )
-                    </p>
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 divide-y divide-slate-200">
-                      {selectedBsr.requestingNannies.map((nanny) => (
-                        <button
-                          key={nanny.nannyId}
-                          onClick={() => setBsrSelectedNanny(nanny)}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-100 transition-colors cursor-pointer"
-                        >
-                          {nanny.profilePicUrl ? (
-                            <img
-                              src={nanny.profilePicUrl}
-                              alt=""
-                              className="h-9 w-9 rounded-full object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-100 flex-shrink-0">
-                              <span className="text-xs font-semibold text-violet-600">
-                                {nanny.firstName[0]}
-                              </span>
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-slate-900 truncate">
-                              {nanny.firstName}
-                              {calcAge(nanny.dateOfBirth) !== null
-                                ? `, ${calcAge(nanny.dateOfBirth)}`
-                                : ""}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {nanny.distanceKm !== null && (
-                                <span>
-                                  {nanny.distanceKm < 1
-                                    ? "<1"
-                                    : nanny.distanceKm}{" "}
-                                  km
-                                </span>
-                              )}
-                              {nanny.experienceYears && (
-                                <span> · {nanny.experienceYears}yr exp</span>
-                              )}
-                            </p>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-slate-300 flex-shrink-0" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              {/* Nanny Mini Popup */}
-              {bsrSelectedNanny && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-                  <Card className="w-full max-w-sm">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">
-                          Nanny Profile
-                        </CardTitle>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setBsrSelectedNanny(null);
-                            setBsrError(null);
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center gap-3">
-                        {bsrSelectedNanny.profilePicUrl ? (
-                          <img
-                            src={bsrSelectedNanny.profilePicUrl}
-                            alt=""
-                            className="h-14 w-14 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-violet-100">
-                            <span className="text-lg font-semibold text-violet-600">
-                              {bsrSelectedNanny.firstName[0]}
-                            </span>
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-base font-semibold text-slate-900">
-                            {bsrSelectedNanny.firstName}
-                            {calcAge(bsrSelectedNanny.dateOfBirth) !== null
-                              ? `, ${calcAge(bsrSelectedNanny.dateOfBirth)}`
-                              : ""}
-                          </p>
-                          {bsrSelectedNanny.suburb && (
-                            <p className="text-sm text-slate-500">
-                              {bsrSelectedNanny.suburb}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="space-y-1.5 text-sm text-slate-600">
-                        {bsrSelectedNanny.distanceKm !== null && (
-                          <p className="flex items-center gap-1.5">
-                            <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                            {bsrSelectedNanny.distanceKm < 1
-                              ? "<1"
-                              : bsrSelectedNanny.distanceKm}{" "}
-                            km away
-                          </p>
-                        )}
-                        {bsrSelectedNanny.experienceYears && (
-                          <p className="flex items-center gap-1.5">
-                            <Star className="h-3.5 w-3.5 text-slate-400" />
-                            {bsrSelectedNanny.experienceYears} years experience
-                          </p>
-                        )}
-                        {bsrSelectedNanny.languages &&
-                          bsrSelectedNanny.languages.length > 0 && (
-                            <p className="flex items-center gap-1.5">
-                              <Globe className="h-3.5 w-3.5 text-slate-400" />
-                              {bsrSelectedNanny.languages.join(", ")}
-                            </p>
-                          )}
-                      </div>
-                      {bsrSelectedNanny.aiHeadline && (
-                        <p className="text-sm text-slate-500 italic line-clamp-3">
-                          {bsrSelectedNanny.aiHeadline.replace(/<[^>]*>/g, "")}
-                        </p>
-                      )}
-                      {bsrError && (
-                        <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                          {bsrError}
-                        </div>
-                      )}
-                      <div className="space-y-2">
-                        <Button
-                          className="w-full bg-violet-500 hover:bg-violet-600"
-                          disabled={bsrAccepting}
-                          onClick={() =>
-                            handleBsrAcceptNanny(
-                              selectedBsr.id,
-                              bsrSelectedNanny.nannyId,
-                            )
-                          }
-                        >
-                          {bsrAccepting ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                          )}
-                          Accept Babysitter
-                        </Button>
-                        <a
-                          href={`/nannies/${bsrSelectedNanny.nannyId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block w-full text-center rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                        >
-                          View Full Profile
-                        </a>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              {/* Confirmed nanny info popup */}
-              {bsrConfirmedInfo && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-                  <Card className="w-full max-w-sm">
-                    <CardContent className="pt-6 space-y-4 text-center">
-                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                        <CheckCircle className="h-6 w-6 text-green-600" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-slate-900">
-                        Babysitter Confirmed!
-                      </h3>
-                      {bsrConfirmedInfo.firstName && (
-                        <p className="text-slate-600">
-                          {bsrConfirmedInfo.firstName} has been confirmed for
-                          your babysitting job.
-                        </p>
-                      )}
-                      {bsrConfirmedInfo.phone && (
-                        <div className="rounded-lg bg-violet-50 border border-violet-200 p-4 space-y-2">
-                          <p className="text-sm font-medium text-slate-700 flex items-center justify-center gap-2">
-                            <Phone className="h-4 w-4 text-violet-500" />
-                            {bsrConfirmedInfo.phone}
-                          </p>
-                        </div>
-                      )}
-                      <p className="text-sm text-slate-500">
-                        Please contact your babysitter directly to confirm all
-                        the details.
-                      </p>
-                      <Button
-                        className="w-full bg-violet-500 hover:bg-violet-600"
-                        onClick={() => {
-                          setBsrConfirmedInfo(null);
-                          setSelectedBsr(null);
-                          router.refresh();
-                        }}
-                      >
-                        Done
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              {/* Accepted nanny details for filled BSR */}
-              {selectedBsr.status === "filled" && selectedBsr.acceptedNanny && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-3">
-                    {selectedBsr.acceptedNanny.profilePicUrl ? (
-                      <img
-                        src={selectedBsr.acceptedNanny.profilePicUrl}
-                        alt=""
-                        className="h-10 w-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-200">
-                        <UserCheck className="h-5 w-5 text-green-700" />
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-green-900">
-                        {selectedBsr.acceptedNanny.firstName}
-                        {calcAge(selectedBsr.acceptedNanny.dateOfBirth) !== null
-                          ? `, ${calcAge(selectedBsr.acceptedNanny.dateOfBirth)}`
-                          : ""}
-                      </p>
-                      {selectedBsr.acceptedNanny.distanceKm !== null && (
-                        <p className="text-xs text-green-700">
-                          {selectedBsr.acceptedNanny.distanceKm < 1
-                            ? "<1 km"
-                            : `${selectedBsr.acceptedNanny.distanceKm} km`}{" "}
-                          away
-                        </p>
-                      )}
-                    </div>
-                    <a
-                      href={`/nannies/${selectedBsr.accepted_nanny_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm font-medium text-green-700 hover:text-green-900 transition-colors"
-                    >
-                      View Profile
-                    </a>
-                  </div>
-                  <div className="rounded-lg bg-violet-50 border border-violet-200 p-3">
-                    <p className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-violet-500" />
-                      {selectedBsr.acceptedNanny.phone ?? "Phone not available"}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Please contact your babysitter directly to confirm all
-                      details.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Time slots */}
-              <div className="rounded-lg border border-slate-200 bg-slate-50 divide-y divide-slate-200">
-                {selectedBsr.slots.map((slot) => (
-                  <div
-                    key={slot.id}
-                    className="flex items-center justify-between px-3 py-2.5"
-                  >
-                    <span className="text-sm text-slate-700">
-                      {bsrFormatSlotDate(slot.slot_date)}
-                    </span>
-                    <span className="text-sm text-slate-500">
-                      {bsrFormatTime(slot.start_time)} –{" "}
-                      {bsrFormatTime(slot.end_time)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Details */}
-              <div className="space-y-2 text-sm text-slate-500">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-3.5 w-3.5" />
-                  <span>
-                    {selectedBsr.address && <>{selectedBsr.address}, </>}
-                    {selectedBsr.suburb} {selectedBsr.postcode}
-                  </span>
-                </div>
-                {(() => {
-                  let mins = 0;
-                  for (const s of selectedBsr.slots) {
-                    if (s.start_time && s.end_time) {
-                      const [sh, sm] = s.start_time.split(":").map(Number);
-                      const [eh, em] = s.end_time.split(":").map(Number);
-                      mins += eh * 60 + em - (sh * 60 + sm);
-                    }
-                  }
-                  const hrs = Math.round((mins / 60) * 10) / 10;
-                  return hrs > 0 ? (
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-3.5 w-3.5" />
-                      {hrs} hrs total
-                    </div>
-                  ) : null;
-                })()}
-                {selectedBsr.hourly_rate && (
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-3.5 w-3.5" />$
-                    {selectedBsr.hourly_rate}/hr
-                    {(() => {
-                      let mins = 0;
-                      for (const s of selectedBsr.slots) {
-                        if (s.start_time && s.end_time) {
-                          const [sh, sm] = s.start_time.split(":").map(Number);
-                          const [eh, em] = s.end_time.split(":").map(Number);
-                          mins += eh * 60 + em - (sh * 60 + sm);
-                        }
-                      }
-                      const hrs = Math.round((mins / 60) * 10) / 10;
-                      const est = Math.round(hrs * selectedBsr.hourly_rate!);
-                      return hrs > 0 ? <span> (est. ${est})</span> : null;
-                    })()}
-                  </div>
-                )}
-                {selectedBsr.special_requirements && (
-                  <p className="text-sm text-slate-600 italic">
-                    &ldquo;{selectedBsr.special_requirements}&rdquo;
-                  </p>
-                )}
-              </div>
-
-              {bsrError && !bsrSelectedNanny && (
-                <p className="text-sm text-red-600">{bsrError}</p>
-              )}
-
-              {/* Cancel button */}
-              {(selectedBsr.status === "open" ||
-                selectedBsr.status === "filled") && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-slate-500"
-                  disabled={bsrCancelling}
-                  onClick={() => handleBsrCancel(selectedBsr.id)}
-                >
-                  {bsrCancelling ? (
-                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                  ) : (
-                    <X className="mr-1 h-3 w-3" />
-                  )}
-                  {selectedBsr.status === "filled"
-                    ? "Cancel Booking"
-                    : "Cancel Request"}
-                </Button>
-              )}
-
-              <p className="text-xs text-slate-400">
-                Created{" "}
-                {new Date(selectedBsr.created_at).toLocaleDateString("en-AU", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* Connection Detail Popup */}
       <ConnectionDetailPopup
@@ -2970,132 +2080,5 @@ export function ParentHubClient({
         </div>
       )}
     </>
-  );
-}
-
-// ── BSR Tile (compact inline version for hub) ──
-
-function BsrTileInline({
-  request,
-  onClick,
-  locked,
-  onLockedClick,
-}: {
-  request: BabysittingRequestWithSlots;
-  onClick: () => void;
-  locked?: boolean;
-  onLockedClick?: () => void;
-}) {
-  const isOpen = request.status === "open";
-  const isFilled = request.status === "filled";
-  const isPast = [
-    "expired",
-    "cancelled",
-    "nanny_cancelled",
-    "completed",
-  ].includes(request.status);
-  const borderColor = isOpen
-    ? "border-amber-200"
-    : isFilled
-      ? "border-green-200"
-      : "border-slate-200";
-
-  const statusConfig: Record<string, { label: string; style: string }> = {
-    completed: { label: "Completed", style: "bg-green-100 text-green-700" },
-    expired: { label: "Expired", style: "bg-amber-100 text-amber-800" },
-    cancelled: { label: "Cancelled", style: "bg-slate-100 text-slate-600" },
-    nanny_cancelled: {
-      label: "Nanny Cancelled",
-      style: "bg-red-100 text-red-700",
-    },
-  };
-
-  const firstSlot = request.slots?.[0];
-
-  return (
-    <button
-      onClick={locked ? onLockedClick : onClick}
-      className={`relative w-full text-left rounded-lg border ${borderColor} bg-white p-3 hover:bg-slate-50 transition-colors cursor-pointer ${isPast ? "opacity-75" : ""}`}
-    >
-      {locked && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 shadow-sm">
-            <Lock className="h-4 w-4 text-slate-400" />
-          </div>
-        </div>
-      )}
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-0.5">
-            {isFilled && request.acceptedNanny ? (
-              <div className="flex items-center gap-2">
-                {request.acceptedNanny.profilePicUrl ? (
-                  <img
-                    src={request.acceptedNanny.profilePicUrl}
-                    alt=""
-                    className="h-7 w-7 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-green-100">
-                    <span className="text-xs font-semibold text-green-600">
-                      {request.acceptedNanny.firstName[0]}
-                    </span>
-                  </div>
-                )}
-                <p className="text-sm font-medium text-slate-900">
-                  {request.acceptedNanny.firstName}
-                  {calcAge(request.acceptedNanny.dateOfBirth) !== null
-                    ? `, ${calcAge(request.acceptedNanny.dateOfBirth)}`
-                    : ""}
-                </p>
-              </div>
-            ) : (
-              firstSlot && (
-                <p className="text-sm font-medium text-slate-900">
-                  {bsrFormatSlotDate(firstSlot.slot_date)}
-                  {request.slots.length > 1 && (
-                    <span className="text-slate-400">
-                      {" "}
-                      +{request.slots.length - 1} more
-                    </span>
-                  )}
-                </p>
-              )
-            )}
-          </div>
-          {firstSlot && (
-            <p className="text-xs text-slate-500">
-              {isFilled && bsrFormatSlotDate(firstSlot.slot_date)}
-              {isFilled && " · "}
-              {bsrFormatTime(firstSlot.start_time)} –{" "}
-              {bsrFormatTime(firstSlot.end_time)}
-              {request.suburb && <span> · {request.suburb}</span>}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {isOpen && request.requestingNannies.length > 0 && (
-            <span className="flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
-              <User className="h-3 w-3" />
-              {request.requestingNannies.length}
-            </span>
-          )}
-          {isFilled && (
-            <span className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-              <CheckCircle className="h-3 w-3" />
-              Confirmed
-            </span>
-          )}
-          {isPast && statusConfig[request.status] && (
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusConfig[request.status].style}`}
-            >
-              {statusConfig[request.status].label}
-            </span>
-          )}
-          <ChevronRight className="h-4 w-4 text-slate-300" />
-        </div>
-      </div>
-    </button>
   );
 }

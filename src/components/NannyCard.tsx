@@ -33,9 +33,14 @@ interface NannyCardProps {
   onRequestInterview?: (nannyId: string) => void;
 }
 
-export function NannyCard({ nanny, showRequestButton = false, onRequestInterview }: NannyCardProps) {
+export function NannyCard({
+  nanny,
+  showRequestButton = false,
+  onRequestInterview,
+}: NannyCardProps) {
   const initials = `${nanny.first_name[0]}${nanny.last_name[0]}`;
-  const experienceYears = nanny.nanny_experience_years || nanny.total_experience_years;
+  const experienceYears =
+    nanny.nanny_experience_years || nanny.total_experience_years;
   const isVerified = (nanny.verification_level ?? 0) >= 3;
 
   return (
@@ -51,7 +56,9 @@ export function NannyCard({ nanny, showRequestButton = false, onRequestInterview
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-24 h-24 rounded-full bg-white shadow-md flex items-center justify-center">
-                <span className="text-3xl font-semibold text-violet-500">{initials}</span>
+                <span className="text-3xl font-semibold text-violet-500">
+                  {initials}
+                </span>
               </div>
             </div>
           )}
@@ -68,7 +75,8 @@ export function NannyCard({ nanny, showRequestButton = false, onRequestInterview
         <div className="flex items-start justify-between">
           <div>
             <h3 className="font-semibold text-lg text-slate-900 group-hover:text-violet-600 transition-colors">
-              {nanny.first_name.charAt(0).toUpperCase() + nanny.first_name.slice(1)}
+              {nanny.first_name.charAt(0).toUpperCase() +
+                nanny.first_name.slice(1)}
             </h3>
             <div className="flex items-center gap-1 text-sm text-slate-500 mt-0.5">
               <MapPin className="w-3.5 h-3.5" />
@@ -77,7 +85,9 @@ export function NannyCard({ nanny, showRequestButton = false, onRequestInterview
           </div>
           {nanny.hourly_rate_min && (
             <div className="text-right">
-              <div className="font-bold text-lg text-slate-900">${nanny.hourly_rate_min}</div>
+              <div className="font-bold text-lg text-slate-900">
+                ${nanny.hourly_rate_min}
+              </div>
               <div className="text-xs text-slate-500">/hour</div>
             </div>
           )}
@@ -85,7 +95,8 @@ export function NannyCard({ nanny, showRequestButton = false, onRequestInterview
 
         {experienceYears && (
           <p className="mt-3 text-sm text-slate-600">
-            {experienceYears} year{experienceYears !== 1 ? "s" : ""} experience as a nanny
+            {experienceYears} year{experienceYears !== 1 ? "s" : ""} experience
+            as a nanny
           </p>
         )}
 
@@ -97,24 +108,37 @@ export function NannyCard({ nanny, showRequestButton = false, onRequestInterview
 
         <div className="mt-4 flex flex-wrap gap-1.5">
           {(nanny.verification_level ?? 0) >= 4 && (
-            <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+            <Badge
+              variant="secondary"
+              className="text-xs bg-green-100 text-green-700"
+            >
               Fully Verified
             </Badge>
           )}
           {nanny.drivers_license && (
-            <Badge variant="secondary" className="text-xs bg-slate-100 text-slate-600">
+            <Badge
+              variant="secondary"
+              className="text-xs bg-slate-100 text-slate-600"
+            >
               <Car className="mr-1 h-3 w-3" />
               License
             </Badge>
           )}
           {nanny.vaccination_status && (
-            <Badge variant="secondary" className="text-xs bg-slate-100 text-slate-600">
+            <Badge
+              variant="secondary"
+              className="text-xs bg-slate-100 text-slate-600"
+            >
               <Syringe className="mr-1 h-3 w-3" />
               Vaccinated
             </Badge>
           )}
           {nanny.languages?.slice(0, 2).map((lang) => (
-            <Badge key={lang} variant="secondary" className="text-xs bg-slate-100 text-slate-600">
+            <Badge
+              key={lang}
+              variant="secondary"
+              className="text-xs bg-slate-100 text-slate-600"
+            >
               {lang}
             </Badge>
           ))}
@@ -174,7 +198,9 @@ export function EmptyNannyState() {
         <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-violet-100 flex items-center justify-center">
           <ShieldCheck className="h-8 w-8 text-violet-500" />
         </div>
-        <h3 className="text-lg font-semibold text-slate-900">No nannies found</h3>
+        <h3 className="text-lg font-semibold text-slate-900">
+          No nannies found
+        </h3>
         <p className="mt-2 text-sm text-slate-500">
           Check back soon as more verified nannies join our platform.
         </p>

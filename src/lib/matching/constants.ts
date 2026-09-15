@@ -3,10 +3,10 @@
 // Quality base weights (must sum to 1.0)
 export const WEIGHTS = {
   location: 0.25,
-  schedule: 0.30,
-  experience: 0.20,
-  roleFit: 0.10,
-  qualifications: 0.10,
+  schedule: 0.3,
+  experience: 0.2,
+  roleFit: 0.1,
+  qualifications: 0.1,
   supportFit: 0.05,
 } as const;
 
@@ -47,7 +47,7 @@ export const NANNY_BLOCK_MAP: Record<string, string> = {
 // Qualification scoring (highest wins)
 export const QUAL_SCORES: Record<string, number> = {
   "No Qualifications": 0,
-  "Other": 10,
+  Other: 10,
   "Certificate III in Early Childhood Education and Care": 30,
   "Certificate IV in Education Support": 50,
   "Diploma of Early Childhood Education and Care": 75,
@@ -84,8 +84,8 @@ export const REQUIREMENT_PENALTIES = {
   vaccination: 0.8,
   nonSmoker: 0.8,
   petsComfort: 0.85,
-  nannyAgeMild: 0.85,   // under by 1-3yr
-  nannyAgeSevere: 0.7,  // under by 4+yr
+  nannyAgeMild: 0.85, // under by 1-3yr
+  nannyAgeSevere: 0.7, // under by 4+yr
 } as const;
 
 // Requirement penalty floor (product can't go below this)
@@ -93,16 +93,16 @@ export const REQUIREMENT_MULTIPLIER_FLOOR = 0.3;
 
 // Over-qualified bonus multipliers
 export const OQ_BONUSES = {
-  extraExperiencePerYear: 1.03,    // per extra year over requirement
-  extraExperienceCap: 1.15,        // max from experience alone
-  certificationPer: 1.04,          // per certification held
-  certificationCap: 1.12,          // max from certs alone
-  higherQualification: 1.05,       // Diploma or Bachelor
-  carUnrequired: 1.03,             // has car even if not required
-  immediateStart: 1.05,            // ASAP match
-  languageMatch: 1.04,             // language alignment
-  ageOverMinPerTwo: 1.02,          // per 2yr over minimum age
-  ageOverMinCap: 1.06,             // max from age alone
+  extraExperiencePerYear: 1.03, // per extra year over requirement
+  extraExperienceCap: 1.15, // max from experience alone
+  certificationPer: 1.04, // per certification held
+  certificationCap: 1.12, // max from certs alone
+  higherQualification: 1.05, // Diploma or Bachelor
+  carUnrequired: 1.03, // has car even if not required
+  immediateStart: 1.05, // ASAP match
+  languageMatch: 1.04, // language alignment
+  ageOverMinPerTwo: 1.02, // per 2yr over minimum age
+  ageOverMinCap: 1.06, // max from age alone
 } as const;
 
 // Over-qualified multiplier cap

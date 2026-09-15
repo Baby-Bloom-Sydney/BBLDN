@@ -7,12 +7,21 @@ interface ClientHireEmailParams {
   edtechLink: string;
 }
 
-export function buildClientHireConfirmationEmail(params: ClientHireEmailParams): {
+export function buildClientHireConfirmationEmail(
+  params: ClientHireEmailParams,
+): {
   subject: string;
   html: string;
   text: string;
 } {
-  const { clientName, professionalName, referenceNumber, hireDate, wwccPortalLink, edtechLink } = params;
+  const {
+    clientName,
+    professionalName,
+    referenceNumber,
+    hireDate,
+    wwccPortalLink,
+    edtechLink,
+  } = params;
 
   const subject = `Congratulations! Your hire of ${professionalName} is confirmed — Ref: ${referenceNumber}`;
 

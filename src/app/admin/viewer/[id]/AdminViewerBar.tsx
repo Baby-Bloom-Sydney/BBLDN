@@ -47,7 +47,9 @@ export function AdminViewerBar({ user }: { user: TargetUser }) {
       >
         <div className="flex items-center gap-2 text-sm">
           <span className="font-medium">{name}</span>
-          <span className="rounded bg-white/20 px-1.5 py-0.5 text-xs capitalize">{user.role}</span>
+          <span className="rounded bg-white/20 px-1.5 py-0.5 text-xs capitalize">
+            {user.role}
+          </span>
         </div>
         <ChevronDown className="h-4 w-4" />
       </div>
@@ -74,9 +76,12 @@ export function AdminViewerBar({ user }: { user: TargetUser }) {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-sm truncate">{name}</span>
-              <span className="rounded bg-white/20 px-1.5 py-0.5 text-xs capitalize">{user.role}</span>
+              <span className="rounded bg-white/20 px-1.5 py-0.5 text-xs capitalize">
+                {user.role}
+              </span>
               <span className="rounded bg-white/15 px-1.5 py-0.5 text-xs">
-                {LEVEL_LABELS[user.verificationLevel] ?? `L${user.verificationLevel}`}
+                {LEVEL_LABELS[user.verificationLevel] ??
+                  `L${user.verificationLevel}`}
               </span>
             </div>
             <p className="text-xs text-violet-200 truncate">
@@ -108,7 +113,7 @@ export function AdminViewerBar({ user }: { user: TargetUser }) {
                 "rounded-t px-3 py-1.5 text-sm font-medium transition-colors",
                 isActive
                   ? "bg-white text-violet-700"
-                  : "text-violet-200 hover:bg-white/10 hover:text-white"
+                  : "text-violet-200 hover:bg-white/10 hover:text-white",
               )}
             >
               {tab.label}

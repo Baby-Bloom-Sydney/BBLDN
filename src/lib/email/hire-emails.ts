@@ -1,10 +1,14 @@
-import { createAdminClient } from '@/lib/supabase/admin';
-import { sendEmail } from './resend';
-import { generateClientHirePDF, generateProfessionalHirePDF } from '@/lib/pdf/generate-hire-pdf';
-import { buildClientHireConfirmationEmail } from './templates/client-hire-confirmation';
-import { buildProfessionalHireConfirmationEmail } from './templates/professional-hire-confirmation';
+import { createAdminClient } from "@/lib/supabase/admin";
+import { sendEmail } from "./resend";
+import {
+  generateClientHirePDF,
+  generateProfessionalHirePDF,
+} from "@/lib/pdf/generate-hire-pdf";
+import { buildClientHireConfirmationEmail } from "./templates/client-hire-confirmation";
+import { buildProfessionalHireConfirmationEmail } from "./templates/professional-hire-confirmation";
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app-babybloom.vercel.app';
+const appUrl =
+  process.env.NEXT_PUBLIC_APP_URL || "https://app-babybloom.vercel.app";
 
 interface HireEmailParams {
   placementId: string;
@@ -22,38 +26,53 @@ interface HireEmailParams {
  * Generates hire summary PDFs and sends confirmation emails to both parent and nanny.
  * Should be called fire-and-forget after placement creation — failures are logged but never block.
  */
-export async function sendHireConfirmationEmails(params: HireEmailParams): Promise<void> {
+export async function sendHireConfirmationEmails(
+  params: HireEmailParams,
+): Promise<void> {
   const {
-    placementId, nannyId, parentName, nannyName,
-    parentEmail, nannyEmail, parentUserId, nannyUserId,
+    placementId,
+    nannyId,
+    parentName,
+    nannyName,
+    parentEmail,
+    nannyEmail,
+    parentUserId,
+    nannyUserId,
   } = params;
 
   const adminClient = createAdminClient();
-  const hireDate = new Date().toLocaleDateString('en-AU', {
-    day: 'numeric', month: 'long', year: 'numeric',
+  const hireDate = new Date().toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 
   // Fetch nanny verification date
   const { data: nanny } = await adminClient
-    .from('nannies')
-    .select('user_id')
-    .eq('id', nannyId)
+    .from("nannies")
+    .select("user_id")
+    .eq("id", nannyId)
     .single();
 
   let verificationDate = hireDate; // fallback
   if (nanny?.user_id) {
     const { data: verification } = await adminClient
-      .from('verifications')
-      .select('created_at')
-      .eq('user_id', nanny.user_id)
-      .order('created_at', { ascending: false })
+      .from("verifications")
+      .select("created_at")
+      .eq("user_id", nanny.user_id)
+      .order("created_at", { ascending: false })
       .limit(1)
       .single();
 
     if (verification?.created_at) {
-      verificationDate = new Date(verification.created_at).toLocaleDateString('en-AU', {
-        day: 'numeric', month: 'long', year: 'numeric',
-      });
+      verificationDate = new Date(verification.created_at).toLocaleDateString(
+        "en-AU",
+        {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        },
+      );
     }
   }
 
@@ -82,7 +101,8 @@ export async function sendHireConfirmationEmails(params: HireEmailParams): Promi
       professionalName: nannyName,
       referenceNumber: clientPdf.referenceNumber,
       hireDate,
-      wwccPortalLink: 'https://service.nsw.gov.au/transaction/apply-for-a-working-with-children-check',
+      wwccPortalLink:
+        "https://service.nsw.gov.au/transaction/apply-for-a-working-with-children-check",
       edtechLink: `${appUrl}/parent`,
     });
 
@@ -91,9 +111,11 @@ export async function sendHireConfirmationEmails(params: HireEmailParams): Promi
       subject: email.subject,
       html: email.html,
       text: email.text,
-      emailType: 'hire_confirmation_client',
+      emailType: "hire_confirmation_client",
       recipientUserId: parentUserId,
-      attachments: [{ filename: clientPdf.filename, content: clientPdf.buffer }],
+      attachments: [
+        { filename: clientPdf.filename, content: clientPdf.buffer },
+      ],
     });
   }
 
@@ -112,11 +134,13 @@ export async function sendHireConfirmationEmails(params: HireEmailParams): Promi
       subject: email.subject,
       html: email.html,
       text: email.text,
-      emailType: 'hire_confirmation_professional',
+      emailType: "hire_confirmation_professional",
       recipientUserId: nannyUserId,
       attachments: [{ filename: proPdf.filename, content: proPdf.buffer }],
     });
   }
 
-  console.log(`[HireEmails] Sent hire confirmation emails for placement ${placementId}`);
+  console.log(
+    `[HireEmails] Sent hire confirmation emails for placement ${placementId}`,
+  );
 }

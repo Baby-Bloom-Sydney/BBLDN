@@ -17,14 +17,11 @@ import {
   Home,
   User,
   ShieldCheck,
-  Briefcase,
   Settings,
   Search,
   ClipboardList,
-  Baby,
   Filter,
   Users,
-  BarChart3,
   LogOut,
   PlusCircle,
   LucideIcon,
@@ -32,9 +29,7 @@ import {
   Eye,
   Inbox,
   Link2,
-  Share2,
   CreditCard,
-  Wallet,
   LifeBuoy,
   Phone,
 } from "lucide-react";
@@ -58,9 +53,7 @@ const nannyNavItems: NavItem[] = [
   { href: "/nanny/profile", icon: User, label: "My Profile" },
   { href: "/nanny/team", icon: Users, label: "Our Team" },
   { href: "/nanny/verification", icon: ShieldCheck, label: "Verification" },
-  { href: "/nanny/share", icon: Share2, label: "Share Profile" },
   { href: "/nanny/inbox", icon: Inbox, label: "Inbox" },
-  { href: "/nanny/babysitting", icon: Briefcase, label: "Babysitting Jobs" },
   { href: "/nanny/apply", icon: PlusCircle, label: "Apply" },
   { href: "/nanny/settings", icon: Settings, label: "Settings" },
 ];
@@ -73,7 +66,6 @@ const parentNavItems: NavItem[] = [
   { href: "/parent/request", icon: PlusCircle, label: "Nanny Request" },
   { href: "/parent/connections", icon: Link2, label: "Connections" },
   { href: "/parent/inbox", icon: Inbox, label: "Inbox" },
-  { href: "/parent/babysitting", icon: Baby, label: "Babysitting" },
   { href: "/parent/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -84,9 +76,7 @@ const adminNavItems: NavItem[] = [
   { href: "/admin/verifications", icon: ShieldCheck, label: "Verifications" },
   { href: "/admin/users", icon: Users, label: "User Management" },
   { href: "/admin/subscriptions", icon: CreditCard, label: "Subscriptions" },
-  { href: "/admin/payouts", icon: Wallet, label: "Payouts" },
   { href: "/admin/support", icon: LifeBuoy, label: "Support" },
-  { href: "/admin/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 

@@ -1,23 +1,32 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { StageProps } from '../../FunnelOrchestrator';
-import { CompoundPageShell } from '../../shared/CompoundPageShell';
-import { convertLeadToAccount } from '@/lib/actions/nanny-leads';
-import { recordConsent } from '@/lib/legal/record-consent';
-import { AGR02_CHECKPOINTS } from '@/lib/legal/checkpoints';
-import { ConsentCheckboxGroup } from '@/components/legal/ConsentCheckboxGroup';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Loader2, Lock } from 'lucide-react';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { StageProps } from "../../FunnelOrchestrator";
+import { CompoundPageShell } from "../../shared/CompoundPageShell";
+import { convertLeadToAccount } from "@/lib/actions/nanny-leads";
+import { recordConsent } from "@/lib/legal/record-consent";
+import { AGR02_CHECKPOINTS } from "@/lib/legal/checkpoints";
+import { ConsentCheckboxGroup } from "@/components/legal/ConsentCheckboxGroup";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, Lock } from "lucide-react";
 
-export function N5CreateAccount({ state, dispatch, goNext, goBack, progress, questionNumber }: StageProps) {
+export function N5CreateAccount({
+  state,
+  dispatch,
+  goNext,
+  goBack,
+  progress,
+  questionNumber,
+}: StageProps) {
   const router = useRouter();
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [consentChecked, setConsentChecked] = useState<Record<string, boolean>>({});
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [consentChecked, setConsentChecked] = useState<Record<string, boolean>>(
+    {},
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attempted, setAttempted] = useState(false);
@@ -25,8 +34,15 @@ export function N5CreateAccount({ state, dispatch, goNext, goBack, progress, que
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email);
   const passwordValid = password.length >= 8;
   const passwordsMatch = password === confirmPassword;
-  const allConsentsChecked = AGR02_CHECKPOINTS.every((cp) => consentChecked[cp.id]);
-  const canSubmit = emailValid && passwordValid && passwordsMatch && allConsentsChecked && state.leadId;
+  const allConsentsChecked = AGR02_CHECKPOINTS.every(
+    (cp) => consentChecked[cp.id],
+  );
+  const canSubmit =
+    emailValid &&
+    passwordValid &&
+    passwordsMatch &&
+    allConsentsChecked &&
+    state.leadId;
 
   const handleSubmit = async () => {
     setAttempted(true);
@@ -38,26 +54,30 @@ export function N5CreateAccount({ state, dispatch, goNext, goBack, progress, que
     try {
       await recordConsent(
         AGR02_CHECKPOINTS.map((cp) => ({
-          agreementId: 'AGR-02',
+          agreementId: "AGR-02",
           checkpointId: cp.id,
           checkpointText: cp.text,
-        }))
+        })),
       );
     } catch {}
 
-    const result = await convertLeadToAccount(state.leadId, password, state.email);
+    const result = await convertLeadToAccount(
+      state.leadId,
+      password,
+      state.email,
+    );
 
     if (result.success) {
       // Clear localStorage since conversion is done
       try {
-        localStorage.removeItem('bb_nanny_lead_funnel');
+        localStorage.removeItem("bb_nanny_lead_funnel");
       } catch {
         // Ignore
       }
       // Route directly into verification funnel (skip N5Welcome)
-      router.push('/nanny/onboarding-verification');
+      router.push("/nanny/onboarding-verification");
     } else {
-      setError(result.error || 'Failed to create account. Please try again.');
+      setError(result.error || "Failed to create account. Please try again.");
       setSubmitting(false);
     }
   };
@@ -84,12 +104,19 @@ export function N5CreateAccount({ state, dispatch, goNext, goBack, progress, que
           <Input
             type="email"
             value={state.email}
-            onChange={(e) => dispatch({ type: 'UPDATE_CONTACT', payload: { email: e.target.value } })}
+            onChange={(e) =>
+              dispatch({
+                type: "UPDATE_CONTACT",
+                payload: { email: e.target.value },
+              })
+            }
             placeholder="your@email.com"
             className="h-11 border-slate-200 focus:border-violet-500 focus:ring-violet-500"
           />
-          {state.email.trim() !== '' && !emailValid && (
-            <p className="text-xs text-amber-600">Please enter a valid email address</p>
+          {state.email.trim() !== "" && !emailValid && (
+            <p className="text-xs text-amber-600">
+              Please enter a valid email address
+            </p>
           )}
         </div>
 
@@ -106,7 +133,9 @@ export function N5CreateAccount({ state, dispatch, goNext, goBack, progress, que
             className="border-slate-200 focus:border-violet-500 focus:ring-violet-500"
           />
           {password.length > 0 && !passwordValid && (
-            <p className="text-xs text-amber-600">Password must be at least 8 characters</p>
+            <p className="text-xs text-amber-600">
+              Password must be at least 8 characters
+            </p>
           )}
         </div>
 
@@ -138,7 +167,9 @@ export function N5CreateAccount({ state, dispatch, goNext, goBack, progress, que
         </div>
 
         {error && (
-          <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{error}</p>
+          <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">
+            {error}
+          </p>
         )}
 
         <div className="fixed bottom-0 left-0 right-0 z-20 pt-3 pb-[66px] bg-gradient-to-t from-white from-70% to-transparent">
@@ -154,7 +185,7 @@ export function N5CreateAccount({ state, dispatch, goNext, goBack, progress, que
                   Creating your account...
                 </>
               ) : (
-                'Secure My Account'
+                "Secure My Account"
               )}
             </Button>
           </div>

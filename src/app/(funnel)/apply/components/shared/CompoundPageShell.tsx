@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 interface CompoundPageShellProps {
   title: string;
@@ -40,12 +40,12 @@ export function CompoundPageShell({
 
       {/* Content */}
       <div
-        className={`flex-1 pt-14 pb-6 transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0'
-          }`}
+        className={`flex-1 pt-14 pb-6 transition-opacity duration-300 ${
+          visible ? "opacity-100" : "opacity-0"
+        }`}
       >
         {/* Title */}
         <div className="text-center mb-6">
-
           <h2 className="text-xl sm:text-2xl font-semibold text-slate-800 leading-snug">
             {title}
           </h2>
@@ -57,9 +57,7 @@ export function CompoundPageShell({
         </div>
 
         {/* Scrollable form content */}
-        <div className="max-w-md mx-auto px-4 pb-20">
-          {children}
-        </div>
+        <div className="max-w-md mx-auto px-4 pb-20">{children}</div>
       </div>
     </div>
   );

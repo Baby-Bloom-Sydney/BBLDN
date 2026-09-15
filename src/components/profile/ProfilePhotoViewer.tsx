@@ -12,12 +12,25 @@ interface ProfilePhotoViewerProps {
   onIndexChange: (index: number) => void;
 }
 
-export function ProfilePhotoViewer({ photos, open, index, firstName, onClose, onIndexChange }: ProfilePhotoViewerProps) {
+export function ProfilePhotoViewer({
+  photos,
+  open,
+  index,
+  firstName,
+  onClose,
+  onIndexChange,
+}: ProfilePhotoViewerProps) {
   if (!open || photos.length === 0) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={onClose}>
-      <div className="relative max-w-lg w-full mx-4" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-w-lg w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           className="absolute -top-10 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
@@ -33,7 +46,9 @@ export function ProfilePhotoViewer({ photos, open, index, firstName, onClose, on
           {photos.length > 1 && (
             <>
               <button
-                onClick={() => onIndexChange((index - 1 + photos.length) % photos.length)}
+                onClick={() =>
+                  onIndexChange((index - 1 + photos.length) % photos.length)
+                }
                 className="absolute left-2 top-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
               >
                 <ChevronLeft className="h-5 w-5" />
@@ -54,7 +69,7 @@ export function ProfilePhotoViewer({ photos, open, index, firstName, onClose, on
               onClick={() => onIndexChange(i)}
               className={cn(
                 "h-2 w-2 rounded-full transition-colors",
-                i === index ? "bg-white" : "bg-white/40"
+                i === index ? "bg-white" : "bg-white/40",
               )}
             />
           ))}

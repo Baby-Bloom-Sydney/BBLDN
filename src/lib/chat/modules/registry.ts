@@ -28,7 +28,6 @@ import { katieAdminModule } from "./katie-admin";
 import { verificationModule } from "./verification";
 import { connectionsModule } from "./connections";
 import { profileModule } from "./profile";
-import { bsrModule } from "./bsr";
 import { jobSearchModule } from "./job-search";
 import { onboardingModule } from "./onboarding";
 import { childOnboardingModule } from "./child-onboarding";
@@ -50,7 +49,6 @@ const ALL_MODULES: BloomBotModule[] = [
   verificationModule,
   connectionsModule,
   profileModule,
-  bsrModule,
   jobSearchModule,
   onboardingModule,
   childOnboardingModule,

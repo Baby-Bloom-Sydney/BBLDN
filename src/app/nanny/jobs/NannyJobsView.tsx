@@ -1,12 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  MapPin,
-  Clock,
-  DollarSign,
-  Baby,
-} from "lucide-react";
+import { MapPin, Clock, DollarSign, Baby } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════════
 // TYPES
@@ -115,7 +110,10 @@ function ScheduleGrid({
                 {DAY_SHORT[day]}
               </div>
               {BRACKET_KEYS.map((b) => (
-                <div key={b} className="flex items-center justify-center py-0.5">
+                <div
+                  key={b}
+                  className="flex items-center justify-center py-0.5"
+                >
                   <div
                     className={`h-2.5 w-2.5 rounded-full ${
                       dayTimes.includes(b) ? "bg-violet-400" : "bg-violet-200"
@@ -135,7 +133,13 @@ function ScheduleGrid({
 // POSITION TILE
 // ═══════════════════════════════════════════════════════════════
 
-function PositionTile({ position, applied }: { position: OpenPosition; applied?: boolean }) {
+function PositionTile({
+  position,
+  applied,
+}: {
+  position: OpenPosition;
+  applied?: boolean;
+}) {
   return (
     <Link
       href={`/position/${position.id}`}
@@ -160,7 +164,8 @@ function PositionTile({ position, applied }: { position: OpenPosition; applied?:
             <p className="text-[11px] text-slate-400 shrink-0 ml-2">
               {(() => {
                 const days = Math.floor(
-                  (Date.now() - new Date(position.created_at).getTime()) / 86400000
+                  (Date.now() - new Date(position.created_at).getTime()) /
+                    86400000,
                 );
                 if (days === 0) return "Today";
                 if (days === 1) return "1 day ago";

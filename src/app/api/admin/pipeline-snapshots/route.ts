@@ -1,26 +1,30 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  const sections = searchParams.get('sections')?.split(',').filter(Boolean) || [];
-  const from = searchParams.get('from');
-  const to = searchParams.get('to');
+  const sections =
+    searchParams.get("sections")?.split(",").filter(Boolean) || [];
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
 
   if (sections.length === 0) {
-    return NextResponse.json({ error: 'No sections specified' }, { status: 400 });
+    return NextResponse.json(
+      { error: "No sections specified" },
+      { status: 400 },
+    );
   }
 
   const admin = createAdminClient();
 
   let query = admin
-    .from('pipeline_snapshots')
-    .select('snapshot_date, section_key, stages')
-    .in('section_key', sections)
-    .order('snapshot_date', { ascending: true });
+    .from("pipeline_snapshots")
+    .select("snapshot_date, section_key, stages")
+    .in("section_key", sections)
+    .order("snapshot_date", { ascending: true });
 
-  if (from) query = query.gte('snapshot_date', from);
-  if (to) query = query.lte('snapshot_date', to);
+  if (from) query = query.gte("snapshot_date", from);
+  if (to) query = query.lte("snapshot_date", to);
 
   const { data, error } = await query;
 

@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { Users, Heart, ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { trackEvent } from '@/lib/analytics/trackEvent';
+import Link from "next/link";
+import { Users, Heart, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/analytics/trackEvent";
 
 export interface ConnectedNanny {
   nannyId: string;
@@ -15,11 +15,15 @@ export interface ConnectedNanny {
 
 interface ConnectionsTileProps {
   connectionsCount: number;
-  connectedNannies: ConnectedNanny[];  // max 3 for display
-  placement: ConnectedNanny | null;    // active placement (hired nanny)
+  connectedNannies: ConnectedNanny[]; // max 3 for display
+  placement: ConnectedNanny | null; // active placement (hired nanny)
 }
 
-export function ConnectionsTile({ connectionsCount, connectedNannies, placement }: ConnectionsTileProps) {
+export function ConnectionsTile({
+  connectionsCount,
+  connectedNannies,
+  placement,
+}: ConnectionsTileProps) {
   // Helper to get initials
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -69,11 +73,13 @@ export function ConnectionsTile({ connectionsCount, connectedNannies, placement 
         <Button
           asChild
           className="w-full bg-violet-600 hover:bg-violet-700 text-white"
-          onClick={() => trackEvent({ event_name: 'connections_tile_view_placement_clicked' })}
+          onClick={() =>
+            trackEvent({
+              event_name: "connections_tile_view_placement_clicked",
+            })
+          }
         >
-          <Link href="/parent">
-            View Connection
-          </Link>
+          <Link href="/parent">View Connection</Link>
         </Button>
       </div>
     );
@@ -91,7 +97,9 @@ export function ConnectionsTile({ connectionsCount, connectedNannies, placement 
           <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center">
             <Users className="w-4 h-4 text-violet-600" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-900 flex-1">Connections</h3>
+          <h3 className="text-lg font-semibold text-slate-900 flex-1">
+            Connections
+          </h3>
           <span className="bg-violet-100 text-violet-600 text-sm font-medium rounded-full px-2 py-0.5">
             {connectionsCount}
           </span>
@@ -131,7 +139,7 @@ export function ConnectionsTile({ connectionsCount, connectedNannies, placement 
           {displayNannies.map((nanny, idx) => (
             <span key={nanny.nannyId}>
               {formatName(nanny.firstName, nanny.lastName)}
-              {idx < displayNannies.length - 1 && ', '}
+              {idx < displayNannies.length - 1 && ", "}
             </span>
           ))}
         </p>
@@ -140,11 +148,14 @@ export function ConnectionsTile({ connectionsCount, connectedNannies, placement 
         <Button
           asChild
           className="w-full bg-violet-600 hover:bg-violet-700 text-white"
-          onClick={() => trackEvent({ event_name: 'connections_tile_view_all_clicked', metadata: { count: connectionsCount } })}
+          onClick={() =>
+            trackEvent({
+              event_name: "connections_tile_view_all_clicked",
+              metadata: { count: connectionsCount },
+            })
+          }
         >
-          <Link href="/parent/connections">
-            View All
-          </Link>
+          <Link href="/parent/connections">View All</Link>
         </Button>
       </div>
     );
@@ -169,9 +180,14 @@ export function ConnectionsTile({ connectionsCount, connectedNannies, placement 
       <Button
         asChild
         className="w-full bg-violet-600 hover:bg-violet-700 text-white"
-        onClick={() => trackEvent({ event_name: 'connections_tile_browse_clicked' })}
+        onClick={() =>
+          trackEvent({ event_name: "connections_tile_browse_clicked" })
+        }
       >
-        <Link href="/parent/browse" className="flex items-center justify-center gap-2">
+        <Link
+          href="/parent/browse"
+          className="flex items-center justify-center gap-2"
+        >
           Browse Nannies
           <ArrowRight className="w-4 h-4" />
         </Link>

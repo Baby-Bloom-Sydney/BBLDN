@@ -1,76 +1,85 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { usePathname } from 'next/navigation';
-import Link from 'next/link';
+import { useState } from "react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import {
-  Home, Users, Baby, Shield, Settings, LayoutDashboard,
-  FileText, Search, MessageSquare, Calendar, ChevronLeft,
-  ChevronRight, LogIn, UserPlus, HelpCircle, Mail,
-  BarChart3, ClipboardList, Eye, FileCheck, PlusCircle, UserCircle
-} from 'lucide-react';
+  Home,
+  Users,
+  Shield,
+  Settings,
+  LayoutDashboard,
+  FileText,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  LogIn,
+  UserPlus,
+  HelpCircle,
+  Mail,
+  ClipboardList,
+  Eye,
+  FileCheck,
+  PlusCircle,
+  UserCircle,
+} from "lucide-react";
 
 const SECTIONS = [
   {
-    title: 'Public',
-    color: 'text-emerald-500',
+    title: "Public",
+    color: "text-emerald-500",
     routes: [
-      { path: '/', label: 'Home', icon: Home },
-      { path: '/nannies', label: 'Browse (Public)', icon: Search },
-      { path: '/nannies/dev-1', label: 'Nanny Profile', icon: UserCircle },
-      { path: '/about', label: 'About', icon: HelpCircle },
-      { path: '/how-it-works', label: 'How It Works', icon: Eye },
-      { path: '/contact', label: 'Contact', icon: Mail },
+      { path: "/", label: "Home", icon: Home },
+      { path: "/nannies", label: "Browse (Public)", icon: Search },
+      { path: "/nannies/dev-1", label: "Nanny Profile", icon: UserCircle },
+      { path: "/about", label: "About", icon: HelpCircle },
+      { path: "/how-it-works", label: "How It Works", icon: Eye },
+      { path: "/contact", label: "Contact", icon: Mail },
     ],
   },
   {
-    title: 'Auth',
-    color: 'text-amber-500',
+    title: "Auth",
+    color: "text-amber-500",
     routes: [
-      { path: '/login', label: 'Login', icon: LogIn },
-      { path: '/signup', label: 'Signup (Role Select)', icon: UserPlus },
-      { path: '/signup/nanny', label: 'Nanny Signup', icon: UserPlus },
-      { path: '/signup/parent', label: 'Parent Signup', icon: UserPlus },
-      { path: '/forgot-password', label: 'Forgot Password', icon: Settings },
+      { path: "/login", label: "Login", icon: LogIn },
+      { path: "/signup", label: "Signup (Role Select)", icon: UserPlus },
+      { path: "/signup/nanny", label: "Nanny Signup", icon: UserPlus },
+      { path: "/signup/parent", label: "Parent Signup", icon: UserPlus },
+      { path: "/forgot-password", label: "Forgot Password", icon: Settings },
     ],
   },
   {
-    title: 'Nanny',
-    color: 'text-violet-500',
+    title: "Nanny",
+    color: "text-violet-500",
     routes: [
-      { path: '/nanny', label: 'Hub', icon: LayoutDashboard },
-      { path: '/nanny/register', label: 'Registration Form', icon: FileText },
-      { path: '/nanny/profile', label: 'Edit Profile', icon: Users },
-      { path: '/nanny/verification', label: 'Verification', icon: Shield },
-      { path: '/nanny/verify', label: 'ID Verification', icon: FileCheck },
-      { path: '/nanny/interviews', label: 'Interviews', icon: MessageSquare },
-      { path: '/nanny/babysitting', label: 'Babysitting', icon: Baby },
-      { path: '/nanny/settings', label: 'Settings', icon: Settings },
+      { path: "/nanny", label: "Hub", icon: LayoutDashboard },
+      { path: "/nanny/register", label: "Registration Form", icon: FileText },
+      { path: "/nanny/profile", label: "Edit Profile", icon: Users },
+      { path: "/nanny/verification", label: "Verification", icon: Shield },
+      { path: "/nanny/verify", label: "ID Verification", icon: FileCheck },
+      { path: "/nanny/settings", label: "Settings", icon: Settings },
     ],
   },
   {
-    title: 'Parent',
-    color: 'text-blue-500',
+    title: "Parent",
+    color: "text-blue-500",
     routes: [
-      { path: '/parent', label: 'Hub', icon: LayoutDashboard },
-      { path: '/parent', label: 'Create Position', icon: FileText },
-      { path: '/parent/request', label: 'Nanny Request', icon: PlusCircle },
-      { path: '/parent/browse', label: 'Browse (Parent)', icon: Search },
-      { path: '/parent/interviews', label: 'Interviews', icon: MessageSquare },
-      { path: '/parent/babysitting', label: 'Babysitting', icon: Calendar },
-      { path: '/parent/settings', label: 'Settings', icon: Settings },
+      { path: "/parent", label: "Hub", icon: LayoutDashboard },
+      { path: "/parent", label: "Create Position", icon: FileText },
+      { path: "/parent/request", label: "Nanny Request", icon: PlusCircle },
+      { path: "/parent/browse", label: "Browse (Parent)", icon: Search },
+      { path: "/parent/settings", label: "Settings", icon: Settings },
     ],
   },
   {
-    title: 'Admin',
-    color: 'text-red-500',
+    title: "Admin",
+    color: "text-red-500",
     routes: [
-      { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { path: '/admin/verifications', label: 'Verifications', icon: Shield },
-      { path: '/admin/users', label: 'Users', icon: Users },
-      { path: '/admin/pipeline', label: 'Pipeline', icon: ClipboardList },
-      { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
-      { path: '/admin/settings', label: 'Settings', icon: Settings },
+      { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { path: "/admin/verifications", label: "Verifications", icon: Shield },
+      { path: "/admin/users", label: "Users", icon: Users },
+      { path: "/admin/pipeline", label: "Pipeline", icon: ClipboardList },
+      { path: "/admin/settings", label: "Settings", icon: Settings },
     ],
   },
 ];
@@ -94,7 +103,9 @@ export function DevSidebar() {
   return (
     <div className="fixed right-0 top-0 bottom-0 z-[9998] w-56 bg-gray-950 text-gray-300 overflow-y-auto shadow-2xl border-l border-gray-800 flex flex-col">
       <div className="flex items-center justify-between px-3 py-3 border-b border-gray-800">
-        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Dev Nav</span>
+        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+          Dev Nav
+        </span>
         <button
           onClick={() => setOpen(false)}
           className="text-gray-500 hover:text-white p-1"
@@ -107,22 +118,26 @@ export function DevSidebar() {
       <nav className="flex-1 py-2">
         {SECTIONS.map((section) => (
           <div key={section.title} className="mb-1">
-            <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${section.color}`}>
+            <div
+              className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${section.color}`}
+            >
               {section.title}
             </div>
             {section.routes.map((route) => {
               const Icon = route.icon;
-              const isActive = route.path === '/'
-                ? pathname === '/'
-                : pathname === route.path || pathname.startsWith(route.path + '/');
+              const isActive =
+                route.path === "/"
+                  ? pathname === "/"
+                  : pathname === route.path ||
+                    pathname.startsWith(route.path + "/");
               return (
                 <Link
                   key={route.path}
                   href={route.path}
                   className={`flex items-center gap-2 px-3 py-1.5 text-xs transition-colors ${
                     isActive
-                      ? 'bg-violet-600/20 text-violet-300 border-r-2 border-violet-500'
-                      : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                      ? "bg-violet-600/20 text-violet-300 border-r-2 border-violet-500"
+                      : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
                   }`}
                 >
                   <Icon className="h-3.5 w-3.5 flex-shrink-0" />

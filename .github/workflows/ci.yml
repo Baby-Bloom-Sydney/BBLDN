@@ -13,8 +13,8 @@
 #                                        (supabase start) · e2e (next build → playwright)              [red until S2–S5, E1]
 #   7 build + budgets → build           next build · size-limit [Phase 1 baseline] · prod-guard · bundle string scan
 #   7 types           → types-drift     supabase gen types ↔ src/modules/shared-types/database.types.ts [red until S2/S5]
-#   sec               → gitleaks        gitleaks (pinned binary, .gitleaks.toml) · npm audit --audit-level=high ·
-#                                        exact-version pins + lockfile
+#   sec               → gitleaks        gitleaks (pinned binary, .gitleaks.toml) · npm audit --audit-level=high with an
+#                                        expiring allow-list (scripts/ci/check-audit.mjs) · exact-version pins + lockfile
 #   8 preview + lhci  → (Vercel preview, warn-only day one; wired once bb-ldn exists — HANDOFF §2 row 6)
 #
 # Rules applied: every action and tool pinned (commit SHA / exact version); `npm ci` with cache; artefacts uploaded
@@ -254,9 +254,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-      - name: npm audit --audit-level=high (07 §10.2) — expiring allow-list file lands with S1
+      - name: npm audit --audit-level=high with the expiring allow-list (07 §10.2; scripts/ci/audit-allowlist.json)
         if: ${{ !cancelled() }}
-        run: npm audit --audit-level=high
+        run: npm run check:audit
       - name: exact-version pins + lockfile (07 §10.2) — red on the raw copy (Sydney `^` ranges) until S1
         if: ${{ !cancelled() }}
         run: npm run check:pins

@@ -25,10 +25,7 @@ export default async function MatchmakingNannyProfilePage({
         Back to matchmaking
       </Link>
 
-      <NannyProfileView
-        nanny={nanny}
-        isActiveNanny={true}
-      />
+      <NannyProfileView nanny={nanny} isActiveNanny={true} />
     </div>
   );
 }

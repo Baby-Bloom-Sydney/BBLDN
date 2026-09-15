@@ -1,20 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { sendEmail } from '@/lib/email/resend';
+import { NextRequest, NextResponse } from "next/server";
+import { sendEmail } from "@/lib/email/resend";
 
 export async function GET(request: NextRequest) {
   // Dev-only guard
-  if (process.env.NEXT_PUBLIC_DEV_MODE !== 'true' && process.env.NODE_ENV !== 'development') {
-    return NextResponse.json({ error: 'Not available in production' }, { status: 403 });
+  if (
+    process.env.NEXT_PUBLIC_DEV_MODE !== "true" &&
+    process.env.NODE_ENV !== "development"
+  ) {
+    return NextResponse.json(
+      { error: "Not available in production" },
+      { status: 403 },
+    );
   }
 
-  const to = request.nextUrl.searchParams.get('to');
+  const to = request.nextUrl.searchParams.get("to");
   if (!to) {
-    return NextResponse.json({ error: 'Missing ?to=email@example.com' }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing ?to=email@example.com" },
+      { status: 400 },
+    );
   }
 
   const result = await sendEmail({
     to,
-    subject: 'Baby Bloom — Test Email',
+    subject: "Baby Bloom — Test Email",
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
         <h1 style="color: #8B5CF6; font-size: 24px; margin-bottom: 16px;">Baby Bloom Sydney</h1>
@@ -27,8 +36,8 @@ export async function GET(request: NextRequest) {
         </p>
       </div>
     `,
-    text: 'This is a test email from Baby Bloom Sydney. If you are reading this, Resend is configured correctly!',
-    emailType: 'admin_notification',
+    text: "This is a test email from Baby Bloom Sydney. If you are reading this, Resend is configured correctly!",
+    emailType: "admin_notification",
   });
 
   return NextResponse.json(result);

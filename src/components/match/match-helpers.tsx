@@ -39,12 +39,24 @@ export function calcAge(dob: string | null): number | null {
 
 // ── Availability table ──
 
-const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
+const DAYS = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+] as const;
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const BLOCKS = ["morning", "midday", "afternoon", "evening"] as const;
 const BLOCK_LABELS = ["Morning", "Midday", "Afternoon", "Evening"];
 
-export function AvailabilityTable({ schedule }: { schedule: Record<string, string[]> }) {
+export function AvailabilityTable({
+  schedule,
+}: {
+  schedule: Record<string, string[]>;
+}) {
   return (
     <div className="border rounded-lg overflow-hidden">
       <table className="w-full text-[9px]">
@@ -52,7 +64,10 @@ export function AvailabilityTable({ schedule }: { schedule: Record<string, strin
           <tr className="border-b">
             <th className="py-0.5 px-1.5 text-left font-medium text-slate-400 w-[36px]" />
             {BLOCK_LABELS.map((b) => (
-              <th key={b} className="py-0.5 px-0 text-center font-medium text-slate-400 uppercase tracking-wider">
+              <th
+                key={b}
+                className="py-0.5 px-0 text-center font-medium text-slate-400 uppercase tracking-wider"
+              >
                 {b.slice(0, 3)}
               </th>
             ))}
@@ -62,18 +77,31 @@ export function AvailabilityTable({ schedule }: { schedule: Record<string, strin
           {DAYS.map((day, i) => {
             const available = schedule[day] ?? [];
             return (
-              <tr key={day} className={i < DAYS.length - 1 ? "border-b border-slate-100" : ""}>
-                <td className="py-[3px] px-1.5 font-medium text-slate-600">{DAY_LABELS[i]}</td>
+              <tr
+                key={day}
+                className={
+                  i < DAYS.length - 1 ? "border-b border-slate-100" : ""
+                }
+              >
+                <td className="py-[3px] px-1.5 font-medium text-slate-600">
+                  {DAY_LABELS[i]}
+                </td>
                 {BLOCKS.map((block) => {
                   const has = available.includes(block);
                   return (
                     <td key={block} className="py-[3px] px-0 text-center">
                       <span
                         className={`inline-flex items-center justify-center w-[18px] h-[18px] rounded-full ${
-                          has ? "bg-violet-100 text-violet-500" : "bg-slate-100 text-slate-300"
+                          has
+                            ? "bg-violet-100 text-violet-500"
+                            : "bg-slate-100 text-slate-300"
                         }`}
                       >
-                        {has ? <Check className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
+                        {has ? (
+                          <Check className="w-2.5 h-2.5" />
+                        ) : (
+                          <Minus className="w-2.5 h-2.5" />
+                        )}
                       </span>
                     </td>
                   );
@@ -91,7 +119,10 @@ export function AvailabilityTable({ schedule }: { schedule: Record<string, strin
 
 export type View = "availability" | "overview" | "breakdown";
 
-export function getTranslateClass(panel: "availability" | "overview" | "breakdown", view: View): string {
+export function getTranslateClass(
+  panel: "availability" | "overview" | "breakdown",
+  view: View,
+): string {
   if (panel === "availability") {
     if (view === "availability") return "translate-x-0";
     return "-translate-x-full";

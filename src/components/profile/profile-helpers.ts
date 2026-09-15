@@ -26,9 +26,20 @@ export function computeAge(dob: string | null): number | null {
   return age;
 }
 
-export function ageRangeToFriendly(minMonths: number, maxMonths: number): string {
-  const minLabel = minMonths === 0 ? "Newborns" : minMonths < 12 ? `${minMonths}mth olds` : `${Math.floor(minMonths / 12)}yr olds`;
-  const maxLabel = maxMonths < 12 ? `${maxMonths}mth olds` : `${Math.floor(maxMonths / 12)}yr olds`;
+export function ageRangeToFriendly(
+  minMonths: number,
+  maxMonths: number,
+): string {
+  const minLabel =
+    minMonths === 0
+      ? "Newborns"
+      : minMonths < 12
+        ? `${minMonths}mth olds`
+        : `${Math.floor(minMonths / 12)}yr olds`;
+  const maxLabel =
+    maxMonths < 12
+      ? `${maxMonths}mth olds`
+      : `${Math.floor(maxMonths / 12)}yr olds`;
   return `${minLabel} to ${maxLabel}`;
 }
 
@@ -38,7 +49,19 @@ export function childrenCountLabel(count: number): string {
 }
 
 export const BADGE_ICONS: Record<string, React.ElementType> = {
-  Clock, Baby, GraduationCap, Award, Car, Globe, Heart,
-  Stethoscope, CigaretteOff, PawPrint, Users, ShieldCheck,
-  Briefcase, BookOpen, Check,
+  Clock,
+  Baby,
+  GraduationCap,
+  Award,
+  Car,
+  Globe,
+  Heart,
+  Stethoscope,
+  CigaretteOff,
+  PawPrint,
+  Users,
+  ShieldCheck,
+  Briefcase,
+  BookOpen,
+  Check,
 };

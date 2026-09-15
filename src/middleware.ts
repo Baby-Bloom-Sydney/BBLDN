@@ -3,7 +3,7 @@ import { updateSession } from "@/lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
   // DEV MODE: bypass all auth checks
-  if (process.env.NEXT_PUBLIC_DEV_MODE === 'true') {
+  if (process.env.NEXT_PUBLIC_DEV_MODE === "true") {
     return NextResponse.next();
   }
 

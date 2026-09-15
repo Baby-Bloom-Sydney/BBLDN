@@ -9,7 +9,8 @@ export function MissionTeaser() {
             Early years matter
           </h2>
           <p className="mt-4 text-slate-600 leading-relaxed">
-            Foundations are set in the first five years. The right care during this period changes everything.
+            Foundations are set in the first five years. The right care during
+            this period changes everything.
           </p>
           <Link
             href="/about"

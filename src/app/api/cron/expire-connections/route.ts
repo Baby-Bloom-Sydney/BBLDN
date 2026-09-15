@@ -1,9 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { createInboxMessage, logConnectionEvent } from '@/lib/actions/connection-helpers';
-import { sendEmail } from '@/lib/email/resend';
-import { getUserEmailInfo } from '@/lib/email/helpers';
-import { CONNECTION_STAGE } from '@/lib/position/constants';
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  createInboxMessage,
+  logConnectionEvent,
+} from "@/lib/actions/connection-helpers";
+import { sendEmail } from "@/lib/email/resend";
+import { getUserEmailInfo } from "@/lib/email/helpers";
+import { CONNECTION_STAGE } from "@/lib/position/constants";
 
 /**
  * Cron endpoint: expires pending connection requests past their expires_at.
@@ -18,42 +21,44 @@ import { CONNECTION_STAGE } from '@/lib/position/constants';
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
-    const authHeader = request.headers.get('authorization');
+    const authHeader = request.headers.get("authorization");
     if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   }
 
   const supabase = createAdminClient();
   const now = new Date().toISOString();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app-babybloom.vercel.app';
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL || "https://app-babybloom.vercel.app";
   const baseStyle = `font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;`;
   const btnStyle = `background: #8B5CF6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;`;
 
   // Find all pending/accepted requests past expiry
   const { data: stale } = await supabase
-    .from('connection_requests')
-    .select('id, parent_id, nanny_id, status')
-    .in('status', ['pending', 'accepted'])
-    .lt('expires_at', now);
+    .from("connection_requests")
+    .select("id, parent_id, nanny_id, status")
+    .in("status", ["pending", "accepted"])
+    .lt("expires_at", now);
 
   let expired = 0;
 
   for (const req of stale ?? []) {
-    const wasAccepted = req.status === 'accepted';
+    const wasAccepted = req.status === "accepted";
 
     // Update to expired — set both status and connection_stage
     const { error } = await supabase
-      .from('connection_requests')
+      .from("connection_requests")
       .update({
-        status: 'expired',
-        connection_stage: req.status === 'pending'
-          ? CONNECTION_STAGE.REQUEST_EXPIRED
-          : CONNECTION_STAGE.SCHEDULE_EXPIRED,
+        status: "expired",
+        connection_stage:
+          req.status === "pending"
+            ? CONNECTION_STAGE.REQUEST_EXPIRED
+            : CONNECTION_STAGE.SCHEDULE_EXPIRED,
         updated_at: now,
       })
-      .eq('id', req.id)
-      .in('status', ['pending', 'accepted']); // Optimistic lock
+      .eq("id", req.id)
+      .in("status", ["pending", "accepted"]); // Optimistic lock
 
     if (error) continue; // Already expired by lazy expiry
 
@@ -64,41 +69,41 @@ export async function GET(request: NextRequest) {
       connectionRequestId: req.id,
       parentId: req.parent_id,
       nannyId: req.nanny_id,
-      eventType: 'expired',
+      eventType: "expired",
     });
 
     // Get user IDs
     const { data: nannyData } = await supabase
-      .from('nannies')
-      .select('user_id')
-      .eq('id', req.nanny_id)
+      .from("nannies")
+      .select("user_id")
+      .eq("id", req.nanny_id)
       .single();
 
     const { data: parentData } = await supabase
-      .from('parents')
-      .select('user_id')
-      .eq('id', req.parent_id)
+      .from("parents")
+      .select("user_id")
+      .eq("id", req.parent_id)
       .single();
 
     // Parent inbox + email (INT-005)
     if (parentData) {
       await createInboxMessage({
         userId: parentData.user_id,
-        type: 'connection_expired',
-        title: 'Connection request expired',
+        type: "connection_expired",
+        title: "Connection request expired",
         body: wasAccepted
-          ? 'Your accepted connection has expired because a meet and greet was not scheduled in time.'
-          : 'Your connection request has expired as the nanny did not respond in time.',
-        actionUrl: '/parent/connections',
+          ? "Your accepted connection has expired because a meet and greet was not scheduled in time."
+          : "Your connection request has expired as the nanny did not respond in time.",
+        actionUrl: "/parent/connections",
         referenceId: req.id,
-        referenceType: 'connection_request',
+        referenceType: "connection_request",
       });
 
       const parentInfo = await getUserEmailInfo(parentData.user_id);
       if (parentInfo) {
         sendEmail({
           to: parentInfo.email,
-          subject: 'Connection request expired',
+          subject: "Connection request expired",
           html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1e293b;background:#f8fafc;">
 <div style="max-width:600px;margin:0 auto;padding:32px 16px;">
@@ -122,9 +127,11 @@ export async function GET(request: NextRequest) {
   </div>
 </div>
 </body></html>`,
-          emailType: 'interview_request',
+          emailType: "interview_request",
           recipientUserId: parentData.user_id,
-        }).catch(err => console.error('[ExpireCron] INT-005 email error:', err));
+        }).catch((err) =>
+          console.error("[ExpireCron] INT-005 email error:", err),
+        );
       }
     }
 
@@ -132,21 +139,23 @@ export async function GET(request: NextRequest) {
     if (nannyData) {
       await createInboxMessage({
         userId: nannyData.user_id,
-        type: 'connection_expired',
-        title: wasAccepted ? 'Accepted connection expired' : 'Missed connection request',
+        type: "connection_expired",
+        title: wasAccepted
+          ? "Accepted connection expired"
+          : "Missed connection request",
         body: wasAccepted
-          ? 'An accepted connection has expired because the family did not schedule a meet and greet in time.'
-          : 'A connection request has expired. Responding promptly helps families find the right nanny.',
-        actionUrl: '/nanny/inbox',
+          ? "An accepted connection has expired because the family did not schedule a meet and greet in time."
+          : "A connection request has expired. Responding promptly helps families find the right nanny.",
+        actionUrl: "/nanny/inbox",
         referenceId: req.id,
-        referenceType: 'connection_request',
+        referenceType: "connection_request",
       });
 
       const nannyInfo = await getUserEmailInfo(nannyData.user_id);
       if (nannyInfo) {
         sendEmail({
           to: nannyInfo.email,
-          subject: 'Missed connection request',
+          subject: "Missed connection request",
           html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1e293b;background:#f8fafc;">
 <div style="max-width:600px;margin:0 auto;padding:32px 16px;">
@@ -170,9 +179,11 @@ export async function GET(request: NextRequest) {
   </div>
 </div>
 </body></html>`,
-          emailType: 'interview_request',
+          emailType: "interview_request",
           recipientUserId: nannyData.user_id,
-        }).catch(err => console.error('[ExpireCron] INT-006 email error:', err));
+        }).catch((err) =>
+          console.error("[ExpireCron] INT-006 email error:", err),
+        );
       }
     }
   }

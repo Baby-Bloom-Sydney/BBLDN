@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { processDfyWaves } from '@/lib/actions/matching';
+import { NextRequest, NextResponse } from "next/server";
+import { processDfyWaves } from "@/lib/actions/matching";
 
 /**
  * Cron endpoint: processes pending DFY email waves.
@@ -15,9 +15,9 @@ import { processDfyWaves } from '@/lib/actions/matching';
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
-    const authHeader = request.headers.get('authorization');
+    const authHeader = request.headers.get("authorization");
     if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   }
 

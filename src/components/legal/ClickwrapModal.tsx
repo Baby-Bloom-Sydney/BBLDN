@@ -1,18 +1,21 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/dialog';
-import { ConsentCheckboxGroup } from './ConsentCheckboxGroup';
-import { recordConsent, recordInformedAction } from '@/lib/legal/record-consent';
-import type { CheckpointConfig, AgreementId } from '@/lib/legal/types';
-import { Loader2 } from 'lucide-react';
+} from "@/components/ui/dialog";
+import { ConsentCheckboxGroup } from "./ConsentCheckboxGroup";
+import {
+  recordConsent,
+  recordInformedAction,
+} from "@/lib/legal/record-consent";
+import type { CheckpointConfig, AgreementId } from "@/lib/legal/types";
+import { Loader2 } from "lucide-react";
 
 interface ClickwrapModalProps {
   open: boolean;
@@ -61,7 +64,9 @@ export function ClickwrapModal({
   const [recording, setRecording] = useState(false);
 
   const hasCheckpoints = checkpoints.length > 0;
-  const allChecked = hasCheckpoints ? checkpoints.every((cp) => checked[cp.id]) : true;
+  const allChecked = hasCheckpoints
+    ? checkpoints.every((cp) => checked[cp.id])
+    : true;
   const isLoading = recording || externalLoading;
 
   const handleChange = (id: string, value: boolean) => {
@@ -79,7 +84,11 @@ export function ClickwrapModal({
         checkpointText: cp.text,
       }));
 
-      const result = await recordConsent(consentInputs, relatedEntityId, modalContentVersion);
+      const result = await recordConsent(
+        consentInputs,
+        relatedEntityId,
+        modalContentVersion,
+      );
       if (result.success) {
         await onConfirm();
       }
@@ -87,7 +96,7 @@ export function ClickwrapModal({
       const result = await recordInformedAction({
         agreementId,
         buttonText,
-        modalContentVersion: modalContentVersion || '',
+        modalContentVersion: modalContentVersion || "",
         relatedEntityId,
       });
       if (result.success) {
@@ -117,11 +126,16 @@ export function ClickwrapModal({
         {reminderItems && reminderItems.length > 0 && (
           <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3">
             {reminderTitle && (
-              <p className="text-sm font-semibold text-slate-700 mb-2">{reminderTitle}</p>
+              <p className="text-sm font-semibold text-slate-700 mb-2">
+                {reminderTitle}
+              </p>
             )}
             <ul className="space-y-2">
               {reminderItems.map((item, i) => (
-                <li key={i} className="flex gap-2 text-xs text-slate-600 leading-relaxed">
+                <li
+                  key={i}
+                  className="flex gap-2 text-xs text-slate-600 leading-relaxed"
+                >
                   <span className="text-slate-400 shrink-0 mt-0.5">&bull;</span>
                   <span>{item}</span>
                 </li>
@@ -179,7 +193,9 @@ export function ClickwrapModal({
         </div>
 
         {footerText && (
-          <p className="text-xs text-slate-400 text-center pt-1">{footerText}</p>
+          <p className="text-xs text-slate-400 text-center pt-1">
+            {footerText}
+          </p>
         )}
       </DialogContent>
     </Dialog>

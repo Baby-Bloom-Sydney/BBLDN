@@ -6,8 +6,12 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      { source: '/signup/nanny', destination: '/apply/nanny', permanent: true },
-      { source: '/nanny/register', destination: '/nanny/profile', permanent: true },
+      { source: "/signup/nanny", destination: "/apply/nanny", permanent: true },
+      {
+        source: "/nanny/register",
+        destination: "/nanny/profile",
+        permanent: true,
+      },
     ];
   },
   experimental: {

@@ -130,20 +130,6 @@ export interface ConnectionRequestChatTile {
 }
 
 /**
- * Babysitting job — id-only. Same live-fetch pattern as
- * `connection_request`. BsrJobTile reads from
- * `/api/chat/bsr/[id]` (role-aware: nanny sees their invitation,
- * parent sees their own request). Expiry ticks visibly until the
- * user acts; buckets shift when the nanny / parent decides.
- */
-export interface BsrJobChatTile {
-  kind: "bsr_job";
-  data: {
-    id: string;
-  };
-}
-
-/**
  * DFY-match notification — id-only. Nanny-only; job matches don't
  * have state equivalent to connections, but the details come from
  * a server action that resolves recent position data. The tile
@@ -229,7 +215,6 @@ export interface ParentPlacementChatTile {
  *
  *   | { kind: "interview_request"; data: { id: string } }
  *   | { kind: "connection_request"; data: { id: string } }
- *   | { kind: "bsr_job"; data: { id: string; slot_id?: string } }
  *
  * Do NOT add them to the union until the matching module + tile
  * component actually ship.
@@ -243,7 +228,6 @@ export type ChatTile =
   | ProgressChatTile
   | VerificationStatusChatTile
   | ConnectionRequestChatTile
-  | BsrJobChatTile
   | JobMatchChatTile
   | ParentPositionChatTile
   | ParentPlacementChatTile
@@ -296,8 +280,6 @@ export function isChatTile(value: unknown): value is ChatTile {
       );
     }
     case "connection_request":
-      return typeof data.id === "string" && data.id.length > 0;
-    case "bsr_job":
       return typeof data.id === "string" && data.id.length > 0;
     case "job_match":
       return typeof data.id === "string" && data.id.length > 0;

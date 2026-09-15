@@ -1,7 +1,7 @@
 /**
  * Cron — audit-consent-expiry
  *
- * **Schedule:** daily at `5 21 * * *` UTC (5 min after release-payouts)
+ * **Schedule:** daily at `5 21 * * *` UTC
  *  = 07:05 AEST / 08:05 AEDT.
  *
  * **Job (v1):** scans `consent_records` for the bundled per-child

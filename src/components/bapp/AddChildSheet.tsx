@@ -131,8 +131,8 @@ export function AddChildSheet({
     // the server-returned `inviteUrl` (which depends on
     // NEXT_PUBLIC_INVITE_BASE_URL — sensitive to env-paste artefacts
     // like a trailing newline). Mirrors how every other share surface
-    // in the app builds links (BsrShareClient, PositionShareClient,
-    // NannyShareClient). The token half is what the server actually
+    // in the app builds links (the share pages,
+    // removed at S1). The token half is what the server actually
     // controls; the host half is whatever the user is currently on
     // (prod, preview, localhost — same code, all environments).
     const inviteUrl = `${

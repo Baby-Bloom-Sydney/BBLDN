@@ -12,7 +12,10 @@ function calculateAge(dob: string): number {
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
   const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getDate() < birthDate.getDate())
+  ) {
     age--;
   }
   return age;
@@ -35,7 +38,7 @@ function MultiSelectTags({
     onChange(
       selected.includes(opt)
         ? selected.filter((v) => v !== opt)
-        : [...selected, opt]
+        : [...selected, opt],
     );
   };
   return (
@@ -103,7 +106,12 @@ function Reveal({
   );
 }
 
-export function StepHelpfulInfo({ data, updateData, goNext, goBack }: StepProps) {
+export function StepHelpfulInfo({
+  data,
+  updateData,
+  goNext,
+  goBack,
+}: StepProps) {
   const languages: string[] = data.languages ?? [];
   const dob = data.date_of_birth ?? null;
 
@@ -139,8 +147,7 @@ export function StepHelpfulInfo({ data, updateData, goNext, goBack }: StepProps)
         data.other_languages.trim() !== "") ||
       (!showOtherLanguages && languages.length > 0));
 
-  const showCar =
-    showDrivers && data.drivers_license === true;
+  const showCar = showDrivers && data.drivers_license === true;
   const showPets =
     showDrivers && (data.drivers_license === false || data.has_car !== null);
   const showVaccination = showPets && data.comfortable_with_pets !== null;
@@ -156,7 +163,6 @@ export function StepHelpfulInfo({ data, updateData, goNext, goBack }: StepProps)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-
         {/* Date of Birth */}
         <div className="space-y-3">
           <p className="text-sm font-medium text-slate-700">
@@ -280,7 +286,12 @@ export function StepHelpfulInfo({ data, updateData, goNext, goBack }: StepProps)
 
         {/* Navigation */}
         <div className="flex gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={goBack} className="flex-1">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={goBack}
+            className="flex-1"
+          >
             Back
           </Button>
           {canContinue && (

@@ -5,12 +5,29 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { StepProps } from "../NannyRegistrationFunnel";
 
-const EXPERIENCE_OPTIONS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10+"];
+const EXPERIENCE_OPTIONS = [
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10+",
+];
 
 const selectClass =
   "w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none";
 
-export function StepExperience({ data, updateData, goNext, goBack }: StepProps) {
+export function StepExperience({
+  data,
+  updateData,
+  goNext,
+  goBack,
+}: StepProps) {
   const {
     total_experience,
     nanny_experience,
@@ -35,7 +52,6 @@ export function StepExperience({ data, updateData, goNext, goBack }: StepProps) 
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-6 pb-8">
-
         {/* Total Experience */}
         <div className="flex flex-col gap-2">
           <Label className="text-sm font-medium text-slate-700">
@@ -96,7 +112,8 @@ export function StepExperience({ data, updateData, goNext, goBack }: StepProps) 
         >
           <div className="flex flex-col gap-2">
             <Label className="text-sm font-medium text-slate-700">
-              How many years of experience do you have working with children under 3 years old?
+              How many years of experience do you have working with children
+              under 3 years old?
             </Label>
             <select
               className={selectClass}
@@ -154,7 +171,8 @@ export function StepExperience({ data, updateData, goNext, goBack }: StepProps) 
         >
           <div className="flex flex-col gap-2">
             <Label className="text-sm font-medium text-slate-700">
-              Briefly describe your childcare experience, including key roles and positions held
+              Briefly describe your childcare experience, including key roles
+              and positions held
             </Label>
             <textarea
               className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none min-h-[120px] resize-y"

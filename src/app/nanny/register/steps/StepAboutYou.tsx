@@ -8,7 +8,7 @@ import { uploadFile } from "@/lib/supabase/storage";
 import { createClient } from "@/lib/supabase/client";
 import { isLiveMode } from "@/components/dev/DevToolbar";
 
-const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
 export function StepAboutYou({ data, updateData, goNext, goBack }: StepProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -31,7 +31,9 @@ export function StepAboutYou({ data, updateData, goNext, goBack }: StepProps) {
     setUploadError(null);
 
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       setUploadError("You must be logged in to upload a profile picture.");
@@ -73,7 +75,10 @@ export function StepAboutYou({ data, updateData, goNext, goBack }: StepProps) {
   // Extract display name from URL or filename
   const displayName = data.profile_picture_url
     ? data.profile_picture_url.includes("/")
-      ? decodeURIComponent(data.profile_picture_url.split("/").pop()?.replace(/^\d+-/, "") || "Profile picture")
+      ? decodeURIComponent(
+          data.profile_picture_url.split("/").pop()?.replace(/^\d+-/, "") ||
+            "Profile picture",
+        )
       : data.profile_picture_url
     : null;
 
@@ -90,7 +95,6 @@ export function StepAboutYou({ data, updateData, goNext, goBack }: StepProps) {
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
-
         {/* Hobbies & Interests */}
         <div className="space-y-3">
           <p className="text-sm font-medium text-slate-700">
@@ -100,7 +104,9 @@ export function StepAboutYou({ data, updateData, goNext, goBack }: StepProps) {
             rows={4}
             placeholder="Add Hobbies and Interests"
             value={data.hobbies_interests ?? ""}
-            onChange={(e) => handleChange("hobbies_interests", e.target.value || null)}
+            onChange={(e) =>
+              handleChange("hobbies_interests", e.target.value || null)
+            }
             className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none resize-none"
           />
         </div>
@@ -114,7 +120,9 @@ export function StepAboutYou({ data, updateData, goNext, goBack }: StepProps) {
             rows={4}
             placeholder="Add Strengths and Traits"
             value={data.strengths_traits ?? ""}
-            onChange={(e) => handleChange("strengths_traits", e.target.value || null)}
+            onChange={(e) =>
+              handleChange("strengths_traits", e.target.value || null)
+            }
             className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none resize-none"
           />
         </div>
@@ -122,13 +130,16 @@ export function StepAboutYou({ data, updateData, goNext, goBack }: StepProps) {
         {/* Specialised Skills & Training */}
         <div className="space-y-3">
           <p className="text-sm font-medium text-slate-700">
-            What specialised skills, experience, or training make you stand out as a nanny?
+            What specialised skills, experience, or training make you stand out
+            as a nanny?
           </p>
           <textarea
             rows={4}
             placeholder="Add Specialised Skills, Experience and Training"
             value={data.skills_training ?? ""}
-            onChange={(e) => handleChange("skills_training", e.target.value || null)}
+            onChange={(e) =>
+              handleChange("skills_training", e.target.value || null)
+            }
             className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none resize-none"
           />
         </div>
@@ -144,12 +155,29 @@ export function StepAboutYou({ data, updateData, goNext, goBack }: StepProps) {
             {isUploading ? (
               <div className="flex flex-col items-center gap-3">
                 <div className="w-16 h-16 rounded-full bg-violet-100 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-violet-600 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  <svg
+                    className="w-8 h-8 text-violet-600 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
                   </svg>
                 </div>
-                <p className="text-sm font-medium text-violet-700">Uploading...</p>
+                <p className="text-sm font-medium text-violet-700">
+                  Uploading...
+                </p>
               </div>
             ) : data.profile_picture_url ? (
               <div className="flex flex-col items-center gap-3">
@@ -180,7 +208,9 @@ export function StepAboutYou({ data, updateData, goNext, goBack }: StepProps) {
                   <p className="text-sm font-medium text-violet-700">
                     {displayName}
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">Click to change photo</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Click to change photo
+                  </p>
                 </div>
               </div>
             ) : (
@@ -213,14 +243,14 @@ export function StepAboutYou({ data, updateData, goNext, goBack }: StepProps) {
                   </button>
                 </div>
                 <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                  Parents love seeing who will care for their children. Upload your best profile picture to help them picture you in the role.
+                  Parents love seeing who will care for their children. Upload
+                  your best profile picture to help them picture you in the
+                  role.
                 </p>
               </div>
             )}
           </div>
-          {uploadError && (
-            <p className="text-xs text-red-500">{uploadError}</p>
-          )}
+          {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
           <input
             ref={fileInputRef}
             type="file"
@@ -236,20 +266,28 @@ export function StepAboutYou({ data, updateData, goNext, goBack }: StepProps) {
             id="accuracy_confirmed"
             type="checkbox"
             checked={!!data.accuracy_confirmed}
-            onChange={(e) => handleChange("accuracy_confirmed", e.target.checked)}
+            onChange={(e) =>
+              handleChange("accuracy_confirmed", e.target.checked)
+            }
             className="mt-0.5 h-4 w-4 accent-violet-600 rounded border-slate-300 cursor-pointer"
           />
           <label
             htmlFor="accuracy_confirmed"
             className="text-sm text-slate-700 cursor-pointer leading-relaxed"
           >
-            I confirm that all of the information that I have provided is accurate.
+            I confirm that all of the information that I have provided is
+            accurate.
           </label>
         </div>
 
         {/* Navigation */}
         <div className="flex gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={goBack} className="flex-1">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={goBack}
+            className="flex-1"
+          >
             Back
           </Button>
           {canContinue && (

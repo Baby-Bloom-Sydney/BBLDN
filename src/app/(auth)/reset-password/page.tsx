@@ -20,16 +20,19 @@ import { resetPassword } from "@/lib/auth/actions";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-const resetPasswordSchema = z.object({
-  password: z.string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[0-9]/, "Password must include a number")
-    .regex(/[^A-Za-z0-9]/, "Password must include a special character"),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-});
+const resetPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .regex(/[0-9]/, "Password must include a number")
+      .regex(/[^A-Za-z0-9]/, "Password must include a special character"),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
@@ -52,7 +55,9 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const checkSession = async () => {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       setIsValidSession(!!session);
     };
     checkSession();
@@ -99,9 +104,12 @@ export default function ResetPasswordPage() {
           <div className="mx-auto w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
             <AlertCircle className="w-6 h-6 text-destructive" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Invalid or expired link</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Invalid or expired link
+          </h1>
           <p className="text-sm text-muted-foreground mt-2">
-            This password reset link is invalid or has expired. Please request a new one.
+            This password reset link is invalid or has expired. Please request a
+            new one.
           </p>
         </div>
 
@@ -121,7 +129,9 @@ export default function ResetPasswordPage() {
           <div className="mx-auto w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-4">
             <CheckCircle2 className="w-6 h-6 text-green-600" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Password reset successful</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Password reset successful
+          </h1>
           <p className="text-sm text-muted-foreground mt-2">
             Your password has been updated. Redirecting you to sign in...
           </p>
@@ -133,7 +143,9 @@ export default function ResetPasswordPage() {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="text-2xl font-bold tracking-tight">Reset your password</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Reset your password
+        </h1>
         <p className="text-sm text-muted-foreground mt-2">
           Enter your new password below.
         </p>

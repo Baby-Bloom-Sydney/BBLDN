@@ -16,7 +16,6 @@ import {
   Baby,
   Filter,
   Users,
-  BarChart3,
   LogOut,
   LogIn,
   UserPlus,
@@ -27,9 +26,7 @@ import {
   Inbox,
   Link2,
   Award,
-  Share2,
   CreditCard,
-  Wallet,
   LifeBuoy,
   Phone,
 } from "lucide-react";
@@ -48,10 +45,8 @@ const nannyNavItems = [
   { href: "/nanny/profile", icon: User, label: "My Profile" },
   { href: "/nanny/team", icon: Users, label: "Our Team" },
   { href: "/nanny/verification", icon: ShieldCheck, label: "Verification" },
-  { href: "/nanny/share", icon: Share2, label: "Share Profile" },
   { href: "/nanny/inbox", icon: Inbox, label: "Inbox" },
   { href: "/nanny/positions", icon: Award, label: "My Positions" },
-  { href: "/nanny/babysitting", icon: Briefcase, label: "Babysitting Jobs" },
   { href: "/nanny/apply", icon: PlusCircle, label: "Apply" },
   { href: "/nanny/settings", icon: Settings, label: "Settings" },
 ];
@@ -59,13 +54,11 @@ const nannyNavItems = [
 const parentNavItems = [
   { href: "/parent", icon: Home, label: "Dashboard" },
   { href: "/parent/browse", icon: Search, label: "Browse Nannies" },
-  { href: "/parent/verification", icon: ShieldCheck, label: "Verification" },
   { href: "/parent", icon: ClipboardList, label: "My Childcare" },
   { href: "/parent/matches", icon: Filter, label: "My Matches" },
   { href: "/parent/request", icon: PlusCircle, label: "Nanny Request" },
   { href: "/parent", icon: Link2, label: "Connections" },
   { href: "/parent/inbox", icon: Inbox, label: "Inbox" },
-  { href: "/parent/babysitting", icon: Baby, label: "Babysitting" },
   { href: "/parent/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -76,14 +69,12 @@ const adminNavItems = [
   { href: "/admin/positions", icon: Briefcase, label: "Positions" },
   { href: "/admin/users", icon: Users, label: "User Management" },
   { href: "/admin/subscriptions", icon: CreditCard, label: "Subscriptions" },
-  { href: "/admin/payouts", icon: Wallet, label: "Payouts" },
   { href: "/admin/support", icon: LifeBuoy, label: "Support" },
   {
     href: "/admin/verification-reference",
     icon: BookOpen,
     label: "Verification Ref",
   },
-  { href: "/admin/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 

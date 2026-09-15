@@ -25,7 +25,7 @@ export function MasteryRatingGrid({
             "rounded-lg px-3 py-2 text-xs font-medium transition-colors",
             selectedScore === score
               ? "bg-emerald-500 text-white shadow-sm"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200",
           )}
         >
           {MASTERY_LABELS[score]}

@@ -65,7 +65,7 @@ export function MatchCard({ match, actions }: MatchCardProps) {
             <div className="flex justify-end">
               <div
                 className={`rounded-lg border px-2.5 py-1 font-semibold text-sm ${getScoreBadgeStyle(
-                  match.finalScore
+                  match.finalScore,
                 )}`}
               >
                 {match.finalScore}% Match
@@ -76,7 +76,9 @@ export function MatchCard({ match, actions }: MatchCardProps) {
                 {profile.first_name}
               </h3>
               {nannyAge && (
-                <span className="text-base text-slate-400 shrink-0">{nannyAge}</span>
+                <span className="text-base text-slate-400 shrink-0">
+                  {nannyAge}
+                </span>
               )}
               {nanny.hourly_rate_min != null && (
                 <span className="text-sm text-slate-400 shrink-0 ml-auto">
@@ -170,8 +172,14 @@ export function MatchCard({ match, actions }: MatchCardProps) {
         >
           {(() => {
             const allItems = [
-              ...match.overQualifiedBonuses.map((b) => ({ text: `+ ${b}`, color: "text-green-600" })),
-              ...match.unmetRequirements.map((r) => ({ text: `- ${r}`, color: "text-amber-600" })),
+              ...match.overQualifiedBonuses.map((b) => ({
+                text: `+ ${b}`,
+                color: "text-green-600",
+              })),
+              ...match.unmetRequirements.map((r) => ({
+                text: `- ${r}`,
+                color: "text-amber-600",
+              })),
             ];
             const left = allItems.slice(0, 10);
             const right = allItems.slice(10);
@@ -179,13 +187,23 @@ export function MatchCard({ match, actions }: MatchCardProps) {
               <div className="flex gap-3 text-[11px] flex-1 min-h-0">
                 <div className="flex-1 min-w-0">
                   {left.map((item) => (
-                    <p key={item.text} className={`${item.color} truncate leading-[16px]`}>{item.text}</p>
+                    <p
+                      key={item.text}
+                      className={`${item.color} truncate leading-[16px]`}
+                    >
+                      {item.text}
+                    </p>
                   ))}
                 </div>
                 {right.length > 0 && (
                   <div className="flex-1 min-w-0">
                     {right.map((item) => (
-                      <p key={item.text} className={`${item.color} truncate leading-[16px]`}>{item.text}</p>
+                      <p
+                        key={item.text}
+                        className={`${item.color} truncate leading-[16px]`}
+                      >
+                        {item.text}
+                      </p>
                     ))}
                   </div>
                 )}

@@ -1,24 +1,34 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef } from 'react';
-import { StageProps } from '../../FunnelOrchestrator';
-import { YesNoTags } from '../../shared/YesNoTags';
-import { MultiSelectTags } from '../../shared/MultiSelectTags';
-import { SingleSelectTags } from '../../shared/SingleSelectTags';
-import { ProgressiveReveal } from '../../shared/ProgressiveReveal';
-import { CompoundPageShell } from '../../shared/CompoundPageShell';
-import { QUALIFICATION_OPTIONS, CERTIFICATE_OPTIONS } from '@/types/nanny-leads';
-import { Label } from '@/components/ui/label';
-import { AlertTriangle } from 'lucide-react';
+import { useCallback, useEffect, useRef } from "react";
+import { StageProps } from "../../FunnelOrchestrator";
+import { YesNoTags } from "../../shared/YesNoTags";
+import { MultiSelectTags } from "../../shared/MultiSelectTags";
+import { SingleSelectTags } from "../../shared/SingleSelectTags";
+import { ProgressiveReveal } from "../../shared/ProgressiveReveal";
+import { CompoundPageShell } from "../../shared/CompoundPageShell";
+import {
+  QUALIFICATION_OPTIONS,
+  CERTIFICATE_OPTIONS,
+} from "@/types/nanny-leads";
+import { Label } from "@/components/ui/label";
+import { AlertTriangle } from "lucide-react";
 
-export function N1Credentials({ state, dispatch, goNext, goBack, progress, questionNumber }: StageProps) {
+export function N1Credentials({
+  state,
+  dispatch,
+  goNext,
+  goBack,
+  progress,
+  questionNumber,
+}: StageProps) {
   const { qualifications } = state;
 
   const update = useCallback(
     (payload: Partial<typeof qualifications>) => {
-      dispatch({ type: 'UPDATE_QUALIFICATIONS', payload });
+      dispatch({ type: "UPDATE_QUALIFICATIONS", payload });
     },
-    [dispatch]
+    [dispatch],
   );
 
   const wwccBlocked = qualifications.wwcc === false;
@@ -41,11 +51,13 @@ export function N1Credentials({ state, dispatch, goNext, goBack, progress, quest
   const showQualification = qualifications.has_qualifications === true;
   const showCertificatesGate =
     qualifications.has_qualifications === false ||
-    (qualifications.has_qualifications === true && qualifications.highest_qualification !== null);
+    (qualifications.has_qualifications === true &&
+      qualifications.highest_qualification !== null);
   const showCertificates = qualifications.has_certificates === true;
   const showWwcc =
     qualifications.has_certificates === false ||
-    (qualifications.has_certificates === true && qualifications.certificates.length > 0);
+    (qualifications.has_certificates === true &&
+      qualifications.certificates.length > 0);
 
   return (
     <CompoundPageShell
@@ -151,8 +163,8 @@ export function N1Credentials({ state, dispatch, goNext, goBack, progress, quest
                 A valid Working with Children Check is required
               </p>
               <p className="text-sm text-amber-700">
-                Baby Bloom can only accept childcare professionals who hold a valid WWCC.
-                You can apply for one at{' '}
+                Baby Bloom can only accept childcare professionals who hold a
+                valid WWCC. You can apply for one at{" "}
                 <a
                   href="https://www.service.nsw.gov.au/transaction/apply-for-a-working-with-children-check"
                   target="_blank"
@@ -161,15 +173,16 @@ export function N1Credentials({ state, dispatch, goNext, goBack, progress, quest
                 >
                   Service NSW
                 </a>
-                . Once you have your WWCC, come back and complete your application.
+                . Once you have your WWCC, come back and complete your
+                application.
               </p>
               <p className="text-sm text-amber-700 mt-1">
-                You can still complete the rest of your application — we&apos;ll save your progress.
+                You can still complete the rest of your application — we&apos;ll
+                save your progress.
               </p>
             </div>
           </div>
         )}
-
       </div>
     </CompoundPageShell>
   );

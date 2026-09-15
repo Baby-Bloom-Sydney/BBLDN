@@ -22,7 +22,7 @@ export function NavLink({ href, children, className, onClick }: NavLinkProps) {
       className={cn(
         "text-sm font-medium transition-colors hover:text-violet-500",
         isActive ? "text-violet-500" : "text-slate-600",
-        className
+        className,
       )}
     >
       {children}

@@ -67,8 +67,21 @@ type TabId = (typeof TABS)[number]["id"];
 
 // ── Availability Grid ──
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
-const TIME_SLOTS = ["Morning (6am-10am)", "Midday (10am-2pm)", "Afternoon (2pm-6pm)", "Evening (6pm-10pm)"] as const;
+const DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;
+const TIME_SLOTS = [
+  "Morning (6am-10am)",
+  "Midday (10am-2pm)",
+  "Afternoon (2pm-6pm)",
+  "Evening (6pm-10pm)",
+] as const;
 const SLOT_LABELS = ["Morning", "Midday", "Afternoon", "Evening"];
 const SLOT_RANGES = [
   { start: 6, end: 10 },
@@ -83,18 +96,34 @@ function normaliseDaySlots(raw: unknown): boolean[] {
     return TIME_SLOTS.map((slot) => raw.includes(slot));
   }
   if (typeof raw === "object" && raw !== null && "available" in raw) {
-    const obj = raw as { available?: boolean; start?: string | null; end?: string | null };
-    if (!obj.available || !obj.start || !obj.end) return [false, false, false, false];
+    const obj = raw as {
+      available?: boolean;
+      start?: string | null;
+      end?: string | null;
+    };
+    if (!obj.available || !obj.start || !obj.end)
+      return [false, false, false, false];
     const startHour = parseInt(obj.start.split(":")[0]);
     const endHour = parseInt(obj.end.split(":")[0]);
-    return SLOT_RANGES.map((range) => startHour <= range.start && endHour >= range.end);
+    return SLOT_RANGES.map(
+      (range) => startHour <= range.start && endHour >= range.end,
+    );
   }
   return [false, false, false, false];
 }
 
-function AvailabilityGrid({ availability }: { availability: PublicNannyProfile["availability"] }) {
-  if (!availability?.days_available || availability.days_available.length === 0) {
-    return <p className="text-sm text-slate-500 italic">Availability not set yet.</p>;
+function AvailabilityGrid({
+  availability,
+}: {
+  availability: PublicNannyProfile["availability"];
+}) {
+  if (
+    !availability?.days_available ||
+    availability.days_available.length === 0
+  ) {
+    return (
+      <p className="text-sm text-slate-500 italic">Availability not set yet.</p>
+    );
   }
   const schedule = availability.schedule || {};
   return (
@@ -104,7 +133,12 @@ function AvailabilityGrid({ availability }: { availability: PublicNannyProfile["
           <tr>
             <th className="py-2 pr-3 text-left text-xs font-medium text-slate-500 uppercase" />
             {SLOT_LABELS.map((label) => (
-              <th key={label} className="px-2 py-2 text-center text-xs font-medium text-slate-500 uppercase">{label}</th>
+              <th
+                key={label}
+                className="px-2 py-2 text-center text-xs font-medium text-slate-500 uppercase"
+              >
+                {label}
+              </th>
             ))}
           </tr>
         </thead>
@@ -116,15 +150,21 @@ function AvailabilityGrid({ availability }: { availability: PublicNannyProfile["
             const isAvailable = availability.days_available?.includes(day);
             return (
               <tr key={day} className="border-t border-slate-100">
-                <td className="py-2.5 pr-3 font-medium text-slate-700 text-sm whitespace-nowrap">{day.slice(0, 3)}</td>
+                <td className="py-2.5 pr-3 font-medium text-slate-700 text-sm whitespace-nowrap">
+                  {day.slice(0, 3)}
+                </td>
                 {SLOT_LABELS.map((_, i) => {
                   const active = isAvailable && slotActive[i];
                   return (
                     <td key={i} className="px-2 py-2.5 text-center">
-                      <span className={cn(
-                        "inline-flex h-7 w-7 items-center justify-center rounded-full text-xs",
-                        active ? "bg-violet-100 text-violet-600" : "bg-slate-50 text-slate-300"
-                      )}>
+                      <span
+                        className={cn(
+                          "inline-flex h-7 w-7 items-center justify-center rounded-full text-xs",
+                          active
+                            ? "bg-violet-100 text-violet-600"
+                            : "bg-slate-50 text-slate-300",
+                        )}
+                      >
                         {active ? "✓" : "–"}
                       </span>
                     </td>
@@ -141,10 +181,18 @@ function AvailabilityGrid({ availability }: { availability: PublicNannyProfile["
 
 // ── Section Card ──
 
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+function SectionCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5">
-      <h3 className="mb-3 text-sm font-semibold text-slate-500 uppercase tracking-wider">{title}</h3>
+      <h3 className="mb-3 text-sm font-semibold text-slate-500 uppercase tracking-wider">
+        {title}
+      </h3>
       {children}
     </div>
   );
@@ -199,7 +247,9 @@ export function NannyProfileView({
 
   const age = calculateAge(nanny.date_of_birth);
   const ai = nanny.ai_content as Record<string, unknown> | null;
-  const bioSummary = parseBioSummary(typeof ai?.bio_summary === 'string' ? ai.bio_summary : undefined);
+  const bioSummary = parseBioSummary(
+    typeof ai?.bio_summary === "string" ? ai.bio_summary : undefined,
+  );
   const tagline = (ai?.headline as string) || "";
   const bioContent = (ai?.parent_pitch as string) || "";
   const experienceContent = (ai?.experience_summary as string) || "";
@@ -213,7 +263,9 @@ export function NannyProfileView({
           href="/nanny/profile"
           className="mb-4 flex items-center justify-between rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 transition-colors hover:bg-violet-100"
         >
-          <span className="text-sm text-violet-700">This is your profile as parents see it.</span>
+          <span className="text-sm text-violet-700">
+            This is your profile as parents see it.
+          </span>
           <span className="flex items-center gap-1.5 text-sm font-medium text-violet-600">
             <Pencil className="h-3.5 w-3.5" />
             Edit Profile
@@ -244,7 +296,9 @@ export function NannyProfileView({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">
-                  {nanny.first_name.charAt(0).toUpperCase() + nanny.first_name.slice(1)}{age ? `, ${age}` : ""}
+                  {nanny.first_name.charAt(0).toUpperCase() +
+                    nanny.first_name.slice(1)}
+                  {age ? `, ${age}` : ""}
                 </h1>
                 <p className="flex items-center gap-1 text-sm text-slate-500 mt-0.5">
                   <MapPin className="h-3.5 w-3.5" />
@@ -257,7 +311,9 @@ export function NannyProfileView({
               <div className="mt-3">
                 <div
                   className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0"
-                  dangerouslySetInnerHTML={{ __html: tagline.replace(/<\/?p>/g, "") }}
+                  dangerouslySetInnerHTML={{
+                    __html: tagline.replace(/<\/?p>/g, ""),
+                  }}
                 />
               </div>
             )}
@@ -272,14 +328,15 @@ export function NannyProfileView({
         {/* CTA */}
         {!isOwner && !isActiveNanny && (
           <div className="mt-5">
-            {existingRequestStatus === 'confirmed' ? (
+            {existingRequestStatus === "confirmed" ? (
               <Link href="/parent/connections">
                 <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-medium">
                   <Check className="mr-2 h-4 w-4" />
                   Connected
                 </Button>
               </Link>
-            ) : existingRequestStatus === 'pending' || existingRequestStatus === 'accepted' ? (
+            ) : existingRequestStatus === "pending" ||
+              existingRequestStatus === "accepted" ? (
               <Link href="/parent/connections">
                 <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-medium">
                   <Check className="mr-2 h-4 w-4" />
@@ -316,10 +373,14 @@ export function NannyProfileView({
             <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg space-y-4">
               <div className="flex items-center gap-2 text-amber-600">
                 <AlertTriangle className="h-5 w-5" />
-                <h3 className="font-semibold text-lg">Position already filled</h3>
+                <h3 className="font-semibold text-lg">
+                  Position already filled
+                </h3>
               </div>
               <p className="text-sm text-slate-600">
-                You already have an active nanny on your position. To connect with {nanny.first_name}, you&apos;ll need to remove your current nanny first.
+                You already have an active nanny on your position. To connect
+                with {nanny.first_name}, you&apos;ll need to remove your current
+                nanny first.
               </p>
               <div className="flex gap-2">
                 <Button
@@ -371,7 +432,7 @@ export function NannyProfileView({
                 "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive
                   ? "bg-violet-600 text-white shadow-sm"
-                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-50",
               )}
             >
               <Icon className="h-4 w-4" />
@@ -394,11 +455,17 @@ export function NannyProfileView({
             ) : (
               <div className="space-y-4">
                 <p className="text-slate-600 leading-relaxed">
-                  {nanny.first_name} is a {nanny.nationality || ""} nanny based in {nanny.suburb}
-                  {nanny.total_experience_years ? ` with ${nanny.total_experience_years} years of childcare experience` : ""}.
+                  {nanny.first_name} is a {nanny.nationality || ""} nanny based
+                  in {nanny.suburb}
+                  {nanny.total_experience_years
+                    ? ` with ${nanny.total_experience_years} years of childcare experience`
+                    : ""}
+                  .
                 </p>
                 {nanny.strengths_traits && (
-                  <p className="text-slate-600 leading-relaxed">{nanny.strengths_traits}</p>
+                  <p className="text-slate-600 leading-relaxed">
+                    {nanny.strengths_traits}
+                  </p>
                 )}
               </div>
             )}
@@ -410,71 +477,151 @@ export function NannyProfileView({
           <>
             {bioSummary.about && (
               <SectionCard title="About Me">
-                <div className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0" dangerouslySetInnerHTML={{ __html: bioSummary.about }} />
+                <div
+                  className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0"
+                  dangerouslySetInnerHTML={{ __html: bioSummary.about }}
+                />
               </SectionCard>
             )}
             {(experienceContent || nanny.total_experience_years) && (
               <SectionCard title="Experience">
                 {experienceContent ? (
-                  <div className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0" dangerouslySetInnerHTML={{ __html: experienceContent }} />
+                  <div
+                    className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0"
+                    dangerouslySetInnerHTML={{ __html: experienceContent }}
+                  />
                 ) : (
                   <div className="space-y-1 text-sm text-slate-700">
-                    {nanny.total_experience_years !== null && <p>{nanny.total_experience_years} years total childcare experience</p>}
-                    {nanny.nanny_experience_years !== null && <p>{nanny.nanny_experience_years} years as a nanny</p>}
-                    {nanny.under_3_experience_years !== null && nanny.under_3_experience_years > 0 && <p>{nanny.under_3_experience_years} years with children under 3</p>}
-                    {nanny.newborn_experience_years !== null && nanny.newborn_experience_years > 0 && <p>{nanny.newborn_experience_years} years with newborns</p>}
+                    {nanny.total_experience_years !== null && (
+                      <p>
+                        {nanny.total_experience_years} years total childcare
+                        experience
+                      </p>
+                    )}
+                    {nanny.nanny_experience_years !== null && (
+                      <p>{nanny.nanny_experience_years} years as a nanny</p>
+                    )}
+                    {nanny.under_3_experience_years !== null &&
+                      nanny.under_3_experience_years > 0 && (
+                        <p>
+                          {nanny.under_3_experience_years} years with children
+                          under 3
+                        </p>
+                      )}
+                    {nanny.newborn_experience_years !== null &&
+                      nanny.newborn_experience_years > 0 && (
+                        <p>
+                          {nanny.newborn_experience_years} years with newborns
+                        </p>
+                      )}
                   </div>
                 )}
               </SectionCard>
             )}
             {bioSummary.traits && (
               <SectionCard title="Strengths">
-                <div className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0" dangerouslySetInnerHTML={{ __html: bioSummary.traits }} />
+                <div
+                  className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0"
+                  dangerouslySetInnerHTML={{ __html: bioSummary.traits }}
+                />
               </SectionCard>
             )}
             {bioSummary.background && (
               <SectionCard title="Background & Skills">
-                <div className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0" dangerouslySetInnerHTML={{ __html: bioSummary.background }} />
+                <div
+                  className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0"
+                  dangerouslySetInnerHTML={{ __html: bioSummary.background }}
+                />
               </SectionCard>
             )}
             {bioSummary.services && (
               <SectionCard title="Services">
-                <div className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0" dangerouslySetInnerHTML={{ __html: bioSummary.services }} />
+                <div
+                  className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0"
+                  dangerouslySetInnerHTML={{ __html: bioSummary.services }}
+                />
               </SectionCard>
             )}
             {!bioSummary.about && !bioSummary.traits && (
               <>
                 {nanny.strengths_traits && (
-                  <SectionCard title="Strengths"><p className="text-sm text-slate-700">{nanny.strengths_traits}</p></SectionCard>
+                  <SectionCard title="Strengths">
+                    <p className="text-sm text-slate-700">
+                      {nanny.strengths_traits}
+                    </p>
+                  </SectionCard>
                 )}
                 {nanny.hobbies_interests && (
-                  <SectionCard title="Hobbies & Interests"><p className="text-sm text-slate-700">{nanny.hobbies_interests}</p></SectionCard>
+                  <SectionCard title="Hobbies & Interests">
+                    <p className="text-sm text-slate-700">
+                      {nanny.hobbies_interests}
+                    </p>
+                  </SectionCard>
                 )}
                 {nanny.skills_training && (
-                  <SectionCard title="Skills & Training"><p className="text-sm text-slate-700">{nanny.skills_training}</p></SectionCard>
+                  <SectionCard title="Skills & Training">
+                    <p className="text-sm text-slate-700">
+                      {nanny.skills_training}
+                    </p>
+                  </SectionCard>
                 )}
               </>
             )}
             <SectionCard title="Key Details">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {nanny.nationality && (
-                  <div><span className="text-slate-500">Nationality</span><p className="font-medium text-slate-700">{nanny.nationality}</p></div>
+                  <div>
+                    <span className="text-slate-500">Nationality</span>
+                    <p className="font-medium text-slate-700">
+                      {nanny.nationality}
+                    </p>
+                  </div>
                 )}
-                {nanny.languages && nanny.languages.filter(l => l !== "Foreign Language" && l !== "Multiple").length > 0 && (
-                  <div><span className="text-slate-500">Languages</span><p className="font-medium text-slate-700">{nanny.languages.filter(l => l !== "Foreign Language" && l !== "Multiple").join(", ")}</p></div>
-                )}
+                {nanny.languages &&
+                  nanny.languages.filter(
+                    (l) => l !== "Foreign Language" && l !== "Multiple",
+                  ).length > 0 && (
+                    <div>
+                      <span className="text-slate-500">Languages</span>
+                      <p className="font-medium text-slate-700">
+                        {nanny.languages
+                          .filter(
+                            (l) => l !== "Foreign Language" && l !== "Multiple",
+                          )
+                          .join(", ")}
+                      </p>
+                    </div>
+                  )}
                 <div>
                   <span className="text-slate-500">Age Range</span>
-                  <p className="font-medium text-slate-700">{ageMonthsToLabel(nanny.min_child_age_months)} – {ageMonthsToLabel(nanny.max_child_age_months)}</p>
+                  <p className="font-medium text-slate-700">
+                    {ageMonthsToLabel(nanny.min_child_age_months)} –{" "}
+                    {ageMonthsToLabel(nanny.max_child_age_months)}
+                  </p>
                 </div>
                 {nanny.max_children && (
-                  <div><span className="text-slate-500">Max Children</span><p className="font-medium text-slate-700">{nanny.max_children}</p></div>
+                  <div>
+                    <span className="text-slate-500">Max Children</span>
+                    <p className="font-medium text-slate-700">
+                      {nanny.max_children}
+                    </p>
+                  </div>
                 )}
                 {nanny.hourly_rate_min && (
-                  <div><span className="text-slate-500">Hourly Rate</span><p className="font-medium text-slate-700">From ${nanny.hourly_rate_min}</p></div>
+                  <div>
+                    <span className="text-slate-500">Hourly Rate</span>
+                    <p className="font-medium text-slate-700">
+                      From ${nanny.hourly_rate_min}
+                    </p>
+                  </div>
                 )}
                 {nanny.pay_frequency && nanny.pay_frequency.length > 0 && (
-                  <div><span className="text-slate-500">Pay Frequency</span><p className="font-medium text-slate-700">{nanny.pay_frequency.join(", ")}</p></div>
+                  <div>
+                    <span className="text-slate-500">Pay Frequency</span>
+                    <p className="font-medium text-slate-700">
+                      {nanny.pay_frequency.join(", ")}
+                    </p>
+                  </div>
                 )}
               </div>
             </SectionCard>
@@ -493,25 +640,64 @@ export function NannyProfileView({
               <div className="space-y-4 text-sm">
                 <div>
                   <h4 className="font-semibold text-slate-800 mb-2">Summary</h4>
-                  <p className="text-slate-700">✅ Ages {ageMonthsToLabel(nanny.min_child_age_months)} – {ageMonthsToLabel(nanny.max_child_age_months)}</p>
-                  {nanny.role_types_preferred?.map((s) => <p key={s} className="text-slate-700">✅ {s}</p>)}
-                  {nanny.level_of_support_offered?.map((s) => <p key={s} className="text-slate-700">✅ {s}</p>)}
+                  <p className="text-slate-700">
+                    ✅ Ages {ageMonthsToLabel(nanny.min_child_age_months)} –{" "}
+                    {ageMonthsToLabel(nanny.max_child_age_months)}
+                  </p>
+                  {nanny.role_types_preferred?.map((s) => (
+                    <p key={s} className="text-slate-700">
+                      ✅ {s}
+                    </p>
+                  ))}
+                  {nanny.level_of_support_offered?.map((s) => (
+                    <p key={s} className="text-slate-700">
+                      ✅ {s}
+                    </p>
+                  ))}
                 </div>
-                {(nanny.total_experience_years || nanny.nanny_experience_years) && (
+                {(nanny.total_experience_years ||
+                  nanny.nanny_experience_years) && (
                   <div>
-                    <h4 className="font-semibold text-slate-800 mb-2">Experience</h4>
-                    {nanny.total_experience_years !== null && <p className="text-slate-700">✅ {nanny.total_experience_years} years childcare experience</p>}
-                    {nanny.nanny_experience_years !== null && <p className="text-slate-700">✅ {nanny.nanny_experience_years} years nanny experience</p>}
-                    {nanny.under_3_experience_years !== null && nanny.under_3_experience_years > 0 && <p className="text-slate-700">✅ {nanny.under_3_experience_years} years infant experience</p>}
+                    <h4 className="font-semibold text-slate-800 mb-2">
+                      Experience
+                    </h4>
+                    {nanny.total_experience_years !== null && (
+                      <p className="text-slate-700">
+                        ✅ {nanny.total_experience_years} years childcare
+                        experience
+                      </p>
+                    )}
+                    {nanny.nanny_experience_years !== null && (
+                      <p className="text-slate-700">
+                        ✅ {nanny.nanny_experience_years} years nanny experience
+                      </p>
+                    )}
+                    {nanny.under_3_experience_years !== null &&
+                      nanny.under_3_experience_years > 0 && (
+                        <p className="text-slate-700">
+                          ✅ {nanny.under_3_experience_years} years infant
+                          experience
+                        </p>
+                      )}
                   </div>
                 )}
                 <div>
-                  <h4 className="font-semibold text-slate-800 mb-2">Transport & Other</h4>
-                  {nanny.drivers_license && <p className="text-slate-700">🪪 Drivers License</p>}
+                  <h4 className="font-semibold text-slate-800 mb-2">
+                    Transport & Other
+                  </h4>
+                  {nanny.drivers_license && (
+                    <p className="text-slate-700">🪪 Drivers License</p>
+                  )}
                   {nanny.has_car && <p className="text-slate-700">🚗 Car</p>}
-                  {nanny.comfortable_with_pets && <p className="text-slate-700">✅ Comfortable with Pets</p>}
-                  {nanny.vaccination_status && <p className="text-slate-700">✅ Fully Vaccinated</p>}
-                  {nanny.non_smoker && <p className="text-slate-700">✅ Non-Smoker</p>}
+                  {nanny.comfortable_with_pets && (
+                    <p className="text-slate-700">✅ Comfortable with Pets</p>
+                  )}
+                  {nanny.vaccination_status && (
+                    <p className="text-slate-700">✅ Fully Vaccinated</p>
+                  )}
+                  {nanny.non_smoker && (
+                    <p className="text-slate-700">✅ Non-Smoker</p>
+                  )}
                 </div>
               </div>
             )}
@@ -528,7 +714,10 @@ export function NannyProfileView({
                   Sign up to see {nanny.first_name}&apos;s availability
                 </p>
                 <Link href="/signup">
-                  <Button size="sm" className="bg-violet-500 hover:bg-violet-600">
+                  <Button
+                    size="sm"
+                    className="bg-violet-500 hover:bg-violet-600"
+                  >
                     Sign Up to See Availability
                   </Button>
                 </Link>

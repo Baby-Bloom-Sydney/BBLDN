@@ -10,7 +10,9 @@ export default async function AdminViewerProfilePage({
   params: { id: string };
 }) {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const admin = createAdminClient();
@@ -31,12 +33,16 @@ export default async function AdminViewerProfilePage({
     // Fetch user profile
     const { data: profile } = await admin
       .from("user_profiles")
-      .select("first_name, last_name, email, mobile_number, date_of_birth, suburb, postcode, profile_picture_url")
+      .select(
+        "first_name, last_name, email, mobile_number, date_of_birth, suburb, postcode, profile_picture_url",
+      )
       .eq("user_id", targetUserId)
       .single();
 
     if (!profile) {
-      return <div className="p-6 text-center text-slate-500">Profile not found</div>;
+      return (
+        <div className="p-6 text-center text-slate-500">Profile not found</div>
+      );
     }
 
     // Fetch nanny record
@@ -47,7 +53,11 @@ export default async function AdminViewerProfilePage({
       .single();
 
     if (!nanny) {
-      return <div className="p-6 text-center text-slate-500">Nanny record not found</div>;
+      return (
+        <div className="p-6 text-center text-slate-500">
+          Nanny record not found
+        </div>
+      );
     }
 
     // Fetch credentials, assurances, availability
@@ -69,28 +79,36 @@ export default async function AdminViewerProfilePage({
 
     const highest_qualification =
       (credsRes.data || []).find(
-        (c: { credential_category: string }) => c.credential_category === "qualification"
+        (c: { credential_category: string }) =>
+          c.credential_category === "qualification",
       )?.qualification_type || null;
 
     const certificates = (credsRes.data || [])
-      .filter((c: { credential_category: string }) => c.credential_category === "certification")
+      .filter(
+        (c: { credential_category: string }) =>
+          c.credential_category === "certification",
+      )
       .map((c: { certification_type: string }) => c.certification_type)
       .filter((t: string | null): t is string => t !== null);
 
     const assurances = (assurRes.data || []).map(
-      (a: { assurance_type: string }) => a.assurance_type
+      (a: { assurance_type: string }) => a.assurance_type,
     );
 
     const nannyProfile: NannyProfile = {
       ...profile,
       ...nanny,
-      profile_picture_url: profile.profile_picture_url || nanny.profile_picture_url || null,
+      profile_picture_url:
+        profile.profile_picture_url || nanny.profile_picture_url || null,
       nanny_id: nanny.id,
       highest_qualification,
       certificates,
       assurances,
       availability: availRes.data
-        ? { days_available: availRes.data.days_available, schedule: availRes.data.schedule }
+        ? {
+            days_available: availRes.data.days_available,
+            schedule: availRes.data.schedule,
+          }
         : null,
       ai_content: nanny.ai_content || null,
     };
@@ -102,12 +120,16 @@ export default async function AdminViewerProfilePage({
   if (role === "parent") {
     const { data: profile } = await admin
       .from("user_profiles")
-      .select("first_name, last_name, email, mobile_number, suburb, postcode, profile_picture_url")
+      .select(
+        "first_name, last_name, email, mobile_number, suburb, postcode, profile_picture_url",
+      )
       .eq("user_id", targetUserId)
       .single();
 
     if (!profile) {
-      return <div className="p-6 text-center text-slate-500">Profile not found</div>;
+      return (
+        <div className="p-6 text-center text-slate-500">Profile not found</div>
+      );
     }
 
     return (

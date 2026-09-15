@@ -41,7 +41,9 @@ export function ContactUserModal({
   const [fromAddress, setFromAddress] = useState(FROM_OPTIONS[0].value);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(
+    "idle",
+  );
   const [error, setError] = useState<string | null>(null);
 
   function reset() {
@@ -80,7 +82,8 @@ export function ContactUserModal({
     }
   }
 
-  const canSend = subject.trim().length > 0 && body.trim().length > 0 && status === "idle";
+  const canSend =
+    subject.trim().length > 0 && body.trim().length > 0 && status === "idle";
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -101,7 +104,9 @@ export function ContactUserModal({
           <div className="space-y-4 mt-2">
             {/* From */}
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-1.5 block">From</label>
+              <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                From
+              </label>
               <select
                 value={fromAddress}
                 onChange={(e) => setFromAddress(e.target.value)}
@@ -117,13 +122,21 @@ export function ContactUserModal({
 
             {/* To */}
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-1.5 block">To</label>
-              <Input value={userEmail} disabled className="text-sm bg-slate-50" />
+              <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                To
+              </label>
+              <Input
+                value={userEmail}
+                disabled
+                className="text-sm bg-slate-50"
+              />
             </div>
 
             {/* Subject */}
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-1.5 block">Subject</label>
+              <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                Subject
+              </label>
               <Input
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
@@ -134,7 +147,9 @@ export function ContactUserModal({
 
             {/* Body */}
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-1.5 block">Message</label>
+              <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                Message
+              </label>
               <Textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
@@ -154,7 +169,11 @@ export function ContactUserModal({
 
             {/* Actions */}
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" size="sm" onClick={() => handleOpenChange(false)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleOpenChange(false)}
+              >
                 Cancel
               </Button>
               <Button

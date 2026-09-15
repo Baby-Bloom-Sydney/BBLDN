@@ -1,14 +1,17 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { BiometricConsentModal } from '@/components/legal/BiometricConsentModal';
-import { ConsentCheckboxGroup } from '@/components/legal/ConsentCheckboxGroup';
-import { recordConsent, recordBiometricConsent } from '@/lib/legal/record-consent';
-import { AGR04_CHECKPOINTS } from '@/lib/legal/checkpoints';
-import { ShieldCheck, Loader2, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { BiometricConsentModal } from "@/components/legal/BiometricConsentModal";
+import { ConsentCheckboxGroup } from "@/components/legal/ConsentCheckboxGroup";
+import {
+  recordConsent,
+  recordBiometricConsent,
+} from "@/lib/legal/record-consent";
+import { AGR04_CHECKPOINTS } from "@/lib/legal/checkpoints";
+import { ShieldCheck, Loader2, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 
 export default function NannyVerifyPage() {
   const router = useRouter();
@@ -20,7 +23,9 @@ export default function NannyVerifyPage() {
     notice_time_spent_seconds: number;
     checkboxes_enabled_at: string;
   } | null>(null);
-  const [consentChecked, setConsentChecked] = useState<Record<string, boolean>>({});
+  const [consentChecked, setConsentChecked] = useState<Record<string, boolean>>(
+    {},
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,31 +50,31 @@ export default function NannyVerifyPage() {
     const bioResult = await recordBiometricConsent({
       ...biometricData,
       checkbox_timestamps: Object.fromEntries(
-        AGR04_CHECKPOINTS.map((cp) => [cp.id, new Date().toISOString()])
+        AGR04_CHECKPOINTS.map((cp) => [cp.id, new Date().toISOString()]),
       ),
     });
 
     if (!bioResult.success) {
-      setError(bioResult.error || 'Failed to record biometric consent');
+      setError(bioResult.error || "Failed to record biometric consent");
       setSubmitting(false);
       return;
     }
 
     const consentResult = await recordConsent(
       AGR04_CHECKPOINTS.map((cp) => ({
-        agreementId: 'AGR-04',
+        agreementId: "AGR-04",
         checkpointId: cp.id,
         checkpointText: cp.text,
-      }))
+      })),
     );
 
     if (!consentResult.success) {
-      setError(consentResult.error || 'Failed to record consent');
+      setError(consentResult.error || "Failed to record consent");
       setSubmitting(false);
       return;
     }
 
-    router.push('/nanny/verification');
+    router.push("/nanny/verification");
   };
 
   return (
@@ -94,14 +99,15 @@ export default function NannyVerifyPage() {
             Identity Verification
           </h1>
           <p className="text-sm text-slate-500 text-center mb-8">
-            To protect families on our platform, we need to verify your identity using
-            AI-assisted facial recognition and government document checks.
+            To protect families on our platform, we need to verify your identity
+            using AI-assisted facial recognition and government document checks.
           </p>
 
           {!biometricRead ? (
             <div className="text-center">
               <p className="text-sm text-slate-600 mb-4">
-                Before proceeding, you must read the Biometric Data Collection Notice.
+                Before proceeding, you must read the Biometric Data Collection
+                Notice.
               </p>
               <Button
                 onClick={() => setShowBiometricNotice(true)}
@@ -128,7 +134,9 @@ export default function NannyVerifyPage() {
               />
 
               {error && (
-                <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{error}</p>
+                <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">
+                  {error}
+                </p>
               )}
 
               <Button
@@ -142,7 +150,7 @@ export default function NannyVerifyPage() {
                     Submitting...
                   </>
                 ) : (
-                  'Submit for Verification'
+                  "Submit for Verification"
                 )}
               </Button>
             </div>

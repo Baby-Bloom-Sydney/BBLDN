@@ -47,11 +47,7 @@ export function ExpandablePhoto({ src, alt, children }: ExpandablePhotoProps) {
             className="w-[75vmin] h-[75vmin] max-w-[420px] max-h-[420px] rounded-full overflow-hidden ring-4 ring-white/20 shadow-2xl"
             style={{ animation: "scale-in 200ms ease-out" }}
           >
-            <img
-              src={src}
-              alt={alt}
-              className="w-full h-full object-cover"
-            />
+            <img src={src} alt={alt} className="w-full h-full object-cover" />
           </div>
         </div>
       )}

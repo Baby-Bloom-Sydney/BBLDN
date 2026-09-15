@@ -1,22 +1,24 @@
-'use server';
+"use server";
 
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
  * Get a nanny's phone number from verifications table,
  * falling back to user_profiles.mobile_number.
  * Uses admin client since phone is sensitive data behind RLS.
  */
-export async function getNannyPhone(nannyUserId: string): Promise<string | null> {
+export async function getNannyPhone(
+  nannyUserId: string,
+): Promise<string | null> {
   const supabase = createAdminClient();
 
   // Try verifications first
   const { data } = await supabase
-    .from('verifications')
-    .select('phone_number')
-    .eq('user_id', nannyUserId)
-    .not('phone_number', 'is', null)
-    .order('created_at', { ascending: false })
+    .from("verifications")
+    .select("phone_number")
+    .eq("user_id", nannyUserId)
+    .not("phone_number", "is", null)
+    .order("created_at", { ascending: false })
     .limit(1)
     .single();
 
@@ -24,9 +26,9 @@ export async function getNannyPhone(nannyUserId: string): Promise<string | null>
 
   // Fallback to user_profiles.mobile_number
   const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('mobile_number')
-    .eq('user_id', nannyUserId)
+    .from("user_profiles")
+    .select("mobile_number")
+    .eq("user_id", nannyUserId)
     .single();
 
   return profile?.mobile_number ?? null;
@@ -36,12 +38,14 @@ export async function getNannyPhone(nannyUserId: string): Promise<string | null>
  * Get a parent's phone number from user_profiles.mobile_number.
  * Uses admin client since phone is sensitive data behind RLS.
  */
-export async function getParentPhone(parentUserId: string): Promise<string | null> {
+export async function getParentPhone(
+  parentUserId: string,
+): Promise<string | null> {
   const supabase = createAdminClient();
   const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('mobile_number')
-    .eq('user_id', parentUserId)
+    .from("user_profiles")
+    .select("mobile_number")
+    .eq("user_id", parentUserId)
     .single();
   return profile?.mobile_number ?? null;
 }
@@ -64,18 +68,20 @@ export async function getPositionSummary(positionId: string): Promise<{
   const supabase = createAdminClient();
 
   const { data: position, error } = await supabase
-    .from('nanny_positions')
-    .select('id, schedule_type, hours_per_week, days_required, hourly_rate, urgency, start_date, level_of_support')
-    .eq('id', positionId)
+    .from("nanny_positions")
+    .select(
+      "id, schedule_type, hours_per_week, days_required, hourly_rate, urgency, start_date, level_of_support",
+    )
+    .eq("id", positionId)
     .single();
 
   if (error || !position) return null;
 
   const { data: children } = await supabase
-    .from('position_children')
-    .select('age_months, gender')
-    .eq('position_id', positionId)
-    .order('display_order', { ascending: true });
+    .from("position_children")
+    .select("age_months, gender")
+    .eq("position_id", positionId)
+    .order("display_order", { ascending: true });
 
   return {
     ...position,
@@ -98,7 +104,7 @@ export async function createInboxMessage(params: {
 }): Promise<void> {
   const supabase = createAdminClient();
 
-  const { error } = await supabase.from('inbox_messages').insert({
+  const { error } = await supabase.from("inbox_messages").insert({
     user_id: params.userId,
     type: params.type,
     title: params.title,
@@ -110,7 +116,7 @@ export async function createInboxMessage(params: {
   });
 
   if (error) {
-    console.error('[Inbox] Failed to create message:', error);
+    console.error("[Inbox] Failed to create message:", error);
   }
 }
 
@@ -126,7 +132,7 @@ export async function logConnectionEvent(params: {
 }): Promise<void> {
   const supabase = createAdminClient();
 
-  const { error } = await supabase.from('connections_log').insert({
+  const { error } = await supabase.from("connections_log").insert({
     connection_request_id: params.connectionRequestId,
     parent_id: params.parentId,
     nanny_id: params.nannyId,
@@ -135,6 +141,6 @@ export async function logConnectionEvent(params: {
   });
 
   if (error) {
-    console.error('[ConnectionsLog] Failed to log event:', error);
+    console.error("[ConnectionsLog] Failed to log event:", error);
   }
 }

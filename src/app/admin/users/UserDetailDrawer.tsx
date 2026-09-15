@@ -15,8 +15,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { LEVEL_LABELS, STATUS_LABELS } from "@/lib/verification";
-import { adminDeleteUser, adminChangeRole, adminResetVerification, adminRegenerateNannyBio } from "@/lib/actions/admin";
-import { CheckCircle2, Clock, XCircle, MapPin, Mail, Phone, Calendar, Shield, Baby, Loader2, Trash2, RefreshCw, UserCog, ExternalLink, Send, Eye } from "lucide-react";
+import {
+  adminDeleteUser,
+  adminChangeRole,
+  adminResetVerification,
+  adminRegenerateNannyBio,
+} from "@/lib/actions/admin";
+import {
+  CheckCircle2,
+  Clock,
+  XCircle,
+  MapPin,
+  Mail,
+  Phone,
+  Calendar,
+  Shield,
+  Baby,
+  Loader2,
+  Trash2,
+  RefreshCw,
+  UserCog,
+  ExternalLink,
+  Send,
+  Eye,
+} from "lucide-react";
 import { ContactUserModal } from "./ContactUserModal";
 import type { UserData } from "./page";
 
@@ -26,7 +48,9 @@ interface UserDetailDrawerProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function getLevelVariant(level: number | null): "inactive" | "pending" | "active" | "verified" | "info" {
+function getLevelVariant(
+  level: number | null,
+): "inactive" | "pending" | "active" | "verified" | "info" {
   if (level === null) return "inactive";
   if (level === 0) return "inactive";
   if (level === 1) return "pending";
@@ -35,17 +59,33 @@ function getLevelVariant(level: number | null): "inactive" | "pending" | "active
   return "verified";
 }
 
-function getStatusVariant(status: number | null): "unattempted" | "pending" | "failed" | "verified" | "active" | "info" {
+function getStatusVariant(
+  status: number | null,
+): "unattempted" | "pending" | "failed" | "verified" | "active" | "info" {
   if (status === null) return "unattempted";
   if (status === 0) return "unattempted";
   if (status === 20) return "info";
-  if (status === 12 || status === 22 || status === 23 || status === 26 || status === 27 || status === 28) return "failed";
+  if (
+    status === 12 ||
+    status === 22 ||
+    status === 23 ||
+    status === 26 ||
+    status === 27 ||
+    status === 28
+  )
+    return "failed";
   if (status === 30) return "active";
   if (status === 40) return "verified";
   return "pending";
 }
 
-function AdminActions({ user, onClose }: { user: UserData; onClose: () => void }) {
+function AdminActions({
+  user,
+  onClose,
+}: {
+  user: UserData;
+  onClose: () => void;
+}) {
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState(user.role);
   const [showRoleConfirm, setShowRoleConfirm] = useState(false);
@@ -53,18 +93,28 @@ function AdminActions({ user, onClose }: { user: UserData; onClose: () => void }
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
-  const [result, setResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [result, setResult] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
-  const name = `${user.first_name || ""} ${user.last_name || ""}`.trim() || "Unknown";
+  const name =
+    `${user.first_name || ""} ${user.last_name || ""}`.trim() || "Unknown";
 
   const handleChangeRole = async () => {
     if (selectedRole === user.role) return;
     setLoading("role");
     setResult(null);
-    const res = await adminChangeRole(user.user_id, selectedRole as 'nanny' | 'parent' | 'admin');
+    const res = await adminChangeRole(
+      user.user_id,
+      selectedRole as "nanny" | "parent" | "admin",
+    );
     setLoading(null);
     if (res.success) {
-      setResult({ type: "success", message: `Role changed to ${selectedRole}` });
+      setResult({
+        type: "success",
+        message: `Role changed to ${selectedRole}`,
+      });
       setShowRoleConfirm(false);
       router.refresh();
     } else {
@@ -121,18 +171,25 @@ function AdminActions({ user, onClose }: { user: UserData; onClose: () => void }
         </h3>
 
         {result && (
-          <p className={`text-sm ${result.type === "success" ? "text-green-600" : "text-red-600"}`}>
+          <p
+            className={`text-sm ${result.type === "success" ? "text-green-600" : "text-red-600"}`}
+          >
             {result.message}
           </p>
         )}
 
         {/* Change Role */}
         <div className="space-y-2">
-          <p className="text-xs font-medium text-slate-500 uppercase">Change Role</p>
+          <p className="text-xs font-medium text-slate-500 uppercase">
+            Change Role
+          </p>
           <div className="flex gap-2">
             <select
               value={selectedRole}
-              onChange={(e) => { setSelectedRole(e.target.value); setShowRoleConfirm(false); }}
+              onChange={(e) => {
+                setSelectedRole(e.target.value);
+                setShowRoleConfirm(false);
+              }}
               className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
             >
               <option value="nanny">Nanny</option>
@@ -140,7 +197,11 @@ function AdminActions({ user, onClose }: { user: UserData; onClose: () => void }
               <option value="admin">Admin</option>
             </select>
             {selectedRole !== user.role && !showRoleConfirm && (
-              <Button size="sm" variant="outline" onClick={() => setShowRoleConfirm(true)}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowRoleConfirm(true)}
+              >
                 Change
               </Button>
             )}
@@ -150,9 +211,23 @@ function AdminActions({ user, onClose }: { user: UserData; onClose: () => void }
               <p className="text-sm text-amber-800 flex-1">
                 Change to <span className="font-semibold">{selectedRole}</span>?
               </p>
-              <Button size="sm" variant="ghost" onClick={() => setShowRoleConfirm(false)}>No</Button>
-              <Button size="sm" onClick={handleChangeRole} disabled={loading === "role"}>
-                {loading === "role" ? <Loader2 className="h-3 w-3 animate-spin" /> : "Yes"}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowRoleConfirm(false)}
+              >
+                No
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleChangeRole}
+                disabled={loading === "role"}
+              >
+                {loading === "role" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  "Yes"
+                )}
               </Button>
             </div>
           )}
@@ -161,7 +236,9 @@ function AdminActions({ user, onClose }: { user: UserData; onClose: () => void }
         {/* Reset Verification (nannies only) */}
         {user.role === "nanny" && (
           <div className="space-y-2">
-            <p className="text-xs font-medium text-slate-500 uppercase">Reset Verification</p>
+            <p className="text-xs font-medium text-slate-500 uppercase">
+              Reset Verification
+            </p>
             {!showResetConfirm ? (
               <Button
                 size="sm"
@@ -175,14 +252,30 @@ function AdminActions({ user, onClose }: { user: UserData; onClose: () => void }
             ) : (
               <div className="rounded-lg bg-amber-50 px-3 py-2 space-y-2">
                 <p className="text-sm text-amber-800">
-                  This deletes all verification records and resets to zero. Continue?
+                  This deletes all verification records and resets to zero.
+                  Continue?
                 </p>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="ghost" className="flex-1" onClick={() => setShowResetConfirm(false)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="flex-1"
+                    onClick={() => setShowResetConfirm(false)}
+                  >
                     Cancel
                   </Button>
-                  <Button size="sm" variant="destructive" className="flex-1" onClick={handleResetVerification} disabled={loading === "reset"}>
-                    {loading === "reset" ? <Loader2 className="h-3 w-3 animate-spin" /> : "Reset"}
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={handleResetVerification}
+                    disabled={loading === "reset"}
+                  >
+                    {loading === "reset" ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      "Reset"
+                    )}
                   </Button>
                 </div>
               </div>
@@ -193,7 +286,9 @@ function AdminActions({ user, onClose }: { user: UserData; onClose: () => void }
         {/* Regenerate AI Profile (nannies only) */}
         {user.role === "nanny" && (
           <div className="space-y-2">
-            <p className="text-xs font-medium text-slate-500 uppercase">Regenerate AI Profile</p>
+            <p className="text-xs font-medium text-slate-500 uppercase">
+              Regenerate AI Profile
+            </p>
             <Button
               size="sm"
               variant="outline"
@@ -206,14 +301,18 @@ function AdminActions({ user, onClose }: { user: UserData; onClose: () => void }
               ) : (
                 <RefreshCw className="mr-2 h-3.5 w-3.5" />
               )}
-              {loading === "regenerate" ? "Regenerating..." : "Regenerate Profile"}
+              {loading === "regenerate"
+                ? "Regenerating..."
+                : "Regenerate Profile"}
             </Button>
           </div>
         )}
 
         {/* Delete User */}
         <div className="space-y-2">
-          <p className="text-xs font-medium text-slate-500 uppercase">Delete User</p>
+          <p className="text-xs font-medium text-slate-500 uppercase">
+            Delete User
+          </p>
           {!showDeleteConfirm ? (
             <Button
               size="sm"
@@ -227,8 +326,8 @@ function AdminActions({ user, onClose }: { user: UserData; onClose: () => void }
           ) : (
             <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-3 space-y-2">
               <p className="text-sm text-red-800">
-                Type <span className="font-mono font-semibold">{name}</span> to confirm deletion.
-                This cannot be undone.
+                Type <span className="font-mono font-semibold">{name}</span> to
+                confirm deletion. This cannot be undone.
               </p>
               <Input
                 value={deleteConfirmName}
@@ -237,7 +336,15 @@ function AdminActions({ user, onClose }: { user: UserData; onClose: () => void }
                 className="text-sm"
               />
               <div className="flex gap-2">
-                <Button size="sm" variant="ghost" className="flex-1" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmName(""); }}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setDeleteConfirmName("");
+                  }}
+                >
                   Cancel
                 </Button>
                 <Button
@@ -247,7 +354,11 @@ function AdminActions({ user, onClose }: { user: UserData; onClose: () => void }
                   disabled={deleteConfirmName !== name || loading === "delete"}
                   onClick={handleDelete}
                 >
-                  {loading === "delete" ? <Loader2 className="h-3 w-3 animate-spin" /> : "Delete Forever"}
+                  {loading === "delete" ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    "Delete Forever"
+                  )}
                 </Button>
               </div>
             </div>
@@ -258,12 +369,17 @@ function AdminActions({ user, onClose }: { user: UserData; onClose: () => void }
   );
 }
 
-export function UserDetailDrawer({ user, open, onOpenChange }: UserDetailDrawerProps) {
+export function UserDetailDrawer({
+  user,
+  open,
+  onOpenChange,
+}: UserDetailDrawerProps) {
   const [showContactModal, setShowContactModal] = useState(false);
 
   if (!user) return null;
 
-  const name = `${user.first_name || ""} ${user.last_name || ""}`.trim() || "Unknown";
+  const name =
+    `${user.first_name || ""} ${user.last_name || ""}`.trim() || "Unknown";
   const level = user.verification_level;
   const status = user.verification_status;
 
@@ -294,7 +410,9 @@ export function UserDetailDrawer({ user, open, onOpenChange }: UserDetailDrawerP
             />
             <div>
               <p className="text-lg font-semibold">{name}</p>
-              <p className="capitalize text-sm text-slate-500">{user.role.replace("_", " ")}</p>
+              <p className="capitalize text-sm text-slate-500">
+                {user.role.replace("_", " ")}
+              </p>
               {user.role === "nanny" && (
                 <div className="mt-1">
                   <StatusBadge variant={getLevelVariant(level)}>
@@ -311,7 +429,9 @@ export function UserDetailDrawer({ user, open, onOpenChange }: UserDetailDrawerP
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => window.open(`/nannies/${user.nanny_id}`, '_blank')}
+                onClick={() =>
+                  window.open(`/nannies/${user.nanny_id}`, "_blank")
+                }
               >
                 <ExternalLink className="mr-2 h-4 w-4" />
                 View Profile
@@ -320,7 +440,9 @@ export function UserDetailDrawer({ user, open, onOpenChange }: UserDetailDrawerP
             <Button
               variant="outline"
               className="flex-1"
-              onClick={() => window.open(`/admin/viewer/${user.user_id}`, '_blank')}
+              onClick={() =>
+                window.open(`/admin/viewer/${user.user_id}`, "_blank")
+              }
             >
               <Eye className="mr-2 h-4 w-4" />
               View as User
@@ -339,7 +461,9 @@ export function UserDetailDrawer({ user, open, onOpenChange }: UserDetailDrawerP
           {/* Personal Info */}
           <Card>
             <CardContent className="p-4 space-y-3">
-              <h3 className="text-sm font-semibold text-slate-700">Personal Information</h3>
+              <h3 className="text-sm font-semibold text-slate-700">
+                Personal Information
+              </h3>
 
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2 text-slate-600">
@@ -369,12 +493,16 @@ export function UserDetailDrawer({ user, open, onOpenChange }: UserDetailDrawerP
           {/* Role & Status */}
           <Card>
             <CardContent className="p-4 space-y-3">
-              <h3 className="text-sm font-semibold text-slate-700">Role & Status</h3>
+              <h3 className="text-sm font-semibold text-slate-700">
+                Role & Status
+              </h3>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500">Role</span>
-                  <span className="capitalize font-medium">{user.role.replace("_", " ")}</span>
+                  <span className="capitalize font-medium">
+                    {user.role.replace("_", " ")}
+                  </span>
                 </div>
                 {user.role === "nanny" && (
                   <>
@@ -454,7 +582,7 @@ export function UserDetailDrawer({ user, open, onOpenChange }: UserDetailDrawerP
                         <CheckCircle2 className="h-3.5 w-3.5" /> Verified
                       </span>
                     ) : status !== null && status >= 20 && status < 40 ? (
-                      status === 22 && user.nanny_status === 'suspended' ? (
+                      status === 22 && user.nanny_status === "suspended" ? (
                         <span className="flex items-center gap-1 text-red-700 font-semibold">
                           <XCircle className="h-3.5 w-3.5" /> BARRED
                         </span>

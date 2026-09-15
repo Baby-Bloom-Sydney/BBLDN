@@ -28,7 +28,9 @@ export async function fetchBrowseNannies(
 
   const { data: nannies, error } = await supabase
     .from("nannies")
-    .select("id, user_id, hourly_rate_min, nanny_experience_years, total_experience_years, under_3_experience_years, newborn_experience_years, verification_tier, verification_level, drivers_license, vaccination_status, languages, role_types_preferred, ai_content")
+    .select(
+      "id, user_id, hourly_rate_min, nanny_experience_years, total_experience_years, under_3_experience_years, newborn_experience_years, verification_tier, verification_level, drivers_license, vaccination_status, languages, role_types_preferred, ai_content",
+    )
     .eq("profile_visible", true)
     .order("created_at", { ascending: false })
     .range(from, to);
@@ -44,7 +46,9 @@ export async function fetchBrowseNannies(
   const [{ data: profiles }, { data: credentials }] = await Promise.all([
     supabase
       .from("user_profiles")
-      .select("user_id, first_name, last_name, suburb, profile_picture_url, date_of_birth")
+      .select(
+        "user_id, first_name, last_name, suburb, profile_picture_url, date_of_birth",
+      )
       .in("user_id", userIds),
     supabase
       .from("nanny_credentials")
@@ -54,7 +58,12 @@ export async function fetchBrowseNannies(
   ]);
 
   const profileMap = new Map((profiles || []).map((p) => [p.user_id, p]));
-  const qualMap = new Map((credentials || []).map((c) => [c.nanny_id, c.qualification_type as string]));
+  const qualMap = new Map(
+    (credentials || []).map((c) => [
+      c.nanny_id,
+      c.qualification_type as string,
+    ]),
+  );
 
   const mapped = nannies
     .map((nanny) => {

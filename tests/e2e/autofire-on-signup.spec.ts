@@ -117,7 +117,6 @@ test.describe("T-040 autofire on adv-funnel signup", () => {
     }
     if (testUserId) {
       await admin.from("inbox_messages").delete().eq("user_id", testUserId);
-      await admin.from("viral_shares").delete().eq("user_id", testUserId);
       await admin.from("user_roles").delete().eq("user_id", testUserId);
       await admin.from("user_profiles").delete().eq("user_id", testUserId);
       await admin.auth.admin.deleteUser(testUserId).catch(() => {});

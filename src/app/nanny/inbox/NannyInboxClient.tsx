@@ -3,9 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import {
-  ConnectionRequestWithDetails,
-} from "@/lib/actions/connection";
+import { ConnectionRequestWithDetails } from "@/lib/actions/connection";
 import { CONNECTION_STAGE } from "@/lib/position/constants";
 import { InboxMessage, markAsRead, markAllAsRead } from "@/lib/actions/inbox";
 import { formatSydneyDate } from "@/lib/timezone";
@@ -21,7 +19,7 @@ import {
 
 // ── Helpers ──
 
-const SKIP_INTRO_WAIT = process.env.NEXT_PUBLIC_SKIP_INTRO_WAIT === 'true';
+const SKIP_INTRO_WAIT = process.env.NEXT_PUBLIC_SKIP_INTRO_WAIT === "true";
 
 function isIntroPast(request: ConnectionRequestWithDetails): boolean {
   if (!request.confirmed_time) return false;
@@ -32,16 +30,18 @@ function isIntroPast(request: ConnectionRequestWithDetails): boolean {
 function isPostIntro(request: ConnectionRequestWithDetails): boolean {
   const stage = request.connection_stage;
   if (stage == null) return false;
-  return ([
-    CONNECTION_STAGE.INTRO_COMPLETE,
-    CONNECTION_STAGE.INTRO_INCOMPLETE,
-    CONNECTION_STAGE.AWAITING_RESPONSE,
-    CONNECTION_STAGE.TRIAL_ARRANGED,
-    CONNECTION_STAGE.TRIAL_COMPLETE,
-    CONNECTION_STAGE.OFFERED,
-    CONNECTION_STAGE.CONFIRMED,
-    CONNECTION_STAGE.ACTIVE,
-  ] as number[]).includes(stage);
+  return (
+    [
+      CONNECTION_STAGE.INTRO_COMPLETE,
+      CONNECTION_STAGE.INTRO_INCOMPLETE,
+      CONNECTION_STAGE.AWAITING_RESPONSE,
+      CONNECTION_STAGE.TRIAL_ARRANGED,
+      CONNECTION_STAGE.TRIAL_COMPLETE,
+      CONNECTION_STAGE.OFFERED,
+      CONNECTION_STAGE.CONFIRMED,
+      CONNECTION_STAGE.ACTIVE,
+    ] as number[]
+  ).includes(stage);
 }
 
 // ── Notification Item ──
@@ -171,17 +171,18 @@ export function NannyInboxClient({
 
   // Check for post-intro connections that need attention in My Positions
   const allConfirmedOrCompleted = pendingRequests.filter(
-    (r) => r.status === "confirmed" || r.status === "completed"
+    (r) => r.status === "confirmed" || r.status === "completed",
   );
   const postIntroConnections = allConfirmedOrCompleted.filter(
-    (r) => isPostIntro(r) || (r.status === "confirmed" && isIntroPast(r))
+    (r) => isPostIntro(r) || (r.status === "confirmed" && isIntroPast(r)),
   );
 
   // Also count pending requests that need attention in My Positions
   const pendingInMyPositions = pendingRequests.filter(
-    (r) => r.status === "pending" || r.status === "accepted"
+    (r) => r.status === "pending" || r.status === "accepted",
   );
-  const needsAttentionCount = postIntroConnections.length + pendingInMyPositions.length;
+  const needsAttentionCount =
+    postIntroConnections.length + pendingInMyPositions.length;
 
   const handleMarkRead = async (id: string) => {
     await markAsRead(id);
@@ -204,7 +205,8 @@ export function NannyInboxClient({
           className="flex items-center justify-between rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 hover:bg-violet-100 transition-colors"
         >
           <p className="text-sm font-medium text-violet-800">
-            {needsAttentionCount} connection{needsAttentionCount > 1 ? "s" : ""} need{needsAttentionCount === 1 ? "s" : ""} your attention
+            {needsAttentionCount} connection{needsAttentionCount > 1 ? "s" : ""}{" "}
+            need{needsAttentionCount === 1 ? "s" : ""} your attention
           </p>
           <span className="flex items-center gap-1 text-sm font-medium text-violet-600">
             Go to My Positions
@@ -249,9 +251,7 @@ export function NannyInboxClient({
       {/* Past Connections */}
       {pastConnections.length > 0 && (
         <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-slate-700">
-            Past Intros
-          </h2>
+          <h2 className="text-lg font-semibold text-slate-700">Past Intros</h2>
           <div className="grid gap-2">
             {pastConnections.map((req) => (
               <PastConnectionCard key={req.id} request={req} />
@@ -261,12 +261,14 @@ export function NannyInboxClient({
       )}
 
       {/* Empty state */}
-      {notifications.length === 0 && pastConnections.length === 0 && needsAttentionCount === 0 && (
-        <div className="text-center py-12">
-          <Bell className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-500">No notifications yet</p>
-        </div>
-      )}
+      {notifications.length === 0 &&
+        pastConnections.length === 0 &&
+        needsAttentionCount === 0 && (
+          <div className="text-center py-12">
+            <Bell className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-sm text-slate-500">No notifications yet</p>
+          </div>
+        )}
     </div>
   );
 }

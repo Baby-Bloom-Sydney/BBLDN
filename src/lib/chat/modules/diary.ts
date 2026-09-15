@@ -663,8 +663,7 @@ export const diaryModule: BloomBotModule = {
           },
           image_url: {
             type: "string",
-            description:
-              "Optional image URL to attach (Cloudinary or Supabase Storage URL).",
+            description: "Optional image URL to attach (Supabase Storage URL).",
           },
         },
         required: ["note"],

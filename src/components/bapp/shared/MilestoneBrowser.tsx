@@ -33,10 +33,7 @@ interface GroupedMilestones {
 }
 
 function groupMilestones(milestones: Milestone[]): GroupedMilestones[] {
-  const domainMap = new Map<
-    string,
-    Map<string, Milestone[]>
-  >();
+  const domainMap = new Map<string, Map<string, Milestone[]>>();
 
   for (const m of milestones) {
     if (!domainMap.has(m.domain)) {
@@ -81,7 +78,9 @@ export function MilestoneBrowser({
   maxSelections,
 }: MilestoneBrowserProps) {
   const [openDomain, setOpenDomain] = useState<string | null>(null);
-  const [expandedMilestone, setExpandedMilestone] = useState<string | null>(null);
+  const [expandedMilestone, setExpandedMilestone] = useState<string | null>(
+    null,
+  );
 
   const grouped = useMemo(() => groupMilestones(milestones), [milestones]);
 
@@ -99,7 +98,7 @@ export function MilestoneBrowser({
             key={domain}
             className={cn(
               "overflow-hidden rounded-lg border transition-colors",
-              isOpen ? DOMAIN_BG[color] : "border-slate-200 bg-white"
+              isOpen ? DOMAIN_BG[color] : "border-slate-200 bg-white",
             )}
           >
             {/* Domain header */}
@@ -117,7 +116,7 @@ export function MilestoneBrowser({
               <ChevronDown
                 className={cn(
                   "h-4 w-4 text-slate-400 transition-transform",
-                  isOpen && "rotate-180"
+                  isOpen && "rotate-180",
                 )}
               />
             </button>
@@ -147,7 +146,7 @@ export function MilestoneBrowser({
                               "rounded-lg border p-2.5 transition-colors",
                               isSelected
                                 ? "border-emerald-300 bg-emerald-50"
-                                : "border-slate-200 bg-white"
+                                : "border-slate-200 bg-white",
                             )}
                           >
                             <button
@@ -162,7 +161,7 @@ export function MilestoneBrowser({
                                   setExpandedMilestone(null);
                                 } else if (!isSelected) {
                                   setExpandedMilestone(
-                                    isExpanded ? null : m.id
+                                    isExpanded ? null : m.id,
                                   );
                                 }
                               }}

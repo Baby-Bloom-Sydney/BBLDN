@@ -3,8 +3,16 @@
 // =============================================================================
 
 export const DOMAINS = {
-  CL: { label: "Communication & Language", short: "Communication", color: "blue" },
-  PSE: { label: "Personal, Social & Emotional", short: "Social", color: "pink" },
+  CL: {
+    label: "Communication & Language",
+    short: "Communication",
+    color: "blue",
+  },
+  PSE: {
+    label: "Personal, Social & Emotional",
+    short: "Social",
+    color: "pink",
+  },
   PD: { label: "Physical Development", short: "Physical", color: "green" },
   LIT: { label: "Literacy", short: "Literacy", color: "purple" },
   NUM: { label: "Numeracy", short: "Numeracy", color: "orange" },

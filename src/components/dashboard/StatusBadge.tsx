@@ -1,6 +1,13 @@
 import { cn } from "@/lib/utils";
 
-type StatusVariant = "pending" | "active" | "verified" | "inactive" | "failed" | "unattempted" | "info";
+type StatusVariant =
+  | "pending"
+  | "active"
+  | "verified"
+  | "inactive"
+  | "failed"
+  | "unattempted"
+  | "info";
 
 interface StatusBadgeProps {
   variant: StatusVariant;
@@ -18,13 +25,17 @@ const variantStyles: Record<StatusVariant, string> = {
   info: "bg-blue-100 text-blue-800",
 };
 
-export function StatusBadge({ variant, children, className }: StatusBadgeProps) {
+export function StatusBadge({
+  variant,
+  children,
+  className,
+}: StatusBadgeProps) {
   return (
     <span
       className={cn(
         "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
         variantStyles[variant],
-        className
+        className,
       )}
     >
       {children}

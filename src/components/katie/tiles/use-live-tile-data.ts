@@ -7,8 +7,8 @@
  * `/api/chat/<kind>/[id]` on mount, and refetches on window focus so
  * actions taken on the main page are reflected in the chat. Three
  * tiles use this — `ConnectionRequestTile`, `PositionTile`,
- * `PlacementTile` — and a fourth (`BsrJobTile`) and fifth
- * (`JobMatchTile`) likely will once they're audited.
+ * `PlacementTile` — and a fourth (`JobMatchTile`) likely will once
+ * it's audited.
  *
  * Centralising the plumbing here avoids drift in:
  *   - the cancellation flag pattern across rapid id changes

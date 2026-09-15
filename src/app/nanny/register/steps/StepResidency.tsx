@@ -275,11 +275,11 @@ export function StepResidency({ data, updateData, goNext, goBack }: StepProps) {
   const residencyStatusAnswered =
     isAustralian ||
     (residencyStatusTag !== null &&
-      (residencyStatusTag !== "Other" ||
-        (customResidencyStatus.trim() !== "")));
+      (residencyStatusTag !== "Other" || customResidencyStatus.trim() !== ""));
 
   const showRightToWork = !!nationality;
-  const rightToWorkAnswered = data.right_to_work !== null && data.right_to_work !== undefined;
+  const rightToWorkAnswered =
+    data.right_to_work !== null && data.right_to_work !== undefined;
 
   const showSydneyResident =
     showRightToWork && (isAustralian || rightToWorkAnswered);
@@ -325,7 +325,6 @@ export function StepResidency({ data, updateData, goNext, goBack }: StepProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-
         {/* Nationality Dropdown */}
         <div className="space-y-3">
           <p className="text-sm font-medium text-slate-700">
@@ -442,7 +441,12 @@ export function StepResidency({ data, updateData, goNext, goBack }: StepProps) {
 
         {/* Navigation */}
         <div className="flex gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={goBack} className="flex-1">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={goBack}
+            className="flex-1"
+          >
             Back
           </Button>
           {canContinue && (

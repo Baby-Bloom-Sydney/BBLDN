@@ -31,7 +31,9 @@ export function ScheduleTimeGrid({
 
   // Parse proposed times into available slots set and unique dates
   const availableSlots = new Set(proposedTimes);
-  const uniqueDates = Array.from(new Set(proposedTimes.map((s) => s.split("_")[0]))).sort();
+  const uniqueDates = Array.from(
+    new Set(proposedTimes.map((s) => s.split("_")[0])),
+  ).sort();
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr + "T00:00:00");
@@ -42,19 +44,29 @@ export function ScheduleTimeGrid({
   };
 
   // Time picker
-  const selectedBracketKey = selectedSlot ? selectedSlot.split("_")[1] as keyof typeof TIME_BRACKETS : null;
+  const selectedBracketKey = selectedSlot
+    ? (selectedSlot.split("_")[1] as keyof typeof TIME_BRACKETS)
+    : null;
   const timeGrid = selectedBracketKey
-    ? [getBracketTimeOptions(selectedBracketKey).slice(0, 4),
-       getBracketTimeOptions(selectedBracketKey).slice(4, 8),
-       getBracketTimeOptions(selectedBracketKey).slice(8, 12)]
+    ? [
+        getBracketTimeOptions(selectedBracketKey).slice(0, 4),
+        getBracketTimeOptions(selectedBracketKey).slice(4, 8),
+        getBracketTimeOptions(selectedBracketKey).slice(8, 12),
+      ]
     : [];
-  const hasSelectedTime = selectedSlot && selectedHour !== null && selectedMinute !== null;
+  const hasSelectedTime =
+    selectedSlot && selectedHour !== null && selectedMinute !== null;
 
   const getConfirmationLabel = () => {
-    if (!selectedSlot || selectedHour === null || selectedMinute === null) return "";
+    if (!selectedSlot || selectedHour === null || selectedMinute === null)
+      return "";
     const [date] = selectedSlot.split("_");
     const d = new Date(date + "T00:00:00");
-    const dayStr = d.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" });
+    const dayStr = d.toLocaleDateString("en-AU", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
     const h = selectedHour > 12 ? selectedHour - 12 : selectedHour;
     const ampm = selectedHour >= 12 ? "pm" : "am";
     const m = selectedMinute.toString().padStart(2, "0");
@@ -62,7 +74,8 @@ export function ScheduleTimeGrid({
   };
 
   const handleConfirm = () => {
-    if (!selectedSlot || selectedHour === null || selectedMinute === null) return;
+    if (!selectedSlot || selectedHour === null || selectedMinute === null)
+      return;
     const [date] = selectedSlot.split("_");
     const iso = sydneyToUTC(date, selectedHour, selectedMinute);
     onConfirm(iso);
@@ -86,8 +99,12 @@ export function ScheduleTimeGrid({
               <div />
               {BRACKET_KEYS.map((bracket) => (
                 <div key={bracket} className="text-center">
-                  <p className="text-xs font-semibold text-slate-600">{TIME_BRACKETS[bracket].label}</p>
-                  <p className="text-[10px] text-slate-400">{TIME_BRACKETS[bracket].sublabel}</p>
+                  <p className="text-xs font-semibold text-slate-600">
+                    {TIME_BRACKETS[bracket].label}
+                  </p>
+                  <p className="text-[10px] text-slate-400">
+                    {TIME_BRACKETS[bracket].sublabel}
+                  </p>
                 </div>
               ))}
             </div>
@@ -96,10 +113,15 @@ export function ScheduleTimeGrid({
             {uniqueDates.map((date) => {
               const { weekday, day } = formatDate(date);
               return (
-                <div key={date} className="grid grid-cols-[90px_repeat(4,1fr)] gap-1 mb-1">
+                <div
+                  key={date}
+                  className="grid grid-cols-[90px_repeat(4,1fr)] gap-1 mb-1"
+                >
                   <div className="flex items-center">
                     <div>
-                      <p className="text-xs font-semibold text-slate-600">{weekday}</p>
+                      <p className="text-xs font-semibold text-slate-600">
+                        {weekday}
+                      </p>
                       <p className="text-[10px] text-slate-400">{day}</p>
                     </div>
                   </div>
@@ -122,8 +144,8 @@ export function ScheduleTimeGrid({
                           isSelected
                             ? "bg-violet-600 text-white border-violet-600 cursor-pointer"
                             : isAvailable
-                            ? "bg-violet-50 text-violet-600 border-violet-200 hover:border-violet-400 cursor-pointer"
-                            : "bg-slate-50 text-slate-200 border-slate-100 cursor-not-allowed"
+                              ? "bg-violet-50 text-violet-600 border-violet-200 hover:border-violet-400 cursor-pointer"
+                              : "bg-slate-50 text-slate-200 border-slate-100 cursor-not-allowed"
                         }`}
                       >
                         {isAvailable ? (isSelected ? "\u2713" : "") : ""}
@@ -140,13 +162,12 @@ export function ScheduleTimeGrid({
       {/* 4x3 time picker */}
       {selectedSlot && selectedBracketKey && (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-700">
-            Select a time
-          </p>
+          <p className="text-sm font-medium text-slate-700">Select a time</p>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="grid grid-cols-4 gap-1.5">
               {timeGrid.flat().map((opt) => {
-                const isSelected = selectedHour === opt.hour && selectedMinute === opt.minute;
+                const isSelected =
+                  selectedHour === opt.hour && selectedMinute === opt.minute;
                 return (
                   <button
                     key={`${opt.hour}-${opt.minute}`}
@@ -197,7 +218,10 @@ export function ScheduleTimeGrid({
           onClick={handleConfirm}
         >
           {submitting ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Confirming...</>
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Confirming...
+            </>
           ) : (
             "Confirm Time"
           )}

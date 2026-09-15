@@ -45,9 +45,7 @@ export function BrowsePreview({ nannies }: BrowsePreviewProps) {
                 asChild
                 className="bg-violet-500 hover:bg-violet-600 text-white text-base h-12 px-8"
               >
-                <a href="#quick-match">
-                  Find your Nanny
-                </a>
+                <a href="#quick-match">Find your Nanny</a>
               </Button>
               <Button
                 size="lg"
@@ -71,9 +69,7 @@ export function BrowsePreview({ nannies }: BrowsePreviewProps) {
             asChild
             className="bg-violet-500 hover:bg-violet-600 text-white text-base h-12 px-8 w-full sm:w-auto max-w-[280px] sm:max-w-none"
           >
-            <a href="#quick-match">
-              Find your Nanny
-            </a>
+            <a href="#quick-match">Find your Nanny</a>
           </Button>
           <Button
             size="sm"

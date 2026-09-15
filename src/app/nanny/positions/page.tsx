@@ -1,20 +1,23 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
-import { getNannyPlacements, getNannyUpcomingIntros } from "@/lib/actions/position-funnel";
+import {
+  getNannyPlacements,
+  getNannyUpcomingIntros,
+} from "@/lib/actions/position-funnel";
 import { NannyPositionsClient } from "./NannyPositionsClient";
 
 export default async function NannyPositionsPage() {
-  const [{ data: placements, error }, { data: upcomingIntros }] = await Promise.all([
-    getNannyPlacements(),
-    getNannyUpcomingIntros(),
-  ]);
+  const [{ data: placements, error }, { data: upcomingIntros }] =
+    await Promise.all([getNannyPlacements(), getNannyUpcomingIntros()]);
 
   if (error) {
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">My Positions</h1>
-          <p className="mt-1 text-slate-500">Your nanny placements through Baby Bloom</p>
+          <p className="mt-1 text-slate-500">
+            Your nanny placements through Baby Bloom
+          </p>
         </div>
         <Card>
           <CardContent className="flex items-center gap-3 py-6">
@@ -30,7 +33,9 @@ export default async function NannyPositionsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">My Positions</h1>
-        <p className="mt-1 text-slate-500">Your nanny placements through Baby Bloom</p>
+        <p className="mt-1 text-slate-500">
+          Your nanny placements through Baby Bloom
+        </p>
       </div>
 
       <NannyPositionsClient

@@ -28,7 +28,6 @@ import {
   Pencil,
   Check,
   MoreHorizontal,
-  Sparkles,
   CheckCircle,
   XCircle,
 } from "lucide-react";
@@ -60,7 +59,6 @@ import {
 import type { DfyNotification } from "@/lib/actions/matching";
 import { PositionAccordion } from "@/components/position/PositionAccordion";
 import { AvailabilityGrid } from "@/components/position/AvailabilityGrid";
-import Link from "next/link";
 
 function formatStartWeekDisplay(dateStr: string): string {
   if (dateStr === "tbc") return "Start week to be confirmed";
@@ -97,7 +95,6 @@ interface NannyPositionsClientProps {
   placements: Placement[];
   upcomingIntros?: UpcomingIntro[];
   dfyNotificationsInitial?: DfyNotification[];
-  shareUnlocked?: boolean;
   embedded?: boolean;
 }
 
@@ -154,7 +151,6 @@ export function NannyPositionsClient({
   placements,
   upcomingIntros = [],
   dfyNotificationsInitial = [],
-  shareUnlocked = false,
   embedded = false,
 }: NannyPositionsClientProps) {
   const router = useRouter();
@@ -1329,24 +1325,7 @@ export function NannyPositionsClient({
             {dfyNotifications.length > 0 ? ` (${dfyNotifications.length})` : ""}
           </p>
 
-          {!shareUnlocked ? (
-            <div className="rounded-lg border border-violet-100 bg-violet-50/50 p-4 text-center space-y-2">
-              <p className="text-sm text-slate-600">Your profile is live</p>
-              <p className="text-sm text-slate-600">
-                Share your profile to appear in parent matchmaking results
-              </p>
-              <Button
-                asChild
-                size="sm"
-                className="bg-violet-600 hover:bg-violet-700"
-              >
-                <Link href="/nanny/share">
-                  <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-                  Be seen in parents&apos; matchmaking
-                </Link>
-              </Button>
-            </div>
-          ) : dfyNotifications.length === 0 ? (
+          {dfyNotifications.length === 0 ? (
             <div className="text-center py-4">
               <p className="text-sm text-slate-400">
                 When families match with you, they&apos;ll appear here.

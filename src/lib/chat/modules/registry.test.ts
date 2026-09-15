@@ -113,11 +113,6 @@ describe("module registry", () => {
       expect(ids).toContain("connections.request_received");
     });
 
-    it("includes a known bsr trigger id", () => {
-      const ids = collectProactiveTriggers().map((t) => t.id);
-      expect(ids).toContain("bsr.accepted_by_parent");
-    });
-
     it("includes the A-08 child-onboarding triggers", () => {
       const ids = collectProactiveTriggers().map((t) => t.id);
       expect(ids).toContain("child.created");

@@ -18,7 +18,7 @@ const CHECKPOINTS: Checkpoint[] = [
 
 function isTrialElapsed(trialDate?: string | null): boolean {
   if (!trialDate) return false;
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
   return trialDate < today;
 }
 
@@ -30,7 +30,10 @@ function getIntermediaryText(
   trialDate?: string | null,
 ): string {
   if (checkpoint === "Connect") {
-    if (stage === CONNECTION_STAGE.NANNY_APPLIED || stage === CONNECTION_STAGE.NANNY_APPLIED_PENDING)
+    if (
+      stage === CONNECTION_STAGE.NANNY_APPLIED ||
+      stage === CONNECTION_STAGE.NANNY_APPLIED_PENDING
+    )
       return role === "nanny"
         ? "Applied"
         : "A nanny has applied to your position";
@@ -38,7 +41,10 @@ function getIntermediaryText(
       return role === "parent"
         ? "We're reaching out to your potential nanny"
         : "A family has sent you a connection request";
-    if (stage === CONNECTION_STAGE.ACCEPTED || stage === CONNECTION_STAGE.ACCEPTED_PENDING)
+    if (
+      stage === CONNECTION_STAGE.ACCEPTED ||
+      stage === CONNECTION_STAGE.ACCEPTED_PENDING
+    )
       return role === "parent"
         ? "They accepted! Pick a time for your meet and greet"
         : "Accepted! The family will arrange a meet and greet";
@@ -83,8 +89,7 @@ function getIntermediaryText(
     }
     if (stage === CONNECTION_STAGE.CONFIRMED)
       return "Confirmed! Congratulations!";
-    if (stage >= CONNECTION_STAGE.ACTIVE)
-      return "Your placement is active";
+    if (stage >= CONNECTION_STAGE.ACTIVE) return "Your placement is active";
   }
 
   return "";
@@ -108,7 +113,7 @@ export function ConnectionProgress({
   hideMatchmaking = false,
 }: ConnectionProgressProps) {
   const visible = hideMatchmaking
-    ? CHECKPOINTS.filter(cp => cp.label !== "Matchmaking")
+    ? CHECKPOINTS.filter((cp) => cp.label !== "Matchmaking")
     : CHECKPOINTS;
 
   const getState = (i: number): "completed" | "current" | "future" => {
@@ -118,7 +123,9 @@ export function ConnectionProgress({
 
     const nextReal = visible[i + 1];
     if (!nextReal) {
-      return currentStage >= CONNECTION_STAGE.CONFIRMED ? "completed" : "current";
+      return currentStage >= CONNECTION_STAGE.CONFIRMED
+        ? "completed"
+        : "current";
     }
     return currentStage >= nextReal.reachedAt ? "completed" : "current";
   };
@@ -132,38 +139,60 @@ export function ConnectionProgress({
         const isCompleted = state === "completed";
 
         // Get intermediary text for current step, or for the last step when completed
-        const text = (isCurrent || (isLast && isCompleted))
-          ? getIntermediaryText(currentStage, role, cp.label, fillInitiatedBy, trialDate)
-          : "";
+        const text =
+          isCurrent || (isLast && isCompleted)
+            ? getIntermediaryText(
+                currentStage,
+                role,
+                cp.label,
+                fillInitiatedBy,
+                trialDate,
+              )
+            : "";
 
         // Date context for intro time or trial date
         let dateText: string | null = null;
-        if (text && confirmedTime && currentStage === CONNECTION_STAGE.INTRO_SCHEDULED)
+        if (
+          text &&
+          confirmedTime &&
+          currentStage === CONNECTION_STAGE.INTRO_SCHEDULED
+        )
           dateText = new Date(confirmedTime).toLocaleDateString("en-AU", {
-            weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit",
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+            hour: "numeric",
+            minute: "2-digit",
           });
-        if (text && trialDate && currentStage === CONNECTION_STAGE.TRIAL_ARRANGED)
-          dateText = new Date(trialDate + "T00:00:00").toLocaleDateString("en-AU", {
-            weekday: "short", day: "numeric", month: "short",
-          });
+        if (
+          text &&
+          trialDate &&
+          currentStage === CONNECTION_STAGE.TRIAL_ARRANGED
+        )
+          dateText = new Date(trialDate + "T00:00:00").toLocaleDateString(
+            "en-AU",
+            {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+            },
+          );
 
         const lineColor = isCompleted
           ? "bg-green-300"
           : isCurrent
-          ? "bg-violet-200"
-          : "bg-slate-100";
+            ? "bg-violet-200"
+            : "bg-slate-100";
 
         // Completed and future steps are condensed; current step is full size
-        const circleSize = isCurrent
-          ? "h-7 w-7"
-          : "h-5 w-5";
+        const circleSize = isCurrent ? "h-7 w-7" : "h-5 w-5";
         const iconSize = isCurrent ? "h-4 w-4" : "h-3 w-3";
         const dotSize = "h-2.5 w-2.5";
         const labelClass = isCompleted
           ? "text-xs leading-5 font-medium text-green-700"
           : isCurrent
-          ? "text-sm leading-7 font-semibold text-violet-700"
-          : "text-xs leading-5 text-slate-300";
+            ? "text-sm leading-7 font-semibold text-violet-700"
+            : "text-xs leading-5 text-slate-300";
 
         return (
           <div key={cp.label} className="flex gap-3">
@@ -174,8 +203,8 @@ export function ConnectionProgress({
                   isCompleted
                     ? "border-green-500 bg-green-500"
                     : isCurrent
-                    ? "border-violet-500 bg-violet-50 ring-2 ring-violet-200"
-                    : "border-slate-200 bg-white"
+                      ? "border-violet-500 bg-violet-50 ring-2 ring-violet-200"
+                      : "border-slate-200 bg-white"
                 }`}
               >
                 {isCompleted && <Check className={`${iconSize} text-white`} />}
@@ -188,9 +217,7 @@ export function ConnectionProgress({
 
             {/* Right: label + content */}
             <div className={isLast ? "pb-0" : isCurrent ? "pb-1" : "pb-0.5"}>
-              <p className={labelClass}>
-                {cp.label}
-              </p>
+              <p className={labelClass}>{cp.label}</p>
 
               {/* Intermediary/status text (only for current or last-completed) */}
               {text && (
@@ -211,7 +238,9 @@ export function ConnectionProgress({
               )}
 
               {/* Small spacer for steps without text */}
-              {!text && !isLast && <div className={isCurrent ? "h-5" : "h-2"} />}
+              {!text && !isLast && (
+                <div className={isCurrent ? "h-5" : "h-2"} />
+              )}
             </div>
           </div>
         );

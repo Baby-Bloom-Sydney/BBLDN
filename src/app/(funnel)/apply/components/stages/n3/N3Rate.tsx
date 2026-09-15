@@ -1,25 +1,34 @@
-'use client';
+"use client";
 
-import { useCallback } from 'react';
-import { StageProps } from '../../FunnelOrchestrator';
-import { MultiSelectTags } from '../../shared/MultiSelectTags';
-import { ProgressiveReveal } from '../../shared/ProgressiveReveal';
-import { CompoundPageShell } from '../../shared/CompoundPageShell';
-import { PAY_FREQUENCY_OPTIONS } from '@/types/nanny-leads';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { useCallback } from "react";
+import { StageProps } from "../../FunnelOrchestrator";
+import { MultiSelectTags } from "../../shared/MultiSelectTags";
+import { ProgressiveReveal } from "../../shared/ProgressiveReveal";
+import { CompoundPageShell } from "../../shared/CompoundPageShell";
+import { PAY_FREQUENCY_OPTIONS } from "@/types/nanny-leads";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
-export function N3Rate({ state, dispatch, goNext, goBack, progress, questionNumber }: StageProps) {
+export function N3Rate({
+  state,
+  dispatch,
+  goNext,
+  goBack,
+  progress,
+  questionNumber,
+}: StageProps) {
   const { salary } = state;
 
   const update = useCallback(
     (payload: Partial<typeof salary>) => {
-      dispatch({ type: 'UPDATE_SALARY', payload });
+      dispatch({ type: "UPDATE_SALARY", payload });
     },
-    [dispatch]
+    [dispatch],
   );
 
-  const rateValue = salary.hourly_rate_min ? parseFloat(salary.hourly_rate_min.replace('$', '')) : 0;
+  const rateValue = salary.hourly_rate_min
+    ? parseFloat(salary.hourly_rate_min.replace("$", ""))
+    : 0;
   const hasRate = rateValue >= 35;
 
   const canContinue = hasRate && salary.pay_frequency.length > 0;
@@ -41,13 +50,15 @@ export function N3Rate({ state, dispatch, goNext, goBack, progress, questionNumb
             What hourly rate are you looking for?
           </Label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">
+              $
+            </span>
             <input
               type="number"
               min={35}
               max={100}
               step={0.25}
-              value={rateValue || ''}
+              value={rateValue || ""}
               onChange={(e) => {
                 const val = e.target.value;
                 update({ hourly_rate_min: val ? `$${val}` : null });

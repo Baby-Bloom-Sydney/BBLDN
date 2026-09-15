@@ -13,7 +13,11 @@ interface VerificationProgressProps {
   steps: VerificationStep[];
 }
 
-function getStepState(step: VerificationStep, index: number, steps: VerificationStep[]): StepState {
+function getStepState(
+  step: VerificationStep,
+  index: number,
+  steps: VerificationStep[],
+): StepState {
   const s = step.status;
 
   // Completed states
@@ -22,9 +26,11 @@ function getStepState(step: VerificationStep, index: number, steps: Verification
   }
 
   // If not completed, check if all previous steps are completed
-  const allPreviousComplete = steps.slice(0, index).every((prev) =>
-    ["verified", "saved", "doc_verified", "passed"].includes(prev.status)
-  );
+  const allPreviousComplete = steps
+    .slice(0, index)
+    .every((prev) =>
+      ["verified", "saved", "doc_verified", "passed"].includes(prev.status),
+    );
 
   if (allPreviousComplete && s !== "not_started") {
     return "current"; // Active / in-progress / needs action
@@ -40,8 +46,10 @@ function getStepState(step: VerificationStep, index: number, steps: Verification
 function getSubtext(step: VerificationStep): string {
   const s = step.status;
   if (s === "pending" || s === "processing") return "Verifying...";
-  if (s === "review" || s === "application_pending") return "Pending manual review";
-  if (s === "failed" || s === "rejected" || s === "barred") return "Action needed";
+  if (s === "review" || s === "application_pending")
+    return "Pending manual review";
+  if (s === "failed" || s === "rejected" || s === "barred")
+    return "Action needed";
   if (s === "ocg_not_found" || s === "closed") return "Action needed";
   if (s === "expired") return "Expired — please resubmit";
   return "";
@@ -61,8 +69,8 @@ export function VerificationProgress({ steps }: VerificationProgressProps) {
         const lineColor = isCompleted
           ? "bg-green-300"
           : isCurrent
-          ? "bg-violet-200"
-          : "bg-slate-100";
+            ? "bg-violet-200"
+            : "bg-slate-100";
 
         const circleSize = isCurrent ? "h-7 w-7" : "h-5 w-5";
         const iconSize = isCurrent ? "h-4 w-4" : "h-3 w-3";
@@ -70,8 +78,8 @@ export function VerificationProgress({ steps }: VerificationProgressProps) {
         const labelClass = isCompleted
           ? "text-xs leading-5 font-medium text-green-700"
           : isCurrent
-          ? "text-sm leading-7 font-semibold text-violet-700"
-          : "text-xs leading-5 text-slate-300";
+            ? "text-sm leading-7 font-semibold text-violet-700"
+            : "text-xs leading-5 text-slate-300";
 
         return (
           <div key={step.label} className="flex gap-3">
@@ -82,8 +90,8 @@ export function VerificationProgress({ steps }: VerificationProgressProps) {
                   isCompleted
                     ? "border-green-500 bg-green-500"
                     : isCurrent
-                    ? "border-violet-500 bg-violet-50 ring-2 ring-violet-200"
-                    : "border-slate-200 bg-white"
+                      ? "border-violet-500 bg-violet-50 ring-2 ring-violet-200"
+                      : "border-slate-200 bg-white"
                 }`}
               >
                 {isCompleted && <Check className={`${iconSize} text-white`} />}
@@ -100,11 +108,15 @@ export function VerificationProgress({ steps }: VerificationProgressProps) {
 
               {subtext && (
                 <div className="py-1">
-                  <p className="text-xs leading-relaxed text-violet-600/80">{subtext}</p>
+                  <p className="text-xs leading-relaxed text-violet-600/80">
+                    {subtext}
+                  </p>
                 </div>
               )}
 
-              {!subtext && !isLast && <div className={isCurrent ? "h-5" : "h-2"} />}
+              {!subtext && !isLast && (
+                <div className={isCurrent ? "h-5" : "h-2"} />
+              )}
             </div>
           </div>
         );

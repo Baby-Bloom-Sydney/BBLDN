@@ -25,7 +25,7 @@ export function DomainBadge({ domain, className }: DomainBadgeProps) {
       <span
         className={cn(
           "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-600",
-          className
+          className,
         )}
       >
         General
@@ -50,7 +50,7 @@ export function DomainBadge({ domain, className }: DomainBadgeProps) {
       <span
         className={cn(
           "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-600",
-          className
+          className,
         )}
       >
         {domain}
@@ -65,7 +65,7 @@ export function DomainBadge({ domain, className }: DomainBadgeProps) {
       className={cn(
         "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
         colors,
-        className
+        className,
       )}
     >
       {domainInfo.short}

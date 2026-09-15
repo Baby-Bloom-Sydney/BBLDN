@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { usePathname } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 
 function getVisitorId(): string {
-  const key = 'bb-visitor-id';
+  const key = "bb-visitor-id";
   let id = localStorage.getItem(key);
   if (!id) {
     id = crypto.randomUUID();
@@ -26,14 +26,14 @@ export function VisitorTracker() {
 
       // Parse UTM params from current URL (only present on landing from ads/campaigns)
       const params = new URLSearchParams(window.location.search);
-      const utm_source = params.get('utm_source') || undefined;
-      const utm_medium = params.get('utm_medium') || undefined;
-      const utm_campaign = params.get('utm_campaign') || undefined;
-      const utm_content = params.get('utm_content') || undefined;
+      const utm_source = params.get("utm_source") || undefined;
+      const utm_medium = params.get("utm_medium") || undefined;
+      const utm_campaign = params.get("utm_campaign") || undefined;
+      const utm_content = params.get("utm_content") || undefined;
 
-      fetch('/api/analytics/visit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      fetch("/api/analytics/visit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           visitor_id: visitorId,
           page_path: pathname,

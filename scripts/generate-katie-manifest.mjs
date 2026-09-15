@@ -49,7 +49,15 @@ function routePathFromFile(file) {
 
 function extractHttpMethods(source) {
   const methods = [];
-  for (const m of ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]) {
+  for (const m of [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+    "HEAD",
+  ]) {
     const re = new RegExp(`export\\s+(?:async\\s+)?function\\s+${m}\\b`);
     if (re.test(source)) methods.push(m);
   }

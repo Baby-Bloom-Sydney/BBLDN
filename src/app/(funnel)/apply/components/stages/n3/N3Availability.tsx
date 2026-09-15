@@ -1,27 +1,34 @@
-'use client';
+"use client";
 
-import { useCallback } from 'react';
-import { StageProps } from '../../FunnelOrchestrator';
-import { SingleSelectTags } from '../../shared/SingleSelectTags';
-import { ProgressiveReveal } from '../../shared/ProgressiveReveal';
-import { CompoundPageShell } from '../../shared/CompoundPageShell';
-import { DAY_OPTIONS, TIME_OPTIONS } from '@/types/nanny-leads';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Check } from 'lucide-react';
+import { useCallback } from "react";
+import { StageProps } from "../../FunnelOrchestrator";
+import { SingleSelectTags } from "../../shared/SingleSelectTags";
+import { ProgressiveReveal } from "../../shared/ProgressiveReveal";
+import { CompoundPageShell } from "../../shared/CompoundPageShell";
+import { DAY_OPTIONS, TIME_OPTIONS } from "@/types/nanny-leads";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Check } from "lucide-react";
 
-const IMMEDIATE_START_OPTIONS = ['Yes', 'At a later date'];
-const PLACEMENT_ONGOING_OPTIONS = ['Yes', 'Until a certain date'];
+const IMMEDIATE_START_OPTIONS = ["Yes", "At a later date"];
+const PLACEMENT_ONGOING_OPTIONS = ["Yes", "Until a certain date"];
 
-export function N3Availability({ state, dispatch, goNext, goBack, progress, questionNumber }: StageProps) {
+export function N3Availability({
+  state,
+  dispatch,
+  goNext,
+  goBack,
+  progress,
+  questionNumber,
+}: StageProps) {
   const { availability } = state;
 
   const update = useCallback(
     (payload: Partial<typeof availability>) => {
-      dispatch({ type: 'UPDATE_AVAILABILITY', payload });
+      dispatch({ type: "UPDATE_AVAILABILITY", payload });
     },
-    [dispatch]
+    [dispatch],
   );
 
   const dayTimes = availability.day_times || {};
@@ -48,34 +55,35 @@ export function N3Availability({ state, dispatch, goNext, goBack, progress, ques
   };
 
   const anyDayHasTime = availability.available_days.some(
-    (day) => (dayTimes[day.toLowerCase()] ?? []).length > 0
+    (day) => (dayTimes[day.toLowerCase()] ?? []).length > 0,
   );
 
   const allDaysHaveTimes =
     availability.available_days.length > 0 &&
     availability.available_days.every(
-      (day) => (dayTimes[day.toLowerCase()] ?? []).length > 0
+      (day) => (dayTimes[day.toLowerCase()] ?? []).length > 0,
     );
 
   const showImmediateStart = anyDayHasTime;
-  const showStartDate = availability.immediate_start === 'At a later date';
+  const showStartDate = availability.immediate_start === "At a later date";
   const showPlacementOngoing =
-    availability.immediate_start === 'Yes' ||
-    (availability.immediate_start === 'At a later date' &&
+    availability.immediate_start === "Yes" ||
+    (availability.immediate_start === "At a later date" &&
       availability.start_date !== null &&
-      availability.start_date.trim() !== '');
-  const showEndDate = availability.placement_ongoing === 'Until a certain date';
+      availability.start_date.trim() !== "");
+  const showEndDate = availability.placement_ongoing === "Until a certain date";
 
   const isComplete =
     anyDayHasTime &&
     availability.immediate_start !== null &&
-    (availability.immediate_start !== 'At a later date' ||
-      (availability.start_date !== null && availability.start_date.trim() !== '')) &&
+    (availability.immediate_start !== "At a later date" ||
+      (availability.start_date !== null &&
+        availability.start_date.trim() !== "")) &&
     availability.placement_ongoing !== null &&
-    (availability.placement_ongoing !== 'Until a certain date' ||
-      (availability.end_date !== null && availability.end_date.trim() !== ''));
+    (availability.placement_ongoing !== "Until a certain date" ||
+      (availability.end_date !== null && availability.end_date.trim() !== ""));
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
 
   return (
     <CompoundPageShell
@@ -100,8 +108,8 @@ export function N3Availability({ state, dispatch, goNext, goBack, progress, ques
                   onClick={() => toggleDay(day)}
                   className={`px-2 h-11 rounded-lg border text-sm font-medium flex items-center justify-center transition-all duration-150 ${
                     availability.available_days.includes(day)
-                      ? 'bg-violet-500 text-white border-violet-500'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
+                      ? "bg-violet-500 text-white border-violet-500"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
                   }`}
                 >
                   {day.slice(0, 3)}
@@ -116,8 +124,8 @@ export function N3Availability({ state, dispatch, goNext, goBack, progress, ques
                   onClick={() => toggleDay(day)}
                   className={`px-2 h-11 rounded-lg border text-sm font-medium flex items-center justify-center transition-all duration-150 ${
                     availability.available_days.includes(day)
-                      ? 'bg-violet-500 text-white border-violet-500'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
+                      ? "bg-violet-500 text-white border-violet-500"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
                   }`}
                 >
                   {day.slice(0, 3)}
@@ -138,11 +146,13 @@ export function N3Availability({ state, dispatch, goNext, goBack, progress, ques
               <div className="grid grid-cols-[80px_repeat(4,1fr)] gap-1 mb-1">
                 <div />
                 {TIME_OPTIONS.map((time) => {
-                  const label = time.replace(/\s*\(.*\)/, '');
-                  const range = time.match(/\(([^)]+)\)/)?.[1] ?? '';
+                  const label = time.replace(/\s*\(.*\)/, "");
+                  const range = time.match(/\(([^)]+)\)/)?.[1] ?? "";
                   return (
                     <div key={time} className="text-center leading-tight">
-                      <p className="text-[10px] font-semibold text-slate-600">{label}</p>
+                      <p className="text-[10px] font-semibold text-slate-600">
+                        {label}
+                      </p>
                       <p className="text-[8px] text-slate-400">{range}</p>
                     </div>
                   );
@@ -154,9 +164,14 @@ export function N3Availability({ state, dispatch, goNext, goBack, progress, ques
                 const dayKey = day.toLowerCase();
                 const currentTimes = dayTimes[dayKey] || [];
                 return (
-                  <div key={day} className="grid grid-cols-[80px_repeat(4,1fr)] gap-1 mb-1">
+                  <div
+                    key={day}
+                    className="grid grid-cols-[80px_repeat(4,1fr)] gap-1 mb-1"
+                  >
                     <div className="flex items-center">
-                      <p className="text-xs font-semibold text-slate-600">{day.slice(0, 3)}</p>
+                      <p className="text-xs font-semibold text-slate-600">
+                        {day.slice(0, 3)}
+                      </p>
                     </div>
                     {TIME_OPTIONS.map((time) => {
                       const isOn = currentTimes.includes(time);
@@ -167,11 +182,11 @@ export function N3Availability({ state, dispatch, goNext, goBack, progress, ques
                           onClick={() => toggleTime(day, time)}
                           className={`h-9 rounded-md border text-xs font-medium flex items-center justify-center transition-colors ${
                             isOn
-                              ? 'bg-violet-500 text-white border-violet-500'
-                              : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-100'
+                              ? "bg-violet-500 text-white border-violet-500"
+                              : "bg-white text-slate-400 border-slate-200 hover:bg-slate-100"
                           }`}
                         >
-                          {isOn ? <Check className="h-3.5 w-3.5" /> : ''}
+                          {isOn ? <Check className="h-3.5 w-3.5" /> : ""}
                         </button>
                       );
                     })}
@@ -191,7 +206,14 @@ export function N3Availability({ state, dispatch, goNext, goBack, progress, ques
             <SingleSelectTags
               options={IMMEDIATE_START_OPTIONS}
               selected={availability.immediate_start}
-              onChange={(val) => update({ immediate_start: val, start_date: null, placement_ongoing: null, end_date: null })}
+              onChange={(val) =>
+                update({
+                  immediate_start: val,
+                  start_date: null,
+                  placement_ongoing: null,
+                  end_date: null,
+                })
+              }
             />
           </div>
         </ProgressiveReveal>
@@ -205,7 +227,7 @@ export function N3Availability({ state, dispatch, goNext, goBack, progress, ques
             <Input
               type="date"
               min={today}
-              value={availability.start_date || ''}
+              value={availability.start_date || ""}
               onChange={(e) => update({ start_date: e.target.value || null })}
               className="h-11 border-slate-200 focus:border-violet-500 focus:ring-violet-500"
             />
@@ -221,7 +243,9 @@ export function N3Availability({ state, dispatch, goNext, goBack, progress, ques
             <SingleSelectTags
               options={PLACEMENT_ONGOING_OPTIONS}
               selected={availability.placement_ongoing}
-              onChange={(val) => update({ placement_ongoing: val, end_date: null })}
+              onChange={(val) =>
+                update({ placement_ongoing: val, end_date: null })
+              }
             />
           </div>
         </ProgressiveReveal>
@@ -235,7 +259,7 @@ export function N3Availability({ state, dispatch, goNext, goBack, progress, ques
             <Input
               type="date"
               min={availability.start_date || today}
-              value={availability.end_date || ''}
+              value={availability.end_date || ""}
               onChange={(e) => update({ end_date: e.target.value || null })}
               className="h-11 border-slate-200 focus:border-violet-500 focus:ring-violet-500"
             />

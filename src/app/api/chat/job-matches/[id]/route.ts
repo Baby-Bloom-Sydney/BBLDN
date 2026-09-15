@@ -20,7 +20,7 @@ import {
 import {
   distanceText,
   childrenSummary,
-} from "@/lib/chat/modules/bsr-translator";
+} from "@/lib/chat/modules/job-match-prose";
 
 export const runtime = "nodejs";
 

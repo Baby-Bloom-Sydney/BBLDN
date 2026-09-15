@@ -8,10 +8,16 @@ interface LayoutProps {
   params: { id: string };
 }
 
-export default async function AdminViewerLayout({ children, params }: LayoutProps) {
+export default async function AdminViewerLayout({
+  children,
+  params,
+}: LayoutProps) {
   // Verify admin auth
   const supabase = createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
   if (authError || !user) redirect("/login");
 
   const admin = createAdminClient();

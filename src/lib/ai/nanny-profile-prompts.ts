@@ -146,10 +146,19 @@ Structure:
 
 export function parseAIProfileSections(raw: string): Record<string, string> {
   const sections: Record<string, string> = {};
-  const tags = ['headline', 'about', 'personality', 'values', 'background', 'what_i_offer', 'experience', 'bio'];
+  const tags = [
+    "headline",
+    "about",
+    "personality",
+    "values",
+    "background",
+    "what_i_offer",
+    "experience",
+    "bio",
+  ];
 
   for (const tag of tags) {
-    const regex = new RegExp(`<${tag}>(.*?)</${tag}>`, 's');
+    const regex = new RegExp(`<${tag}>(.*?)</${tag}>`, "s");
     const match = raw.match(regex);
     if (match) {
       sections[tag] = match[1].trim();
@@ -190,10 +199,10 @@ export interface V2PromptData {
 }
 
 export function buildV2Prompt(data: V2PromptData): string {
-  const yesNo = (v: boolean | null | undefined) => v ? 'Yes' : 'No';
+  const yesNo = (v: boolean | null | undefined) => (v ? "Yes" : "No");
 
   // Calculate age from DOB
-  let age = '';
+  let age = "";
   if (data.dateOfBirth) {
     const birth = new Date(data.dateOfBirth);
     const now = new Date();
@@ -205,36 +214,39 @@ export function buildV2Prompt(data: V2PromptData): string {
 
   // Derive nanny experience from childcare roles
   const nannyExp = data.childcareRoles
-    .filter(r => r.role === 'Nanny')
+    .filter((r) => r.role === "Nanny")
     .reduce((sum, r) => sum + (r.duration || 0), 0);
 
   // Build experience details from roles
-  const experienceDetails = data.childcareRoles.length > 0
-    ? data.childcareRoles.map(r => `${r.role} (${r.duration} years)`).join(', ')
-    : 'None';
+  const experienceDetails =
+    data.childcareRoles.length > 0
+      ? data.childcareRoles
+          .map((r) => `${r.role} (${r.duration} years)`)
+          .join(", ")
+      : "None";
 
   return `Generate a nanny profile based on:
 First Name: ${data.firstName}
 Last Name: ${data.lastName}
-Suburb: ${data.suburb || 'Not provided'}
-Age: ${age || 'Not provided'}
-Nationality: ${data.nationality || 'Not provided'}
-Motivation: ${data.motivation || 'Not provided'}
-Personality Traits: ${data.personalityTraits.join(', ') || 'None'}
-Professional Values: ${data.professionalValues.join(', ') || 'None'}
+Suburb: ${data.suburb || "Not provided"}
+Age: ${age || "Not provided"}
+Nationality: ${data.nationality || "Not provided"}
+Motivation: ${data.motivation || "Not provided"}
+Personality Traits: ${data.personalityTraits.join(", ") || "None"}
+Professional Values: ${data.professionalValues.join(", ") || "None"}
 Total Childcare Experience: ${data.totalExperience ?? 0} years
 Nanny Experience: ${nannyExp} years
 Under 3 Experience: ${data.under3Experience ?? 0} years
 Newborn Experience: ${data.newbornExperience ?? 0} years
 Childcare Roles: ${experienceDetails}
-Services: ${data.roleTypes.join(', ') || 'None'}
-Level of Support: ${data.levelOfSupport.join(', ') || 'None'}
-Minimum Age: ${data.minAge || 'Any'}
-Maximum Age: ${data.maxAge || 'Any'}
+Services: ${data.roleTypes.join(", ") || "None"}
+Level of Support: ${data.levelOfSupport.join(", ") || "None"}
+Minimum Age: ${data.minAge || "Any"}
+Maximum Age: ${data.maxAge || "Any"}
 Additional Child Needs: ${yesNo(data.additionalNeeds)}
-Qualifications: ${data.highestQualification || 'None'}
-Certifications: ${data.certificates.join(', ') || 'None'}
-Languages: ${data.languages.join(', ') || 'English'}
+Qualifications: ${data.highestQualification || "None"}
+Certifications: ${data.certificates.join(", ") || "None"}
+Languages: ${data.languages.join(", ") || "English"}
 Driver's License: ${yesNo(data.driversLicense)}
 Access to a Car: ${yesNo(data.hasCar)}
 Pets: ${yesNo(data.comfortableWithPets)}
@@ -266,15 +278,17 @@ export function generateV2Checklist(data: V2ChecklistData): string {
   const lines: string[] = [];
 
   // Summary
-  lines.push('<strong>Summary</strong>');
+  lines.push("<strong>Summary</strong>");
   if (data.minAge || data.maxAge) {
-    lines.push(`✅ Age range: ${data.minAge || 'Any'} – ${data.maxAge || 'Any'}`);
+    lines.push(
+      `✅ Age range: ${data.minAge || "Any"} – ${data.maxAge || "Any"}`,
+    );
   }
   if (data.roleTypes.length) {
-    lines.push(`✅ Services: ${data.roleTypes.join(', ')}`);
+    lines.push(`✅ Services: ${data.roleTypes.join(", ")}`);
   }
   if (data.levelOfSupport.length) {
-    lines.push(`✅ Support: ${data.levelOfSupport.join(', ')}`);
+    lines.push(`✅ Support: ${data.levelOfSupport.join(", ")}`);
   }
 
   // Qualifications & Training
@@ -283,25 +297,30 @@ export function generateV2Checklist(data: V2ChecklistData): string {
     quals.push(`✅ ${data.highestQualification}`);
   }
   if (quals.length) {
-    lines.push('<br><strong>Qualifications & Training</strong>');
+    lines.push("<br><strong>Qualifications & Training</strong>");
     lines.push(...quals);
   }
 
   // Experience
-  lines.push('<br><strong>Experience</strong>');
-  const totalYears = data.totalExperience ? parseInt(data.totalExperience) || 0 : 0;
-  if (totalYears > 0) lines.push(`✅ ${totalYears} years total childcare experience`);
+  lines.push("<br><strong>Experience</strong>");
+  const totalYears = data.totalExperience
+    ? parseInt(data.totalExperience) || 0
+    : 0;
+  if (totalYears > 0)
+    lines.push(`✅ ${totalYears} years total childcare experience`);
 
   const nannyYears = data.childcareRoles
-    .filter(r => r.role === 'Nanny')
+    .filter((r) => r.role === "Nanny")
     .reduce((sum, r) => sum + (r.duration || 0), 0);
   if (nannyYears > 0) lines.push(`✅ ${nannyYears} years nanny experience`);
 
-  if (data.under3Experience) lines.push(`✅ ${data.under3Experience} years infant experience (under 3)`);
-  if (data.newbornExperience) lines.push(`✅ ${data.newbornExperience} years newborn experience`);
+  if (data.under3Experience)
+    lines.push(`✅ ${data.under3Experience} years infant experience (under 3)`);
+  if (data.newbornExperience)
+    lines.push(`✅ ${data.newbornExperience} years newborn experience`);
 
   if (data.childcareRoles.length > 0) {
-    const otherRoles = data.childcareRoles.filter(r => r.role !== 'Nanny');
+    const otherRoles = data.childcareRoles.filter((r) => r.role !== "Nanny");
     for (const role of otherRoles) {
       lines.push(`✅ ${role.role} (${role.duration} years)`);
     }
@@ -309,7 +328,7 @@ export function generateV2Checklist(data: V2ChecklistData): string {
 
   // Personality
   if (data.personalityTraits.length > 0) {
-    lines.push('<br><strong>Personality</strong>');
+    lines.push("<br><strong>Personality</strong>");
     for (const trait of data.personalityTraits) {
       lines.push(`✅ ${trait}`);
     }
@@ -321,28 +340,28 @@ export function generateV2Checklist(data: V2ChecklistData): string {
     accreds.push(`✅ ${cert}`);
   }
   if (accreds.length) {
-    lines.push('<br><strong>Accreditations</strong>');
+    lines.push("<br><strong>Accreditations</strong>");
     lines.push(...accreds);
   }
 
   // Transport
   const transport: string[] = [];
   if (data.driversLicense) transport.push("🪪 Driver's License");
-  if (data.hasCar) transport.push('🚗 Access to a Car');
+  if (data.hasCar) transport.push("🚗 Access to a Car");
   if (transport.length) {
-    lines.push('<br><strong>Transport</strong>');
+    lines.push("<br><strong>Transport</strong>");
     lines.push(...transport);
   }
 
   // Plus
   const plus: string[] = [];
-  if (data.comfortableWithPets) plus.push('✅ Comfortable with Pets');
-  if (data.vaccinationStatus) plus.push('✅ Fully Vaccinated');
-  if (data.nonSmoker) plus.push('✅ Non-Smoker');
+  if (data.comfortableWithPets) plus.push("✅ Comfortable with Pets");
+  if (data.vaccinationStatus) plus.push("✅ Fully Vaccinated");
+  if (data.nonSmoker) plus.push("✅ Non-Smoker");
   if (plus.length) {
-    lines.push('<br><strong>Plus</strong>');
+    lines.push("<br><strong>Plus</strong>");
     lines.push(...plus);
   }
 
-  return lines.join('<br>');
+  return lines.join("<br>");
 }

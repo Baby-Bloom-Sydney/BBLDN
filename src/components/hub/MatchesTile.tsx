@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { Filter, Lock, Sparkles, CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { trackEvent } from '@/lib/analytics/trackEvent';
+import Link from "next/link";
+import { Filter, Lock, Sparkles, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/analytics/trackEvent";
 
 interface MatchesTileProps {
   hasPosition: boolean;
@@ -38,11 +38,11 @@ export function MatchesTile({ hasPosition, hasDfy }: MatchesTileProps) {
             asChild
             variant="secondary"
             className="w-full sm:w-auto bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium"
-            onClick={() => trackEvent({ event_name: 'matches_tile_create_position_clicked' })}
+            onClick={() =>
+              trackEvent({ event_name: "matches_tile_create_position_clicked" })
+            }
           >
-            <Link href="/parent/request">
-              Create Position
-            </Link>
+            <Link href="/parent/request">Create Position</Link>
           </Button>
         </div>
       </div>
@@ -79,11 +79,11 @@ export function MatchesTile({ hasPosition, hasDfy }: MatchesTileProps) {
           asChild
           className="w-full bg-violet-600 hover:bg-violet-700 text-white font-medium"
           size="lg"
-          onClick={() => trackEvent({ event_name: 'matches_tile_dfy_view_matches_clicked' })}
+          onClick={() =>
+            trackEvent({ event_name: "matches_tile_dfy_view_matches_clicked" })
+          }
         >
-          <Link href="/parent/matches">
-            View Matches
-          </Link>
+          <Link href="/parent/matches">View Matches</Link>
         </Button>
       </div>
     );
@@ -113,9 +113,14 @@ export function MatchesTile({ hasPosition, hasDfy }: MatchesTileProps) {
           asChild
           className="w-full bg-violet-600 hover:bg-violet-700 text-white font-medium"
           size="lg"
-          onClick={() => trackEvent({ event_name: 'matches_tile_find_nanny_clicked' })}
+          onClick={() =>
+            trackEvent({ event_name: "matches_tile_find_nanny_clicked" })
+          }
         >
-          <Link href="/parent/matches/checkout" className="flex items-center justify-center gap-2">
+          <Link
+            href="/parent/matches/checkout"
+            className="flex items-center justify-center gap-2"
+          >
             <Sparkles className="w-5 h-5" />
             Find Me a Nanny
           </Link>
@@ -125,7 +130,9 @@ export function MatchesTile({ hasPosition, hasDfy }: MatchesTileProps) {
         <Link
           href="/parent/matches"
           className="text-sm text-slate-500 hover:text-violet-600 transition-colors font-medium"
-          onClick={() => trackEvent({ event_name: 'matches_tile_browse_clicked' })}
+          onClick={() =>
+            trackEvent({ event_name: "matches_tile_browse_clicked" })
+          }
         >
           Browse yourself
         </Link>

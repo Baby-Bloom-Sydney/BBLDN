@@ -43,12 +43,16 @@ interface MultiSelectTagsProps {
   onChange: (val: string[]) => void;
 }
 
-function MultiSelectTags({ options, selected, onChange }: MultiSelectTagsProps) {
+function MultiSelectTags({
+  options,
+  selected,
+  onChange,
+}: MultiSelectTagsProps) {
   const toggle = (opt: string) => {
     onChange(
       selected.includes(opt)
         ? selected.filter((v) => v !== opt)
-        : [...selected, opt]
+        : [...selected, opt],
     );
   };
   return (
@@ -77,7 +81,11 @@ interface SingleSelectTagsProps {
   onChange: (val: string) => void;
 }
 
-function SingleSelectTags({ options, selected, onChange }: SingleSelectTagsProps) {
+function SingleSelectTags({
+  options,
+  selected,
+  onChange,
+}: SingleSelectTagsProps) {
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((opt) => (
@@ -98,7 +106,12 @@ function SingleSelectTags({ options, selected, onChange }: SingleSelectTagsProps
   );
 }
 
-export function StepAvailability({ data, updateData, goNext, goBack }: StepProps) {
+export function StepAvailability({
+  data,
+  updateData,
+  goNext,
+  goBack,
+}: StepProps) {
   const {
     available_days = [],
     monday_times = [],
@@ -126,7 +139,7 @@ export function StepAvailability({ data, updateData, goNext, goBack }: StepProps
 
   // Determine if any day has at least one time slot selected
   const anyDayHasTime = available_days.some(
-    (day) => (dayTimesMap[day] ?? []).length > 0
+    (day) => (dayTimesMap[day] ?? []).length > 0,
   );
 
   // All selected days must have at least one time slot
@@ -143,7 +156,9 @@ export function StepAvailability({ data, updateData, goNext, goBack }: StepProps
   // Placement ongoing shown if immediate start answered OR start date provided
   const showPlacementOngoing =
     immediate_start === "Yes" ||
-    (immediate_start === "At a later date" && start_date != null && start_date.trim().length > 0);
+    (immediate_start === "At a later date" &&
+      start_date != null &&
+      start_date.trim().length > 0);
 
   // End date shown if "Until a certain date" selected
   const showEndDate = placement_ongoing === "Until a certain date";
@@ -152,9 +167,11 @@ export function StepAvailability({ data, updateData, goNext, goBack }: StepProps
   const isComplete =
     allDaysHaveTimes &&
     immediate_start != null &&
-    (immediate_start !== "At a later date" || (start_date != null && start_date.trim().length > 0)) &&
+    (immediate_start !== "At a later date" ||
+      (start_date != null && start_date.trim().length > 0)) &&
     placement_ongoing != null &&
-    (placement_ongoing !== "Until a certain date" || (end_date != null && end_date.trim().length > 0));
+    (placement_ongoing !== "Until a certain date" ||
+      (end_date != null && end_date.trim().length > 0));
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -166,7 +183,6 @@ export function StepAvailability({ data, updateData, goNext, goBack }: StepProps
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-6 pb-8">
-
         {/* Available Days */}
         <div className="flex flex-col gap-2">
           <Label className="text-sm font-medium text-slate-700">
@@ -193,7 +209,8 @@ export function StepAvailability({ data, updateData, goNext, goBack }: StepProps
             </Label>
             {available_days.map((day) => {
               const fieldKey = DAY_TIMES_FIELD[day];
-              const currentTimes = (data[fieldKey] as string[] | undefined) ?? [];
+              const currentTimes =
+                (data[fieldKey] as string[] | undefined) ?? [];
               return (
                 <div key={day} className="flex flex-col gap-2">
                   <span className="text-sm font-semibold text-slate-600">
@@ -277,9 +294,7 @@ export function StepAvailability({ data, updateData, goNext, goBack }: StepProps
         {/* End Date — revealed if "Until a certain date" */}
         <div
           className={`transition-all duration-300 ease-in-out overflow-hidden ${
-            showEndDate
-              ? "max-h-[200px] opacity-100 mt-6"
-              : "max-h-0 opacity-0"
+            showEndDate ? "max-h-[200px] opacity-100 mt-6" : "max-h-0 opacity-0"
           }`}
         >
           <div className="flex flex-col gap-2">
@@ -290,9 +305,7 @@ export function StepAvailability({ data, updateData, goNext, goBack }: StepProps
               type="date"
               min={today}
               value={end_date ?? ""}
-              onChange={(e) =>
-                updateData({ end_date: e.target.value || null })
-              }
+              onChange={(e) => updateData({ end_date: e.target.value || null })}
               className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-800 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
             />
           </div>

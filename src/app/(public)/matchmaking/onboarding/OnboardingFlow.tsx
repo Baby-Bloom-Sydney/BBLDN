@@ -3,11 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { QuestionShell } from "./QuestionShell";
-import {
-  TypeformFormData,
-  INITIAL_FORM_DATA,
-  QUESTIONS,
-} from "./questions";
+import { TypeformFormData, INITIAL_FORM_DATA, QUESTIONS } from "./questions";
 import { SingleSelect } from "./renderers/SingleSelect";
 import { MultiSelect } from "./renderers/MultiSelect";
 import { TextInput } from "./renderers/TextInput";
@@ -71,10 +67,10 @@ export function OnboardingFlow() {
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const interstitialTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
+    null,
   );
   const autoAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
+    null,
   );
 
   const updateData = useCallback((d: Partial<TypeformFormData>) => {
@@ -99,15 +95,14 @@ export function OnboardingFlow() {
       }
       return Math.max(0, Math.min(idx, QUESTIONS.length - 1));
     },
-    []
+    [],
   );
 
   const transitionTo = useCallback((nextIndex: number) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (interstitialTimerRef.current)
       clearTimeout(interstitialTimerRef.current);
-    if (autoAdvanceTimerRef.current)
-      clearTimeout(autoAdvanceTimerRef.current);
+    if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
 
     setIsExiting(true);
 
@@ -129,7 +124,7 @@ export function OnboardingFlow() {
         setCompleted(true);
       }
     },
-    [findNextIndex, transitionTo]
+    [findNextIndex, transitionTo],
   );
 
   const goNext = useCallback(() => {
@@ -194,7 +189,7 @@ export function OnboardingFlow() {
         advanceOrComplete(currentIndex);
       }, 300);
     },
-    [currentIndex, showConditional, updateData, advanceOrComplete]
+    [currentIndex, showConditional, updateData, advanceOrComplete],
   );
 
   // Handle interstitial auto-advance
@@ -228,13 +223,15 @@ export function OnboardingFlow() {
   useEffect(() => {
     if (completed && !hasSaved.current) {
       hasSaved.current = true;
-      saveParentLead(leadId.current, formData as Record<string, unknown>).then((result) => {
-        if (result.success) {
-          router.push(`/matchmaking/results?lead=${leadId.current}`);
-        } else {
-          setSubmitError(result.error);
-        }
-      });
+      saveParentLead(leadId.current, formData as Record<string, unknown>).then(
+        (result) => {
+          if (result.success) {
+            router.push(`/matchmaking/results?lead=${leadId.current}`);
+          } else {
+            setSubmitError(result.error);
+          }
+        },
+      );
     }
   }, [completed, formData, router]);
 
@@ -247,7 +244,10 @@ export function OnboardingFlow() {
             <p className="text-red-600 text-sm">{submitError}</p>
             <button
               type="button"
-              onClick={() => { hasSaved.current = false; setSubmitError(null); }}
+              onClick={() => {
+                hasSaved.current = false;
+                setSubmitError(null);
+              }}
               className="px-5 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition-colors"
             >
               Try again
@@ -269,7 +269,7 @@ export function OnboardingFlow() {
 
   // Render conditional content (appears BELOW the options)
   const renderConditional = (
-    cond: NonNullable<(typeof QUESTIONS)[number]["conditional"]>
+    cond: NonNullable<(typeof QUESTIONS)[number]["conditional"]>,
   ) => {
     if (cond.subType === "textarea") {
       return (
@@ -396,7 +396,7 @@ export function OnboardingFlow() {
               options={currentQ.options ?? []}
               selected={
                 currentQ.field
-                  ? (formData[currentQ.field] as string | null) ?? null
+                  ? ((formData[currentQ.field] as string | null) ?? null)
                   : null
               }
               onSelect={(val) => {
@@ -457,7 +457,6 @@ export function OnboardingFlow() {
         return null;
     }
   };
-
 
   // Interstitial screen
   if (currentQ.type === "interstitial") {

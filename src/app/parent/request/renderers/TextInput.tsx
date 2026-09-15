@@ -19,9 +19,7 @@ export function TextInput({
 }: TextInputProps) {
   return (
     <div className="flex flex-col gap-3">
-      {label && (
-        <p className="text-sm font-medium text-slate-600">{label}</p>
-      )}
+      {label && <p className="text-sm font-medium text-slate-600">{label}</p>}
       <input
         type="text"
         value={value}

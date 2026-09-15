@@ -18,7 +18,6 @@ import { LeadDrawerVerificationBreakdown } from "./LeadDrawerVerificationBreakdo
 import { LeadDrawerChildrenPositions } from "./LeadDrawerChildrenPositions";
 import { LeadDrawerAvailability } from "./LeadDrawerAvailability";
 import { LeadDrawerOnboardingAnswers } from "./LeadDrawerOnboardingAnswers";
-import { LeadDrawerSubscriptionPayout } from "./LeadDrawerSubscriptionPayout";
 import { LeadDrawerFooterMeta } from "./LeadDrawerFooterMeta";
 
 interface LeadDrawerProps {
@@ -56,7 +55,6 @@ export function LeadDrawer({ detail, timeline }: LeadDrawerProps) {
           <LeadDrawerChildrenPositions detail={local} />
           <LeadDrawerAvailability detail={local} onLocalPatch={setLocal} />
           <LeadDrawerOnboardingAnswers detail={local} />
-          <LeadDrawerSubscriptionPayout detail={local} />
           <LeadDrawerFooterMeta detail={local} />
         </div>
       </div>

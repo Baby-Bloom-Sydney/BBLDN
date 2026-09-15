@@ -31,7 +31,9 @@ for (const model of ["gemini-3-pro-preview", "gemini-3-flash-preview"]) {
   try {
     const stream = await ai.models.generateContentStream({
       model,
-      contents: [{ role: "user", parts: [{ text: "Hi! Say hello back, briefly." }] }],
+      contents: [
+        { role: "user", parts: [{ text: "Hi! Say hello back, briefly." }] },
+      ],
       config: { maxOutputTokens: 50 },
     });
     for await (const chunk of stream) {
@@ -40,16 +42,25 @@ for (const model of ["gemini-3-pro-preview", "gemini-3-flash-preview"]) {
       if (chunk.usageMetadata) usage = chunk.usageMetadata;
     }
     const t1 = Date.now();
-    console.log(JSON.stringify({
-      model,
-      ok: true,
-      ttft_ms: firstTextAt - t0,
-      total_ms: t1 - t0,
-      output: outputText,
-      input_tokens: usage?.promptTokenCount,
-      output_tokens: usage?.candidatesTokenCount,
-    }));
+    console.log(
+      JSON.stringify({
+        model,
+        ok: true,
+        ttft_ms: firstTextAt - t0,
+        total_ms: t1 - t0,
+        output: outputText,
+        input_tokens: usage?.promptTokenCount,
+        output_tokens: usage?.candidatesTokenCount,
+      }),
+    );
   } catch (err) {
-    console.log(JSON.stringify({ model, ok: false, error: String(err).slice(0, 200), elapsed_ms: Date.now() - t0 }));
+    console.log(
+      JSON.stringify({
+        model,
+        ok: false,
+        error: String(err).slice(0, 200),
+        elapsed_ms: Date.now() - t0,
+      }),
+    );
   }
 }
