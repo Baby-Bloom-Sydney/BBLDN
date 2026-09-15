@@ -6,5 +6,11 @@
   "src/lib/**",
   "src/types/**",
   "src/__tests__/**",
-  "src/middleware.ts"
+  "src/middleware.ts",
+  "tests/e2e/**",
+  "tests/fixtures/**",
+  "scripts/*.ts",
+  "scripts/*.mjs",
+  "scripts/*.sh",
+  "scripts/_run-output/**"
 ]

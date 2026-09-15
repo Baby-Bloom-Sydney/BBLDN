@@ -7,7 +7,7 @@ export type Scalars = {
   Uuid: Brand<string, "Uuid">;
   /** Lower-cased email (citext in the DB — 02 C-8). */
   Email: Brand<string, "Email">;
-  /** E.164, `+44…` only (ADR-102; 02 C-7). */
+  /** E.164, UK numbers only — the prefix is `LOCALE.phonePrefix` (ADR-102; 02 C-7). */
   E164: Brand<string, "E164">;
   /** Absolute https URL. */
   Url: Brand<string, "Url">;

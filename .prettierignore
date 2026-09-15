@@ -10,3 +10,5 @@ public/katie-manifest.json
 docs/reference/sydney/
 CLAUDE.md
 .env.test
+vercel.json
+.env.example
