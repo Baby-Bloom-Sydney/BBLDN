@@ -6,8 +6,8 @@
 # Stage → job → what runs (05 §9 numbering):
 #   1 lint            → lint            eslint · prettier --check · CLAUDE.md = CODE-CLAUDE.md (local gate, see below)
 #   1 lint            → allowed-imports scripts/gen-boundary-rules.ts --check + eslint.boundaries.js   [red until S6]
-#   1 lint            → banned-literals scripts/check-config-literals.ts [S2] · banned-words static pre-check ·
-#                                        gen-env-example.ts --check [S2] · process.env grep outside config/env.ts
+#   1 lint            → banned-literals scripts/ci/check-config-literals.mjs · banned-words static pre-check ·
+#                                        env:check (.env.example) · crons:check (vercel.json) · process.env grep outside config
 #   2 typecheck       → typecheck       tsc --noEmit --pretty false
 #   3–6 tests         → test            vitest --coverage → diff-cover ≥ 80 % changed lines · contract · integration
 #                                        (supabase start) · e2e (next build → playwright)              [red until S2–S5, E1]
@@ -40,23 +40,44 @@ concurrency:
 
 env:
   NODE_VERSION: "22"
-  # Placeholder-only build env (non-secret; module-load guards in the legacy tree need a value to exist).
-  NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
-  SUPABASE_URL: https://placeholder.supabase.co
-  SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role
+  # Placeholder-only env (non-secret) so `next build` can collect page data and `config/env.ts` parses (01 §3.3;
+  # 07 §7: real values live in Vercel env + the keychain, never here). Kept in step with .env.test — the config.env
+  # suite parses this block. Names: src/modules/config/lib/env-schema.ts (50; .env.example is generated from it).
   NEXT_PUBLIC_APP_URL: http://localhost:3000
-  NEXT_PUBLIC_SITE_URL: http://localhost:3000
-  NEXT_PUBLIC_INVITE_BASE_URL: http://localhost:3000
-  RESEND_API_KEY: re_placeholder
-  STRIPE_SECRET_KEY: sk_test_ci-dummy # hyphen keeps the gitleaks stripe rule from matching a placeholder
-  STRIPE_WEBHOOK_SECRET: whsec_placeholder
-  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
   CRON_SECRET: placeholder-cron-secret
   ADMIN_API_TOKEN: placeholder-admin-token
-  GOOGLE_AI_API_KEY: placeholder-google
-  OPENAI_API_KEY: placeholder-openai
+  SYSTEM_PARENT_ID: 00000000-0000-4000-8000-000000000000
+  ADMIN_EMAIL: admin@example.test
+  SUPPORT_INBOX: support@example.test
+  NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+  SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role
+  STRIPE_MODE: test
+  STRIPE_SECRET_KEY: sk_test_ci-dummy # hyphen keeps the gitleaks stripe rule from matching a placeholder
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+  STRIPE_WEBHOOK_SECRET: whsec_placeholder
+  STRIPE_PRICE_SELF_SERVE_APP_UPFRONT: price_placeholder_upfront
+  STRIPE_PRICE_SELF_SERVE_APP_MONTHLY: price_placeholder_monthly
+  PURCHASE_PROVIDER: stub-stripe
+  STUB_EVENT_SECRET: placeholder-stub-event-secret
+  EMAIL_PROVIDER: stub-email
+  SMS_PROVIDER: null-sms
+  AREAS_SOURCE: stub
+  RESEND_API_KEY: re_placeholder
   EMAIL_DEV_DRY_RUN: "true"
+  OPENAI_API_KEY: placeholder-openai
+  GOOGLE_AI_API_KEY: placeholder-google
+  KATIE_DAILY_LIMIT_USD: "2"
+  KATIE_ENABLED: "true"
+  NEXT_PUBLIC_KATIE_ENABLED: "true"
+  INVITE_LINKS_ENABLED: "true"
+  NEW_TRIALS_ENABLED: "true"
+  PAYMENTS_ENABLED: "true"
+  NEXT_PUBLIC_SENTRY_DSN: https://placeholder@o0.ingest.sentry.example.test/0 # the public reader uses the preview column under NODE_ENV=production
+  # Legacy-tree names only (never defined in London — 06 §2.5); module-load guards in the Sydney tree still read them until F-d.
+  SUPABASE_URL: https://placeholder.supabase.co
+  NEXT_PUBLIC_SITE_URL: http://localhost:3000
+  NEXT_PUBLIC_INVITE_BASE_URL: http://localhost:3000
 
 jobs:
   typecheck:
@@ -120,15 +141,18 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: check-config-literals (05 §6; AC-X-23) — red until S2 lands the script; legacy hits cleared by F-d
+      - name: check-config-literals (05 §6; AC-X-23) — legacy tree excluded by literal-exclusions.json until F-d
         run: npm run check:config-literals
       - name: banned-words static pre-check (05 §5) — red on the legacy parent surfaces until F-d
         if: ${{ !cancelled() }}
         run: npm run check:banned-words
-      - name: gen-env-example --check (06 §2.5; HANDOFF §5.4) — red until S2
+      - name: .env.example = generated from the env schema (06 §2.5; HANDOFF §5.4)
         if: ${{ !cancelled() }}
-        run: npm run check:env-example
-      - name: process.env only in config/env.ts (01 §1.3 rule 1; 07 §10.2) — red until S2 + F-d
+        run: npm run env:check
+      - name: vercel.json cron block = generated from config/crons.ts (01 §4f; 06 §4.1 C)
+        if: ${{ !cancelled() }}
+        run: npm run crons:check
+      - name: process.env only in config/env.ts + config/public-env.ts (01 §1.3 rule 1; 07 §10.2) — legacy tree excluded until F-d
         if: ${{ !cancelled() }}
         run: npm run check:env-reads
 

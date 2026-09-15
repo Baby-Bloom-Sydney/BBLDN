@@ -1,0 +1,22 @@
+// The module's type surface (01 §2.5). Every type group re-exported; values live in index.ts.
+import type { ENUMS } from "./enums";
+
+/** The union for one 02 §3 enum, derived from its tuple: `EnumValue<'user_role'>` = 'parent' | 'nanny' | 'admin'. */
+export type EnumValue<K extends keyof typeof ENUMS> = (typeof ENUMS)[K][number];
+export type EnumName = keyof typeof ENUMS;
+
+export type { Brand } from "./brand";
+export type * from "./scalars";
+export type * from "./ids";
+export type { AppError, AppErrorDetails, ClientAppError } from "./app-error";
+export type { Result } from "./result";
+export type ErrorCode = (typeof import("./error-codes").ERROR_CODES)[number];
+export type ModuleName = (typeof import("./module-names").MODULE_NAMES)[number];
+export type { Actor } from "./actor";
+export type { EventName, EventPropsMap, PropsFor } from "./events";
+export type ClientEventName =
+  (typeof import("./client-event-names").CLIENT_EVENT_NAMES)[number];
+export type * from "./stage-model";
+export type * from "./platform";
+export type * from "./scheduling";
+export type * from "./vetting";
