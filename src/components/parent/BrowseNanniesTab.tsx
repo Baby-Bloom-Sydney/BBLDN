@@ -18,8 +18,8 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { type NannyCardData, EmptyNannyState } from "@/components/NannyCard";
-import { NannyCardBK } from "@/app/brandkit1/NannyCardBK";
-import { NannyMatchCardBK } from "@/app/brandkit1/NannyMatchCardBK";
+import { NannyCardBK } from "@/components/nanny/NannyCardBK";
+import { NannyMatchCardBK } from "@/components/nanny/NannyMatchCardBK";
 import { fetchBrowseNannies } from "@/lib/actions/browse";
 import { getMatchesForPosition } from "@/lib/actions/matching";
 import { getPosition } from "@/lib/actions/parent";

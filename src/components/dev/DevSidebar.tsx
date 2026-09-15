@@ -69,7 +69,6 @@ const SECTIONS = [
       { path: '/admin/verifications', label: 'Verifications', icon: Shield },
       { path: '/admin/users', label: 'Users', icon: Users },
       { path: '/admin/pipeline', label: 'Pipeline', icon: ClipboardList },
-      { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
       { path: '/admin/settings', label: 'Settings', icon: Settings },
     ],
   },

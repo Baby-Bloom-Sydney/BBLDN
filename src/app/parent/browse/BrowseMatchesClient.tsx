@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { NannyMatchCardBK } from "@/app/brandkit1/NannyMatchCardBK";
+import { NannyMatchCardBK } from "@/components/nanny/NannyMatchCardBK";
 import { Sparkles, MapPin, Clock, GraduationCap } from "lucide-react";
 import type { MatchResult } from "@/lib/matching/types";
 import type { LucideIcon } from "lucide-react";

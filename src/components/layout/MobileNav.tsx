@@ -22,7 +22,6 @@ import {
   ClipboardList,
   Filter,
   Users,
-  BarChart3,
   LogOut,
   PlusCircle,
   LucideIcon,
@@ -78,7 +77,6 @@ const adminNavItems: NavItem[] = [
   { href: "/admin/users", icon: Users, label: "User Management" },
   { href: "/admin/subscriptions", icon: CreditCard, label: "Subscriptions" },
   { href: "/admin/support", icon: LifeBuoy, label: "Support" },
-  { href: "/admin/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 

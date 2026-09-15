@@ -16,7 +16,6 @@ import {
   Baby,
   Filter,
   Users,
-  BarChart3,
   LogOut,
   LogIn,
   UserPlus,
@@ -76,7 +75,6 @@ const adminNavItems = [
     icon: BookOpen,
     label: "Verification Ref",
   },
-  { href: "/admin/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 

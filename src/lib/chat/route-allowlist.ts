@@ -40,7 +40,6 @@ const PATH_DENY_PREFIXES = [
 ];
 
 const PATH_DENY_EXACT = new Set<string>([
-  "/nanny/profiletest", // dev scratchpad
   "/ui", // component playground
   "/ui2",
   "/ui/embed/[component]",

@@ -4,7 +4,7 @@ import { ArrowRight, ChevronLeft, ChevronRight, Sparkles, ClipboardList, Users }
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { type NannyCardData, EmptyNannyState } from "@/components/NannyCard";
-import { NannyCardBK } from "@/app/brandkit1/NannyCardBK";
+import { NannyCardBK } from "@/components/nanny/NannyCardBK";
 import { getMatchesForPosition } from "@/lib/actions/matching";
 import { getPosition } from "@/lib/actions/parent";
 import { EmptyState } from "@/components/dashboard/EmptyState";
