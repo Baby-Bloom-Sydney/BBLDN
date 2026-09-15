@@ -1,4 +1,4 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# BabyBloom London — .gitignore (07 §7; 08 §2.1 step 0 (i); COMMIT-DISCIPLINE "what not to commit")
 
 # dependencies
 /node_modules
@@ -6,40 +6,48 @@
 .pnp.js
 .yarn/install-state.gz
 
-# testing
+# environment — every .env* except the generated example (06 §2.5; S2)
+.env
+.env.*
+!.env.example
+
+# secrets / keys
+*.pem
+*.key
+credentials.*
+service-account*.json
+
+# next.js / build output
+/.next/
+/out/
+/build
+*.tsbuildinfo
+next-env.d.ts
+
+# vercel
+.vercel
+
+# testing artefacts (05 §10 — never committed; uploaded as CI artefacts only)
 /coverage
+lcov.info
 /playwright-report
+/blob-report
 /test-results
 /playwright/.cache
 /tests/e2e/artifacts
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
+# local supabase state
+/supabase/.temp
+/supabase/.branches
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
-.env*.local
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-app/seed-parents.mjs
-
-# Local seed/utility scripts with secrets
-seed-parents.mjs
-reset-dfy.sql
+# os / editor
+.DS_Store
+Thumbs.db
+.idea
+.vscode/*
+!.vscode/extensions.json

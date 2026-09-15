@@ -1,4 +1,5 @@
 {
+  "regions": ["lhr1"],
   "crons": [
     {
       "path": "/api/cron/send-delayed-emails",
@@ -45,16 +46,8 @@
       "schedule": "15 3 * * *"
     },
     {
-      "path": "/api/cron/schedule-upfront-cycles",
-      "schedule": "0 4 * * *"
-    },
-    {
       "path": "/api/cron/trial-reminders",
       "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/release-payouts",
-      "schedule": "0 21 * * *"
     },
     {
       "path": "/api/cron/audit-consent-expiry",
