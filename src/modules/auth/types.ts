@@ -32,6 +32,16 @@ export type Session = {
 };
 
 /**
+ * What the middleware gets back from `refreshSession`: a `Session` plus the one extra signal the gate needs and
+ * cannot get a second time (01 §4d step 3 — the edge runtime has no `next/headers`, so the gate reads the
+ * password signal in the same round-trip that rotates the cookies). A `GateSession` **is** a `Session`, so the
+ * 03 §1.4 return type is honoured and no caller that knows only `Session` changes.
+ */
+export type GateSession = Session & {
+  readonly needsPasswordSetup: boolean;
+};
+
+/**
  * Self-signup produces a customer role only: no path a visitor can reach may write `admin`
  * (07 §5.4 row 3 — admin accounts are created by migration / service role; `grantRole` is the admin-actor road).
  */
@@ -106,7 +116,7 @@ export interface Auth<DB extends DatabaseShape = AppDatabase> {
   refreshSession(
     req: NextRequest,
     res: NextResponse,
-  ): Promise<Result<Session | null>>;
+  ): Promise<Result<GateSession | null>>;
   /**
    * 01 §4d step 3 — a signed-in user with no password (ADR-042) is routed to set-password, never shown an error.
    * **Connector extension:** 03 §1.4 does not name this method; the gate rule it serves is stated in 01 §4d and
@@ -167,4 +177,23 @@ export interface AuthDriver<DB extends DatabaseShape = AppDatabase> {
 /** What `createAuth` needs beyond the driver. */
 export type AuthDeps<DB extends DatabaseShape = AppDatabase> = {
   readonly driver: AuthDriver<DB>;
+};
+
+// ── stub-auth (05 §3 rule 1: production code inside the module it stubs) ──
+
+/** One in-memory account. No `password` ⇒ ADR-042's passwordless account. */
+export type StubUser = {
+  readonly id: string;
+  readonly email: Email;
+  readonly password?: string;
+  /** Absent ⇒ authenticated with the provider but not a known actor — the gate treats it as no session. */
+  readonly role?: Role;
+  readonly mfaVerified?: boolean;
+};
+
+export type StubAuthOptions = {
+  readonly users?: ReadonlyArray<StubUser>;
+  readonly signedInUserId?: string;
+  /** Rows a `NamedOperation` sees; the stub's "test schema" behind the same port (03 §11 row 9). */
+  readonly tables?: Readonly<Record<string, ReadonlyArray<unknown>>>;
 };
