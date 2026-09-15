@@ -10,9 +10,11 @@ const JWT = /^[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}$/;
 const PROVIDER_KEY = /^(sk|rk|pk|whsec|re)_[A-Za-z0-9]|^eyJ[A-Za-z0-9_-]{10,}/;
 const BEARER = /^bearer\s/i;
 
+// `EMAIL` is unanchored with two greedy quantifiers, so on a long string *without* an `@` the engine retries at
+// every offset — quadratic. The `includes` check is the cheap pre-filter that keeps that off the hot path.
 export const looksLikePii = (value: string): boolean =>
   !UUID.test(value) &&
-  (EMAIL.test(value) ||
+  ((value.includes("@") && EMAIL.test(value)) ||
     JWT.test(value) ||
     PROVIDER_KEY.test(value) ||
     BEARER.test(value) ||

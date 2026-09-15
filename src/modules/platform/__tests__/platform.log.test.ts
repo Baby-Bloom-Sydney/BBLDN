@@ -354,6 +354,44 @@ describe("platform/log — S3b HIGH-2: sensitive keys (01 §4b; 07 §2.7(a))", (
     });
   });
 
+  it("normalises acronym runs, so IPAddress is redacted like ipAddress is", () => {
+    expect(
+      scrubPii({
+        IPAddress: "203.0.113.7",
+        UserAgent: "Mozilla/5.0",
+        SessionID: "sess-abc",
+        telephone: "020 7946 0000", // config-literal-ok: a PII fixture the scrubber must redact
+      }),
+    ).toEqual({
+      IPAddress: REDACTED,
+      UserAgent: REDACTED,
+      SessionID: REDACTED,
+      telephone: REDACTED,
+    });
+  });
+
+  it("keeps the consent audit fields readable — they are ids, not document contents", () => {
+    // `documentId` / `documentVersion` are `consent/types.ts`'s `DocumentVersion`: the audit signal of a consent
+    // event. The `document` prefix used to swallow them; `sessionId` must stay redacted all the same.
+    expect(
+      scrubPii({
+        documentId: "privacy-policy",
+        documentVersion: 3,
+        consentRecordId: "cr-1",
+        cookieConsentId: "cc-1",
+        documentContents: "the whole notice",
+        sessionId: "sess-abc",
+      }),
+    ).toEqual({
+      documentId: "privacy-policy",
+      documentVersion: 3,
+      consentRecordId: "cr-1",
+      cookieConsentId: "cc-1",
+      documentContents: REDACTED,
+      sessionId: REDACTED,
+    });
+  });
+
   it("keeps the safe keys the logger needs (they are not collateral of the plural boundary)", () => {
     expect(
       scrubPii({
@@ -422,6 +460,30 @@ describe("platform/log — S3b MEDIUM: non-string values are content-checked too
       stamp: 20260915,
       nested: { alt: [REDACTED] },
     });
+  });
+});
+
+describe("platform/log — S3b: the scrubber is bounded and cannot be a DoS lever", () => {
+  it("scrubs a very long message in linear time — the input is cut before any pattern runs", () => {
+    // `EMAIL` is unanchored with two greedy quantifiers, so a long string holding an `@` but no valid address
+    // makes the engine retry at every offset — measured at 3.3 s for this input unbounded, against 0 ms bounded.
+    // Scrubbing ran over the *untruncated* message, so one logged provider body could hold the event loop.
+    // Bounded first, scrubbed second.
+    const hostile = `${"a".repeat(40_000)}@${"b".repeat(40_000)}`;
+    const started = performance.now();
+    const { lines, sink } = capture();
+    createLogger({ sink, clock }).warn(hostile);
+    const elapsed = performance.now() - started;
+    expect(String(lines[0]?.msg).length).toBeLessThan(2100);
+    expect(lines[0]?.msg).toMatch(/…\[truncated\]$/);
+    expect(elapsed).toBeLessThan(250);
+  });
+
+  it("still finds PII inside the part it scans", () => {
+    const { lines, sink } = capture();
+    createLogger({ sink, clock }).warn(`ann@example.test ${"x ".repeat(4000)}`);
+    expect(lines[0]?.msg).not.toContain("ann@example.test");
+    expect(lines[0]?.msg).toContain("[redacted]");
   });
 });
 
