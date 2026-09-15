@@ -199,3 +199,67 @@ describe("platform — envelope (01 §4c)", () => {
     expect(toActionResult(ok(3))).toEqual({ ok: true, value: 3 });
   });
 });
+
+
+// S3b — the S3 security review's MEDIUM on `toClientError`: `details` was only stripped for INTERNAL, so any
+// other code could carry a raw provider body, a stack or a PII-shaped string across the boundary.
+describe("platform — toClientError guards `details` on every code (S3b)", () => {
+  it("strips Error instances and PII-shaped strings from details, not just for INTERNAL", () => {
+    const failed = err("PROVIDER_ERROR", "stripe failed", {
+      provider: "stripe",
+      thrown: new Error("at /app/src/modules/payments/lib/charge.ts:12:9"),
+      contact: "ann@example.test",
+      key: "sk_live_ci-dummy",
+      note: "ring +44 7700 900123 back", // config-literal-ok: a PII fixture the guard must redact
+      nested: { deeper: { email: "ann@example.test" } },
+      list: ["fine", "ann@example.test"],
+      reason: "declined",
+      retryAfterSeconds: 30,
+    });
+    expect(toClientError(failed.error)).toEqual({
+      code: "PROVIDER_ERROR",
+      message: "stripe failed",
+      details: {
+        provider: "stripe",
+        thrown: "[redacted]",
+        contact: "[redacted]",
+        key: "[redacted]",
+        note: "[redacted]",
+        nested: { deeper: { email: "[redacted]" } },
+        list: ["fine", "[redacted]"],
+        reason: "declined",
+        retryAfterSeconds: 30,
+      },
+    });
+  });
+
+  it("leaves a clean details object untouched and never mutates the caller's error", () => {
+    const details = { mobile: ["UK mobile required"], field: "mobile" };
+    const failed = err("VALIDATION", "check the form", details);
+    const client = toClientError(failed.error);
+    expect(client.details).toEqual(details);
+    expect(Object.isFrozen(client)).toBe(true);
+    expect(failed.error.details).toBe(details);
+  });
+
+  it("an error with no details still crosses the boundary unchanged", () => {
+    expect(toClientError(err("NOT_FOUND", "gone").error)).toEqual({
+      code: "NOT_FOUND",
+      message: "gone",
+    });
+  });
+
+  it("the same guard runs through the envelope and the action result (one chokepoint)", () => {
+    const failed = err("CONFLICT", "not movable", {
+      reason: "stage",
+      thrown: new Error("boom"),
+    });
+    const envelope = envelopeOf(failed, { requestId: REQUEST_ID });
+    expect(envelope.body).toMatchObject({
+      error: { details: { reason: "stage", thrown: "[redacted]" } },
+    });
+    expect(toActionResult(failed)).toMatchObject({
+      error: { details: { reason: "stage", thrown: "[redacted]" } },
+    });
+  });
+});

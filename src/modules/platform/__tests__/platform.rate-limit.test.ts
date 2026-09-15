@@ -12,6 +12,9 @@ import {
   rateLimiter,
 } from "@/modules/platform";
 import type { LogLine, RateLimitStore } from "@/modules/platform";
+// S3b: internal to the module — the guard is boot wiring, deliberately not part of the connector surface.
+import { assertSharedStore } from "../rate-limit/lib/assert-shared-store";
+import { MEMORY_BACKED_RATE_LIMITER } from "../rate-limit/lib/memory-backed-rate-limiter";
 
 const T0 = Date.parse("2026-09-15T08:00:00.000Z");
 const at = (offsetSeconds: number) =>
@@ -127,5 +130,48 @@ describe("platform/rate-limit — consume", () => {
     const { limiter } = harness();
     configureRateLimiter(limiter);
     expect((await rateLimiter.consume("default-key", policy)).ok).toBe(true);
+  });
+});
+
+
+// S3b — the S3 security review's MEDIUM on the limiter: the per-instance memory store was the silent production
+// default. The shared `rate_limit_buckets` store (07 §8; S5) is still a later unit — this is only the assertion
+// that its absence in production is loud and fails closed instead of silently limiting per Vercel instance.
+describe("platform/rate-limit — the shared store is asserted in production (S3b)", () => {
+  it("passes outside production, even on the memory-backed default", () => {
+    expect(assertSharedStore(MEMORY_BACKED_RATE_LIMITER, false)).toBeNull();
+  });
+
+  it("passes in production once a shared-store limiter has been installed", () => {
+    expect(assertSharedStore(harness().limiter, true)).toBeNull();
+  });
+
+  it("fails closed in production while the default memory store is still installed, with ALERT_ENV_INVALID", () => {
+    const lines: LogLine[] = [];
+    const denied = assertSharedStore(
+      MEMORY_BACKED_RATE_LIMITER,
+      true,
+      createLogger({ sink: (line) => void lines.push(line) }),
+    );
+    expect(denied?.ok).toBe(false);
+    if (denied && !denied.ok) {
+      expect(denied.error.code).toBe("INTERNAL");
+      expect(denied.error.message).not.toContain("memory");
+    }
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      level: "error",
+      alert: "ALERT_ENV_INVALID",
+      module: "platform",
+    });
+  });
+
+  it("the module-level limiter routes every consume through the assertion", async () => {
+    configureRateLimiter(harness().limiter);
+    const result = await rateLimiter.consume("guarded", {
+      key: "ip",
+      perMinute: 5,
+    });
+    expect(result.ok).toBe(true);
   });
 });
