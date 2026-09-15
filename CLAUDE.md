@@ -1,0 +1,247 @@
+# CLAUDE.md — BabyBloom London (code repo)
+
+> **Seed file.** This document lives at `LDN/SPECS/00-foundations/CODE-CLAUDE.md` and is copied **verbatim** to `<ldn-repo>/CLAUDE.md` at repo bootstrap (`08-launch-and-cutover.md` §2.1 step 0 — Code repo bootstrap; gate A0). It holds **process rules and pointers only** — never a project fact. Every fact is a `doc §section` reference into the foundations, so this file can never disagree with them. If you find a fact here, it is a defect: move it to the owning doc and leave a pointer.
+
+This repository is the application whose brand, domain, senders, URLs, currency, locale, timezone, areas, prices and flags are all read from the `config` module (`01-architecture.md` §3) — none of them are literals in code, and none are stated in this file. The **foundations** — the nine numbered documents plus `DECISIONS.md` — are the single source of truth for what this app is and does. **Amend the doc first:** if the code needs something a foundation does not say, the foundation is edited (new section or ADR) *before* the code is written; code that contradicts a foundation is wrong until the foundation changes (`README.md` §4 rule 2).
+
+**Where the foundations are.** Throughout this file `FOUNDATIONS` means `../LDN/SPECS/00-foundations/` — i.e. the `LDN` planning tree checked out as a **sibling** of this repo. At bootstrap (`08-launch-and-cutover.md` §2.1 step 0) one of two shapes is chosen and **recorded as an ADR in `DECISIONS.md`**: **(a) linked — the default** — the repo sits beside `LDN/` and every relative path resolves as written; **(b) vendored** — the numbered docs + `DECISIONS.md` are copied read-only into `<ldn-repo>/docs/foundations/` and re-synced at every task boundary, with the originals in `LDN/` remaining canonical. **That ADR governs every `../LDN/` path in this file** — `../LDN/SPECS/00-foundations/` *and* `../LDN/OPERATIONS/` (INDEX, PROGRESS, PROTOCOLS, BRANCHES) alike: if vendored, the ADR also states how each `../LDN/OPERATIONS/…` path resolves (sibling checkout of the workspace repo, or a recorded alias); no path in this file may be left unresolved. Either way: edits go to the `LDN/` originals, never to a vendored copy.
+
+---
+
+## 1. FIRST 30 SECONDS — before any other work
+
+You may be one of several Claude sessions, sub-agents and BAI himself active on this repo at once. Coordination happens through the LDN OPERATIONS layer, not through this repo. Reads, in order:
+
+1. **This file** — the process rules.
+2. **`FOUNDATIONS/README.md`** — the file index and the **ownership matrix** (§2): which doc § owns each topic.
+3. **`FOUNDATIONS/DECISIONS.md`** — the ADR register; read the header rules and the **newest rows** (bottom of §1) plus the open decisions (§2). A decision that binds your work is cited by ADR id in your PR body.
+4. **The OPERATIONS task you were pointed at** — `../LDN/OPERATIONS/INDEX.md` lists active tasks (`L-NNN` ids); the task's `PROGRESS.md` is the soft lock: claim before work, sign every edit, update on every status change (`../LDN/OPERATIONS/PROTOCOLS/MULTI-AGENT-ETIQUETTE.md`, `SIGN-OFF-FORMAT.md`).
+5. **Your handle** = the renameable Claude Code session name BAI has set (`../LDN/OPERATIONS/PROTOCOLS/HANDLE-CONVENTION.md`). Ask BAI if you don't know it; use it on every commit, footer and log line.
+6. **`docs/build-progress.md`** in this repo (§9 below) — current code state, known bugs, exact next unit.
+
+Then: confirm you are a **coding agent** working from a handoff doc (`../LDN/OPERATIONS/PROTOCOLS/PLANNING-VS-IMPLEMENTATION.md`). Planning sessions do not write code in this repo.
+
+---
+
+## 2. The five laws — merge-blocking
+
+From `TARGET/build-standard/README.md` §2 (ADR-007). A "no" on any acceptance question blocks the merge.
+
+| # | Law | Merge-blocking rule in this repo |
+|---|---|---|
+| L1 | **One function per file** | A file exports exactly one thing: one action, one component, one helper, one type group. No `utils` grab-bags. Checked by the boundary lint (`05-acceptance-and-test-plan.md` §7). |
+| L2 | **Connectors first** | A module's `index.ts` + `types.ts` are written and reviewed **before** its inside. Where the mechanism is undecided, the connector ships with a stub (`*.stub.ts`) that honours it (`03-interface-contracts.md` §1). |
+| L3 | **Swap without breaking** | Delete the module folder, drop in a stub honouring `index.ts`, the app still builds and runs. The swap tests are the acceptance (`03-interface-contracts.md` §11; `05-acceptance-and-test-plan.md` §3). |
+| L4 | **Config, not literals** | Brand, domain, senders, URLs, currency, locale, timezone, area source, prices, feature flags — read from `config` only (`01-architecture.md` §3.2 rule 1). A literal outside `src/modules/config/` fails the config-literal test (`05-acceptance-and-test-plan.md` §6). |
+| L5 | **Full ECC, every time** | §3 below, unabridged. |
+
+**The five-question acceptance test** (build-standard §5) — answered in every PR body, every review:
+
+1. Does each new file export exactly one thing?
+2. Was the connector (`index.ts` + `types.ts`) written and reviewed before the inside?
+3. Could the module be replaced by a stub honouring the connector with nothing else changing?
+4. Is every brand / domain / locale / currency / price / flag value read from `config`?
+5. Did the ECC review agents run, and are files ≤ 800 / functions ≤ 50 / changed-line coverage ≥ 80 %?
+
+Copied Sydney code is split to one-function-per-file and swept for literals **as it arrives**, module by module, never as a big-bang refactor (build-standard §6; `01-architecture.md` §3.2 rule 3).
+
+---
+
+## 3. ECC hard rules — never skip
+
+ECC = Everything Claude Code: `~/.claude/rules/` (rules), `~/.claude/skills/` (skills), `~/.claude/agents/` (agents). These apply to every change in this repo (`../LDN/CLAUDE.md` § ECC discipline; build-standard L5):
+
+- **Files ≤ 800 lines, functions ≤ 50 lines** (`common/coding-style.md`). Split before, never after.
+- **No `any` in TypeScript application code.** Use `unknown` + narrow (`typescript/coding-style.md`).
+- **Immutable updates only.** Never mutate; return new objects (`common/coding-style.md`).
+- **TDD-first; 80 %+ changed-line coverage on new code** (`common/testing.md`; gate in `05-acceptance-and-test-plan.md` §9 stage 3). Code before test is a deviation that needs a written justification.
+- **`code-reviewer` + `typescript-reviewer` after every change** (`common/code-review.md`). Not optional.
+- **`security-reviewer` on auth / user input / money / API / storage paths** — scope per module in `07-security-and-data-protection.md` §10.1 (mandatory before merge).
+- **`database-reviewer` on any schema, migration, RLS or RPC change** (`02-data-model.md`; `07-security-and-data-protection.md` §5).
+- **No hardcoded secrets.** `config/env.ts` reads `process.env` once; `process.env` anywhere else fails review (`07-security-and-data-protection.md` §7).
+- **Run independent agents in parallel** — one tool-call batch (`common/agents.md`).
+- **Update the task's `PROGRESS.md` whenever your work changes status** (LDN OPERATIONS).
+- **Commit at every task boundary** (`../LDN/OPERATIONS/PROTOCOLS/COMMIT-DISCIPLINE.md`); commit shape in `06-runbook.md` §4.3.
+- **Never push, deploy, merge to `main`, or promote without BAI's explicit OK for *that* action.** Prior approvals do not roll forward (`06-runbook.md` §3.2; memory `feedback_never_deploy_without_approval`).
+
+Before any non-trivial task: re-read the relevant ECC rules (`common/coding-style.md` · `common/testing.md` · `common/code-review.md` · `common/development-workflow.md` · `common/security.md`; `typescript/*`; for UI `web/design-quality.md` · `web/performance.md` · `web/coding-style.md`) and pick the matching agent rather than defaulting to general-purpose coding. Research before writing (`common/development-workflow.md` §0): GitHub code search → library docs → registries → adapt a proven implementation.
+
+### Skills — load before the unit, not after (BAI, 2026-09-15: "use all ECC skills and principles")
+
+Read the matching `~/.claude/skills/<name>/SKILL.md` **before** writing, summarise its constraints in the unit's PROGRESS entry, then build. Minimum set per unit type (add others when the unit touches their domain):
+
+| Unit type | Skills (always) | Agents (always) |
+|---|---|---|
+| Repo / CI / tooling (S0, S1, S6) | `coding-standards` · `deployment-patterns` · `github-ops` · `verification-loop` | `[code-reviewer + security-reviewer]` on workflows, scripts, env handling |
+| Config / types / platform (S2, S3) | `coding-standards` · `tdd-workflow` · `backend-patterns` · `api-design` · `security-review` | `[code-reviewer + typescript-reviewer + silent-failure-hunter]`; `type-design-analyzer` on `shared-types` |
+| Auth / API routes / webhooks (S4, F-c shells) | `security-review` · `backend-patterns` · `api-design` · `tdd-workflow` | `[code-reviewer + typescript-reviewer + security-reviewer + silent-failure-hunter]` |
+| Migrations / RLS / RPC (S5) | `database-migrations` · `postgres-patterns` · `security-review` | `[database-reviewer + code-reviewer]`; `code-architect` first |
+| Module connectors + insides (F-a, F-b, F-c) | `coding-standards` · `tdd-workflow` · `backend-patterns` (+ `frontend-patterns` · `frontend-design` for UI) | `code-architect` → `tdd-guide` → `[code-reviewer + typescript-reviewer + silent-failure-hunter]`; `a11y-architect` on UI |
+| Journeys / e2e (E1, Phase 1+) | `e2e-testing` · `verification-loop` | `e2e-runner` · `pr-test-analyzer` |
+| Any breakage | — | `build-error-resolver` (minimal diff) |
+
+Skipping a listed skill or agent is a process violation to call out in review, not a shortcut.
+
+### Workflow recipes (portable from Sydney's `BB/nanny-platform/CLAUDE.md`)
+
+- **New unit of work:** `planner` / `code-architect` → `tdd-guide` writes the failing test → minimum implementation → `[code-reviewer + typescript-reviewer + silent-failure-hunter]` in one batch → fix HIGH + MEDIUM → gates (§7) → commit → PROGRESS.md.
+- **Bug fix:** failing test first → root cause, minimal patch, no surrounding refactor → `[code-reviewer + typescript-reviewer]` → full suite → commit.
+- **Security-sensitive path:** implement security-first → `[code-reviewer + typescript-reviewer + security-reviewer]` → every CRITICAL + HIGH closed before commit.
+- **Schema / migration:** `code-architect` → migration + rollback SQL → `[database-reviewer + code-reviewer]` → local Supabase, verify RLS → **BAI applies to preview / production, one OK per file** (`06-runbook.md` §4.2). Never auto-apply.
+- **Build breakage:** `build-error-resolver`, minimal diff, typecheck + build green, commit.
+
+---
+
+## 4. Where things are decided — pointer table
+
+One topic → one owning `doc §` (`FOUNDATIONS/README.md` §2). Cite these; never restate them.
+
+| Topic | Owner |
+|---|---|
+| Vocabulary — stages, movers, modules, ID schemes, voice, names, canonical terms, fates | `00-glossary.md` (§1 stages · §2 movers · §3 modules · §4 screen IDs · §5 decision IDs · §6 voice · §7 names · §8 canonical terms · §9 fates + principles) |
+| Runtime + hosting, env names | `01-architecture.md` §1 |
+| Module map + allowed imports; service modules; folder shape | `01-architecture.md` §2 (§2.1 map · §2.3 allowed-imports table · §2.4 service modules · §2.5 folder shape) |
+| Config layer — files, rules, env schema, feature flags | `01-architecture.md` §3 (§3.2 rules · §3.3 loading · §3.4 flags) |
+| Error handling, logging, API envelope, auth gate, actions vs routes, crons | `01-architecture.md` §4 (§4a–§4f) |
+| Data + storage boundaries; `auth` data-access port; `UnitOfWork` | `01-architecture.md` §6 (§6.3 data clients) |
+| Analytics seam | `01-architecture.md` §7 |
+| Enums, tables by cluster, not-created list, migration order, RPCs/views, buckets | `02-data-model.md` (§3 enums · §4 tables · §5 not created · §6 migration order · §7 RPCs + views · §8 buckets) |
+| How contracts work; `auth` connector + unit of work | `03-interface-contracts.md` §1 (§1.4) |
+| Stage-model contract; slice registration; `call-layer` connector | `03-interface-contracts.md` §2 (§2.1 · §2.5 signature · §2.7) |
+| Scheduling contract | `03-interface-contracts.md` §3 |
+| Swappable connectors — `vetting-providers` · `purchase-paths` · `areas` · `scoring/distance` · `comms/sms` | `03-interface-contracts.md` §4 · §5 · §6 · §7 · §8 (one section each) |
+| Events / analytics taxonomy | `03-interface-contracts.md` §9 |
+| Cross-contract table; swap tests | `03-interface-contracts.md` §10 · §11 |
+| Screen-ID register; parent / nanny / admin journeys; screen inventory; copy anchors | `04-journeys-and-screens.md` (§2 register · §3–§5 journeys · §6 inventory · §8 copy) |
+| Acceptance criteria (`AC-P` · `AC-N` · `AC-A` · `AC-X` · `AC-Y`) | `05-acceptance-and-test-plan.md` §2 |
+| Test pyramid, suites, fixtures; CI pipeline + merge blocks | `05-acceptance-and-test-plan.md` §4 · §9 |
+| Banned-words test · config-literal test · module-boundary lint | `05-acceptance-and-test-plan.md` §5 · §6 · §7 |
+| NFRs — performance, a11y, SEO | `05-acceptance-and-test-plan.md` §8 |
+| Environments; `.env.example` inventory | `06-runbook.md` §2 (§2.5) |
+| Branch + promote; deploy runbook; rollback | `06-runbook.md` §3 · §4 · §5 |
+| Backup / restore, RTO / RPO; monitoring; day-one manual ops; support | `06-runbook.md` §6 · §7 · §8 · §9 |
+| Funnel metrics | `06-runbook.md` §10 |
+| Data classification; threat model; RLS intent + bucket policies | `07-security-and-data-protection.md` §3 · §4 · §5 |
+| Retention / deletion; secrets; rate limiting; breach duties | `07-security-and-data-protection.md` §6 · §7 · §8 · §9 |
+| Security review gates, CI security items, headers / CSP | `07-security-and-data-protection.md` §10 |
+| Launch sequence, supply plan, go / no-go, cutover | `08-launch-and-cutover.md` §2 · §3 · §5 · §7 |
+| Decisions (ADRs) + open decisions | `DECISIONS.md` §1 · §2 |
+| Build laws, module map origin, acceptance test | `TARGET/build-standard/README.md` §2 · §3 · §5 |
+
+If a topic is not in this table, look it up in `FOUNDATIONS/README.md` §2 (the ownership matrix is the authority; this table mirrors it and is re-synced whenever the matrix changes). If it is in neither, it is undecided: raise it in the task's `PROGRESS.md` and, if KEY, in `../LDN/OPERATIONS/INDEX.md` "Open KEY decisions".
+
+---
+
+## 5. Module rules in the repo
+
+The module rules are **not restated here** — these are the rules; read them there. Every one is merge-blocking through the boundary lint and swap tests (§2). Pointers only:
+
+| Rule | Owner |
+|---|---|
+| Allowed imports between modules | `01-architecture.md` §2.3 |
+| Service modules are leaves (`auth` · `comms` · `areas` · `platform`) | `01-architecture.md` §2.4 (ADR-069) |
+| Folder shape — `index.ts` · `types.ts` · `actions/` · `components/` · `lib/` · `__tests__/` · `README.md` | `01-architecture.md` §2.5; build-standard §4 |
+| Action / route rules — validate once at the boundary, `Result<T>` + error registry, `UnitOfWork` as opaque token | `01-architecture.md` §4a |
+| Data clients — `auth` never exports a driver client or type | `01-architecture.md` §6.3 |
+| How contracts work; `auth` connector + unit of work | `03-interface-contracts.md` §1 (§1.4) |
+| Stage model — `advance()`, slices, registration | `03-interface-contracts.md` §2.1 |
+| Scheduling — who may import it | `03-interface-contracts.md` §3 |
+| Boundary lint (deep imports, one export per file) | `05-acceptance-and-test-plan.md` §7 |
+
+Where one of these sections marks an item as open (e.g. slice-registration shape, `03-interface-contracts.md` §12 / `01-architecture.md` §10), it is **undecided until its ADR lands in `DECISIONS.md`** — do not infer a default from this file.
+
+---
+
+## 6. Branch, deploy, promote
+
+Governed by `06-runbook.md` §3 (five invariants §3.1 · three human safeguards §3.2 · lifecycle §3.3 · branch protection §3.4) and §4 (deploy runbook). Origin: Sydney's `website/system/OPERATIONS/PROTOCOLS/BRANCH-AND-DEPLOY.md`, written after the 2026-06-01 non-fast-forward promote silently reverted 252 files. London makes it mechanical from day one. In one screen:
+
+1. **One trunk: `main`** = what is live = the base every branch starts from.
+2. **Own branch, own worktree, off the *current* `main`**; branch name `<purpose>-DDMMYY-N`. Register it in `../LDN/OPERATIONS/BRANCHES.md` before building; read that file first for overlap. That file is created at bootstrap (`08-launch-and-cutover.md` §2.1 step 0); **if it is absent, stop and create it from the Sydney pattern** (`website/system/OPERATIONS/BRANCHES.md`) before branching.
+3. **Push continuously.** Unpushed work does not exist.
+4. **Merge `main` DOWN before merging UP;** then `git merge-base --is-ancestor origin/main HEAD && echo CURRENT || echo STALE` — STALE means go back to step 4.
+5. **Promote only `main`, fast-forward-only**, via `tools/promote-guard.sh <live-sha> <candidate-sha> <repo>` (exit 0 or STOP). Branch protection on `main` is **on from day one** (required checks, up-to-date rule, no force-push — `06-runbook.md` §3.4).
+6. **Explicit BAI OK** for *this* merge / push / preview / promote — every time.
+
+Gates before every push: `npm run typecheck && npm run lint && npm test` (+ `npm run build` if structural). Commit shape: `06-runbook.md` §4.3 (conventional commit `type(<module>): …`, London admin git identity, **no attribution trailers**). Migrations: BAI applies, one OK per file (§4.2). Preview + smoke: §4.4. Promote + verify: §4.5. Rollback: §5.
+
+---
+
+## 7. Efficiency rules
+
+**Context loading.** Every task: this file + `docs/build-progress.md` + the `README.md` of each module you touch. Stop there unless the task needs more.
+
+- **Bug fix:** the broken file only; check `build-progress.md` Known bugs first.
+- **New action / component:** the owning module's `README.md` + `index.ts` + `types.ts`, plus the closest existing sibling as reference. Not unrelated modules.
+- **Styling:** the file being styled only.
+- **Auth / middleware:** `auth`'s connector (`01-architecture.md` §4d, §6.3) + the middleware gate. Nothing else.
+- **Schema:** `02-data-model.md` + `07-security-and-data-protection.md` §5. Nothing else from the foundations.
+- **Contract change:** the owning section of `03-interface-contracts.md` — amend the doc first (preamble of this file; `README.md` §4 rule 2).
+- **Do not read** `../LDN/STOCKTAKE/`, `../LDN/TRIAGE/`, `../LDN/TARGET/` (except build-standard) or Sydney's `website/` unless the handoff points you there. They are history and reference, not spec.
+
+**Response style.** Don't narrate; do it. Don't echo file contents after editing — path + what changed. Minimal change for a bug fix; no drive-by refactors.
+
+**Agent strategy.** Classify, then go. **Small** (1–5 files or any bug fix): sequential, no agents. **Large** (6+ new independent files): 2–3 agents max, no shared files, each reads this file + `build-progress.md` + its own files only. **Always sequential:** bug fixes, refactors, shared files (`config`, `shared-types`, `platform`, `auth`, layouts), anything order-dependent, schema. Agent failure → stop all, continue sequentially from the last working state.
+
+**Dependency awareness.** Before creating a component, action, helper or config key: check the module `README.md`, `build-progress.md`'s registry and `config` — no duplicates. Before installing a package: check `package.json`.
+
+---
+
+## 8. Compaction protocol
+
+Compact only at a logical breakpoint, never mid-task. Before every compaction:
+
+1. `docs/build-progress.md` — files created / modified (full paths + what changed), current bugs, registry, **exact next unit to pick up**.
+2. The task's `PROGRESS.md` in `../LDN/OPERATIONS/` — a "compacting context now; resume here" log entry, signed with your handle.
+3. Audit footers bumped on every file you edited (`../LDN/OPERATIONS/PROTOCOLS/SIGN-OFF-FORMAT.md`).
+4. **Commit everything** (`COMMIT-DISCIPLINE.md`) — `ops(L-NNN): pre-compaction snapshot` is fine.
+5. After compaction: re-read §1–§3 of this file, then `build-progress.md`.
+
+---
+
+## 9. Build ledger
+
+Three ledgers, each updated whenever code state changes; a task is not done until all three say so.
+
+| Ledger | Where | What goes in |
+|---|---|---|
+| `docs/build-progress.md` | this repo | files created / modified, component + action registry, known bugs, next unit. Must always reflect the true current state so any fresh context resumes perfectly. |
+| `CHANGELOG.md` | this repo | one line per merged unit, newest at top, `type(<module>): …` + PR + ADRs cited. |
+| `PROGRESS.md` | `../LDN/OPERATIONS/ACTIVE/L-NNN-…/` | claim, status, log entries with handle + offset timestamp; mirrored in `INDEX.md`; closed tasks roll into `../LDN/OPERATIONS/CHANGELOG.md`. |
+
+Both in-repo ledgers are seeded at bootstrap (`08-launch-and-cutover.md` §2.1 step 0). **If `docs/build-progress.md` or `CHANGELOG.md` is absent, create it from the `_project-template` shape** (`projects/_project-template/`; Sydney's `BB/nanny-platform/docs/04-technical/build-progress.md` is the reference for the build ledger) **before the first commit** — a commit with no ledger entry is a process violation.
+
+Two repos, two commits: code lands in this repo; docs, PROGRESS and foundation amendments land in the workspace repo.
+
+---
+
+## 10. What never goes in this file
+
+- Project facts: table names, column names, enum values, screen IDs, routes, template ids, event names.
+- Prices, currency, locale, timezone, brand, domain, sender addresses, URLs, flag names or values.
+- Copy, voice, banned words.
+- Decisions — they are ADRs in `DECISIONS.md`; this file may cite an ADR id, never restate its content.
+- Provider names or credentials, environment values, project ids.
+- Anything already owned by a foundation section — link it (§4), don't repeat it.
+
+If a fact is needed here to make a rule readable, the rule is written as a pointer instead. When a foundation section number changes, only §4 of this file changes.
+
+---
+
+## Precedence
+
+1. `~/.claude/rules/` — base ECC rules. Always apply.
+2. **This file** — code-repo process rules.
+3. `FOUNDATIONS/*` — what the app is (facts); they win over any code comment or README in this repo.
+4. `../LDN/OPERATIONS/PROTOCOLS/*` — team protocols referenced from here.
+5. Per-task handoff docs — task-specific notes.
+
+Sydney's `website/` CLAUDE.md chain is reference only; it does not govern this repo. Conflicts go to `../LDN/OPERATIONS/INDEX.md` "Open KEY decisions" for BAI.
+
+---
+
+<!-- audit
+Last edited: 2026-09-15T13:49+10:00 — BB-LDN-Planner-070926
+Notes (F9, review fix pass): preamble bootstrap moment → 08 §2.1 step 0 / gate A0; linked-vs-vendored ADR governs ALL ../LDN/ paths (foundations + OPERATIONS), default linked; §5 reduced to pointers only (01 §2.3–2.5 / §4a / §6.3; 03 §1.4 / §2.1 / §3; 05 §7), restated rules + unratified slice-registration default removed; §6 BRANCHES.md created at bootstrap, else stop + create from Sydney pattern; §9 seed build-progress / CHANGELOG from _project-template shape before first commit; §4 fallback keeps README §2 as authority.
+Previous: Notes: initial authoring (L-004 wave 4) — code-repo CLAUDE.md seed: pointers + process only; five laws as merge blocks + five-question test; ECC hard rules; pointer table mirroring README §2 with real section numbers from 00–08 + DECISIONS + build-standard; module rules (folder shape, boundary lint, service leaves, auth no-client, UnitOfWork token, slice registration default pending 03 §12 item 35 / 01 §10 O-12, scheduling importers); branch/deploy/promote condensed from 06 §3–§4 with Sydney origin; efficiency + compaction (portable half of Sydney's nanny-platform CLAUDE.md); three build ledgers; never-list; precedence. Bootstrap decisions flagged: linked vs vendored foundations; slice-registration shape.
+-->
