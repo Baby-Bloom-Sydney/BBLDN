@@ -1,0 +1,64 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/send-delayed-emails",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/expire-connections",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/proactive",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/compact-daily",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-orphan-children",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/dfy-waves",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/snapshot-pipeline",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/expire-trials",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/expire-past-due",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/expire-cancelled-subscriptions",
+      "schedule": "45 3 * * *"
+    },
+    {
+      "path": "/api/cron/soft-lock-stale-children",
+      "schedule": "15 3 * * *"
+    },
+    {
+      "path": "/api/cron/schedule-upfront-cycles",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/trial-reminders",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/release-payouts",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/cron/audit-consent-expiry",
+      "schedule": "5 21 * * *"
+    }
+  ]
+}

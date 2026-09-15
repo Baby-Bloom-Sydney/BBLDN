@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 263 70% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 263 70% 96%;
+    --accent-foreground: 263 70% 50%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 263 70% 50%;
+    --chart-1: 263 70% 50%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+
+    /* A-07 — Katie lilac theme. Mirrors the violet-100 / violet-200
+       lilac accent used on user hero tiles (e.g. NannyProfileTile's
+       `bg-gradient-to-br from-violet-100 to-violet-50` header strip)
+       so Katie's deck reads as the same brand-family lilac the user
+       already sees on their own profile hero. Used as the Katie tab
+       + body background to give the deck its own visual identity vs
+       the slate-50 main deck. */
+    --color-katie-bg-lilac: 250 100% 98%; /* tailwind violet-50 */
+    --color-katie-bg-lilac-muted: 251 91% 95%; /* tailwind violet-100 */
+  }
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Universal mobile input zoom guard (F-001 / 04-mobile-input-autozoom)
+
+   iOS Safari (and every other iOS browser — they all use WebKit) zooms
+   the viewport on focus when an input/textarea/select has computed
+   font-size < 16px. This rule pins all focusable text controls to
+   16px on mobile breakpoints so the zoom never triggers.
+
+   We deliberately do NOT use `<meta name="viewport" maximum-scale=1>`
+   or `user-scalable=no`. Those globally disable user pinch-zoom and
+   fail WCAG 2.1 SC 1.4.4 Resize Text. This rule fixes the auto-zoom
+   without taking pinch-zoom away from low-vision users.
+
+   `font-size: max(16px, 1rem) !important`:
+   - `max(...)` so a user who's enlarged their browser default beyond
+     16px keeps the larger size — we only enforce the 16-px FLOOR,
+     never a ceiling. (a11y-architect MEDIUM on F-001 sub-task 1.)
+   - `!important` because Tailwind utility classes (`.text-sm` etc.)
+     have class-level specificity (0,1,0) and would otherwise beat
+     the naked `input` element selector (0,0,1), silently
+     re-triggering iOS zoom on any input that picks up a Tailwind
+     text-size class. (code-reviewer HIGH on F-001 sub-task 1.) The
+     rule fires only under `pointer: coarse` and only sets
+     font-size, so the !important blast radius is bounded.
+
+   The selector matches every input variant we use plus a few we
+   don't (so future inputs are pre-emptively covered). `[type="file"]`
+   is excluded because it doesn't trip the zoom and we don't want to
+   force a 16-px label on a hidden control.
+
+   Scoped to coarse pointers to leave desktop / mouse-driven UI
+   untouched — text inputs there often want 14px to match dense
+   admin layouts. `@media (pointer: coarse)` is the canonical iOS /
+   touch-device guard.
+   ────────────────────────────────────────────────────────────────── */
+@media (pointer: coarse) {
+  input:not([type="file"]):not([type="checkbox"]):not([type="radio"]):not(
+      [type="range"]
+    ),
+  textarea,
+  select {
+    font-size: max(16px, 1rem) !important;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Reduced-motion guard — WCAG 2.2 SC 2.3.3.
+
+   Many surfaces in the app (Radix Dialog / Sheet / Tabs) ship with
+   fade / zoom / slide animations by default. Users with vestibular
+   disorders can experience nausea from these — particularly the
+   slide-from-top entrance on full-screen modals.
+
+   Respects `prefers-reduced-motion: reduce` (set in OS
+   accessibility preferences) by collapsing all animation /
+   transition durations to near-zero. Applies project-wide.
+   ────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
