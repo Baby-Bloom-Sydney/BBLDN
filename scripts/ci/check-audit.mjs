@@ -12,6 +12,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const ALLOWLIST = resolve(REPO_ROOT, "scripts/ci/audit-allowlist.json");
 const GATED_SEVERITIES = new Set(["high", "critical"]);
 const TODAY = new Date().toISOString().slice(0, 10);
+const AUDIT_TIMEOUT_MS = 120_000; // a hung registry call fails the check instead of hanging CI
 
 function runAudit() {
   // npm exits non-zero when it finds anything; the JSON report is on stdout either way.
@@ -21,6 +22,7 @@ function runAudit() {
         cwd: REPO_ROOT,
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
+        timeout: AUDIT_TIMEOUT_MS,
       }),
     );
   } catch (error) {

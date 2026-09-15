@@ -7,7 +7,7 @@
  * file touches the dispatch.
  *
  * Architectural commitment (from the Phase 4 plan): for INTERACTIVE
- * tiles (interview_request, connection_request, bsr_job, etc.), the
+ * tiles (connection_request, job_match, etc.), the
  * branch below imports the EXACT SAME component rendered on the main
  * page — not a chat-specific copy. The tile component handles its own
  * data fetch + Realtime subscription + action handlers, so Katie's
