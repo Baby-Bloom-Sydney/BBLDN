@@ -1,0 +1,66 @@
+# Static banned-words pre-check list — 05 §5.2 (00-glossary §6; T-6.3; ADR-035).
+# One phrase per line; matched whole-word, case-insensitive, with hyphen / space
+# variants. The rendered Playwright test (`words.banned`) is the authority; this
+# list only feeds the fast lint-stage pre-check (scripts/ci/banned-words-static.sh).
+# Allowlisted phrases live in tests/e2e/words/allowlist.ts (05 §5.3), never here.
+#
+# First tier (inflections included so a workaround does not pass)
+book
+books
+booked
+booking
+information
+fast track
+continue
+price
+prices
+fee
+fees
+free
+free option
+alternative
+alternatives
+do it yourself
+DIY
+upgrade
+upgrades
+offer
+offers
+consultation
+sales
+# Second tier — glossary §8 "never say" column + the ADR-073 phrase
+sales call
+discovery call
+book a call
+candidates
+leads
+subscription
+premium
+package
+lifetime
+forever
+unlimited
+instalments
+DFY
+priority
+concierge
+tracker
+tracking
+invoice
+checkout link
+demo
+suburb
+borough
+job
+listing
+interview
+Meet and Greet
+screening
+vetting
+CRM
+override
+impersonate
+WWCC
+police check
+within 24 hours
+within the next 24 hours

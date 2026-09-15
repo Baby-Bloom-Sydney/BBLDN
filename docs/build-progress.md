@@ -25,12 +25,12 @@ Checks are the eight protection names (`06-runbook.md` §3.4). Expected on the b
 
 | Check | Expected | Why | Turns green in |
 |---|---|---|---|
-| `typecheck` | see `../LDN/OPERATIONS/ACTIVE/L-005-foundations-build-handoff/PROGRESS.md` S0 entry for the measured result | Sydney tree as copied | S1 (Remove sweep must end green) |
-| `lint` | red | `prettier --check` over the raw tree; `next lint` result per the S0 PROGRESS entry | S1 |
+| `typecheck` | **green** (measured locally 2026-09-15: `tsc --noEmit` exit 0) | Sydney tree as copied | — (S1 must keep it green) |
+| `lint` | red | `next lint` exit 0 with warnings only (unused vars); `prettier --check` over the raw tree fails (Sydney formatted only staged files) | S1 |
 | `allowed-imports` | red | `scripts/gen-boundary-rules.ts` + `eslint.boundaries.js` do not exist yet | S6 |
 | `banned-literals` | red | `scripts/check-config-literals.ts` / `gen-env-example.ts` absent (S2); static banned-words pre-check and the `process.env` grep hit the legacy tree | S2 (scripts) · F-d (sweep) |
-| `test` | red | no coverage baseline, no `contract` / `integration` vitest projects, no local Supabase config; e2e needs env | S2–S5; e2e at E1 |
-| `build` | see PROGRESS S0 entry | `next build` on the copy; prod-guard boot check needs `purchase-paths` (F-c); `size-limit` config is Phase 1 (05 §8.1 baseline) | S1 (build) · F-c (guard) |
+| `test` | red | unit: **1468 / 1471 pass** (measured locally) — the 3 failures are `src/lib/payments/release-payouts-schedule.test.ts`, which asserts the `release-payouts` cron S0 stripped from `vercel.json` (N-2, SEQUENCE `08.33` — S1 deletes the test with the row); no coverage baseline for `diff-cover`; no `contract` / `integration` vitest projects; no local Supabase config; e2e needs env | S1 (unit) · S2–S5 (projects) · E1 (e2e) |
+| `build` | red (build step itself **green**) | `next build` exit 0 with the placeholder env the workflow sets (no env → `Resend` throws at page-data collection); bundle string scan green (230 chunks clean); prod-guard boot check red until `purchase-paths` refuses `stub-stripe` (F-c); `size-limit` config is Phase 1 (05 §8.1 baseline). Note: `prebuild` regenerates `public/katie-manifest.json` — do not commit the regenerated file | F-c (guard) · Phase 1 (budgets) |
 | `types-drift` | red | `src/modules/shared-types/database.types.ts` does not exist; needs `supabase start` + migrations | S2 (file) · S5 (drift) |
 | `gitleaks` | scan green (with the recorded allowlist); pin check red | Sydney `package.json` uses `^` ranges; exact-version pinning is a 07 §10.2 gate | S1 |
 
