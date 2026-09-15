@@ -25,7 +25,7 @@ malformed → `EnvInvalidError` naming names only, `ALERT_ENV_INVALID`). `public
 way a client bundle can hold a public value. The config.env suite asserts that `public-env.ts` reads nothing else and
 that no other file under `src/modules/**` touches `process.env`; `scripts/ci/check-env-reads.mjs` enforces it repo-wide.
 
-**The env registry** is `lib/env-schema.ts` — names, scope, kind, purpose, D / P / Pr marks (06 §2.5). `.env.example`
+**The env registry** is two tables: `lib/public-env-schema.ts` (the `NEXT_PUBLIC_*` names + NODE_ENV — the only table the client reader's import graph touches, so no server NAME can reach a client chunk — 07 §7 item 3) and `lib/env-schema.ts` (the server names, composed with the public table as `ENV_SCHEMA.entries` for the server reader and the generator) — names, scope, kind, purpose, D / P / Pr marks (06 §2.5). `.env.example`
 is generated from it (`npm run env:example`; `env:check` fails CI on drift). `.env.test` is the placeholder-only
 fixture the suite parses (05 §4.3); the CI workflow's `env:` block mirrors it.
 

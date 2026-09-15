@@ -40,10 +40,10 @@ export function parseEnv(
 ): ParsedEnv {
   const input = { ...raw, NODE_ENV: raw.NODE_ENV ?? "development" };
   const environment = resolveEnvironment(input);
-  const result = buildEnvSchema({
-    scope: "all",
-    column: COLUMN_FOR[environment],
-  }).safeParse(input);
+  const result = buildEnvSchema(
+    ENV_SCHEMA.entries,
+    COLUMN_FOR[environment],
+  ).safeParse(input);
   const names = result.success
     ? refineEnv(result.data, environment)
     : issueNames(result.error.issues);

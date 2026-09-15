@@ -284,3 +284,55 @@ describe("config.env — environment resolution (06 §2.1; fail closed off-Verce
     ).toBe(false);
   });
 });
+
+describe("config.env — the client reader's import graph carries no server name (07 §7 item 3)", () => {
+  const SERVER_ONLY_NAMES = [
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "STRIPE_SECRET_KEY",
+    "RESEND_API_KEY",
+    "OPENAI_API_KEY",
+    "GOOGLE_AI_API_KEY",
+    "META_CAPI_ACCESS_TOKEN",
+    "CRON_SECRET",
+    "ADMIN_API_TOKEN",
+    "STRIPE_WEBHOOK_SECRET",
+    "STUB_EVENT_SECRET",
+  ];
+  const CONFIG_DIR = resolve(__dirname, "..");
+
+  function closure(entry: string, seen = new Set<string>()): Set<string> {
+    if (seen.has(entry)) return seen;
+    seen.add(entry);
+    const source = readFileSync(entry, "utf8");
+    for (const match of source.matchAll(/from\s+"(\.[^"]+)"/g)) {
+      const target = resolve(
+        entry,
+        "..",
+        `${match[1].replace(/\.ts$/, "")}.ts`,
+      );
+      closure(target, seen);
+    }
+    return seen;
+  }
+
+  it.each([
+    "index.ts",
+    "public-env.ts",
+    "public-flags.ts",
+    "security.ts",
+    "urls.ts",
+    "domain.ts",
+  ])("%s never reaches a file that names a server-only secret", (file) => {
+    const files = [...closure(resolve(CONFIG_DIR, file))];
+    expect(
+      files.some(
+        (f) => f.endsWith("/lib/env-schema.ts") || f.endsWith("/env.ts"),
+      ),
+    ).toBe(false);
+    for (const f of files) {
+      const text = readFileSync(f, "utf8");
+      for (const name of SERVER_ONLY_NAMES)
+        expect(text, `${f} names ${name}`).not.toContain(name);
+    }
+  });
+});

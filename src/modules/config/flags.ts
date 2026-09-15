@@ -15,13 +15,13 @@ export const FLAGS: Readonly<Record<FlagName, boolean>> = Object.freeze({
   BONUS_PROGRAM: server.BONUS_PROGRAM_ENABLED ?? false, // off (ADR-022 / 053 / 060)
   PROACTIVE: server.PROACTIVE_ENABLED ?? false, // 01 §10 O-5 — safe value until decided
   DEV_MODE: !isProduction && (pub.NEXT_PUBLIC_DEV_MODE ?? false), // honoured only outside production (01 §4d)
-  EMAIL_DEV_DRY_RUN: server.EMAIL_DEV_DRY_RUN ?? false, // dev only (08.03)
+  EMAIL_DEV_DRY_RUN: !isProduction && (server.EMAIL_DEV_DRY_RUN ?? false), // dev only (08.03)
   KATIE_STREAM_DIAGNOSTICS: server.KATIE_STREAM_DIAGNOSTICS ?? false,
   KATIE_PRELOAD_PASSTHROUGH: server.KATIE_PRELOAD_PASSTHROUGH_ENABLED ?? false,
   KATIE_PARALLEL_TOOLS: server.KATIE_PARALLEL_TOOLS_ENABLED ?? false,
   KATIE_IMAGE_MARKER: server.KATIE_IMAGE_MARKER_ENABLED ?? false,
   KATIE_ALWAYS_ON_CONTEXT: server.KATIE_ALWAYS_ON_CONTEXT_ENABLED ?? false,
   KATIE_TYPEWRITER: pub.NEXT_PUBLIC_KATIE_TYPEWRITER_ENABLED ?? false,
-  SKIP_INTRO_WAIT: pub.NEXT_PUBLIC_SKIP_INTRO_WAIT ?? false, // dev diagnostic
-  FUNNEL_LOG: pub.NEXT_PUBLIC_FUNNEL_LOG ?? false, // dev diagnostic
+  SKIP_INTRO_WAIT: !isProduction && (pub.NEXT_PUBLIC_SKIP_INTRO_WAIT ?? false), // dev diagnostic
+  FUNNEL_LOG: !isProduction && (pub.NEXT_PUBLIC_FUNNEL_LOG ?? false), // dev diagnostic
 });

@@ -11,6 +11,7 @@ export const PUBLIC_FLAGS: Readonly<Record<PublicFlagName, boolean>> =
     BONUS_PROGRAM: publicEnv.NEXT_PUBLIC_BONUS_PROGRAM_ENABLED ?? false,
     DEV_MODE: !isProduction && (publicEnv.NEXT_PUBLIC_DEV_MODE ?? false),
     KATIE_TYPEWRITER: publicEnv.NEXT_PUBLIC_KATIE_TYPEWRITER_ENABLED ?? false,
-    SKIP_INTRO_WAIT: publicEnv.NEXT_PUBLIC_SKIP_INTRO_WAIT ?? false,
-    FUNNEL_LOG: publicEnv.NEXT_PUBLIC_FUNNEL_LOG ?? false,
+    SKIP_INTRO_WAIT:
+      !isProduction && (publicEnv.NEXT_PUBLIC_SKIP_INTRO_WAIT ?? false),
+    FUNNEL_LOG: !isProduction && (publicEnv.NEXT_PUBLIC_FUNNEL_LOG ?? false),
   });
