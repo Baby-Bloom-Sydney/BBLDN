@@ -66,7 +66,6 @@ const TABS_HIDDEN_PATHS = [
   "/parent/subscribe",
   "/parent/subscription",
   "/subscribe-for",
-  "/nanny/payouts",
 ];
 
 function isTabsHiddenPath(pathname: string): boolean {

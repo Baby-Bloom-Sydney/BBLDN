@@ -42,18 +42,6 @@ function parseBool(value: string | undefined, defaultValue: boolean): boolean {
 export const PAYMENTS_ENABLED = parseBool(process.env.PAYMENTS_ENABLED, true);
 
 /**
- * Master switch for the nanny-payout side.
- *
- * When false, `startPayoutApplication` blocks with `'payouts_disabled'`,
- * and the daily `send-nanny-payouts` cron skips the transfer step (rows
- * stay in `pending`, picked up on the next eligible run). Webhook
- * processing of Connect events still runs so account state stays fresh.
- *
- * Default: true.
- */
-export const PAYOUTS_ENABLED = parseBool(process.env.PAYOUTS_ENABLED, true);
-
-/**
  * Gate for kicking off NEW family trials.
  *
  * When false, `start_family_trial_if_first()` PG function still no-ops
@@ -71,7 +59,6 @@ export const NEW_TRIALS_ENABLED = parseBool(
 
 export interface PaymentsFlags {
   PAYMENTS_ENABLED: boolean;
-  PAYOUTS_ENABLED: boolean;
   NEW_TRIALS_ENABLED: boolean;
 }
 
@@ -82,7 +69,6 @@ export interface PaymentsFlags {
 export function getPaymentsFlags(): PaymentsFlags {
   return {
     PAYMENTS_ENABLED,
-    PAYOUTS_ENABLED,
     NEW_TRIALS_ENABLED,
   };
 }

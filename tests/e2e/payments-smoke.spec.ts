@@ -9,7 +9,7 @@
  * Surfaces exercised:
  *   1. /subscribe-for/[token] — malformed / not-found / redeemed branches
  *   2. /parent/subscribe — auth gate redirect
- *   3. /nanny/payouts — auth gate redirect + empty-state render
+ *   3. (nanny payouts journey removed at S1 — N-2)
  *   4. /admin/support — auth gate redirect (no admin → /login)
  *   5. /parent/subscription — auth gate redirect
  *
@@ -77,15 +77,6 @@ test.describe("payments smoke — anon redirects + invalid-token states", () => 
     await page.goto("/parent/subscription");
     await page.waitForURL(/\/login/, { timeout: 10_000 });
     expect(page.url()).toContain("/login");
-  });
-
-  test("/nanny/payouts unauth → /login redirect (preserves return URL)", async ({
-    page,
-  }) => {
-    await page.goto("/nanny/payouts");
-    await page.waitForURL(/\/login/, { timeout: 10_000 });
-    expect(page.url()).toContain("/login");
-    expect(decodeURIComponent(page.url())).toContain("/nanny/payouts");
   });
 
   test("/admin/support unauth → /login redirect (auth gate, not 401)", async ({
@@ -195,32 +186,6 @@ test.describe("payments smoke — authenticated surfaces", () => {
     // Plan-picker renders pricing cards. Match the visible Subscribe-page
     // chrome without leaning on copy that might change.
     await expect(page.locator("body")).toContainText(/A\$/);
-    await ctx.close();
-  });
-
-  test("/nanny/payouts as nanny (no families) renders empty state — not the wrong-state degraded view", async ({
-    browser,
-    baseURL,
-  }) => {
-    expect(baseURL).toBeTruthy();
-    const ctx = await signInAs(browser, nanny, baseURL!);
-    const page = await ctx.newPage();
-    await page.goto("/nanny/payouts");
-    // No child_client rows where this nanny is nanny_user_id → empty
-    // state. (We seeded one for the parent fixture above, but that's
-    // owned by `nanny`; let me re-check... actually it IS this nanny.
-    // For this test the nanny will see 1 family. Either way the page
-    // must render — what we're verifying is that the new batched
-    // queries didn't break the render path + the explicit error state
-    // isn't being shown spuriously.)
-    await expect(page.locator("h1")).toContainText(/Payouts/i);
-    // The PayoutsErrorState heading ALSO says "Payouts" but pairs with
-    // a "Couldn't load" alert. If that alert is visible, the batched
-    // queries failed.
-    const errorBanner = page.getByRole("alert").filter({
-      hasText: /Couldn'?t load/i,
-    });
-    await expect(errorBanner).not.toBeVisible();
     await ctx.close();
   });
 

@@ -27,7 +27,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripeClient } from "@/lib/stripe/client";
 import { PAYMENTS_ENABLED } from "@/lib/payments/flags";
-import { cancelInFlightCommission } from "@/lib/payments/commission-cancel";
 
 /** Locked enum — schema CHECK constraint on parent_subscriptions
  *  rejects anything else. Adding a new reason = new column value +
@@ -194,56 +193,6 @@ export async function cancelSubscription(
         "[cancelSubscription] subscription_cancelled log insert failed",
         logErr,
       );
-    }
-
-    // T-018 — cancel in-flight commission rows so a subsequent resub
-    // creates a fresh row rather than reviving a dead one.
-    //
-    // The DB trigger `trg_cancel_inflight_commission_on_terminal_status`
-    // is the universal safeguard — it fires synchronously within the
-    // `parent_subscriptions` UPDATE transaction above and cancels the
-    // rows before this code runs. In normal operation this app-level
-    // call therefore matches zero rows (`cancelled` returns 0) and the
-    // `commission_cancelled` log entry below does NOT fire — the
-    // forensic signal lives on `nanny_payouts.failure_reason` tagged
-    // `sub_status_trigger:cancelled`.
-    //
-    // This call is retained for two scenarios:
-    //   1. Environments where the trigger migration has not yet been
-    //      applied (e.g. fresh dev branches before the migration runs).
-    //   2. Future scenarios where the trigger is rolled back.
-    //
-    // Posture: best-effort. The cancel has already succeeded by this
-    // point; a failure here must not surface as a cancel failure to
-    // the caller. Trigger is the real guarantee.
-    try {
-      const { cancelled } = await cancelInFlightCommission(
-        sub.id,
-        "parent_cancelled",
-      );
-      if (cancelled > 0) {
-        try {
-          await admin.from("activity_logs").insert({
-            user_id: user.id,
-            action_type: "commission_cancelled",
-            action_details: {
-              parent_subscription_id: sub.id,
-              cancelled_count: cancelled,
-              reason: "parent_cancelled",
-            },
-          });
-        } catch (logErr: unknown) {
-          // Nested catch so a failed activity_log insert isn't
-          // misattributed to the cancel-in-flight call itself (the
-          // cancel succeeded and returned a non-zero count).
-          console.error(
-            "[cancelSubscription] commission_cancelled log insert failed",
-            logErr,
-          );
-        }
-      }
-    } catch (cancelErr: unknown) {
-      console.error("[cancelSubscription] cancel-in-flight failed", cancelErr);
     }
 
     return {

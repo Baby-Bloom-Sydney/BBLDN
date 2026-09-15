@@ -29,7 +29,6 @@ import {
   Award,
   Share2,
   CreditCard,
-  Wallet,
   LifeBuoy,
   Phone,
 } from "lucide-react";
@@ -74,7 +73,6 @@ const adminNavItems = [
   { href: "/admin/positions", icon: Briefcase, label: "Positions" },
   { href: "/admin/users", icon: Users, label: "User Management" },
   { href: "/admin/subscriptions", icon: CreditCard, label: "Subscriptions" },
-  { href: "/admin/payouts", icon: Wallet, label: "Payouts" },
   { href: "/admin/support", icon: LifeBuoy, label: "Support" },
   {
     href: "/admin/verification-reference",

@@ -42,7 +42,6 @@ import {
   Users,
   LifeBuoy,
   ShieldCheck,
-  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,12 +53,6 @@ import {
 import { requestPasswordChange } from "@/lib/actions/account-security";
 import { ChildManagementCard } from "@/components/bapp/ChildManagementCard";
 import type { ChildClient } from "@/types/bapp";
-import { UpcomingPayoutsView } from "@/components/payments/UpcomingPayoutsView";
-import { PayoutHistoryView } from "@/components/payments/PayoutHistoryView";
-import { PayoutOnboardingPageClient } from "../payouts/onboarding/PayoutOnboardingPageClient";
-import type { PayoutsDashboardData } from "@/lib/payments/queryPayoutsDashboard";
-import type { PayoutHistoryRow } from "@/lib/payments/queryPayoutHistory";
-import type { PayoutApplicationStatus } from "@/lib/payments/payout-application-status";
 import { SettingsShell } from "@/components/settings/SettingsShell";
 import { IdentityCard } from "@/components/settings/IdentityCard";
 import { SettingsSubsection } from "@/components/settings/SettingsSubsection";
@@ -91,15 +84,6 @@ interface Props {
     expiryDate: string | null;
   } | null;
   managedChildren?: ChildClient[];
-  // Pre-fetched payouts data — passed in by the server page so the
-  // three Payouts leaves render inline without extra round-trips.
-  payoutsDashboard: PayoutsDashboardData | null;
-  payoutHistory: PayoutHistoryRow[] | null;
-  payoutOnboarding: {
-    status: PayoutApplicationStatus;
-    email: string | null;
-    bankSummary: { last4: string | null; bankName: string | null } | null;
-  };
 }
 
 function publicIdentityStatus(level: number): {
@@ -212,21 +196,6 @@ function buildTree(args: {
           ? { label: String(childCount), tone: "neutral" }
           : undefined,
     },
-    // Multi-level Contributions (Bailey 2026-05-13, relabelled
-    // 2026-05-15). Settings is the canonical home for the contributions
-    // surfaces — three siblings under a shared Contributions parent.
-    // Standalone routes (under /nanny/payouts/) still work; the URLs
-    // are intentionally unchanged (backend identifiers stay the same).
-    {
-      id: "contributions",
-      label: "Contributions",
-      icon: Wallet,
-      children: [
-        { id: "upcoming-contributions", label: "Upcoming Contributions" },
-        { id: "contribution-history", label: "Contribution History" },
-        { id: "contribution-settings", label: "Contribution Settings" },
-      ],
-    },
     { id: "contact-us", label: "Contact Us", icon: LifeBuoy },
     // Hidden danger leaf — reached only via the small link at the
     // bottom of Account's drill-down menu.
@@ -239,9 +208,6 @@ export function NannySettingsClient({
   verificationLevel,
   wwcc,
   managedChildren = [],
-  payoutsDashboard,
-  payoutHistory,
-  payoutOnboarding,
 }: Props) {
   const params = useSearchParams();
   const activeId = params.get("s") ?? "";
@@ -305,26 +271,6 @@ export function NannySettingsClient({
             return <SecuritySection />;
           case "linked-children":
             return <ChildrenSection items={managedChildren} />;
-          case "upcoming-contributions":
-            return (
-              <UpcomingPayoutsView
-                data={payoutsDashboard}
-                payoutApplicationStatus={payoutOnboarding.status}
-                setupHref="/nanny/settings?s=contribution-settings"
-                embedded
-              />
-            );
-          case "contribution-history":
-            return <PayoutHistoryView rows={payoutHistory} embedded />;
-          case "contribution-settings":
-            return (
-              <PayoutOnboardingPageClient
-                status={payoutOnboarding.status}
-                email={payoutOnboarding.email}
-                bankSummary={payoutOnboarding.bankSummary}
-                embedded
-              />
-            );
           case "contact-us":
             return <ContactSection />;
           case "close-account":
@@ -816,32 +762,6 @@ function ChildrenSection({ items }: { items: ChildClient[] }) {
     <SettingsSubsection header="Linked children">
       <div className="px-4 py-4">
         <ChildManagementCard items={items} role="nanny" />
-      </div>
-    </SettingsSubsection>
-  );
-}
-
-// ── Payouts (link to dashboard) ──────────────────────────────
-//
-// Per UX-FIX-PLAN FIX-4 + FRONTEND/03-build-spec.md line 1114:
-// /nanny/payouts is the loss-aversion engine. Surfacing the entry
-// point in the settings tree is the spec-mandated way to reach it
-// (the dashboard remains a full page at /nanny/payouts, not embedded
-// here — this leaf is a link). Copy follows Section 9 of
-// system/APP/PAYMENTS/COPY-AND-FRAMING.md (earnings-as-endowment
-// framing, not "subscription billing").
-
-function PayoutsLinkSection() {
-  return (
-    <SettingsSubsection header="Payouts">
-      <div className="space-y-3 px-4 py-4">
-        <p className="text-sm text-slate-700">
-          Your earnings, payout history, and Stripe Connect setup all live on
-          your Payouts dashboard.
-        </p>
-        <Button asChild size="sm" className="bg-violet-600 hover:bg-violet-700">
-          <Link href="/nanny/payouts">Open Payouts dashboard</Link>
-        </Button>
       </div>
     </SettingsSubsection>
   );

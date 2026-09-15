@@ -32,7 +32,6 @@ import {
   Link2,
   Share2,
   CreditCard,
-  Wallet,
   LifeBuoy,
   Phone,
 } from "lucide-react";
@@ -80,7 +79,6 @@ const adminNavItems: NavItem[] = [
   { href: "/admin/verifications", icon: ShieldCheck, label: "Verifications" },
   { href: "/admin/users", icon: Users, label: "User Management" },
   { href: "/admin/subscriptions", icon: CreditCard, label: "Subscriptions" },
-  { href: "/admin/payouts", icon: Wallet, label: "Payouts" },
   { href: "/admin/support", icon: LifeBuoy, label: "Support" },
   { href: "/admin/analytics", icon: BarChart3, label: "Analytics" },
   { href: "/admin/settings", icon: Settings, label: "Settings" },

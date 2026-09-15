@@ -3,9 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NannySettingsClient } from "./NannySettingsClient";
 import type { ChildClient } from "@/types/bapp";
-import { fetchPayoutsDashboardData } from "@/lib/payments/queryPayoutsDashboard";
-import { fetchPayoutHistory } from "@/lib/payments/queryPayoutHistory";
-import { fetchPayoutOnboardingViewData } from "@/lib/payments/queryNannyPayoutOnboarding";
 
 export default async function NannySettingsPage() {
   const supabase = createClient();
@@ -22,9 +19,6 @@ export default async function NannySettingsPage() {
     nannyRes,
     verificationRes,
     childrenRes,
-    payoutsData,
-    historyRows,
-    payoutOnboarding,
   ] = await Promise.all([
     admin
       .from("user_profiles")
@@ -48,9 +42,6 @@ export default async function NannySettingsPage() {
       .select("*")
       .eq("nanny_user_id", user.id)
       .order("created_at", { ascending: true }),
-    fetchPayoutsDashboardData(user.id),
-    fetchPayoutHistory(user.id),
-    fetchPayoutOnboardingViewData(user.id),
   ]);
 
   return (
@@ -75,13 +66,6 @@ export default async function NannySettingsPage() {
           : null
       }
       managedChildren={(childrenRes.data ?? []) as ChildClient[]}
-      payoutsDashboard={payoutsData}
-      payoutHistory={historyRows}
-      payoutOnboarding={{
-        status: payoutOnboarding.status,
-        email: user.email ?? null,
-        bankSummary: payoutOnboarding.bankSummary,
-      }}
     />
   );
 }
