@@ -33,13 +33,18 @@ const PAGE_SIZE = 10;
 type AllSortKey = "newest" | "experience" | "qualification";
 type MatchSortKey = "score" | "distance" | "experience" | "qualification";
 
-const ALL_SORT_OPTIONS: { key: AllSortKey; label: string; icon: LucideIcon }[] = [
-  { key: "newest", label: "Latest", icon: CalendarDays },
-  { key: "experience", label: "Experience", icon: Clock },
-  { key: "qualification", label: "Qualification", icon: GraduationCap },
-];
+const ALL_SORT_OPTIONS: { key: AllSortKey; label: string; icon: LucideIcon }[] =
+  [
+    { key: "newest", label: "Latest", icon: CalendarDays },
+    { key: "experience", label: "Experience", icon: Clock },
+    { key: "qualification", label: "Qualification", icon: GraduationCap },
+  ];
 
-const MATCH_SORT_OPTIONS: { key: MatchSortKey; label: string; icon: LucideIcon }[] = [
+const MATCH_SORT_OPTIONS: {
+  key: MatchSortKey;
+  label: string;
+  icon: LucideIcon;
+}[] = [
   { key: "score", label: "Best Match", icon: Sparkles },
   { key: "distance", label: "Distance", icon: MapPin },
   { key: "experience", label: "Experience", icon: Clock },
@@ -65,7 +70,10 @@ const MATCH_QUAL_RANK: Record<string, number> = {
 
 /* ─── Sort helpers ─── */
 
-function sortNannies(nannies: NannyCardData[], sortBy: AllSortKey): NannyCardData[] {
+function sortNannies(
+  nannies: NannyCardData[],
+  sortBy: AllSortKey,
+): NannyCardData[] {
   if (sortBy === "newest") return nannies;
   const sorted = [...nannies];
   if (sortBy === "experience") {
@@ -76,31 +84,44 @@ function sortNannies(nannies: NannyCardData[], sortBy: AllSortKey): NannyCardDat
     });
   } else if (sortBy === "qualification") {
     sorted.sort((a, b) => {
-      const rankA = (a.highest_qualification && QUAL_RANK[a.highest_qualification]) || 0;
-      const rankB = (b.highest_qualification && QUAL_RANK[b.highest_qualification]) || 0;
+      const rankA =
+        (a.highest_qualification && QUAL_RANK[a.highest_qualification]) || 0;
+      const rankB =
+        (b.highest_qualification && QUAL_RANK[b.highest_qualification]) || 0;
       return rankB - rankA;
     });
   }
   return sorted;
 }
 
-function sortMatches(matches: MatchResult[], sortBy: MatchSortKey): MatchResult[] {
+function sortMatches(
+  matches: MatchResult[],
+  sortBy: MatchSortKey,
+): MatchResult[] {
   const sorted = [...matches];
   switch (sortBy) {
     case "score":
       return sorted.sort((a, b) => b.finalScore - a.finalScore);
     case "distance":
-      return sorted.sort((a, b) => (a.distanceKm ?? 999) - (b.distanceKm ?? 999));
+      return sorted.sort(
+        (a, b) => (a.distanceKm ?? 999) - (b.distanceKm ?? 999),
+      );
     case "experience":
       return sorted.sort((a, b) => {
-        const ea = b.nanny.nanny_experience_years ?? b.nanny.total_experience_years ?? 0;
-        const eb = a.nanny.nanny_experience_years ?? a.nanny.total_experience_years ?? 0;
+        const ea =
+          b.nanny.nanny_experience_years ?? b.nanny.total_experience_years ?? 0;
+        const eb =
+          a.nanny.nanny_experience_years ?? a.nanny.total_experience_years ?? 0;
         return ea - eb;
       });
     case "qualification":
       return sorted.sort((a, b) => {
-        const qa = a.highestQualification ? (MATCH_QUAL_RANK[a.highestQualification] ?? 0) : 0;
-        const qb = b.highestQualification ? (MATCH_QUAL_RANK[b.highestQualification] ?? 0) : 0;
+        const qa = a.highestQualification
+          ? (MATCH_QUAL_RANK[a.highestQualification] ?? 0)
+          : 0;
+        const qb = b.highestQualification
+          ? (MATCH_QUAL_RANK[b.highestQualification] ?? 0)
+          : 0;
         return qb - qa;
       });
     default:
@@ -115,7 +136,10 @@ interface BrowseNanniesTabProps {
   onViewChange?: (view: "all" | "matches") => void;
 }
 
-export function BrowseNanniesTab({ initialView = "all", onViewChange }: BrowseNanniesTabProps) {
+export function BrowseNanniesTab({
+  initialView = "all",
+  onViewChange,
+}: BrowseNanniesTabProps) {
   const [view, setViewState] = useState<ViewType>(initialView);
 
   const setView = (v: ViewType) => {
@@ -137,7 +161,10 @@ export function BrowseNanniesTab({ initialView = "all", onViewChange }: BrowseNa
   const [loadingPage, setLoadingPage] = useState(true);
 
   const [matches, setMatches] = useState<MatchResult[]>([]);
-  const [matchStats, setMatchStats] = useState<{ totalEligible: number; returned: number }>({ totalEligible: 0, returned: 0 });
+  const [matchStats, setMatchStats] = useState<{
+    totalEligible: number;
+    returned: number;
+  }>({ totalEligible: 0, returned: 0 });
   const [hasPosition, setHasPosition] = useState(false);
 
   const [loadingMatches, setLoadingMatches] = useState(false);
@@ -154,31 +181,34 @@ export function BrowseNanniesTab({ initialView = "all", onViewChange }: BrowseNa
   }, []);
 
   // Load data based on current sort + page
-  const loadData = useCallback(async (sort: AllSortKey, pageNum: number) => {
-    if (sort === "newest") {
-      // Server-side paginated
-      const cached = newestPageCache.current.get(pageNum);
-      if (cached) {
-        setDisplayNannies(cached);
+  const loadData = useCallback(
+    async (sort: AllSortKey, pageNum: number) => {
+      if (sort === "newest") {
+        // Server-side paginated
+        const cached = newestPageCache.current.get(pageNum);
+        if (cached) {
+          setDisplayNannies(cached);
+          setLoadingPage(false);
+          return;
+        }
+        setLoadingPage(true);
+        const { nannies, total } = await fetchBrowseNannies(pageNum, PAGE_SIZE);
+        newestPageCache.current.set(pageNum, nannies);
+        setTotalNannies(total);
+        setDisplayNannies(nannies);
         setLoadingPage(false);
-        return;
+      } else {
+        // Client-side sort: fetch all, sort, then slice for page
+        setLoadingPage(true);
+        const all = await loadAllNannies();
+        const sorted = sortNannies(all, sort);
+        const start = (pageNum - 1) * PAGE_SIZE;
+        setDisplayNannies(sorted.slice(start, start + PAGE_SIZE));
+        setLoadingPage(false);
       }
-      setLoadingPage(true);
-      const { nannies, total } = await fetchBrowseNannies(pageNum, PAGE_SIZE);
-      newestPageCache.current.set(pageNum, nannies);
-      setTotalNannies(total);
-      setDisplayNannies(nannies);
-      setLoadingPage(false);
-    } else {
-      // Client-side sort: fetch all, sort, then slice for page
-      setLoadingPage(true);
-      const all = await loadAllNannies();
-      const sorted = sortNannies(all, sort);
-      const start = (pageNum - 1) * PAGE_SIZE;
-      setDisplayNannies(sorted.slice(start, start + PAGE_SIZE));
-      setLoadingPage(false);
-    }
-  }, [loadAllNannies]);
+    },
+    [loadAllNannies],
+  );
 
   // Initial load
   const initialLoaded = useRef(false);
@@ -197,7 +227,9 @@ export function BrowseNanniesTab({ initialView = "all", onViewChange }: BrowseNa
   }, [allSort, page, loadData]);
 
   // Reset page when sort changes
-  useEffect(() => { setPage(1); }, [allSort]);
+  useEffect(() => {
+    setPage(1);
+  }, [allSort]);
 
   // Fetch matches when switching to matches view
   const loadMatches = useCallback(async () => {
@@ -231,7 +263,9 @@ export function BrowseNanniesTab({ initialView = "all", onViewChange }: BrowseNa
         {/* View toggle */}
         <div className="inline-flex gap-0.5 rounded-lg bg-slate-100 p-0.5">
           <button
-            onClick={() => { setView("all"); }}
+            onClick={() => {
+              setView("all");
+            }}
             className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
               view === "all"
                 ? "bg-white text-slate-900 shadow-sm"
@@ -309,7 +343,11 @@ export function BrowseNanniesTab({ initialView = "all", onViewChange }: BrowseNa
           ) : displayNannies.length > 0 ? (
             <div className="space-y-3">
               {displayNannies.map((nanny) => (
-                <NannyCardBK key={nanny.id} nanny={nanny} linkBase="/parent/browse" />
+                <NannyCardBK
+                  key={nanny.id}
+                  nanny={nanny}
+                  linkBase="/parent/browse"
+                />
               ))}
             </div>
           ) : (
@@ -348,7 +386,9 @@ export function BrowseNanniesTab({ initialView = "all", onViewChange }: BrowseNa
           {/* Count */}
           {displayNannies.length > 0 && !loadingPage && (
             <p className="mt-3 text-center text-xs text-slate-400">
-              Showing {(page - 1) * PAGE_SIZE + 1}&ndash;{Math.min(page * PAGE_SIZE, totalNannies)} of {totalNannies} nann{totalNannies === 1 ? "y" : "ies"}
+              Showing {(page - 1) * PAGE_SIZE + 1}&ndash;
+              {Math.min(page * PAGE_SIZE, totalNannies)} of {totalNannies} nann
+              {totalNannies === 1 ? "y" : "ies"}
             </p>
           )}
 
@@ -394,7 +434,8 @@ export function BrowseNanniesTab({ initialView = "all", onViewChange }: BrowseNa
                 ))}
               </div>
               <p className="mt-4 text-sm text-slate-400 text-center">
-                {matchStats.returned} match{matchStats.returned !== 1 ? "es" : ""} found
+                {matchStats.returned} match
+                {matchStats.returned !== 1 ? "es" : ""} found
                 {matchStats.totalEligible > matchStats.returned &&
                   ` out of ${matchStats.totalEligible} verified nannies`}
               </p>

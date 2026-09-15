@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useState } from "react";
+import Link from "next/link";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
@@ -14,20 +14,20 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
+} from "@/components/ui/form";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/dialog';
-import { signIn } from '@/lib/auth/actions';
-import { Loader2 } from 'lucide-react';
+} from "@/components/ui/dialog";
+import { signIn } from "@/lib/auth/actions";
+import { Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(1, 'Password is required'),
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -44,7 +44,7 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: "", password: "" },
   });
 
   async function onSubmit(data: LoginFormData) {
@@ -52,8 +52,8 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
     setError(null);
 
     const formData = new FormData();
-    formData.append('email', data.email);
-    formData.append('password', data.password);
+    formData.append("email", data.email);
+    formData.append("password", data.password);
 
     const result = await signIn(formData);
 
@@ -140,15 +140,20 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
                   Signing in...
                 </>
               ) : (
-                'Sign in'
+                "Sign in"
               )}
             </Button>
           </form>
         </Form>
 
         <div className="text-center text-sm">
-          <span className="text-muted-foreground">Don&apos;t have an account? </span>
-          <Link href="/signup/nanny" className="text-primary font-medium hover:underline">
+          <span className="text-muted-foreground">
+            Don&apos;t have an account?{" "}
+          </span>
+          <Link
+            href="/signup/nanny"
+            className="text-primary font-medium hover:underline"
+          >
             Sign up
           </Link>
         </div>

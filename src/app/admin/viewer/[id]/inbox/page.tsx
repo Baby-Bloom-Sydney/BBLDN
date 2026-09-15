@@ -16,7 +16,9 @@ export default async function AdminViewerInboxPage({
   params: { id: string };
 }) {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const admin = createAdminClient();
@@ -58,7 +60,11 @@ async function renderNannyInbox(admin: any, targetUserId: string) {
     .single();
 
   if (!nanny) {
-    return <div className="p-6 text-center text-slate-500">Nanny record not found</div>;
+    return (
+      <div className="p-6 text-center text-slate-500">
+        Nanny record not found
+      </div>
+    );
   }
 
   const nannyId = nanny.id;
@@ -84,15 +90,21 @@ async function renderNannyInbox(admin: any, targetUserId: string) {
   // Enrich connections with parent info
   let enrichedConnections: ConnectionRequestWithDetails[] = [];
   if (connections.length > 0) {
-    const parentIds = Array.from(new Set(connections.map((r: { parent_id: string }) => r.parent_id)));
+    const parentIds = Array.from(
+      new Set(connections.map((r: { parent_id: string }) => r.parent_id)),
+    );
     const { data: parents } = await admin
       .from("parents")
       .select("id, user_id")
       .in("id", parentIds);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const parentMap = new Map<string, any>((parents || []).map((p: any) => [p.id, p]));
-    const parentUserIds = (parents || []).map((p: { user_id: string }) => p.user_id);
+    const parentMap = new Map<string, any>(
+      (parents || []).map((p: any) => [p.id, p]),
+    );
+    const parentUserIds = (parents || []).map(
+      (p: { user_id: string }) => p.user_id,
+    );
 
     const { data: profiles } = await admin
       .from("user_profiles")
@@ -100,7 +112,9 @@ async function renderNannyInbox(admin: any, targetUserId: string) {
       .in("user_id", parentUserIds);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const profileMap = new Map<string, any>((profiles || []).map((p: any) => [p.user_id, p]));
+    const profileMap = new Map<string, any>(
+      (profiles || []).map((p: any) => [p.user_id, p]),
+    );
 
     enrichedConnections = await Promise.all(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -125,22 +139,22 @@ async function renderNannyInbox(admin: any, targetUserId: string) {
           },
           position,
         } as ConnectionRequestWithDetails;
-      })
+      }),
     );
   }
 
   const activeStatuses = ["pending", "accepted", "confirmed"];
   const pendingRequests = enrichedConnections.filter((r) =>
-    activeStatuses.includes(r.status)
+    activeStatuses.includes(r.status),
   );
   const pastConnections = enrichedConnections.filter(
-    (r) => !activeStatuses.includes(r.status)
+    (r) => !activeStatuses.includes(r.status),
   );
   const notifications = inboxMessages.filter(
     (msg) =>
       !msg.reference_type ||
       msg.reference_type !== "connection_request" ||
-      !["connection_request"].includes(msg.type)
+      !["connection_request"].includes(msg.type),
   );
 
   const isEmpty =

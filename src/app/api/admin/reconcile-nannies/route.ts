@@ -1,8 +1,14 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { syncNannyVerificationState } from '@/lib/actions/verification';
-import { VERIFICATION_STATUS, deriveOverallStatus, type IdentityStatus, type WwccStatus, type CrossCheckStatus } from '@/lib/verification';
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { syncNannyVerificationState } from "@/lib/actions/verification";
+import {
+  VERIFICATION_STATUS,
+  deriveOverallStatus,
+  type IdentityStatus,
+  type WwccStatus,
+  type CrossCheckStatus,
+} from "@/lib/verification";
 
 /**
  * POST /api/admin/reconcile-nannies
@@ -16,29 +22,36 @@ import { VERIFICATION_STATUS, deriveOverallStatus, type IdentityStatus, type Wwc
 export async function POST() {
   // Auth check — must be admin
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const admin = createAdminClient();
   const { data: role } = await admin
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id)
     .single();
 
-  if (!role || !['admin', 'super_admin'].includes(role.role)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!role || !["admin", "super_admin"].includes(role.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   // Step 1: Re-derive verification_status on all verifications records
   const { data: verifications, error: vError } = await admin
-    .from('verifications')
-    .select('id, user_id, identity_status, identity_verified, wwcc_status, wwcc_verified, cross_check_status, verification_status');
+    .from("verifications")
+    .select(
+      "id, user_id, identity_status, identity_verified, wwcc_status, wwcc_verified, cross_check_status, verification_status",
+    );
 
   if (vError || !verifications) {
-    return NextResponse.json({ error: 'Failed to fetch verifications', details: vError }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch verifications", details: vError },
+      { status: 500 },
+    );
   }
 
   let statusFixed = 0;
@@ -49,34 +62,44 @@ export async function POST() {
     // doesn't know about wwcc_verified, so we handle it separately
     const isFullyVerified =
       v.identity_verified === true &&
-      v.identity_status === 'verified' &&
+      v.identity_status === "verified" &&
       v.wwcc_verified === true;
 
     const correct = isFullyVerified
       ? VERIFICATION_STATUS.FULLY_VERIFIED
       : deriveOverallStatus(
-          (v.identity_status || 'not_started') as IdentityStatus,
-          (v.wwcc_status || 'not_started') as WwccStatus,
-          (v.cross_check_status || 'not_started') as CrossCheckStatus,
+          (v.identity_status || "not_started") as IdentityStatus,
+          (v.wwcc_status || "not_started") as WwccStatus,
+          (v.cross_check_status || "not_started") as CrossCheckStatus,
         );
 
     if (v.verification_status !== correct) {
       await admin
-        .from('verifications')
-        .update({ verification_status: correct, updated_at: new Date().toISOString() })
-        .eq('id', v.id);
-      statusChanges.push({ user_id: v.user_id, old: v.verification_status, new: correct });
+        .from("verifications")
+        .update({
+          verification_status: correct,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", v.id);
+      statusChanges.push({
+        user_id: v.user_id,
+        old: v.verification_status,
+        new: correct,
+      });
       statusFixed++;
     }
   }
 
   // Step 2: Sync nannies table for all nannies
   const { data: nannies, error: nError } = await admin
-    .from('nannies')
-    .select('user_id');
+    .from("nannies")
+    .select("user_id");
 
   if (nError || !nannies) {
-    return NextResponse.json({ error: 'Failed to fetch nannies', details: nError }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch nannies", details: nError },
+      { status: 500 },
+    );
   }
 
   const syncErrors: { user_id: string; error: string }[] = [];

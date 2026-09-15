@@ -167,9 +167,7 @@ export function ChildrenCompound({
                         <button
                           key={opt}
                           type="button"
-                          onClick={() =>
-                            updateData({ [GENDER_KEYS[i]]: opt })
-                          }
+                          onClick={() => updateData({ [GENDER_KEYS[i]]: opt })}
                           className={`px-2 py-2 rounded-lg border text-xs font-medium text-center cursor-pointer transition-colors ${
                             gender === opt
                               ? "bg-violet-500 text-white border-violet-500"

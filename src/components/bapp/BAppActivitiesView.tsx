@@ -48,7 +48,7 @@ export function BAppActivitiesView({
           loadMore();
         }
       },
-      { rootMargin: "200px" }
+      { rootMargin: "200px" },
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
@@ -88,7 +88,9 @@ export function BAppActivitiesView({
 
       <ActivityDetailSheet
         open={!!detailItem}
-        onOpenChange={(open) => { if (!open) setDetailItem(null); }}
+        onOpenChange={(open) => {
+          if (!open) setDetailItem(null);
+        }}
         item={detailItem}
         milestones={milestones}
       />

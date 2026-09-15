@@ -28,54 +28,60 @@ export default async function ParentBrowseNannyPage({
 
   try {
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (user) {
       if (user.id === nanny.user_id) {
         isOwner = true;
       } else {
         const { data: role } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
           .single();
 
-        if (role?.role === 'parent') {
+        if (role?.role === "parent") {
           isParent = true;
 
           const adminClient = createAdminClient();
           const { data: parentRecord } = await adminClient
-            .from('parents')
-            .select('id')
-            .eq('user_id', user.id)
+            .from("parents")
+            .select("id")
+            .eq("user_id", user.id)
             .single();
 
           if (parentRecord) {
             const { count } = await adminClient
-              .from('connection_requests')
-              .select('id', { count: 'exact', head: true })
-              .eq('parent_id', parentRecord.id)
-              .eq('status', 'pending');
+              .from("connection_requests")
+              .select("id", { count: "exact", head: true })
+              .eq("parent_id", parentRecord.id)
+              .eq("status", "pending");
 
             pendingRequestCount = count ?? 0;
 
             const { data: existing } = await adminClient
-              .from('connection_requests')
-              .select('status, connection_stage')
-              .eq('parent_id', parentRecord.id)
-              .eq('nanny_id', nanny.nanny_id)
-              .in('status', ['pending', 'accepted', 'confirmed'])
-              .not('connection_stage', 'in', `(${HIDDEN_CONNECTION_STAGES.join(',')})`)
+              .from("connection_requests")
+              .select("status, connection_stage")
+              .eq("parent_id", parentRecord.id)
+              .eq("nanny_id", nanny.nanny_id)
+              .in("status", ["pending", "accepted", "confirmed"])
+              .not(
+                "connection_stage",
+                "in",
+                `(${HIDDEN_CONNECTION_STAGES.join(",")})`,
+              )
               .limit(1)
               .maybeSingle();
 
             existingRequestStatus = existing?.status ?? null;
 
             const { data: activePlacement } = await adminClient
-              .from('nanny_placements')
-              .select('id, nanny_id')
-              .eq('parent_id', parentRecord.id)
-              .eq('status', 'active')
+              .from("nanny_placements")
+              .select("id, nanny_id")
+              .eq("parent_id", parentRecord.id)
+              .eq("status", "active")
               .limit(1)
               .maybeSingle();
 

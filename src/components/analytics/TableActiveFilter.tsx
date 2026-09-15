@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useCallback, useState } from "react";
 
 interface TableActiveFilterProps {
   tableKey: string;
@@ -19,13 +19,20 @@ export function TableActiveFilter({ tableKey }: TableActiveFilterProps) {
   const currentStr = searchParams.get(paramKey);
   const activeDays = currentStr ? parseInt(currentStr) : null;
 
-  const setActive = useCallback((days: number | null) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (days === null) { params.delete(paramKey); } else { params.set(paramKey, String(days)); }
-    const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
-    setExpanded(false);
-  }, [router, pathname, searchParams, paramKey]);
+  const setActive = useCallback(
+    (days: number | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (days === null) {
+        params.delete(paramKey);
+      } else {
+        params.set(paramKey, String(days));
+      }
+      const qs = params.toString();
+      router.push(qs ? `${pathname}?${qs}` : pathname);
+      setExpanded(false);
+    },
+    [router, pathname, searchParams, paramKey],
+  );
 
   return (
     <div className="flex items-center gap-1">
@@ -33,11 +40,11 @@ export function TableActiveFilter({ tableKey }: TableActiveFilterProps) {
         onClick={() => setExpanded(!expanded)}
         className={`text-[10px] px-2 py-0.5 rounded font-medium transition-colors ${
           activeDays !== null
-            ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
-            : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
+            ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+            : "bg-slate-50 text-slate-400 hover:bg-slate-100"
         }`}
       >
-        {activeDays !== null ? `Active ${activeDays}d` : 'Active: All'}
+        {activeDays !== null ? `Active ${activeDays}d` : "Active: All"}
       </button>
       {expanded && (
         <div className="flex items-center gap-0.5">
@@ -45,8 +52,8 @@ export function TableActiveFilter({ tableKey }: TableActiveFilterProps) {
             onClick={() => setActive(null)}
             className={`px-1.5 py-0.5 text-[9px] font-medium rounded transition-colors ${
               activeDays === null
-                ? 'bg-emerald-500 text-white'
-                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                ? "bg-emerald-500 text-white"
+                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
             }`}
           >
             All
@@ -57,8 +64,8 @@ export function TableActiveFilter({ tableKey }: TableActiveFilterProps) {
               onClick={() => setActive(d)}
               className={`px-1.5 py-0.5 text-[9px] font-medium rounded transition-colors ${
                 activeDays === d
-                  ? 'bg-emerald-500 text-white'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  ? "bg-emerald-500 text-white"
+                  : "bg-slate-100 text-slate-500 hover:bg-slate-200"
               }`}
             >
               {d}d

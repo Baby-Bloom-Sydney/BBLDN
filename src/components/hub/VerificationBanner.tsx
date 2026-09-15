@@ -1,18 +1,25 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { ShieldAlert, ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { trackEvent } from '@/lib/analytics/trackEvent';
+import Link from "next/link";
+import { ShieldAlert, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/analytics/trackEvent";
 
 interface VerificationBannerProps {
-  role: 'nanny' | 'parent';
+  role: "nanny" | "parent";
   message: string;
   submessage?: string;
 }
 
-export function VerificationBanner({ role, message, submessage }: VerificationBannerProps) {
-  const trackingEvent = role === 'nanny' ? 'banner_verify_cta_clicked' : 'parent_banner_verify_cta_clicked';
+export function VerificationBanner({
+  role,
+  message,
+  submessage,
+}: VerificationBannerProps) {
+  const trackingEvent =
+    role === "nanny"
+      ? "banner_verify_cta_clicked"
+      : "parent_banner_verify_cta_clicked";
 
   return (
     <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 flex items-center justify-between gap-4">
@@ -32,7 +39,9 @@ export function VerificationBanner({ role, message, submessage }: VerificationBa
       >
         <Link
           href={`/${role}/verification`}
-          onClick={() => trackEvent({ event_name: trackingEvent, user_role: role })}
+          onClick={() =>
+            trackEvent({ event_name: trackingEvent, user_role: role })
+          }
           className="flex items-center gap-1"
         >
           Verify Now <ArrowRight className="h-3 w-3" />

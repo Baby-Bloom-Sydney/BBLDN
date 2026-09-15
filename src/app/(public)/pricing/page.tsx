@@ -15,12 +15,14 @@ import {
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: 'Nanny Matching Plans & Pricing',
-  description: 'Personalised nanny matching for Sydney families. Choose from DIY search or done-for-you matching with verified, WWCC-checked nannies.',
-  alternates: { canonical: '/pricing' },
+  title: "Nanny Matching Plans & Pricing",
+  description:
+    "Personalised nanny matching for Sydney families. Choose from DIY search or done-for-you matching with verified, WWCC-checked nannies.",
+  alternates: { canonical: "/pricing" },
   openGraph: {
-    title: 'Nanny Matching Plans & Pricing | Baby Bloom Sydney',
-    description: 'Personalised nanny matching for Sydney families. Choose from DIY search or done-for-you matching with verified, WWCC-checked nannies.',
+    title: "Nanny Matching Plans & Pricing | Baby Bloom Sydney",
+    description:
+      "Personalised nanny matching for Sydney families. Choose from DIY search or done-for-you matching with verified, WWCC-checked nannies.",
   },
 };
 
@@ -82,7 +84,8 @@ const HOW_IT_WORKS = [
     icon: Handshake,
     step: "04",
     title: "Meet",
-    description: "An introduction is arranged. From there — it\u2019s personal.",
+    description:
+      "An introduction is arranged. From there — it\u2019s personal.",
   },
 ];
 
@@ -94,38 +97,38 @@ const NANNY_BENEFITS = [
 ];
 
 const faqJsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'FAQPage',
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
   mainEntity: [
     {
-      '@type': 'Question',
-      name: 'How much does a nanny cost in Sydney?',
+      "@type": "Question",
+      name: "How much does a nanny cost in Sydney?",
       acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Nanny rates in Sydney typically range from $34 to $40 per hour for permanent roles and $30 to $37 for casual babysitting in 2026. Rates vary by experience, qualifications, and suburb.',
+        "@type": "Answer",
+        text: "Nanny rates in Sydney typically range from $34 to $40 per hour for permanent roles and $30 to $37 for casual babysitting in 2026. Rates vary by experience, qualifications, and suburb.",
       },
     },
     {
-      '@type': 'Question',
-      name: 'Are Baby Bloom nannies WWCC verified?',
+      "@type": "Question",
+      name: "Are Baby Bloom nannies WWCC verified?",
       acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Yes. Every nanny on Baby Bloom Sydney has a verified Working With Children Check (WWCC) and undergoes identity verification before being visible to families.',
+        "@type": "Answer",
+        text: "Yes. Every nanny on Baby Bloom Sydney has a verified Working With Children Check (WWCC) and undergoes identity verification before being visible to families.",
       },
     },
     {
-      '@type': 'Question',
-      name: 'How does the nanny matching process work?',
+      "@type": "Question",
+      name: "How does the nanny matching process work?",
       acceptedAnswer: {
-        '@type': 'Answer',
+        "@type": "Answer",
         text: "Create a position describing your family's needs, and Baby Bloom matches you with verified nannies based on availability, location, experience, and qualifications. You can then request a meet and greet with your top matches.",
       },
     },
     {
-      '@type': 'Question',
-      name: 'Can I find a babysitter for a one-off job?',
+      "@type": "Question",
+      name: "Can I find a babysitter for a one-off job?",
       acceptedAnswer: {
-        '@type': 'Answer',
+        "@type": "Answer",
         text: "Yes. Baby Bloom's babysitting request feature lets you post a one-off job and get matched with available, verified babysitters in your area within minutes.",
       },
     },
@@ -138,7 +141,7 @@ export default function ServicesPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(faqJsonLd).replace(/</g, '\\u003c'),
+          __html: JSON.stringify(faqJsonLd).replace(/</g, "\\u003c"),
         }}
       />
       {/* ═══ HERO ═══ */}
@@ -218,8 +221,8 @@ export default function ServicesPage() {
                 Less searching. Better matches.
               </h2>
               <p className="mt-4 text-slate-500 leading-relaxed">
-                Suburb. Schedule. Priorities. A handful of nannies matched across
-                12 factors — the strongest fits, contacted directly.
+                Suburb. Schedule. Priorities. A handful of nannies matched
+                across 12 factors — the strongest fits, contacted directly.
               </p>
 
               <div className="mt-8 space-y-4">

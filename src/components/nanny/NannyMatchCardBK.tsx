@@ -5,7 +5,11 @@ import { Card } from "@/components/ui/card";
 import { MapPin, ShieldCheck, Clock, Baby, GraduationCap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { MatchResult } from "@/lib/matching/types";
-import { ExpandableBadges, abbreviateQualification, type TraitBadge } from "./ExpandableBadges";
+import {
+  ExpandableBadges,
+  abbreviateQualification,
+  type TraitBadge,
+} from "./ExpandableBadges";
 
 interface NannyMatchCardBKProps {
   match: MatchResult;
@@ -26,17 +30,35 @@ function buildBadges(match: MatchResult): TraitBadge[] {
   const badges: TraitBadge[] = [];
   const n = match.nanny;
   if (n.total_experience_years && n.total_experience_years > 0) {
-    badges.push({ icon: Clock, label: `${n.total_experience_years}${n.total_experience_years === 1 ? 'yr' : 'yrs'} experience`, variant: "violet" });
+    badges.push({
+      icon: Clock,
+      label: `${n.total_experience_years}${n.total_experience_years === 1 ? "yr" : "yrs"} experience`,
+      variant: "violet",
+    });
   }
   if (n.under_3_experience_years && n.under_3_experience_years > 0) {
-    badges.push({ icon: Baby, label: `Toddlers, ${n.under_3_experience_years}${n.under_3_experience_years === 1 ? 'yr' : 'yrs'}`, variant: "violet" });
+    badges.push({
+      icon: Baby,
+      label: `Toddlers, ${n.under_3_experience_years}${n.under_3_experience_years === 1 ? "yr" : "yrs"}`,
+      variant: "violet",
+    });
   }
   if (n.newborn_experience_years && n.newborn_experience_years > 0) {
-    badges.push({ icon: Baby, label: `Babies, ${n.newborn_experience_years}${n.newborn_experience_years === 1 ? 'yr' : 'yrs'}`, variant: "violet" });
+    badges.push({
+      icon: Baby,
+      label: `Babies, ${n.newborn_experience_years}${n.newborn_experience_years === 1 ? "yr" : "yrs"}`,
+      variant: "violet",
+    });
   }
   if (match.highestQualification) {
     const abbr = abbreviateQualification(match.highestQualification);
-    if (abbr) badges.push({ icon: GraduationCap, label: abbr, variant: "slate", className: "hidden md:inline-flex" });
+    if (abbr)
+      badges.push({
+        icon: GraduationCap,
+        label: abbr,
+        variant: "slate",
+        className: "hidden md:inline-flex",
+      });
   }
   return badges;
 }
@@ -62,7 +84,10 @@ function getMatchBadgeStyle(score: number) {
   return "bg-slate-100 text-slate-600 border-slate-200";
 }
 
-export function NannyMatchCardBK({ match, linkBase = "/parent/browse" }: NannyMatchCardBKProps) {
+export function NannyMatchCardBK({
+  match,
+  linkBase = "/parent/browse",
+}: NannyMatchCardBKProps) {
   const { nanny, profile, breakdown } = match;
   const initials = `${profile.first_name[0]}${profile.last_name[0]}`;
   const age = computeAge(profile.date_of_birth);
@@ -107,14 +132,24 @@ export function NannyMatchCardBK({ match, linkBase = "/parent/browse" }: NannyMa
             {/* Name, location */}
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-lg text-slate-900 truncate group-hover:text-violet-600 transition-colors">
-                {profile.first_name.charAt(0).toUpperCase() + profile.first_name.slice(1)}{age ? <span className="text-sm font-medium text-slate-400">, {age}</span> : ""}
+                {profile.first_name.charAt(0).toUpperCase() +
+                  profile.first_name.slice(1)}
+                {age ? (
+                  <span className="text-sm font-medium text-slate-400">
+                    , {age}
+                  </span>
+                ) : (
+                  ""
+                )}
               </h3>
               <div className="flex items-center gap-1.5 text-sm text-slate-500 mt-0.5">
                 <MapPin className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate">
                   {profile.suburb}
                   {match.distanceKm != null && (
-                    <span className="text-xs text-slate-400">, {Math.round(match.distanceKm)}km</span>
+                    <span className="text-xs text-slate-400">
+                      , {Math.round(match.distanceKm)}km
+                    </span>
                   )}
                 </span>
               </div>

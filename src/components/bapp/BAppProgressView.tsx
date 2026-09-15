@@ -9,12 +9,7 @@ import {
   PolarRadiusAxis,
   ResponsiveContainer,
 } from "recharts";
-import {
-  Activity,
-  Eye,
-  CalendarDays,
-  Trophy,
-} from "lucide-react";
+import { Activity, Eye, CalendarDays, Trophy } from "lucide-react";
 import { DOMAINS, DOMAIN_CODES } from "@/lib/bapp-constants";
 import type { DomainCode } from "@/lib/bapp-constants";
 import type { DashboardData } from "@/types/bapp";
@@ -33,13 +28,15 @@ export function BAppProgressView({ dashboard }: BAppProgressViewProps) {
     }));
   }, [dashboard]);
 
-  const hasData = dashboard !== null && Object.keys(dashboard.domains).length > 0;
+  const hasData =
+    dashboard !== null && Object.keys(dashboard.domains).length > 0;
 
   const stats = dashboard?.stats;
 
   // Resolve strongest domain label
   const strongestLabel = stats?.strongestDomain
-    ? DOMAINS[stats.strongestDomain as DomainCode]?.short ?? stats.strongestDomain
+    ? (DOMAINS[stats.strongestDomain as DomainCode]?.short ??
+      stats.strongestDomain)
     : "—";
 
   return (
@@ -104,9 +101,7 @@ export function BAppProgressView({ dashboard }: BAppProgressViewProps) {
           <div className="space-y-1.5">
             {DOMAIN_CODES.map((code) => {
               const pct = dashboard?.domains[code]?.percent ?? 0;
-              return (
-                <DomainBar key={code} code={code} percent={pct} />
-              );
+              return <DomainBar key={code} code={code} percent={pct} />;
             })}
           </div>
         </div>
@@ -163,9 +158,7 @@ function DomainBar({ code, percent }: { code: DomainCode; percent: number }) {
         <span className="text-xs font-medium text-slate-600">
           {domain.short}
         </span>
-        <span className="text-xs font-semibold text-slate-800">
-          {percent}%
-        </span>
+        <span className="text-xs font-semibold text-slate-800">{percent}%</span>
       </div>
       <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
         <div

@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import type { CheckpointConfig } from '@/lib/legal/types';
+import Link from "next/link";
+import type { CheckpointConfig } from "@/lib/legal/types";
 
 interface ConsentCheckboxGroupProps {
   checkpoints: CheckpointConfig[];
@@ -10,7 +10,10 @@ interface ConsentCheckboxGroupProps {
   disabled?: boolean;
 }
 
-function renderTextWithLinks(text: string, links?: { label: string; href: string }[]) {
+function renderTextWithLinks(
+  text: string,
+  links?: { label: string; href: string }[],
+) {
   if (!links || links.length === 0) return text;
 
   let result: (string | JSX.Element)[] = [text];
@@ -18,7 +21,7 @@ function renderTextWithLinks(text: string, links?: { label: string; href: string
   for (const link of links) {
     const newResult: (string | JSX.Element)[] = [];
     for (const part of result) {
-      if (typeof part !== 'string') {
+      if (typeof part !== "string") {
         newResult.push(part);
         continue;
       }
@@ -37,7 +40,7 @@ function renderTextWithLinks(text: string, links?: { label: string; href: string
             onClick={(e) => e.stopPropagation()}
           >
             {link.label}
-          </Link>
+          </Link>,
         );
         const after = part.slice(idx + bracketPattern.length);
         if (after) newResult.push(after);
@@ -56,7 +59,7 @@ function renderTextWithLinks(text: string, links?: { label: string; href: string
               onClick={(e) => e.stopPropagation()}
             >
               {link.label}
-            </Link>
+            </Link>,
           );
           const after = part.slice(directIdx + link.label.length);
           if (after) newResult.push(after);
@@ -82,7 +85,7 @@ export function ConsentCheckboxGroup({
       {checkpoints.map((cp) => (
         <label
           key={cp.id}
-          className={`flex items-start gap-2 cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`flex items-start gap-2 cursor-pointer ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           <input
             type="checkbox"

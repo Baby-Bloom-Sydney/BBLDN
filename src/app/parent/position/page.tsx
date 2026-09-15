@@ -1,12 +1,16 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
 import { getPosition, PositionWithChildren } from "@/lib/actions/parent";
-import { getParentPlacement, getConfirmedConnections, getParentUpcomingIntros } from "@/lib/actions/position-funnel";
+import {
+  getParentPlacement,
+  getConfirmedConnections,
+  getParentUpcomingIntros,
+} from "@/lib/actions/position-funnel";
 import { getDfyStatus } from "@/lib/actions/matching";
 import { POSITION_STAGE } from "@/lib/position/constants";
 import { PositionPageClient } from "./PositionPageClient";
 
-const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
 export default async function ParentPositionPage() {
   let position: PositionWithChildren | null = null;
@@ -19,12 +23,15 @@ export default async function ParentPositionPage() {
   }
 
   // Fetch placement + confirmed connections for Path B + upcoming intros
-  const [placementResult, connectionsResult, introsResult, dfyStatusResult] = await Promise.all([
-    getParentPlacement(),
-    position?.id ? getConfirmedConnections(position.id) : Promise.resolve({ data: [], error: null }),
-    getParentUpcomingIntros(),
-    getDfyStatus(),
-  ]);
+  const [placementResult, connectionsResult, introsResult, dfyStatusResult] =
+    await Promise.all([
+      getParentPlacement(),
+      position?.id
+        ? getConfirmedConnections(position.id)
+        : Promise.resolve({ data: [], error: null }),
+      getParentUpcomingIntros(),
+      getDfyStatus(),
+    ]);
 
   const placement = placementResult.data;
   const confirmedNannies = connectionsResult.data;
@@ -32,8 +39,11 @@ export default async function ParentPositionPage() {
   const dfyTier = dfyStatusResult.tier;
   const dfyExpiresAt = dfyStatusResult.expiresAt;
   const dfyActivated = dfyStatusResult.activated;
-  const showFillButton = position && !placement &&
-    (position as PositionWithChildren & { stage?: number }).stage === POSITION_STAGE.CONNECTING &&
+  const showFillButton =
+    position &&
+    !placement &&
+    (position as PositionWithChildren & { stage?: number }).stage ===
+      POSITION_STAGE.CONNECTING &&
     confirmedNannies.length > 0;
 
   if (error) {
@@ -41,7 +51,9 @@ export default async function ParentPositionPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">My Childcare</h1>
-          <p className="mt-1 text-slate-500">Create and manage your childcare position</p>
+          <p className="mt-1 text-slate-500">
+            Create and manage your childcare position
+          </p>
         </div>
         <Card>
           <CardContent className="flex items-center gap-3 py-6">

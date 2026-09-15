@@ -1,15 +1,22 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { ClipboardList, MapPin, Clock, Users, ArrowRight, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { trackEvent } from '@/lib/analytics/trackEvent';
+import Link from "next/link";
+import {
+  ClipboardList,
+  MapPin,
+  Clock,
+  Users,
+  ArrowRight,
+  Sparkles,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/analytics/trackEvent";
 
 export interface PositionSummary {
   suburb: string | null;
   hoursPerWeek: number | null;
   numChildren: number;
-  childAges: string[];  // e.g. ["2 years", "4 months"]
+  childAges: string[]; // e.g. ["2 years", "4 months"]
   scheduleType: string | null;
 }
 
@@ -19,7 +26,11 @@ interface PositionTileProps {
   hasDfy: boolean;
 }
 
-export function PositionTile({ hasPosition, positionSummary, hasDfy }: PositionTileProps) {
+export function PositionTile({
+  hasPosition,
+  positionSummary,
+  hasDfy,
+}: PositionTileProps) {
   if (!hasPosition) {
     return (
       <div className="rounded-2xl border-dashed border-2 border-slate-300 bg-slate-50/50 p-8">
@@ -35,7 +46,8 @@ export function PositionTile({ hasPosition, positionSummary, hasDfy }: PositionT
               Find Your Perfect Nanny
             </h3>
             <p className="text-slate-600 max-w-md">
-              Tell us about your family&apos;s needs and we&apos;ll match you with the ideal nanny
+              Tell us about your family&apos;s needs and we&apos;ll match you
+              with the ideal nanny
             </p>
           </div>
 
@@ -44,9 +56,14 @@ export function PositionTile({ hasPosition, positionSummary, hasDfy }: PositionT
             asChild
             className="w-full bg-violet-600 hover:bg-violet-700 text-white font-medium"
             size="lg"
-            onClick={() => trackEvent({ event_name: 'position_tile_get_started_clicked' })}
+            onClick={() =>
+              trackEvent({ event_name: "position_tile_get_started_clicked" })
+            }
           >
-            <Link href="/parent/request" className="flex items-center justify-center gap-2">
+            <Link
+              href="/parent/request"
+              className="flex items-center justify-center gap-2"
+            >
               Get Started
               <ArrowRight className="w-4 h-4" />
             </Link>
@@ -75,7 +92,7 @@ export function PositionTile({ hasPosition, positionSummary, hasDfy }: PositionT
           <div className="min-w-0">
             <p className="text-xs text-slate-500 mb-0.5">Location</p>
             <p className="text-sm font-medium text-slate-900 truncate">
-              {positionSummary?.suburb || 'Not set'}
+              {positionSummary?.suburb || "Not set"}
             </p>
           </div>
         </div>
@@ -88,7 +105,7 @@ export function PositionTile({ hasPosition, positionSummary, hasDfy }: PositionT
             <p className="text-sm font-medium text-slate-900">
               {positionSummary?.hoursPerWeek
                 ? `${positionSummary.hoursPerWeek}/week`
-                : 'Flexible'}
+                : "Flexible"}
             </p>
           </div>
         </div>
@@ -99,13 +116,15 @@ export function PositionTile({ hasPosition, positionSummary, hasDfy }: PositionT
           <div className="min-w-0 flex-1">
             <p className="text-xs text-slate-500 mb-0.5">Children</p>
             <p className="text-sm font-medium text-slate-900">
-              {positionSummary?.numChildren || 0} {positionSummary?.numChildren === 1 ? 'child' : 'children'}
+              {positionSummary?.numChildren || 0}{" "}
+              {positionSummary?.numChildren === 1 ? "child" : "children"}
             </p>
-            {positionSummary?.childAges && positionSummary.childAges.length > 0 && (
-              <p className="text-xs text-slate-500 mt-1">
-                Ages: {positionSummary.childAges.join(', ')}
-              </p>
-            )}
+            {positionSummary?.childAges &&
+              positionSummary.childAges.length > 0 && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Ages: {positionSummary.childAges.join(", ")}
+                </p>
+              )}
           </div>
         </div>
       </div>
@@ -116,30 +135,35 @@ export function PositionTile({ hasPosition, positionSummary, hasDfy }: PositionT
           asChild
           variant="outline"
           className="flex-1 border-violet-200 text-violet-600 hover:bg-violet-50 font-medium"
-          onClick={() => trackEvent({ event_name: 'position_tile_view_position_clicked' })}
+          onClick={() =>
+            trackEvent({ event_name: "position_tile_view_position_clicked" })
+          }
         >
-          <Link href="/parent">
-            View Position
-          </Link>
+          <Link href="/parent">View Position</Link>
         </Button>
 
         {hasDfy ? (
           <Button
             asChild
             className="flex-1 bg-violet-600 hover:bg-violet-700 text-white font-medium"
-            onClick={() => trackEvent({ event_name: 'position_tile_view_matches_clicked' })}
+            onClick={() =>
+              trackEvent({ event_name: "position_tile_view_matches_clicked" })
+            }
           >
-            <Link href="/parent/matches">
-              View Matches
-            </Link>
+            <Link href="/parent/matches">View Matches</Link>
           </Button>
         ) : (
           <Button
             asChild
             className="flex-1 bg-violet-600 hover:bg-violet-700 text-white font-medium"
-            onClick={() => trackEvent({ event_name: 'position_tile_find_nanny_clicked' })}
+            onClick={() =>
+              trackEvent({ event_name: "position_tile_find_nanny_clicked" })
+            }
           >
-            <Link href="/parent/matches/checkout" className="flex items-center justify-center gap-2">
+            <Link
+              href="/parent/matches/checkout"
+              className="flex items-center justify-center gap-2"
+            >
               <Sparkles className="w-4 h-4" />
               Find Me a Nanny
             </Link>

@@ -22,7 +22,7 @@ function MultiSelectTags({
     onChange(
       selected.includes(opt)
         ? selected.filter((v) => v !== opt)
-        : [...selected, opt]
+        : [...selected, opt],
     );
   };
   return (
@@ -52,11 +52,12 @@ function roundUpToQuarter(value: number): number {
 
 export function StepSalary({ data, updateData, goNext, goBack }: StepProps) {
   const [displayValue, setDisplayValue] = useState<string>(
-    data.hourly_rate_min ? data.hourly_rate_min.replace("$", "") : ""
+    data.hourly_rate_min ? data.hourly_rate_min.replace("$", "") : "",
   );
   const payFrequency: string[] = data.pay_frequency ?? [];
 
-  const hasRate = data.hourly_rate_min !== null && data.hourly_rate_min !== undefined;
+  const hasRate =
+    data.hourly_rate_min !== null && data.hourly_rate_min !== undefined;
   const showPayFrequency = hasRate;
   const canContinue = hasRate && payFrequency.length > 0;
 
@@ -101,14 +102,18 @@ export function StepSalary({ data, updateData, goNext, goBack }: StepProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-
         {/* Hourly Rate */}
         <div className="space-y-3">
-          <Label htmlFor="hourly_rate" className="text-sm font-medium text-slate-700">
+          <Label
+            htmlFor="hourly_rate"
+            className="text-sm font-medium text-slate-700"
+          >
             Minimum hourly rate you&apos;ll accept
           </Label>
           <div className="relative max-w-48">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">
+              $
+            </span>
             <Input
               id="hourly_rate"
               type="number"
@@ -129,7 +134,9 @@ export function StepSalary({ data, updateData, goNext, goBack }: StepProps) {
         {/* Pay Frequency — revealed after hourly rate entered */}
         <div
           className={`transition-all duration-300 ease-in-out overflow-hidden ${
-            showPayFrequency ? "max-h-[500px] opacity-100 mt-6" : "max-h-0 opacity-0"
+            showPayFrequency
+              ? "max-h-[500px] opacity-100 mt-6"
+              : "max-h-0 opacity-0"
           }`}
         >
           <div className="space-y-3">
@@ -146,7 +153,12 @@ export function StepSalary({ data, updateData, goNext, goBack }: StepProps) {
 
         {/* Navigation */}
         <div className="flex gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={goBack} className="flex-1">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={goBack}
+            className="flex-1"
+          >
             Back
           </Button>
           {canContinue && (

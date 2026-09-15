@@ -115,9 +115,10 @@ async function cacheStats() {
     cache_hit_rate: total > 0 ? +((cacheHits / total) * 100).toFixed(1) : null,
     cached_tokens_total: cachedTokensSum,
     input_tokens_total: inputTokensSum,
-    cached_token_share: inputTokensSum > 0
-      ? +((cachedTokensSum / inputTokensSum) * 100).toFixed(1)
-      : null,
+    cached_token_share:
+      inputTokensSum > 0
+        ? +((cachedTokensSum / inputTokensSum) * 100).toFixed(1)
+        : null,
     prompt_version_distribution: Object.fromEntries(promptVersions),
   };
 }
@@ -154,8 +155,9 @@ async function toolRounds() {
   }
 
   // tool-calls per turn
-  const toolCallCounts = rows
-    .map((m) => (Array.isArray(m.tool_calls) ? m.tool_calls.length : 0));
+  const toolCallCounts = rows.map((m) =>
+    Array.isArray(m.tool_calls) ? m.tool_calls.length : 0,
+  );
   const turnsByToolCount = new Map();
   for (const c of toolCallCounts) {
     turnsByToolCount.set(c, (turnsByToolCount.get(c) ?? 0) + 1);
@@ -265,7 +267,10 @@ async function modelCompare() {
 
   // Incremental snapshot path — write to disk after each call so even
   // if Pro hangs on a prompt we keep the prior data.
-  const snapshotPath = path.join(APP_ROOT, "scripts/_run-output/model-compare-2026-05-08.json");
+  const snapshotPath = path.join(
+    APP_ROOT,
+    "scripts/_run-output/model-compare-2026-05-08.json",
+  );
   fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
   function snapshot() {
     fs.writeFileSync(snapshotPath, JSON.stringify(results, null, 2));
@@ -324,8 +329,12 @@ async function modelCompare() {
 
   // Summary stats per variant
   for (const v of ["flash", "pro"]) {
-    const ttfts = results[v].map((r) => r.ttft_ms).filter((x) => typeof x === "number");
-    const totals = results[v].map((r) => r.total_ms).filter((x) => typeof x === "number");
+    const ttfts = results[v]
+      .map((r) => r.ttft_ms)
+      .filter((x) => typeof x === "number");
+    const totals = results[v]
+      .map((r) => r.total_ms)
+      .filter((x) => typeof x === "number");
     ttfts.sort((a, b) => a - b);
     totals.sort((a, b) => a - b);
     results.summary[v] = {

@@ -7,15 +7,15 @@ fact (brand, domain, prices, areas, flags, schema, journeys) lives in the founda
 
 ## Where things are
 
-| What | Where |
-|---|---|
-| Process rules, laws, ECC, branch/deploy | [`CLAUDE.md`](./CLAUDE.md) |
-| The foundations (facts + ADRs) | `../LDN/SPECS/00-foundations/` — start at its `README.md`, then `DECISIONS.md` |
-| Build state, known bugs, next unit | [`docs/build-progress.md`](./docs/build-progress.md) |
-| Merged units | [`CHANGELOG.md`](./CHANGELOG.md) |
-| Team coordination (tasks, branches, protocols) | `../LDN/OPERATIONS/` (`INDEX.md`, `BRANCHES.md`, `PROTOCOLS/`) |
-| S1 Remove-sweep ledger (what left the Sydney copy, and why) | [`docs/s1-remove-ledger.md`](./docs/s1-remove-ledger.md) |
-| Carried Sydney docs — reference, not spec | `docs/reference/sydney/` |
+| What                                                        | Where                                                                          |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Process rules, laws, ECC, branch/deploy                     | [`CLAUDE.md`](./CLAUDE.md)                                                     |
+| The foundations (facts + ADRs)                              | `../LDN/SPECS/00-foundations/` — start at its `README.md`, then `DECISIONS.md` |
+| Build state, known bugs, next unit                          | [`docs/build-progress.md`](./docs/build-progress.md)                           |
+| Merged units                                                | [`CHANGELOG.md`](./CHANGELOG.md)                                               |
+| Team coordination (tasks, branches, protocols)              | `../LDN/OPERATIONS/` (`INDEX.md`, `BRANCHES.md`, `PROTOCOLS/`)                 |
+| S1 Remove-sweep ledger (what left the Sydney copy, and why) | [`docs/s1-remove-ledger.md`](./docs/s1-remove-ledger.md)                       |
+| Carried Sydney docs — reference, not spec                   | `docs/reference/sydney/`                                                       |
 
 ## Run it
 

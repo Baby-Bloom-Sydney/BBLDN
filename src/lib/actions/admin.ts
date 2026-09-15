@@ -1,8 +1,8 @@
-'use server';
+"use server";
 
-import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { revalidatePath } from 'next/cache';
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { revalidatePath } from "next/cache";
 import {
   VERIFICATION_STATUS,
   VERIFICATION_LEVEL,
@@ -13,28 +13,39 @@ import {
   type IdentityStatus,
   type WwccStatus,
   type CrossCheckStatus,
-} from '@/lib/verification';
-import { runCrossCheckPhase } from '@/lib/ai/verification-pipeline';
-import { syncNannyVerificationState } from '@/lib/actions/verification';
-import { sendEmail } from '@/lib/email/resend';
-import { openai } from '@/lib/ai/client';
-import { V2_SYSTEM_PROMPT, buildV2Prompt, parseAIProfileSections, generateV2Checklist } from '@/lib/ai/nanny-profile-prompts';
+} from "@/lib/verification";
+import { runCrossCheckPhase } from "@/lib/ai/verification-pipeline";
+import { syncNannyVerificationState } from "@/lib/actions/verification";
+import { sendEmail } from "@/lib/email/resend";
+import { openai } from "@/lib/ai/client";
+import {
+  V2_SYSTEM_PROMPT,
+  buildV2Prompt,
+  parseAIProfileSections,
+  generateV2Checklist,
+} from "@/lib/ai/nanny-profile-prompts";
 
 // ── Helper: require admin role ──
 
-async function requireAdmin(): Promise<{ userId: string; error: string | null }> {
+async function requireAdmin(): Promise<{
+  userId: string;
+  error: string | null;
+}> {
   const supabase = createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) return { userId: '', error: 'Not authenticated' };
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) return { userId: "", error: "Not authenticated" };
 
   const { data: role } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id)
     .single();
 
-  if (!role || !['admin', 'super_admin'].includes(role.role)) {
-    return { userId: '', error: 'Not authorized — admin role required' };
+  if (!role || !["admin", "super_admin"].includes(role.role)) {
+    return { userId: "", error: "Not authorized — admin role required" };
   }
   return { userId: user.id, error: null };
 }
@@ -43,7 +54,7 @@ async function requireAdmin(): Promise<{ userId: string; error: string | null }>
 // State transition: identity_status → verified, level 1 → 2
 
 export async function adminVerifyIdentity(
-  verificationId: string
+  verificationId: string,
 ): Promise<{ success: boolean; error: string | null }> {
   const { userId: adminId, error: authErr } = await requireAdmin();
   if (authErr) return { success: false, error: authErr };
@@ -51,17 +62,17 @@ export async function adminVerifyIdentity(
   const supabase = createAdminClient();
 
   const { data: verification, error: fetchErr } = await supabase
-    .from('verifications')
-    .select('user_id, verification_status, wwcc_status')
-    .eq('id', verificationId)
+    .from("verifications")
+    .select("user_id, verification_status, wwcc_status")
+    .eq("id", verificationId)
     .single();
 
   if (fetchErr || !verification) {
-    return { success: false, error: 'Verification record not found' };
+    return { success: false, error: "Verification record not found" };
   }
 
   const { error: updateVerErr } = await supabase
-    .from('verifications')
+    .from("verifications")
     .update({
       identity_verified: true,
       identity_verified_at: new Date().toISOString(),
@@ -73,31 +84,37 @@ export async function adminVerifyIdentity(
       verification_status: deriveOverallStatus(
         IDENTITY_STATUS.VERIFIED as IdentityStatus,
         (verification.wwcc_status || WWCC_STATUS.NOT_STARTED) as WwccStatus,
-        CROSS_CHECK_STATUS.NOT_STARTED as CrossCheckStatus
+        CROSS_CHECK_STATUS.NOT_STARTED as CrossCheckStatus,
       ),
       updated_at: new Date().toISOString(),
     })
-    .eq('id', verificationId);
+    .eq("id", verificationId);
 
   if (updateVerErr) {
-    return { success: false, error: `Failed to update verification: ${updateVerErr.message}` };
+    return {
+      success: false,
+      error: `Failed to update verification: ${updateVerErr.message}`,
+    };
   }
 
   await syncNannyVerificationState(verification.user_id);
 
   // Check if WWCC is ready → trigger cross-check
   if (verification.wwcc_status === WWCC_STATUS.DOC_VERIFIED) {
-    await supabase.from('verifications').update({
-      cross_check_status: CROSS_CHECK_STATUS.PENDING,
-      updated_at: new Date().toISOString(),
-    }).eq('id', verificationId);
+    await supabase
+      .from("verifications")
+      .update({
+        cross_check_status: CROSS_CHECK_STATUS.PENDING,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", verificationId);
 
-    runCrossCheckPhase(verificationId).catch(err => {
-      console.error('[adminVerifyIdentity] Cross-check error:', err);
+    runCrossCheckPhase(verificationId).catch((err) => {
+      console.error("[adminVerifyIdentity] Cross-check error:", err);
     });
   }
 
-  revalidatePath('/admin/users');
+  revalidatePath("/admin/users");
   return { success: true, error: null };
 }
 
@@ -106,31 +123,31 @@ export async function adminVerifyIdentity(
 
 export async function adminRejectIdentity(
   verificationId: string,
-  reason: string
+  reason: string,
 ): Promise<{ success: boolean; error: string | null }> {
   const { error: authErr } = await requireAdmin();
   if (authErr) return { success: false, error: authErr };
 
   if (!reason.trim()) {
-    return { success: false, error: 'Rejection reason is required' };
+    return { success: false, error: "Rejection reason is required" };
   }
 
   const supabase = createAdminClient();
 
   // Fetch verification record (need user_id for nannies sync + wwcc_status for deriveOverallStatus)
   const { data: verification } = await supabase
-    .from('verifications')
-    .select('user_id, wwcc_status')
-    .eq('id', verificationId)
+    .from("verifications")
+    .select("user_id, wwcc_status")
+    .eq("id", verificationId)
     .single();
 
-  if (!verification) return { success: false, error: 'Verification not found' };
+  if (!verification) return { success: false, error: "Verification not found" };
 
   // Reject identity + clear extracted identity data (clean slate for resubmission).
   // WWCC data is preserved so user doesn't have to re-upload.
   // Cross-check is reset (can't run without verified identity).
   const { error: updateErr } = await supabase
-    .from('verifications')
+    .from("verifications")
     .update({
       identity_status: IDENTITY_STATUS.REJECTED,
       identity_status_at: new Date().toISOString(),
@@ -150,11 +167,11 @@ export async function adminRejectIdentity(
       verification_status: deriveOverallStatus(
         IDENTITY_STATUS.REJECTED as IdentityStatus,
         (verification.wwcc_status || WWCC_STATUS.NOT_STARTED) as WwccStatus,
-        CROSS_CHECK_STATUS.NOT_STARTED as CrossCheckStatus
+        CROSS_CHECK_STATUS.NOT_STARTED as CrossCheckStatus,
       ),
       updated_at: new Date().toISOString(),
     })
-    .eq('id', verificationId);
+    .eq("id", verificationId);
 
   if (updateErr) {
     return { success: false, error: `Failed to reject: ${updateErr.message}` };
@@ -163,7 +180,7 @@ export async function adminRejectIdentity(
   // Sync nannies (demotes level, resets identity_verified + wwcc_verified)
   await syncNannyVerificationState(verification.user_id);
 
-  revalidatePath('/admin/users');
+  revalidatePath("/admin/users");
   return { success: true, error: null };
 }
 
@@ -171,7 +188,7 @@ export async function adminRejectIdentity(
 // Does NOT change verification state. OCG webhook handles actual status changes.
 
 export async function adminConfirmWWCC(
-  verificationId: string
+  verificationId: string,
 ): Promise<{ success: boolean; error: string | null }> {
   const { userId: adminId, error: authErr } = await requireAdmin();
   if (authErr) return { success: false, error: authErr };
@@ -179,19 +196,22 @@ export async function adminConfirmWWCC(
   const supabase = createAdminClient();
 
   const { error: updateErr } = await supabase
-    .from('verifications')
+    .from("verifications")
     .update({
       wwcc_ocg_submitted_at: new Date().toISOString(),
       wwcc_verified_by: adminId,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', verificationId);
+    .eq("id", verificationId);
 
   if (updateErr) {
-    return { success: false, error: `Failed to update verification: ${updateErr.message}` };
+    return {
+      success: false,
+      error: `Failed to update verification: ${updateErr.message}`,
+    };
   }
 
-  revalidatePath('/admin/users');
+  revalidatePath("/admin/users");
   return { success: true, error: null };
 }
 
@@ -200,29 +220,29 @@ export async function adminConfirmWWCC(
 
 export async function adminRejectWWCC(
   verificationId: string,
-  reason: string
+  reason: string,
 ): Promise<{ success: boolean; error: string | null }> {
   const { error: authErr } = await requireAdmin();
   if (authErr) return { success: false, error: authErr };
 
   if (!reason.trim()) {
-    return { success: false, error: 'Rejection reason is required' };
+    return { success: false, error: "Rejection reason is required" };
   }
 
   const supabase = createAdminClient();
 
   const { data: verification, error: fetchErr } = await supabase
-    .from('verifications')
-    .select('user_id')
-    .eq('id', verificationId)
+    .from("verifications")
+    .select("user_id")
+    .eq("id", verificationId)
     .single();
 
   if (fetchErr || !verification) {
-    return { success: false, error: 'Verification record not found' };
+    return { success: false, error: "Verification record not found" };
   }
 
   const { error: updateVerErr } = await supabase
-    .from('verifications')
+    .from("verifications")
     .update({
       wwcc_rejection_reason: reason.trim(),
       wwcc_status: WWCC_STATUS.REJECTED,
@@ -236,15 +256,18 @@ export async function adminRejectWWCC(
       wwcc_doc_verified: false,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', verificationId);
+    .eq("id", verificationId);
 
   if (updateVerErr) {
-    return { success: false, error: `Failed to reject: ${updateVerErr.message}` };
+    return {
+      success: false,
+      error: `Failed to reject: ${updateVerErr.message}`,
+    };
   }
 
   await syncNannyVerificationState(verification.user_id);
 
-  revalidatePath('/admin/users');
+  revalidatePath("/admin/users");
   return { success: true, error: null };
 }
 
@@ -252,7 +275,7 @@ export async function adminRejectWWCC(
 // Deletes from auth.users which cascades to all FK-referenced tables
 
 export async function adminDeleteUser(
-  userId: string
+  userId: string,
 ): Promise<{ success: boolean; error: string | null }> {
   const { error: authErr } = await requireAdmin();
   if (authErr) return { success: false, error: authErr };
@@ -262,11 +285,11 @@ export async function adminDeleteUser(
   const { error } = await adminClient.auth.admin.deleteUser(userId);
 
   if (error) {
-    console.error('[Admin] Delete user error:', error);
+    console.error("[Admin] Delete user error:", error);
     return { success: false, error: `Failed to delete user: ${error.message}` };
   }
 
-  revalidatePath('/admin/users');
+  revalidatePath("/admin/users");
   return { success: true, error: null };
 }
 
@@ -275,7 +298,7 @@ export async function adminDeleteUser(
 
 export async function adminChangeRole(
   userId: string,
-  newRole: 'nanny' | 'parent' | 'admin'
+  newRole: "nanny" | "parent" | "admin",
 ): Promise<{ success: boolean; error: string | null }> {
   const { error: authErr } = await requireAdmin();
   if (authErr) return { success: false, error: authErr };
@@ -284,53 +307,56 @@ export async function adminChangeRole(
 
   // Update role
   const { error: roleErr } = await adminClient
-    .from('user_roles')
+    .from("user_roles")
     .update({ role: newRole, updated_at: new Date().toISOString() })
-    .eq('user_id', userId);
+    .eq("user_id", userId);
 
   if (roleErr) {
-    return { success: false, error: `Failed to update role: ${roleErr.message}` };
+    return {
+      success: false,
+      error: `Failed to update role: ${roleErr.message}`,
+    };
   }
 
   // Create skeleton nanny record if switching to nanny
-  if (newRole === 'nanny') {
+  if (newRole === "nanny") {
     const { data: existing } = await adminClient
-      .from('nannies')
-      .select('id')
-      .eq('user_id', userId)
+      .from("nannies")
+      .select("id")
+      .eq("user_id", userId)
       .maybeSingle();
 
     if (!existing) {
       const { error: insertErr } = await adminClient
-        .from('nannies')
-        .insert({ user_id: userId, status: 'active' });
+        .from("nannies")
+        .insert({ user_id: userId, status: "active" });
 
       if (insertErr) {
-        console.error('[Admin] Create nanny record error:', insertErr);
+        console.error("[Admin] Create nanny record error:", insertErr);
       }
     }
   }
 
   // Create skeleton parent record if switching to parent
-  if (newRole === 'parent') {
+  if (newRole === "parent") {
     const { data: existing } = await adminClient
-      .from('parents')
-      .select('id')
-      .eq('user_id', userId)
+      .from("parents")
+      .select("id")
+      .eq("user_id", userId)
       .maybeSingle();
 
     if (!existing) {
       const { error: insertErr } = await adminClient
-        .from('parents')
-        .insert({ user_id: userId, status: 'active' });
+        .from("parents")
+        .insert({ user_id: userId, status: "active" });
 
       if (insertErr) {
-        console.error('[Admin] Create parent record error:', insertErr);
+        console.error("[Admin] Create parent record error:", insertErr);
       }
     }
   }
 
-  revalidatePath('/admin/users');
+  revalidatePath("/admin/users");
   return { success: true, error: null };
 }
 
@@ -338,7 +364,7 @@ export async function adminChangeRole(
 // Resets nanny verification to zero for re-testing
 
 export async function adminResetVerification(
-  userId: string
+  userId: string,
 ): Promise<{ success: boolean; error: string | null }> {
   const { error: authErr } = await requireAdmin();
   if (authErr) return { success: false, error: authErr };
@@ -347,7 +373,7 @@ export async function adminResetVerification(
 
   // Reset nanny record
   const { error: nannyErr } = await adminClient
-    .from('nannies')
+    .from("nannies")
     .update({
       verification_level: VERIFICATION_LEVEL.SIGNED_UP,
       verification_status: VERIFICATION_STATUS.NOT_STARTED,
@@ -355,30 +381,36 @@ export async function adminResetVerification(
       identity_verified: false,
       updated_at: new Date().toISOString(),
     })
-    .eq('user_id', userId);
+    .eq("user_id", userId);
 
   if (nannyErr) {
-    return { success: false, error: `Failed to reset nanny: ${nannyErr.message}` };
+    return {
+      success: false,
+      error: `Failed to reset nanny: ${nannyErr.message}`,
+    };
   }
 
   // Delete all verification records
   const { error: deleteErr } = await adminClient
-    .from('verifications')
+    .from("verifications")
     .delete()
-    .eq('user_id', userId);
+    .eq("user_id", userId);
 
   if (deleteErr) {
-    return { success: false, error: `Failed to delete verifications: ${deleteErr.message}` };
+    return {
+      success: false,
+      error: `Failed to delete verifications: ${deleteErr.message}`,
+    };
   }
 
-  revalidatePath('/admin/users');
+  revalidatePath("/admin/users");
   return { success: true, error: null };
 }
 
 // ── Admin: Regenerate Nanny AI Bio ──
 
 export async function adminRegenerateNannyBio(
-  userId: string
+  userId: string,
 ): Promise<{ success: boolean; error: string | null }> {
   const { error: authErr } = await requireAdmin();
   if (authErr) return { success: false, error: authErr };
@@ -387,46 +419,50 @@ export async function adminRegenerateNannyBio(
 
   // Fetch nanny record
   const { data: nanny } = await admin
-    .from('nannies')
-    .select('*')
-    .eq('user_id', userId)
+    .from("nannies")
+    .select("*")
+    .eq("user_id", userId)
     .single();
 
-  if (!nanny) return { success: false, error: 'Nanny record not found' };
+  if (!nanny) return { success: false, error: "Nanny record not found" };
 
   // Fetch profile + credentials in parallel
   const [{ data: profile }, { data: credentials }] = await Promise.all([
     admin
-      .from('user_profiles')
-      .select('first_name, last_name, suburb, date_of_birth')
-      .eq('user_id', userId)
+      .from("user_profiles")
+      .select("first_name, last_name, suburb, date_of_birth")
+      .eq("user_id", userId)
       .single(),
     admin
-      .from('nanny_credentials')
-      .select('credential_category, qualification_type, certification_type')
-      .eq('nanny_id', nanny.id),
+      .from("nanny_credentials")
+      .select("credential_category, qualification_type, certification_type")
+      .eq("nanny_id", nanny.id),
   ]);
 
-  if (!profile) return { success: false, error: 'User profile not found' };
+  if (!profile) return { success: false, error: "User profile not found" };
 
-  const highest_qualification = credentials
-    ?.find(c => c.credential_category === 'qualification')?.qualification_type || null;
+  const highest_qualification =
+    credentials?.find((c) => c.credential_category === "qualification")
+      ?.qualification_type || null;
   const certificates = (credentials || [])
-    .filter(c => c.credential_category === 'certification')
-    .map(c => c.certification_type)
+    .filter((c) => c.credential_category === "certification")
+    .map((c) => c.certification_type)
     .filter((t): t is string => t !== null);
 
   // Convert months to age labels for V2 prompt
   const monthsToLabel = (m: number | null): string | null => {
     if (m === null || m === undefined) return null;
-    if (m === 0) return 'Newborn';
+    if (m === 0) return "Newborn";
     if (m < 12) return `${m} months`;
-    if (m === 12) return '12 months';
+    if (m === 12) return "12 months";
     const years = Math.round(m / 12);
     return `${years} years`;
   };
 
-  const childcareRoles = (nanny.childcare_roles || []) as Array<{ role: string; duration: number }>;
+  const childcareRoles = (nanny.childcare_roles || []) as Array<{
+    role: string;
+    duration: number;
+  }>;
 
   // Build V2 prompt data from live nanny profile
   const promptData = {
@@ -439,7 +475,10 @@ export async function adminRegenerateNannyBio(
     personalityTraits: nanny.personality_traits || [],
     levelOfSupport: nanny.level_of_support_offered || [],
     professionalValues: nanny.professional_values || [],
-    totalExperience: nanny.total_experience_years != null ? String(nanny.total_experience_years) : null,
+    totalExperience:
+      nanny.total_experience_years != null
+        ? String(nanny.total_experience_years)
+        : null,
     under3Experience: nanny.under_3_experience_years,
     newbornExperience: nanny.newborn_experience_years,
     childcareRoles,
@@ -461,27 +500,33 @@ export async function adminRegenerateNannyBio(
     const userMessage = buildV2Prompt(promptData);
 
     const completion = await openai.chat.completions.create({
-      model: 'o4-mini',
+      model: "o4-mini",
       messages: [
-        { role: 'developer', content: V2_SYSTEM_PROMPT },
-        { role: 'user', content: userMessage },
+        { role: "developer", content: V2_SYSTEM_PROMPT },
+        { role: "user", content: userMessage },
       ],
       max_completion_tokens: 10000,
     });
 
     const raw = completion.choices[0]?.message?.content?.trim();
-    if (!raw) return { success: false, error: 'No content generated' };
+    if (!raw) return { success: false, error: "No content generated" };
 
     const sections = parseAIProfileSections(raw);
 
     if (!sections.headline && !sections.about && !sections.experience) {
-      return { success: false, error: 'AI generation returned incomplete content' };
+      return {
+        success: false,
+        error: "AI generation returned incomplete content",
+      };
     }
 
     const checklist = generateV2Checklist({
       personalityTraits: nanny.personality_traits || [],
       childcareRoles,
-      totalExperience: nanny.total_experience_years != null ? String(nanny.total_experience_years) : null,
+      totalExperience:
+        nanny.total_experience_years != null
+          ? String(nanny.total_experience_years)
+          : null,
       under3Experience: nanny.under_3_experience_years,
       newbornExperience: nanny.newborn_experience_years,
       highestQualification: highest_qualification,
@@ -498,44 +543,44 @@ export async function adminRegenerateNannyBio(
     });
 
     const aiContent = {
-      headline: sections.headline || '',
-      parent_pitch: sections.bio || '',
+      headline: sections.headline || "",
+      parent_pitch: sections.bio || "",
       bio_summary: {
-        about: sections.about || '',
-        personality: sections.personality || '',
-        values: sections.values || '',
-        background: sections.background || '',
-        what_i_offer: sections.what_i_offer || '',
+        about: sections.about || "",
+        personality: sections.personality || "",
+        values: sections.values || "",
+        background: sections.background || "",
+        what_i_offer: sections.what_i_offer || "",
       },
-      experience_summary: sections.experience || '',
+      experience_summary: sections.experience || "",
       skills_highlight: checklist,
-      ai_model: 'o4-mini',
+      ai_model: "o4-mini",
       generated_at: new Date().toISOString(),
     };
 
     await admin
-      .from('nannies')
+      .from("nannies")
       .update({ ai_content: aiContent })
-      .eq('id', nanny.id);
+      .eq("id", nanny.id);
   } catch (err) {
-    console.error('[adminRegenerateNannyBio] AI error:', err);
-    return { success: false, error: 'AI bio generation failed' };
+    console.error("[adminRegenerateNannyBio] AI error:", err);
+    return { success: false, error: "AI bio generation failed" };
   }
 
-  revalidatePath('/admin/users');
-  revalidatePath('/nannies');
+  revalidatePath("/admin/users");
+  revalidatePath("/nannies");
   return { success: true, error: null };
 }
 
 // ── Admin: Send Email to User ──
 
 const ALLOWED_FROM_ADDRESSES = [
-  'no-reply@babybloomsydney.com.au',
-  'verification@babybloomsydney.com.au',
-  'nannies@babybloomsydney.com.au',
-  'support@babybloomsydney.com.au',
-  'contact@babybloomsydney.com.au',
-  'parents@babybloomsydney.com.au',
+  "no-reply@babybloomsydney.com.au",
+  "verification@babybloomsydney.com.au",
+  "nannies@babybloomsydney.com.au",
+  "support@babybloomsydney.com.au",
+  "contact@babybloomsydney.com.au",
+  "parents@babybloomsydney.com.au",
 ];
 
 export async function adminSendEmail(params: {
@@ -551,14 +596,18 @@ export async function adminSendEmail(params: {
   const { toEmail, toUserId, fromAddress, subject, body } = params;
 
   if (!toEmail || !subject.trim() || !body.trim()) {
-    return { success: false, error: 'Email, subject, and body are required' };
+    return { success: false, error: "Email, subject, and body are required" };
   }
 
   if (!ALLOWED_FROM_ADDRESSES.includes(fromAddress)) {
-    return { success: false, error: 'Invalid from address' };
+    return { success: false, error: "Invalid from address" };
   }
 
-  const bodyHtml = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  const bodyHtml = body
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1e293b;background:#f8fafc;">
@@ -586,12 +635,12 @@ export async function adminSendEmail(params: {
     text: body,
     from: `Baby Bloom <${fromAddress}>`,
     replyTo: fromAddress,
-    emailType: 'admin_contact',
+    emailType: "admin_contact",
     recipientUserId: toUserId,
   });
 
   if (!result.success) {
-    return { success: false, error: result.error || 'Failed to send email' };
+    return { success: false, error: result.error || "Failed to send email" };
   }
 
   return { success: true, error: null };

@@ -24,7 +24,7 @@ export function SuburbAutocomplete({
   const [query, setQuery] = useState(
     data.suburb && data.postcode
       ? `${data.suburb}, ${data.postcode}`
-      : data.suburb ?? ""
+      : (data.suburb ?? ""),
   );
   const [filtered, setFiltered] = useState<SuburbEntry[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -58,8 +58,7 @@ export function SuburbAutocomplete({
       const q = val.toLowerCase().trim();
       const matches = suburbs
         .filter(
-          (s) =>
-            s.suburb.toLowerCase().includes(q) || s.postcode.includes(q)
+          (s) => s.suburb.toLowerCase().includes(q) || s.postcode.includes(q),
         )
         .slice(0, 10);
       setFiltered(matches);

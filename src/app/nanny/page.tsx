@@ -282,7 +282,6 @@ export default async function NannyHubPage() {
     getPendingInvitesForUser(),
   ]);
 
-
   // DSS §8 Q8 (Bailey 2026-05-12) — small green tick on each child
   // tile whose family is currently subscribed. Resolve in one batched
   // query for all parent_user_ids on the nanny's children list.

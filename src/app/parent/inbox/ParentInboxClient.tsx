@@ -4,14 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { InboxMessage, markAsRead, markAllAsRead } from "@/lib/actions/inbox";
-import {
-  Bell,
-  Check,
-  X,
-  AlertTriangle,
-  Loader2,
-  Phone,
-} from "lucide-react";
+import { Bell, Check, X, AlertTriangle, Loader2, Phone } from "lucide-react";
 
 function formatDate(date: string): string {
   return new Date(date).toLocaleDateString("en-AU", {
@@ -121,11 +114,7 @@ export function ParentInboxClient({ messages }: ParentInboxClientProps) {
       )}
       <div className="space-y-2">
         {messages.map((msg) => (
-          <MessageItem
-            key={msg.id}
-            message={msg}
-            onMarkRead={handleMarkRead}
-          />
+          <MessageItem key={msg.id} message={msg} onMarkRead={handleMarkRead} />
         ))}
       </div>
     </div>

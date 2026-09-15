@@ -25,7 +25,7 @@ export function MasteryLabel({ score, className }: MasteryLabelProps) {
       className={cn(
         "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
         colors,
-        className
+        className,
       )}
     >
       {label}

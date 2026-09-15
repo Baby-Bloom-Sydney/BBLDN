@@ -13,37 +13,40 @@ import { StepHelpfulInfo } from "./steps/StepHelpfulInfo";
 import { StepResidency } from "./steps/StepResidency";
 import { StepAboutYou } from "./steps/StepAboutYou";
 import { StepReview } from "./steps/StepReview";
-import { createNannyProfile, CreateNannyProfileData } from "@/lib/actions/nanny";
+import {
+  createNannyProfile,
+  CreateNannyProfileData,
+} from "@/lib/actions/nanny";
 import { isLiveMode } from "@/components/dev/DevToolbar";
 import { DevPrefill } from "@/components/dev/DevPrefill";
 
-const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
 // ── Data interface: matches Wix "Nanny Applications" form exactly ──
 
 export interface NannyRegistrationData {
   // Step 2 — Childcare Experience
-  total_experience: string | null;         // "0"–"10+"
-  nanny_experience: string | null;         // "0"–"10+"
-  under_3_experience: string | null;       // "0"–"10+"
-  newborn_experience: string | null;       // "0"–"10+"
-  experience_details: string | null;       // free-text
+  total_experience: string | null; // "0"–"10+"
+  nanny_experience: string | null; // "0"–"10+"
+  under_3_experience: string | null; // "0"–"10+"
+  newborn_experience: string | null; // "0"–"10+"
+  experience_details: string | null; // free-text
 
   // Step 3 — Qualifications
-  highest_qualification: string | null;    // dropdown value
-  assurances: string[];                    // multi-select tags
-  certificates: string[];                  // multi-select tags
+  highest_qualification: string | null; // dropdown value
+  assurances: string[]; // multi-select tags
+  certificates: string[]; // multi-select tags
 
   // Step 4 — Nannying Preferences
-  role_types: string[];                    // multi-select tags
-  level_of_support: string[];              // multi-select tags
-  max_children: number | null;             // 1 | 2 | 3
-  min_age: string | null;                  // tag value
-  max_age: string | null;                  // tag value
-  additional_needs: boolean | null;        // Yes / No
+  role_types: string[]; // multi-select tags
+  level_of_support: string[]; // multi-select tags
+  max_children: number | null; // 1 | 2 | 3
+  min_age: string | null; // tag value
+  max_age: string | null; // tag value
+  additional_needs: boolean | null; // Yes / No
 
   // Step 5 — Availability
-  available_days: string[];                // multi-select day tags
+  available_days: string[]; // multi-select day tags
   monday_times: string[];
   tuesday_times: string[];
   wednesday_times: string[];
@@ -51,19 +54,19 @@ export interface NannyRegistrationData {
   friday_times: string[];
   saturday_times: string[];
   sunday_times: string[];
-  immediate_start: string | null;          // "Yes" | "At a later date"
-  start_date: string | null;              // ISO date (if "At a later date")
-  placement_ongoing: string | null;        // "Yes" | "Until a certain date"
-  end_date: string | null;                // ISO date (if "Until a certain date")
+  immediate_start: string | null; // "Yes" | "At a later date"
+  start_date: string | null; // ISO date (if "At a later date")
+  placement_ongoing: string | null; // "Yes" | "Until a certain date"
+  end_date: string | null; // ISO date (if "Until a certain date")
 
   // Step 6 — Salary Expectations
-  hourly_rate_min: string | null;          // "$35" | "$40" | "$45" | "$50"
-  pay_frequency: string[];                 // multi-select tags
+  hourly_rate_min: string | null; // "$35" | "$40" | "$45" | "$50"
+  pay_frequency: string[]; // multi-select tags
 
   // Step 7 — Helpful Information
-  date_of_birth: string | null;            // ISO date
-  languages: string[];                     // multi-select tags
-  other_languages: string | null;          // free-text
+  date_of_birth: string | null; // ISO date
+  languages: string[]; // multi-select tags
+  other_languages: string | null; // free-text
   drivers_license: boolean | null;
   has_car: boolean | null;
   comfortable_with_pets: boolean | null;
@@ -71,8 +74,8 @@ export interface NannyRegistrationData {
   non_smoker: boolean | null;
 
   // Step 8 — Residency Details
-  nationality: string | null;              // dropdown
-  residency_status: string | null;         // tag value (if not Australian)
+  nationality: string | null; // dropdown
+  residency_status: string | null; // tag value (if not Australian)
   right_to_work: boolean | null;
   sydney_resident: boolean | null;
   suburb: string | null;
@@ -102,9 +105,11 @@ const DEV_MOCK_DATA: Partial<NannyRegistrationData> = {
   nanny_experience: "3",
   under_3_experience: "2",
   newborn_experience: "1",
-  experience_details: "Creche Worker at Little Stars (2 years), Early Childhood Educator at Bright Horizons (3 years)",
+  experience_details:
+    "Creche Worker at Little Stars (2 years), Early Childhood Educator at Bright Horizons (3 years)",
   // Step 3
-  highest_qualification: "Certificate III in Early Childhood Education and Care",
+  highest_qualification:
+    "Certificate III in Early Childhood Education and Care",
   assurances: ["National Police Check", "References"],
   certificates: ["CPR", "First Aid", "Child Protection"],
   // Step 4
@@ -116,11 +121,27 @@ const DEV_MOCK_DATA: Partial<NannyRegistrationData> = {
   additional_needs: true,
   // Step 5
   available_days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-  monday_times: ["Morning (6am-10am)", "Midday (10am-2pm)", "Afternoon (2pm-6pm)"],
-  tuesday_times: ["Morning (6am-10am)", "Midday (10am-2pm)", "Afternoon (2pm-6pm)"],
+  monday_times: [
+    "Morning (6am-10am)",
+    "Midday (10am-2pm)",
+    "Afternoon (2pm-6pm)",
+  ],
+  tuesday_times: [
+    "Morning (6am-10am)",
+    "Midday (10am-2pm)",
+    "Afternoon (2pm-6pm)",
+  ],
   wednesday_times: ["Morning (6am-10am)", "Midday (10am-2pm)"],
-  thursday_times: ["Morning (6am-10am)", "Midday (10am-2pm)", "Afternoon (2pm-6pm)"],
-  friday_times: ["Morning (6am-10am)", "Midday (10am-2pm)", "Afternoon (2pm-6pm)"],
+  thursday_times: [
+    "Morning (6am-10am)",
+    "Midday (10am-2pm)",
+    "Afternoon (2pm-6pm)",
+  ],
+  friday_times: [
+    "Morning (6am-10am)",
+    "Midday (10am-2pm)",
+    "Afternoon (2pm-6pm)",
+  ],
   saturday_times: [],
   sunday_times: [],
   immediate_start: "Yes",
@@ -148,8 +169,10 @@ const DEV_MOCK_DATA: Partial<NannyRegistrationData> = {
   postcode: "2026",
   // Step 9
   hobbies_interests: "Swimming, reading, arts and crafts, bushwalking, yoga",
-  strengths_traits: "Patient, creative, reliable, strong communicator, great with routines",
-  skills_training: "Certificate III in Early Childhood Education, infant sleep training techniques, Montessori-inspired activities",
+  strengths_traits:
+    "Patient, creative, reliable, strong communicator, great with routines",
+  skills_training:
+    "Certificate III in Early Childhood Education, infant sleep training techniques, Montessori-inspired activities",
   profile_picture_url: null,
   accuracy_confirmed: true,
 };
@@ -178,7 +201,9 @@ interface NannyRegistrationFunnelProps {
   };
 }
 
-export function NannyRegistrationFunnel({ initialData }: NannyRegistrationFunnelProps) {
+export function NannyRegistrationFunnel({
+  initialData,
+}: NannyRegistrationFunnelProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -204,7 +229,8 @@ export function NannyRegistrationFunnel({ initialData }: NannyRegistrationFunnel
         accuracy_confirmed: false,
       };
 
-  const [formData, setFormData] = useState<Partial<NannyRegistrationData>>(defaultData);
+  const [formData, setFormData] =
+    useState<Partial<NannyRegistrationData>>(defaultData);
 
   const goNext = () => setCurrentStep((s) => Math.min(s + 1, STEPS.length - 1));
   const goBack = () => setCurrentStep((s) => Math.max(s - 1, 0));
@@ -225,22 +251,32 @@ export function NannyRegistrationFunnel({ initialData }: NannyRegistrationFunnel
   }
 
   // Build JSONB schedule object from per-day time arrays
-  function buildSchedule(fd: Partial<NannyRegistrationData>): Record<string, string[]> {
+  function buildSchedule(
+    fd: Partial<NannyRegistrationData>,
+  ): Record<string, string[]> {
     const schedule: Record<string, string[]> = {};
     const dayFields = {
-      monday: 'monday_times', tuesday: 'tuesday_times', wednesday: 'wednesday_times',
-      thursday: 'thursday_times', friday: 'friday_times', saturday: 'saturday_times',
-      sunday: 'sunday_times',
+      monday: "monday_times",
+      tuesday: "tuesday_times",
+      wednesday: "wednesday_times",
+      thursday: "thursday_times",
+      friday: "friday_times",
+      saturday: "saturday_times",
+      sunday: "sunday_times",
     } as const;
     for (const [day, field] of Object.entries(dayFields)) {
-      const times = fd[field as keyof NannyRegistrationData] as string[] | undefined;
+      const times = fd[field as keyof NannyRegistrationData] as
+        | string[]
+        | undefined;
       if (times && times.length > 0) schedule[day] = times;
     }
     return schedule;
   }
 
   // Transform form data → server action format
-  function toCreateData(fd: Partial<NannyRegistrationData>): CreateNannyProfileData {
+  function toCreateData(
+    fd: Partial<NannyRegistrationData>,
+  ): CreateNannyProfileData {
     const parseRate = (s: string | null | undefined): number | null => {
       if (!s) return null;
       const n = parseFloat(s.replace("$", ""));
@@ -258,10 +294,18 @@ export function NannyRegistrationFunnel({ initialData }: NannyRegistrationFunnel
       nationality: fd.nationality ?? null,
       languages: fd.languages ?? [],
 
-      total_experience_years: fd.total_experience ? parseInt(fd.total_experience) || 0 : null,
-      nanny_experience_years: fd.nanny_experience ? parseInt(fd.nanny_experience) || 0 : null,
-      under_3_experience_years: fd.under_3_experience ? parseInt(fd.under_3_experience) || 0 : null,
-      newborn_experience_years: fd.newborn_experience ? parseInt(fd.newborn_experience) || 0 : null,
+      total_experience_years: fd.total_experience
+        ? parseInt(fd.total_experience) || 0
+        : null,
+      nanny_experience_years: fd.nanny_experience
+        ? parseInt(fd.nanny_experience) || 0
+        : null,
+      under_3_experience_years: fd.under_3_experience
+        ? parseInt(fd.under_3_experience) || 0
+        : null,
+      newborn_experience_years: fd.newborn_experience
+        ? parseInt(fd.newborn_experience) || 0
+        : null,
       experience_details: fd.experience_details ?? null,
 
       role_types_preferred: fd.role_types ?? [],

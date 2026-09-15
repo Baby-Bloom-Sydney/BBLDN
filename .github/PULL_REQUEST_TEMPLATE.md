@@ -23,9 +23,9 @@
 
 ## Acceptance rows touched (05 §2) with Verify result
 
-| AC | Verify | Result |
-|---|---|---|
-| — | — | — |
+| AC  | Verify | Result |
+| --- | ------ | ------ |
+| —   | —      | —      |
 
 ## Gates (before this push — CLAUDE.md §6)
 

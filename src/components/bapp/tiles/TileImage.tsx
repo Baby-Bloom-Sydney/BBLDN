@@ -33,11 +33,7 @@ export function TileImage({ src, alt }: TileImageProps) {
         onClick={() => setOpen(true)}
         className="relative aspect-square w-full overflow-hidden rounded-lg border border-slate-100"
       >
-        <img
-          src={src}
-          alt={alt}
-          className="h-full w-full object-cover"
-        />
+        <img src={src} alt={alt} className="h-full w-full object-cover" />
       </button>
 
       {/* Full-size lightbox */}

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 interface YesNoTagsProps {
   selected: boolean | null;
@@ -7,7 +7,12 @@ interface YesNoTagsProps {
   noLabel?: string;
 }
 
-export function YesNoTags({ selected, onChange, yesLabel = 'Yes', noLabel = 'No' }: YesNoTagsProps) {
+export function YesNoTags({
+  selected,
+  onChange,
+  yesLabel = "Yes",
+  noLabel = "No",
+}: YesNoTagsProps) {
   return (
     <div className="grid grid-cols-2 gap-2">
       {[
@@ -20,8 +25,8 @@ export function YesNoTags({ selected, onChange, yesLabel = 'Yes', noLabel = 'No'
           onClick={() => onChange(selected === value ? null : value)}
           className={`px-3 h-11 rounded-lg border text-sm font-medium flex items-center justify-center cursor-pointer transition-all duration-150 ${
             selected === value
-              ? 'bg-violet-500 text-white border-violet-500'
-              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
+              ? "bg-violet-500 text-white border-violet-500"
+              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
           }`}
         >
           {label}

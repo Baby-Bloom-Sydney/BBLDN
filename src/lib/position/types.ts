@@ -1,4 +1,9 @@
-import type { PositionStage, PositionStatus, ConnectionStage, EndReason } from './constants';
+import type {
+  PositionStage,
+  PositionStatus,
+  ConnectionStage,
+  EndReason,
+} from "./constants";
 
 // ─── Position Funnel Fields ───
 // These extend the existing Position interface with the new funnel columns.
@@ -19,7 +24,7 @@ export interface PositionFunnelFields {
 export interface ConnectionFunnelFields {
   connection_stage: ConnectionStage;
   intro_outcome_reported_at: string | null; // DB field name; user-facing label is "Meet and Greet"
-  fill_initiated_by: 'nanny' | 'parent' | null;
+  fill_initiated_by: "nanny" | "parent" | null;
   trial_date: string | null;
   trial_reported_at: string | null;
 }
@@ -39,7 +44,7 @@ export interface PlacementExtendedFields {
 /** Note: "intro" in code = "Meet and Greet" in user-facing UI */
 export interface ReportIntroOutcomePayload {
   requestId: string;
-  outcome: 'hired' | 'not_hired' | 'awaiting' | 'trial' | 'incomplete';
+  outcome: "hired" | "not_hired" | "awaiting" | "trial" | "incomplete";
   trialDate?: string;
 }
 

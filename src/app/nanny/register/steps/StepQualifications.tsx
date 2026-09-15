@@ -32,12 +32,16 @@ interface MultiSelectTagsProps {
   onChange: (val: string[]) => void;
 }
 
-function MultiSelectTags({ options, selected, onChange }: MultiSelectTagsProps) {
+function MultiSelectTags({
+  options,
+  selected,
+  onChange,
+}: MultiSelectTagsProps) {
   const toggle = (opt: string) => {
     onChange(
       selected.includes(opt)
         ? selected.filter((v) => v !== opt)
-        : [...selected, opt]
+        : [...selected, opt],
     );
   };
   return (
@@ -60,7 +64,12 @@ function MultiSelectTags({ options, selected, onChange }: MultiSelectTagsProps) 
   );
 }
 
-export function StepQualifications({ data, updateData, goNext, goBack }: StepProps) {
+export function StepQualifications({
+  data,
+  updateData,
+  goNext,
+  goBack,
+}: StepProps) {
   const { highest_qualification, assurances = [], certificates = [] } = data;
 
   const isComplete =
@@ -76,7 +85,6 @@ export function StepQualifications({ data, updateData, goNext, goBack }: StepPro
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-6 pb-8">
-
         {/* Highest Qualification */}
         <div className="flex flex-col gap-2">
           <Label className="text-sm font-medium text-slate-700">

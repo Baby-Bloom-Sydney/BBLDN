@@ -1,11 +1,23 @@
 "use client";
 
-
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatsCard } from "@/components/dashboard/StatsCard";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, ClipboardList, Calendar, Eye, Search, Heart } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Loader2,
+  ClipboardList,
+  Calendar,
+  Eye,
+  Search,
+  Heart,
+} from "lucide-react";
 
 export default function ParentDashboardPage() {
   const { profile, isLoading } = useAuth();
@@ -56,7 +68,9 @@ export default function ParentDashboardPage() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Quick Actions</h2>
+        <h2 className="mb-4 text-lg font-semibold text-slate-900">
+          Quick Actions
+        </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Link href="/parent/browse">
             <Card className="cursor-pointer transition-shadow hover:shadow-md">
@@ -85,7 +99,6 @@ export default function ParentDashboardPage() {
               </CardContent>
             </Card>
           </Link>
-
         </div>
       </div>
 
@@ -93,7 +106,9 @@ export default function ParentDashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>Your latest updates and interactions</CardDescription>
+          <CardDescription>
+            Your latest updates and interactions
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">

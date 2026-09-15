@@ -1,0 +1,11 @@
+# prettier --check . (05 §9 stage 1) — generated, build and reference-only paths are not formatted
+node_modules
+.next
+coverage
+playwright-report
+test-results
+package-lock.json
+tsconfig.tsbuildinfo
+public/katie-manifest.json
+docs/reference/sydney/
+CLAUDE.md

@@ -1,37 +1,45 @@
-'use client';
+"use client";
 
-import { useCallback } from 'react';
-import { StageProps } from '../../FunnelOrchestrator';
-import { SingleSelectTags } from '../../shared/SingleSelectTags';
-import { MultiSelectTags } from '../../shared/MultiSelectTags';
-import { AutoAdvance } from '../../shared/AutoAdvance';
-import { NannyQuestionShell } from '../../shared/NannyQuestionShell';
+import { useCallback } from "react";
+import { StageProps } from "../../FunnelOrchestrator";
+import { SingleSelectTags } from "../../shared/SingleSelectTags";
+import { MultiSelectTags } from "../../shared/MultiSelectTags";
+import { AutoAdvance } from "../../shared/AutoAdvance";
+import { NannyQuestionShell } from "../../shared/NannyQuestionShell";
 import {
   MOTIVATION_OPTIONS,
   PERSONALITY_TRAIT_OPTIONS,
   LEVEL_OF_SUPPORT_OPTIONS,
   PROFESSIONAL_VALUE_OPTIONS,
-} from '@/types/nanny-leads';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+} from "@/types/nanny-leads";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface N1IdentityProps extends StageProps {
   subPage: string;
 }
 
-export function N1Identity({ state, dispatch, goNext, goBack, subPage, progress, questionNumber }: N1IdentityProps) {
+export function N1Identity({
+  state,
+  dispatch,
+  goNext,
+  goBack,
+  subPage,
+  progress,
+  questionNumber,
+}: N1IdentityProps) {
   const { identity } = state;
 
   const update = useCallback(
     (payload: Partial<typeof identity>) => {
-      dispatch({ type: 'UPDATE_IDENTITY', payload });
+      dispatch({ type: "UPDATE_IDENTITY", payload });
     },
-    [dispatch]
+    [dispatch],
   );
 
   // Page 1: Motivation (Q1) — single select with auto-advance
-  if (subPage === 'n1-motivation') {
-    const showOtherInput = identity.motivation === 'Other';
+  if (subPage === "n1-motivation") {
+    const showOtherInput = identity.motivation === "Other";
 
     return (
       <NannyQuestionShell
@@ -52,7 +60,7 @@ export function N1Identity({ state, dispatch, goNext, goBack, subPage, progress,
           {showOtherInput && (
             <Input
               placeholder="Tell us what motivates you..."
-              value={identity.motivation_other || ''}
+              value={identity.motivation_other || ""}
               onChange={(e) => update({ motivation_other: e.target.value })}
               className="h-11 border-slate-200 focus:border-violet-500 focus:ring-violet-500"
               autoFocus
@@ -62,31 +70,33 @@ export function N1Identity({ state, dispatch, goNext, goBack, subPage, progress,
           <AutoAdvance
             shouldAdvance={
               identity.motivation !== null &&
-              identity.motivation !== 'Other' &&
-              identity.motivation !== ''
+              identity.motivation !== "Other" &&
+              identity.motivation !== ""
             }
             onAdvance={goNext}
           />
 
-          {showOtherInput && identity.motivation_other && identity.motivation_other.trim().length > 0 && (
-            <div className="fixed bottom-0 left-0 right-0 z-20 pt-3 pb-[66px] bg-gradient-to-t from-white from-70% to-transparent">
-              <div className="max-w-md mx-auto px-4">
-                <Button
-                  onClick={goNext}
-                  className="w-full bg-violet-600 hover:bg-violet-700 text-white h-11 px-6 rounded-lg font-medium text-sm"
-                >
-                  Continue
-                </Button>
+          {showOtherInput &&
+            identity.motivation_other &&
+            identity.motivation_other.trim().length > 0 && (
+              <div className="fixed bottom-0 left-0 right-0 z-20 pt-3 pb-[66px] bg-gradient-to-t from-white from-70% to-transparent">
+                <div className="max-w-md mx-auto px-4">
+                  <Button
+                    onClick={goNext}
+                    className="w-full bg-violet-600 hover:bg-violet-700 text-white h-11 px-6 rounded-lg font-medium text-sm"
+                  >
+                    Continue
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </div>
       </NannyQuestionShell>
     );
   }
 
   // Page 2: Personality Traits (Q2) — pick top 5
-  if (subPage === 'n1-personality') {
+  if (subPage === "n1-personality") {
     return (
       <NannyQuestionShell
         question="Which of these best describe you as a nanny?"
@@ -121,7 +131,7 @@ export function N1Identity({ state, dispatch, goNext, goBack, subPage, progress,
   }
 
   // Page 3: Level of Support (Q3) — pick 1, auto-advance
-  if (subPage === 'n1-support') {
+  if (subPage === "n1-support") {
     return (
       <NannyQuestionShell
         question="Which of the following best describes your ability to support young children?"
@@ -145,7 +155,7 @@ export function N1Identity({ state, dispatch, goNext, goBack, subPage, progress,
   }
 
   // Page 4: Professional Values (Q4) — pick top 5
-  if (subPage === 'n1-values') {
+  if (subPage === "n1-values") {
     return (
       <NannyQuestionShell
         question="Which of the following do you believe make you an exceptional nanny?"

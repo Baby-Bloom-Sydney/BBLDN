@@ -6,7 +6,14 @@
 import { readdirSync, lstatSync } from "node:fs";
 import { join, extname } from "node:path";
 
-const DEFAULT_SKIP_DIRS = new Set(["node_modules", ".next", ".git", "coverage", "dist", "out"]);
+const DEFAULT_SKIP_DIRS = new Set([
+  "node_modules",
+  ".next",
+  ".git",
+  "coverage",
+  "dist",
+  "out",
+]);
 
 /**
  * @param {string} root            absolute directory to walk (missing → empty list)

@@ -11,22 +11,55 @@ interface SuburbEntry {
 }
 
 // Matches parent form constants exactly
-const DAY_OPTIONS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const DAY_OPTIONS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 const DAY_SHORT: Record<string, string> = {
-  Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed", Thursday: "Thu",
-  Friday: "Fri", Saturday: "Sat", Sunday: "Sun",
+  Monday: "Mon",
+  Tuesday: "Tue",
+  Wednesday: "Wed",
+  Thursday: "Thu",
+  Friday: "Fri",
+  Saturday: "Sat",
+  Sunday: "Sun",
 };
 // Map display day → API key (lowercase)
 const DAY_KEY: Record<string, string> = {
-  Monday: "monday", Tuesday: "tuesday", Wednesday: "wednesday", Thursday: "thursday",
-  Friday: "friday", Saturday: "saturday", Sunday: "sunday",
+  Monday: "monday",
+  Tuesday: "tuesday",
+  Wednesday: "wednesday",
+  Thursday: "thursday",
+  Friday: "friday",
+  Saturday: "saturday",
+  Sunday: "sunday",
 };
 
 const TIME_BLOCKS = [
-  { key: "morning", label: "Morning", sublabel: "6am - 10am", short: "6am-10am" },
+  {
+    key: "morning",
+    label: "Morning",
+    sublabel: "6am - 10am",
+    short: "6am-10am",
+  },
   { key: "midday", label: "Midday", sublabel: "10am - 2pm", short: "10am-2pm" },
-  { key: "afternoon", label: "Afternoon", sublabel: "2pm - 6pm", short: "2pm-6pm" },
-  { key: "evening", label: "Evening", sublabel: "6pm - 10pm", short: "6pm-10pm" },
+  {
+    key: "afternoon",
+    label: "Afternoon",
+    sublabel: "2pm - 6pm",
+    short: "2pm-6pm",
+  },
+  {
+    key: "evening",
+    label: "Evening",
+    sublabel: "6pm - 10pm",
+    short: "6pm-10pm",
+  },
 ];
 
 export function QuickMatch() {
@@ -37,12 +70,16 @@ export function QuickMatch() {
   const [query, setQuery] = useState("");
   const [filtered, setFiltered] = useState<SuburbEntry[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedSuburb, setSelectedSuburb] = useState<SuburbEntry | null>(null);
+  const [selectedSuburb, setSelectedSuburb] = useState<SuburbEntry | null>(
+    null,
+  );
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Availability state — matches parent form pattern: select days, then time blocks per day
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
-  const [availability, setAvailability] = useState<Record<string, string[]>>({});
+  const [availability, setAvailability] = useState<Record<string, string[]>>(
+    {},
+  );
   const timesRef = useRef<HTMLDivElement>(null);
 
   // Search state
@@ -51,7 +88,28 @@ export function QuickMatch() {
   const [prompt, setPrompt] = useState<string | null>(null);
 
   // Typewriter placeholder
-  const PLACEHOLDER_SUBURBS = ["Vaucluse", "Mosman", "Double Bay", "Rose Bay", "Woollahra", "Neutral Bay", "Bellevue Hill", "Cremorne", "Paddington", "Manly", "Bondi", "Balmoral", "Darling Point", "Palm Beach", "Bronte", "Avalon", "Coogee", "Randwick", "Clovelly", "Maroubra"];
+  const PLACEHOLDER_SUBURBS = [
+    "Vaucluse",
+    "Mosman",
+    "Double Bay",
+    "Rose Bay",
+    "Woollahra",
+    "Neutral Bay",
+    "Bellevue Hill",
+    "Cremorne",
+    "Paddington",
+    "Manly",
+    "Bondi",
+    "Balmoral",
+    "Darling Point",
+    "Palm Beach",
+    "Bronte",
+    "Avalon",
+    "Coogee",
+    "Randwick",
+    "Clovelly",
+    "Maroubra",
+  ];
   const [typedPlaceholder, setTypedPlaceholder] = useState("");
   const [isInputFocused, setIsInputFocused] = useState(false);
   const typewriterRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -112,7 +170,10 @@ export function QuickMatch() {
   // Click outside to close dropdown
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setShowDropdown(false);
       }
     };
@@ -126,7 +187,9 @@ export function QuickMatch() {
     if (val.trim().length >= 2) {
       const q = val.toLowerCase().trim();
       const matches = suburbs
-        .filter((s) => s.suburb.toLowerCase().includes(q) || s.postcode.includes(q))
+        .filter(
+          (s) => s.suburb.toLowerCase().includes(q) || s.postcode.includes(q),
+        )
         .slice(0, 8);
       setFiltered(matches);
       setShowDropdown(matches.length > 0);
@@ -180,7 +243,9 @@ export function QuickMatch() {
   }, [selectedDays.length]);
 
   // Sort selected days in week order
-  const sortedSelectedDays = DAY_OPTIONS.filter((d) => selectedDays.includes(d));
+  const sortedSelectedDays = DAY_OPTIONS.filter((d) =>
+    selectedDays.includes(d),
+  );
 
   // Every selected day must have at least one time block
   const allDaysHaveBrackets =
@@ -204,7 +269,7 @@ export function QuickMatch() {
         suburb: selectedSuburb.suburb,
         postcode: selectedSuburb.postcode,
         availability,
-      })
+      }),
     );
 
     router.push("/results");
@@ -238,7 +303,10 @@ export function QuickMatch() {
                 {!isInputFocused && query.length === 0 && (
                   <span className="absolute left-10 top-1/2 -translate-y-1/2 text-sm text-slate-400 pointer-events-none select-none">
                     {typedPlaceholder}
-                    <span className="inline-block w-[2px] h-4 bg-slate-400 ml-[1px] align-middle" style={{ animation: "blink 1s step-end infinite" }} />
+                    <span
+                      className="inline-block w-[2px] h-4 bg-slate-400 ml-[1px] align-middle"
+                      style={{ animation: "blink 1s step-end infinite" }}
+                    />
                   </span>
                 )}
                 <input
@@ -250,7 +318,9 @@ export function QuickMatch() {
                     if (filtered.length > 0) setShowDropdown(true);
                   }}
                   onBlur={() => setIsInputFocused(false)}
-                  placeholder={isInputFocused ? "Search suburb or postcode..." : ""}
+                  placeholder={
+                    isInputFocused ? "Search suburb or postcode..." : ""
+                  }
                   className="w-full h-11 pl-10 pr-4 rounded-lg border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-colors"
                 />
                 {showDropdown && filtered.length > 0 && (
@@ -272,113 +342,120 @@ export function QuickMatch() {
 
             {/* Day + time selection — matches parent form pattern */}
             {selectedSuburb && (
-            <div className="space-y-4">
-              <label className="text-sm font-medium text-slate-700 block text-center">
-                Which days do you need childcare?
-              </label>
+              <div className="space-y-4">
+                <label className="text-sm font-medium text-slate-700 block text-center">
+                  Which days do you need childcare?
+                </label>
 
-              {/* Day selection — 4 + 3 grid, matches DaysTimesCompound */}
-              <div className="flex flex-col gap-2">
-                <div className="grid grid-cols-4 gap-2">
-                  {DAY_OPTIONS.slice(0, 4).map((day) => (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => toggleDay(day)}
-                      className={`px-2 py-2.5 rounded-lg border text-sm font-medium text-center transition-all duration-150 touch-manipulation ${
-                        selectedDays.includes(day)
-                          ? "bg-violet-500 text-white border-violet-500"
-                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
-                      }`}
-                    >
-                      {DAY_SHORT[day]}
-                    </button>
-                  ))}
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {DAY_OPTIONS.slice(4).map((day) => (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => toggleDay(day)}
-                      className={`px-2 py-2.5 rounded-lg border text-sm font-medium text-center transition-all duration-150 touch-manipulation ${
-                        selectedDays.includes(day)
-                          ? "bg-violet-500 text-white border-violet-500"
-                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
-                      }`}
-                    >
-                      {DAY_SHORT[day]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Time bracket grid — appears once days are selected */}
-              {sortedSelectedDays.length > 0 && (
+                {/* Day selection — 4 + 3 grid, matches DaysTimesCompound */}
                 <div className="flex flex-col gap-2">
-                  <p className="text-sm font-medium text-slate-700 text-center">
-                    When during the day?
-                  </p>
-
-                  <div className="w-full overflow-hidden">
-                    <div className="w-full">
-                      {/* Column headers */}
-                      <div className="grid grid-cols-[38px_repeat(4,1fr)] sm:grid-cols-[60px_repeat(4,1fr)] md:grid-cols-[80px_repeat(4,1fr)] gap-1 sm:gap-1.5 mb-1.5">
-                        <div />
-                        {TIME_BLOCKS.map((block) => (
-                          <div key={block.key} className="text-center flex flex-col justify-end">
-                            <p className="text-[10px] min-[400px]:text-[11px] font-semibold text-slate-600 tracking-tight">
-                              {block.label}
-                            </p>
-                            <span className="hidden sm:block text-[9px] text-slate-400 mt-0.5 whitespace-nowrap tracking-wide">
-                              {block.sublabel}
-                            </span>
-                            <span className="block sm:hidden text-[8px] min-[400px]:text-[9px] text-slate-400 mt-0.5 whitespace-nowrap tracking-tighter">
-                              {block.short}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Day rows */}
-                      {sortedSelectedDays.map((day) => {
-                        const currentTimes = availability[DAY_KEY[day]] ?? [];
-                        return (
-                          <div
-                            key={day}
-                            className="grid grid-cols-[38px_repeat(4,1fr)] sm:grid-cols-[60px_repeat(4,1fr)] md:grid-cols-[80px_repeat(4,1fr)] gap-1 sm:gap-1.5 mb-1"
-                          >
-                            <div className="flex items-center">
-                              <p className="text-[11px] sm:text-xs font-semibold text-slate-600 tracking-tight">
-                                {DAY_SHORT[day]}
-                              </p>
-                            </div>
-                            {TIME_BLOCKS.map((block) => {
-                              const isSelected = currentTimes.includes(block.key);
-                              return (
-                                <button
-                                  key={block.key}
-                                  type="button"
-                                  onClick={() => toggleTimeBlock(day, block.key)}
-                                  className={`h-8 sm:h-9 rounded-md border text-xs font-medium transition-colors touch-manipulation ${
-                                    isSelected
-                                      ? "bg-violet-500 text-white border-violet-500 shadow-sm"
-                                      : "bg-white text-slate-400 border-slate-200 hover:border-violet-400 hover:bg-slate-50"
-                                  }`}
-                                >
-                                  {isSelected ? "\u2713" : ""}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        );
-                      })}
-                    </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {DAY_OPTIONS.slice(0, 4).map((day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleDay(day)}
+                        className={`px-2 py-2.5 rounded-lg border text-sm font-medium text-center transition-all duration-150 touch-manipulation ${
+                          selectedDays.includes(day)
+                            ? "bg-violet-500 text-white border-violet-500"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
+                        }`}
+                      >
+                        {DAY_SHORT[day]}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {DAY_OPTIONS.slice(4).map((day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleDay(day)}
+                        className={`px-2 py-2.5 rounded-lg border text-sm font-medium text-center transition-all duration-150 touch-manipulation ${
+                          selectedDays.includes(day)
+                            ? "bg-violet-500 text-white border-violet-500"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
+                        }`}
+                      >
+                        {DAY_SHORT[day]}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              )}
-              <div ref={timesRef} />
-            </div>
+
+                {/* Time bracket grid — appears once days are selected */}
+                {sortedSelectedDays.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm font-medium text-slate-700 text-center">
+                      When during the day?
+                    </p>
+
+                    <div className="w-full overflow-hidden">
+                      <div className="w-full">
+                        {/* Column headers */}
+                        <div className="grid grid-cols-[38px_repeat(4,1fr)] sm:grid-cols-[60px_repeat(4,1fr)] md:grid-cols-[80px_repeat(4,1fr)] gap-1 sm:gap-1.5 mb-1.5">
+                          <div />
+                          {TIME_BLOCKS.map((block) => (
+                            <div
+                              key={block.key}
+                              className="text-center flex flex-col justify-end"
+                            >
+                              <p className="text-[10px] min-[400px]:text-[11px] font-semibold text-slate-600 tracking-tight">
+                                {block.label}
+                              </p>
+                              <span className="hidden sm:block text-[9px] text-slate-400 mt-0.5 whitespace-nowrap tracking-wide">
+                                {block.sublabel}
+                              </span>
+                              <span className="block sm:hidden text-[8px] min-[400px]:text-[9px] text-slate-400 mt-0.5 whitespace-nowrap tracking-tighter">
+                                {block.short}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Day rows */}
+                        {sortedSelectedDays.map((day) => {
+                          const currentTimes = availability[DAY_KEY[day]] ?? [];
+                          return (
+                            <div
+                              key={day}
+                              className="grid grid-cols-[38px_repeat(4,1fr)] sm:grid-cols-[60px_repeat(4,1fr)] md:grid-cols-[80px_repeat(4,1fr)] gap-1 sm:gap-1.5 mb-1"
+                            >
+                              <div className="flex items-center">
+                                <p className="text-[11px] sm:text-xs font-semibold text-slate-600 tracking-tight">
+                                  {DAY_SHORT[day]}
+                                </p>
+                              </div>
+                              {TIME_BLOCKS.map((block) => {
+                                const isSelected = currentTimes.includes(
+                                  block.key,
+                                );
+                                return (
+                                  <button
+                                    key={block.key}
+                                    type="button"
+                                    onClick={() =>
+                                      toggleTimeBlock(day, block.key)
+                                    }
+                                    className={`h-8 sm:h-9 rounded-md border text-xs font-medium transition-colors touch-manipulation ${
+                                      isSelected
+                                        ? "bg-violet-500 text-white border-violet-500 shadow-sm"
+                                        : "bg-white text-slate-400 border-slate-200 hover:border-violet-400 hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    {isSelected ? "\u2713" : ""}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={timesRef} />
+              </div>
             )}
 
             {/* CTA */}
@@ -422,7 +499,6 @@ export function QuickMatch() {
             {error && (
               <p className="text-xs text-red-500 text-center">{error}</p>
             )}
-
           </div>
 
           {/* Trust indicators */}

@@ -1362,17 +1362,14 @@ export function ParentHubClient({
                                       onClick={
                                         isScheduled && matchingIntro
                                           ? () =>
-                                              setSelectedDfyIntro(
-                                                matchingIntro,
-                                              )
+                                              setSelectedDfyIntro(matchingIntro)
                                           : undefined
                                       }
                                     >
                                       <div
                                         className={`flex items-center gap-3 ${!isScheduled && matchingIntro ? "cursor-pointer" : ""}`}
                                         onClick={
-                                          !isScheduled &&
-                                          matchingIntro
+                                          !isScheduled && matchingIntro
                                             ? (e) => {
                                                 e.stopPropagation();
                                                 setSelectedDfyIntro(
@@ -1470,44 +1467,43 @@ export function ParentHubClient({
                                         />
                                       )}
 
-                                      {!isScheduled &&
-                                        !isScheduling && (
-                                          <div className="flex gap-2">
-                                            <Button
-                                              size="sm"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSchedulingDfyId(
-                                                  conn.connectionId,
-                                                );
-                                              }}
-                                              disabled={isDeclining}
-                                              className="flex-1 bg-violet-600 hover:bg-violet-700 text-xs"
-                                            >
-                                              <CheckCircle className="w-3.5 h-3.5 mr-1" />
-                                              Approve
-                                            </Button>
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeclineDfy(
-                                                  conn.connectionId,
-                                                );
-                                              }}
-                                              disabled={isDeclining}
-                                              className="flex-1 text-xs"
-                                            >
-                                              {isDeclining ? (
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-                                              ) : (
-                                                <XCircle className="w-3.5 h-3.5 mr-1" />
-                                              )}
-                                              Decline
-                                            </Button>
-                                          </div>
-                                        )}
+                                      {!isScheduled && !isScheduling && (
+                                        <div className="flex gap-2">
+                                          <Button
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSchedulingDfyId(
+                                                conn.connectionId,
+                                              );
+                                            }}
+                                            disabled={isDeclining}
+                                            className="flex-1 bg-violet-600 hover:bg-violet-700 text-xs"
+                                          >
+                                            <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                                            Approve
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeclineDfy(
+                                                conn.connectionId,
+                                              );
+                                            }}
+                                            disabled={isDeclining}
+                                            className="flex-1 text-xs"
+                                          >
+                                            {isDeclining ? (
+                                              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                                            ) : (
+                                              <XCircle className="w-3.5 h-3.5 mr-1" />
+                                            )}
+                                            Decline
+                                          </Button>
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}

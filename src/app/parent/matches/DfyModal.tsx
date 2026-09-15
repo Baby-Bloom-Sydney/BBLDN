@@ -33,12 +33,16 @@ export function DfyModal({ open, onClose }: DfyModalProps) {
         </DialogHeader>
 
         <p className="text-sm text-slate-600">
-          We&apos;ll contact your best-matched nannies and let interested ones come to you.
+          We&apos;ll contact your best-matched nannies and let interested ones
+          come to you.
         </p>
 
         <ul className="space-y-2">
           {FEATURES.map((feature) => (
-            <li key={feature} className="flex items-start gap-2 text-sm text-slate-700">
+            <li
+              key={feature}
+              className="flex items-start gap-2 text-sm text-slate-700"
+            >
               <Check className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" />
               {feature}
             </li>

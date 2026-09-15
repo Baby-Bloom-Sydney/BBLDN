@@ -27,7 +27,10 @@ interface ExpandableBadgesProps {
   preventLinkNavigation?: boolean;
 }
 
-export function ExpandableBadges({ badges, preventLinkNavigation }: ExpandableBadgesProps) {
+export function ExpandableBadges({
+  badges,
+  preventLinkNavigation,
+}: ExpandableBadgesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(badges.length);
   const [measured, setMeasured] = useState(false);
@@ -83,7 +86,9 @@ export function ExpandableBadges({ badges, preventLinkNavigation }: ExpandableBa
   }, [expanded, badges.length]);
 
   const overflowing = measured && visibleCount < badges.length;
-  const displayBadges = expanded ? badges : badges.slice(0, measured ? visibleCount : badges.length);
+  const displayBadges = expanded
+    ? badges
+    : badges.slice(0, measured ? visibleCount : badges.length);
   const hiddenCount = badges.length - visibleCount;
 
   const handleClick = (e: React.MouseEvent) => {
@@ -96,7 +101,7 @@ export function ExpandableBadges({ badges, preventLinkNavigation }: ExpandableBa
       ref={containerRef}
       className={cn(
         "mt-3 flex gap-1 sm:gap-1.5",
-        expanded ? "flex-wrap" : "flex-nowrap overflow-hidden"
+        expanded ? "flex-wrap" : "flex-nowrap overflow-hidden",
       )}
       style={!expanded && measured ? { maxHeight: "1.75rem" } : undefined}
     >
@@ -106,29 +111,44 @@ export function ExpandableBadges({ badges, preventLinkNavigation }: ExpandableBa
           variant="secondary"
           className={cn(
             "rounded-lg text-[9px] sm:text-[10px] md:text-xs font-medium tracking-tight whitespace-nowrap shrink-0 px-1.5 sm:px-2.5 py-0.5 sm:py-0.5 md:py-1",
-            b.variant === "violet" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600",
-            b.className
+            b.variant === "violet"
+              ? "bg-violet-100 text-violet-700"
+              : "bg-slate-100 text-slate-600",
+            b.className,
           )}
         >
-          <b.icon className="mr-0.5 sm:mr-1 h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" /> {b.label}
+          <b.icon className="mr-0.5 sm:mr-1 h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />{" "}
+          {b.label}
         </Badge>
       ))}
       {!expanded && overflowing && (
         <button
-          onClick={(e) => { handleClick(e); setExpanded(true); }}
+          onClick={(e) => {
+            handleClick(e);
+            setExpanded(true);
+          }}
           className="shrink-0"
         >
-          <Badge variant="secondary" className="rounded-lg text-[9px] sm:text-[10px] md:text-xs font-medium tracking-tight px-1.5 sm:px-2.5 py-0.5 sm:py-0.5 md:py-1 bg-slate-100 text-slate-600 cursor-pointer hover:bg-slate-200 transition-colors whitespace-nowrap">
+          <Badge
+            variant="secondary"
+            className="rounded-lg text-[9px] sm:text-[10px] md:text-xs font-medium tracking-tight px-1.5 sm:px-2.5 py-0.5 sm:py-0.5 md:py-1 bg-slate-100 text-slate-600 cursor-pointer hover:bg-slate-200 transition-colors whitespace-nowrap"
+          >
             + {hiddenCount} more
           </Badge>
         </button>
       )}
       {expanded && overflowing && (
         <button
-          onClick={(e) => { handleClick(e); setExpanded(false); }}
+          onClick={(e) => {
+            handleClick(e);
+            setExpanded(false);
+          }}
           className="shrink-0"
         >
-          <Badge variant="secondary" className="rounded-lg text-[9px] sm:text-[10px] md:text-xs font-medium tracking-tight px-1.5 sm:px-2.5 py-0.5 sm:py-0.5 md:py-1 bg-slate-100 text-slate-600 cursor-pointer hover:bg-slate-200 transition-colors whitespace-nowrap">
+          <Badge
+            variant="secondary"
+            className="rounded-lg text-[9px] sm:text-[10px] md:text-xs font-medium tracking-tight px-1.5 sm:px-2.5 py-0.5 sm:py-0.5 md:py-1 bg-slate-100 text-slate-600 cursor-pointer hover:bg-slate-200 transition-colors whitespace-nowrap"
+          >
             − less
           </Badge>
         </button>

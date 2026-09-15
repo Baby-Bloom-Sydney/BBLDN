@@ -55,7 +55,7 @@ export function DaysTimesCompound({
 
   // Sort selected days in week order
   const sortedSelectedDays = DAY_OPTIONS.filter((d) =>
-    weeklyRoster.includes(d)
+    weeklyRoster.includes(d),
   );
 
   // Continue only when every selected day has at least one bracket

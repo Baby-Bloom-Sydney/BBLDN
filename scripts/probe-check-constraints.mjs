@@ -55,7 +55,9 @@ async function testInsertStatus(table, col, value, extraCols) {
 // cleanly test here — report that too.
 
 async function main() {
-  console.log("=== C2: babysitting_requests.status allows 'pending_payment' ===");
+  console.log(
+    "=== C2: babysitting_requests.status allows 'pending_payment' ===",
+  );
   {
     const { data: rows } = await admin
       .from("babysitting_requests")
@@ -63,7 +65,9 @@ async function main() {
       .limit(1);
     const sample = rows?.[0];
     if (!sample) {
-      console.log("  no rows in babysitting_requests to test against; skipping");
+      console.log(
+        "  no rows in babysitting_requests to test against; skipping",
+      );
     } else {
       const { data, error } = await admin
         .from("babysitting_requests")
@@ -71,9 +75,13 @@ async function main() {
         .eq("id", sample.id)
         .select("id, status");
       if (error) {
-        console.log(`  ❌ UPDATE failed: code=${error.code} msg=${error.message}`);
+        console.log(
+          `  ❌ UPDATE failed: code=${error.code} msg=${error.message}`,
+        );
       } else if (data && data[0]?.status === "pending_payment") {
-        console.log("  ✅ CHECK accepts 'pending_payment' — restoring original status");
+        console.log(
+          "  ✅ CHECK accepts 'pending_payment' — restoring original status",
+        );
         await admin
           .from("babysitting_requests")
           .update({ status: sample.status })
@@ -100,7 +108,9 @@ async function main() {
         .eq("id", sample.id)
         .select("id, status");
       if (error) {
-        console.log(`  ❌ UPDATE failed: code=${error.code} msg=${error.message}`);
+        console.log(
+          `  ❌ UPDATE failed: code=${error.code} msg=${error.message}`,
+        );
       } else if (data && data[0]?.status === "closed") {
         console.log("  ✅ CHECK accepts 'closed' — restoring original status");
         await admin
@@ -149,7 +159,10 @@ async function main() {
 
       console.log("  values currently present in prod:");
       console.log("    urgency:          ", uniq(distinctUrgency, "urgency"));
-      console.log("    placement_length: ", uniq(distinctPL, "placement_length"));
+      console.log(
+        "    placement_length: ",
+        uniq(distinctPL, "placement_length"),
+      );
       console.log("    schedule_type:    ", uniq(distinctST, "schedule_type"));
       console.log(
         "  (any value listed above is accepted by the live CHECK — verify against the migration file)",

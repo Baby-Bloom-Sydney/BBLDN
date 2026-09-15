@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function uploadImage(
-  formData: FormData
+  formData: FormData,
 ): Promise<{ success: boolean; url: string | null; error: string | null }> {
   try {
     const supabase = createClient();
@@ -19,7 +19,14 @@ export async function uploadImage(
     const file = formData.get("file") as File | null;
     const childId = formData.get("childId") as string | null;
 
-    console.log("[uploadImage] file:", file?.name, "size:", file?.size, "childId:", childId);
+    console.log(
+      "[uploadImage] file:",
+      file?.name,
+      "size:",
+      file?.size,
+      "childId:",
+      childId,
+    );
 
     if (!file || !childId) {
       console.log("[uploadImage] MISSING file or childId");

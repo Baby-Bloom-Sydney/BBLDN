@@ -16,18 +16,27 @@ const NEEDLE = "process.env";
 function findEnvReads(file) {
   const lines = readFileSync(file, "utf8").split("\n");
   return lines.flatMap((line, index) =>
-    line.includes(NEEDLE) ? [`${relative(REPO_ROOT, file)}:${index + 1}: ${line.trim()}`] : [],
+    line.includes(NEEDLE)
+      ? [`${relative(REPO_ROOT, file)}:${index + 1}: ${line.trim()}`]
+      : [],
   );
 }
 
-const candidates = listFiles(SCAN_ROOT, { extensions: SOURCE_EXTENSIONS }).filter(
-  (file) => relative(REPO_ROOT, file) !== ALLOWED_FILE && !file.endsWith(".d.ts"),
+const candidates = listFiles(SCAN_ROOT, {
+  extensions: SOURCE_EXTENSIONS,
+}).filter(
+  (file) =>
+    relative(REPO_ROOT, file) !== ALLOWED_FILE && !file.endsWith(".d.ts"),
 );
 const hits = candidates.flatMap(findEnvReads);
 
 if (hits.length > 0) {
-  console.error(`check-env-reads: FAIL — ${hits.length} process.env read(s) outside ${ALLOWED_FILE}`);
+  console.error(
+    `check-env-reads: FAIL — ${hits.length} process.env read(s) outside ${ALLOWED_FILE}`,
+  );
   for (const hit of hits) console.error(`  ${hit}`);
   process.exit(1);
 }
-console.log(`check-env-reads: OK — process.env is read only in ${ALLOWED_FILE}`);
+console.log(
+  `check-env-reads: OK — process.env is read only in ${ALLOWED_FILE}`,
+);

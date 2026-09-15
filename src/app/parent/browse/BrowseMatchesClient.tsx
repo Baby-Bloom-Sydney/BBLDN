@@ -36,19 +36,19 @@ function sortMatches(matches: MatchResult[], sortBy: SortKey): MatchResult[] {
     case "experience":
       return sorted.sort((a, b) => {
         const ea =
-          b.nanny.nanny_experience_years ??
-          b.nanny.total_experience_years ??
-          0;
+          b.nanny.nanny_experience_years ?? b.nanny.total_experience_years ?? 0;
         const eb =
-          a.nanny.nanny_experience_years ??
-          a.nanny.total_experience_years ??
-          0;
+          a.nanny.nanny_experience_years ?? a.nanny.total_experience_years ?? 0;
         return ea - eb;
       });
     case "qualification":
       return sorted.sort((a, b) => {
-        const qa = a.highestQualification ? (QUAL_RANK[a.highestQualification] ?? 0) : 0;
-        const qb = b.highestQualification ? (QUAL_RANK[b.highestQualification] ?? 0) : 0;
+        const qa = a.highestQualification
+          ? (QUAL_RANK[a.highestQualification] ?? 0)
+          : 0;
+        const qb = b.highestQualification
+          ? (QUAL_RANK[b.highestQualification] ?? 0)
+          : 0;
         return qb - qa;
       });
     default:
@@ -62,7 +62,11 @@ interface BrowseMatchesClientProps {
   children?: React.ReactNode;
 }
 
-export function BrowseMatchesClient({ matches, stats, children }: BrowseMatchesClientProps) {
+export function BrowseMatchesClient({
+  matches,
+  stats,
+  children,
+}: BrowseMatchesClientProps) {
   const [sortBy, setSortBy] = useState<SortKey>("score");
   const sorted = sortMatches(matches, sortBy);
 

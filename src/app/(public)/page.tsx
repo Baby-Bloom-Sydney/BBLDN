@@ -9,12 +9,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { NannyPreview } from "@/components/landing/NannyPreviewCard";
 
 export const metadata: Metadata = {
-  title: { absolute: 'Baby Bloom Sydney — Verified Nannies for Sydney Families' },
-  description: 'Find trusted, WWCC-verified nannies in Sydney. Baby Bloom matches families with background-checked, education-focused childcare professionals.',
-  alternates: { canonical: '/' },
+  title: {
+    absolute: "Baby Bloom Sydney — Verified Nannies for Sydney Families",
+  },
+  description:
+    "Find trusted, WWCC-verified nannies in Sydney. Baby Bloom matches families with background-checked, education-focused childcare professionals.",
+  alternates: { canonical: "/" },
   openGraph: {
-    title: 'Baby Bloom Sydney — Verified Nannies for Sydney Families',
-    description: 'Find trusted, WWCC-verified nannies in Sydney. Baby Bloom matches families with background-checked, education-focused childcare professionals.',
+    title: "Baby Bloom Sydney — Verified Nannies for Sydney Families",
+    description:
+      "Find trusted, WWCC-verified nannies in Sydney. Baby Bloom matches families with background-checked, education-focused childcare professionals.",
   },
 };
 
@@ -41,7 +45,9 @@ async function getTopNannies(limit: number): Promise<NannyPreview[]> {
 
   const { data: nannies, error } = await supabase
     .from("nannies")
-    .select("id, user_id, hourly_rate_min, total_experience_years, under_3_experience_years, newborn_experience_years, verification_tier, verification_level, ai_content")
+    .select(
+      "id, user_id, hourly_rate_min, total_experience_years, under_3_experience_years, newborn_experience_years, verification_tier, verification_level, ai_content",
+    )
     .eq("profile_visible", true);
 
   if (error || !nannies?.length) return [];
@@ -62,7 +68,12 @@ async function getTopNannies(limit: number): Promise<NannyPreview[]> {
   ]);
 
   const profileMap = new Map((profiles || []).map((p) => [p.user_id, p]));
-  const qualMap = new Map((credentials || []).map((c) => [c.nanny_id, c.qualification_type as string]));
+  const qualMap = new Map(
+    (credentials || []).map((c) => [
+      c.nanny_id,
+      c.qualification_type as string,
+    ]),
+  );
 
   const mapped: NannyPreview[] = nannies
     .map((nanny) => {
@@ -87,10 +98,15 @@ async function getTopNannies(limit: number): Promise<NannyPreview[]> {
     .filter((n): n is NannyPreview => n !== null);
 
   mapped.sort((a, b) => {
-    const expDiff = (b.total_experience_years ?? 0) - (a.total_experience_years ?? 0);
+    const expDiff =
+      (b.total_experience_years ?? 0) - (a.total_experience_years ?? 0);
     if (expDiff !== 0) return expDiff;
-    const qualA = a.highest_qualification ? (QUAL_RANK[a.highest_qualification] ?? 0) : 0;
-    const qualB = b.highest_qualification ? (QUAL_RANK[b.highest_qualification] ?? 0) : 0;
+    const qualA = a.highest_qualification
+      ? (QUAL_RANK[a.highest_qualification] ?? 0)
+      : 0;
+    const qualB = b.highest_qualification
+      ? (QUAL_RANK[b.highest_qualification] ?? 0)
+      : 0;
     return qualB - qualA;
   });
 
@@ -98,37 +114,70 @@ async function getTopNannies(limit: number): Promise<NannyPreview[]> {
 }
 
 const websiteJsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  name: 'Baby Bloom Sydney',
-  url: 'https://babybloomsydney.com.au',
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Baby Bloom Sydney",
+  url: "https://babybloomsydney.com.au",
 };
 
 const serviceJsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'Service',
-  name: 'Verified Nanny Matching — Sydney',
-  serviceType: 'Nanny and Childcare Matching Service',
-  description: 'Baby Bloom matches Sydney families with WWCC-verified, ID-checked nannies and babysitters.',
+  "@context": "https://schema.org",
+  "@type": "Service",
+  name: "Verified Nanny Matching — Sydney",
+  serviceType: "Nanny and Childcare Matching Service",
+  description:
+    "Baby Bloom matches Sydney families with WWCC-verified, ID-checked nannies and babysitters.",
   provider: {
-    '@type': 'Organization',
-    name: 'Baby Bloom Sydney',
-    url: 'https://babybloomsydney.com.au',
+    "@type": "Organization",
+    name: "Baby Bloom Sydney",
+    url: "https://babybloomsydney.com.au",
   },
   areaServed: {
-    '@type': 'City',
-    name: 'Sydney',
-    addressRegion: 'NSW',
-    addressCountry: 'AU',
+    "@type": "City",
+    name: "Sydney",
+    addressRegion: "NSW",
+    addressCountry: "AU",
   },
   hasOfferCatalog: {
-    '@type': 'OfferCatalog',
-    name: 'Childcare Services',
+    "@type": "OfferCatalog",
+    name: "Childcare Services",
     itemListElement: [
-      { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Permanent Nanny Matching', description: 'Find a verified permanent nanny matched to your family\'s needs' } },
-      { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Part-Time Nanny Matching', description: 'Flexible part-time nanny arrangements for Sydney families' } },
-      { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Casual Babysitting', description: 'On-demand babysitting from verified sitters in your area' } },
-      { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'After-School Care', description: 'Verified nannies for school pickups and after-school care' } },
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: "Permanent Nanny Matching",
+          description:
+            "Find a verified permanent nanny matched to your family's needs",
+        },
+      },
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: "Part-Time Nanny Matching",
+          description:
+            "Flexible part-time nanny arrangements for Sydney families",
+        },
+      },
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: "Casual Babysitting",
+          description:
+            "On-demand babysitting from verified sitters in your area",
+        },
+      },
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: "After-School Care",
+          description:
+            "Verified nannies for school pickups and after-school care",
+        },
+      },
     ],
   },
 };
@@ -141,13 +190,13 @@ export default async function HomePage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(websiteJsonLd).replace(/</g, '\\u003c'),
+          __html: JSON.stringify(websiteJsonLd).replace(/</g, "\\u003c"),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(serviceJsonLd).replace(/</g, '\\u003c'),
+          __html: JSON.stringify(serviceJsonLd).replace(/</g, "\\u003c"),
         }}
       />
       <QuickMatch />

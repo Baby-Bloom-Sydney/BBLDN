@@ -113,7 +113,15 @@ export const REASON_OPTIONS = [
 
 export const HOURS_OPTIONS = ["Under 10", "10–20", "20–30", "30–40", "40+"];
 
-export const DAY_OPTIONS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+export const DAY_OPTIONS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 export const DAY_SHORT: Record<string, string> = {
   Monday: "Mon",
@@ -423,5 +431,4 @@ export const QUESTIONS: QuestionConfig[] = [
       subLabel: "Start date",
     },
   },
-
 ];

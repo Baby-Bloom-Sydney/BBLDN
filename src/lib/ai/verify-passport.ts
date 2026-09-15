@@ -1,6 +1,6 @@
-import { openai } from './client';
+import { openai } from "./client";
 
-import type { UserGuidance } from '@/lib/verification';
+import type { UserGuidance } from "@/lib/verification";
 
 export interface PassportVerificationResult {
   pass: boolean;
@@ -99,33 +99,33 @@ export async function verifyPassport(
     given_names: string;
     date_of_birth: string;
     passport_country: string;
-  }
+  },
 ): Promise<PassportVerificationResult> {
   try {
     // Step 1: AI extracts data from passport image (does NOT decide pass/fail)
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5.4-nano',
+      model: "gpt-5.4-nano",
       messages: [
-        { role: 'system', content: PASSPORT_SYSTEM_PROMPT },
+        { role: "system", content: PASSPORT_SYSTEM_PROMPT },
         {
-          role: 'user',
+          role: "user",
           content: [
             {
-              type: 'text',
+              type: "text",
               text: `Extract all data from this passport and evaluate the selfie comparison. Return ONLY the JSON extraction with your confidence score.`,
             },
             {
-              type: 'image_url',
-              image_url: { url: passportSignedUrl, detail: 'high' },
+              type: "image_url",
+              image_url: { url: passportSignedUrl, detail: "high" },
             },
             {
-              type: 'image_url',
-              image_url: { url: selfieSignedUrl, detail: 'auto' },
+              type: "image_url",
+              image_url: { url: selfieSignedUrl, detail: "auto" },
             },
           ],
         },
       ],
-      response_format: { type: 'json_object' },
+      response_format: { type: "json_object" },
       max_completion_tokens: 2000,
     });
 
@@ -133,15 +133,22 @@ export async function verifyPassport(
     if (!raw) {
       return {
         pass: false,
-        extracted: { surname: null, given_names: null, dob: null, nationality: null, passport_number: null, expiry: null },
+        extracted: {
+          surname: null,
+          given_names: null,
+          dob: null,
+          nationality: null,
+          passport_number: null,
+          expiry: null,
+        },
         selfie_confidence: null,
-        reasoning: 'AI returned empty response',
-        issues: ['AI analysis failed — empty response'],
+        reasoning: "AI returned empty response",
+        issues: ["AI analysis failed — empty response"],
       };
     }
 
     const ai = JSON.parse(raw);
-    console.log('[verifyPassport] AI extraction:', JSON.stringify(ai, null, 2));
+    console.log("[verifyPassport] AI extraction:", JSON.stringify(ai, null, 2));
 
     const extracted = {
       surname: ai.extracted?.surname ?? null,
@@ -152,9 +159,10 @@ export async function verifyPassport(
       expiry: ai.extracted?.expiry ?? null,
     };
 
-    const selfieConfidence: number = typeof ai.selfie_confidence === 'number' ? ai.selfie_confidence : 0;
+    const selfieConfidence: number =
+      typeof ai.selfie_confidence === "number" ? ai.selfie_confidence : 0;
     const selfieValid: boolean = ai.selfie_valid !== false;
-    const selfieReasoning: string = ai.selfie_reasoning ?? '';
+    const selfieReasoning: string = ai.selfie_reasoning ?? "";
 
     // Step 2: Server-side validation — CODE decides pass/fail, not AI
     const issues: string[] = [];
@@ -162,20 +170,24 @@ export async function verifyPassport(
 
     // 2a. Document validity
     if (!ai.document_valid) {
-      issues.push('Document does not appear to be a valid passport');
+      issues.push("Document does not appear to be a valid passport");
     }
-    if (ai.image_quality === 'unreadable') {
-      issues.push('Passport image is too blurry or dark to read');
+    if (ai.image_quality === "unreadable") {
+      issues.push("Passport image is too blurry or dark to read");
     }
-    if (ai.image_quality === 'poor') {
-      issues.push('Passport image quality is poor — some fields may be misread');
+    if (ai.image_quality === "poor") {
+      issues.push(
+        "Passport image quality is poor — some fields may be misread",
+      );
     }
-    reasoning.push(`Document valid: ${ai.document_valid}, Image quality: ${ai.image_quality}`);
+    reasoning.push(
+      `Document valid: ${ai.document_valid}, Image quality: ${ai.image_quality}`,
+    );
 
     // 2b. Selfie validity checks (before confidence score)
     if (!selfieValid) {
       const validityIssues = ai.selfie_validity_issues ?? [];
-      issues.push('Selfie is not suitable for verification');
+      issues.push("Selfie is not suitable for verification");
       if (validityIssues.length > 0) {
         issues.push(...validityIssues.map((i: string) => `Selfie: ${i}`));
       }
@@ -183,9 +195,13 @@ export async function verifyPassport(
 
     // 2c. Selfie confidence score (only meaningful if selfie is valid)
     if (selfieValid && selfieConfidence < SELFIE_PASS_THRESHOLD) {
-      issues.push(`Selfie match confidence too low (${selfieConfidence}%) — minimum ${SELFIE_PASS_THRESHOLD}% required`);
+      issues.push(
+        `Selfie match confidence too low (${selfieConfidence}%) — minimum ${SELFIE_PASS_THRESHOLD}% required`,
+      );
     }
-    reasoning.push(`Selfie valid: ${selfieValid}, Confidence: ${selfieConfidence}%, Threshold: ${SELFIE_PASS_THRESHOLD}%`);
+    reasoning.push(
+      `Selfie valid: ${selfieValid}, Confidence: ${selfieConfidence}%, Threshold: ${SELFIE_PASS_THRESHOLD}%`,
+    );
     if (selfieReasoning) {
       reasoning.push(`Selfie analysis: ${selfieReasoning}`);
     }
@@ -194,32 +210,55 @@ export async function verifyPassport(
     // Users commonly enter surname/given names in the wrong fields, especially
     // with Asian passports where name order conventions differ. If the names are
     // simply swapped, we correct them silently and pass.
-    if (extracted.surname && extracted.given_names && submittedData.surname?.trim() && submittedData.given_names?.trim()) {
+    if (
+      extracted.surname &&
+      extracted.given_names &&
+      submittedData.surname?.trim() &&
+      submittedData.given_names?.trim()
+    ) {
       const extSurname = extracted.surname.toLowerCase().trim();
-      const extGivenFirst = extracted.given_names.toLowerCase().trim().split(/\s+/)[0];
+      const extGivenFirst = extracted.given_names
+        .toLowerCase()
+        .trim()
+        .split(/\s+/)[0];
       const subSurname = submittedData.surname.toLowerCase().trim();
-      const subGivenFirst = submittedData.given_names.toLowerCase().trim().split(/\s+/)[0];
+      const subGivenFirst = submittedData.given_names
+        .toLowerCase()
+        .trim()
+        .split(/\s+/)[0];
 
       const surnameMatch = extSurname === subSurname;
       const givenMatch = extGivenFirst === subGivenFirst;
 
       // Check if names are swapped: submitted surname matches extracted given name AND vice versa
-      const swapped = !surnameMatch && !givenMatch
-        && extSurname === subGivenFirst
-        && extGivenFirst === subSurname;
+      const swapped =
+        !surnameMatch &&
+        !givenMatch &&
+        extSurname === subGivenFirst &&
+        extGivenFirst === subSurname;
 
       if (swapped) {
         // Names are swapped — correct the extracted order to match passport and pass
-        reasoning.push(`Names SWAPPED: user entered surname="${submittedData.surname}" given="${submittedData.given_names}" but passport shows surname="${extracted.surname}" given="${extracted.given_names}" — auto-corrected`);
+        reasoning.push(
+          `Names SWAPPED: user entered surname="${submittedData.surname}" given="${submittedData.given_names}" but passport shows surname="${extracted.surname}" given="${extracted.given_names}" — auto-corrected`,
+        );
       } else {
         if (!surnameMatch) {
-          issues.push(`Surname mismatch: passport shows "${extracted.surname}" but you entered "${submittedData.surname}"`);
+          issues.push(
+            `Surname mismatch: passport shows "${extracted.surname}" but you entered "${submittedData.surname}"`,
+          );
         }
         if (!givenMatch) {
-          issues.push(`First name mismatch: passport shows "${extracted.given_names}" but you entered "${submittedData.given_names}"`);
+          issues.push(
+            `First name mismatch: passport shows "${extracted.given_names}" but you entered "${submittedData.given_names}"`,
+          );
         }
-        reasoning.push(`Surname: extracted="${extracted.surname}" submitted="${submittedData.surname}" ${surnameMatch ? 'MATCH' : 'MISMATCH'}`);
-        reasoning.push(`Given names: extracted="${extracted.given_names}" submitted="${submittedData.given_names}" first="${givenMatch ? 'MATCH' : 'MISMATCH'}"`);
+        reasoning.push(
+          `Surname: extracted="${extracted.surname}" submitted="${submittedData.surname}" ${surnameMatch ? "MATCH" : "MISMATCH"}`,
+        );
+        reasoning.push(
+          `Given names: extracted="${extracted.given_names}" submitted="${submittedData.given_names}" first="${givenMatch ? "MATCH" : "MISMATCH"}"`,
+        );
       }
     } else {
       // Fallback: individual checks when one name is missing from extraction
@@ -227,33 +266,51 @@ export async function verifyPassport(
         const extractedSurname = extracted.surname.toLowerCase().trim();
         const submittedSurname = submittedData.surname.toLowerCase().trim();
         if (extractedSurname !== submittedSurname) {
-          issues.push(`Surname mismatch: passport shows "${extracted.surname}" but you entered "${submittedData.surname}"`);
+          issues.push(
+            `Surname mismatch: passport shows "${extracted.surname}" but you entered "${submittedData.surname}"`,
+          );
         }
-        reasoning.push(`Surname: extracted="${extracted.surname}" submitted="${submittedData.surname}" ${extractedSurname === submittedSurname ? 'MATCH' : 'MISMATCH'}`);
+        reasoning.push(
+          `Surname: extracted="${extracted.surname}" submitted="${submittedData.surname}" ${extractedSurname === submittedSurname ? "MATCH" : "MISMATCH"}`,
+        );
       } else if (!extracted.surname) {
-        issues.push('Could not read surname from passport');
+        issues.push("Could not read surname from passport");
       }
 
       if (extracted.given_names && submittedData.given_names?.trim()) {
-        const extractedFirst = extracted.given_names.toLowerCase().trim().split(/\s+/)[0];
-        const submittedFirst = submittedData.given_names.toLowerCase().trim().split(/\s+/)[0];
+        const extractedFirst = extracted.given_names
+          .toLowerCase()
+          .trim()
+          .split(/\s+/)[0];
+        const submittedFirst = submittedData.given_names
+          .toLowerCase()
+          .trim()
+          .split(/\s+/)[0];
         if (extractedFirst !== submittedFirst) {
-          issues.push(`First name mismatch: passport shows "${extracted.given_names}" but you entered "${submittedData.given_names}"`);
+          issues.push(
+            `First name mismatch: passport shows "${extracted.given_names}" but you entered "${submittedData.given_names}"`,
+          );
         }
-        reasoning.push(`Given names: extracted="${extracted.given_names}" submitted="${submittedData.given_names}" first="${extractedFirst === submittedFirst ? 'MATCH' : 'MISMATCH'}"`);
+        reasoning.push(
+          `Given names: extracted="${extracted.given_names}" submitted="${submittedData.given_names}" first="${extractedFirst === submittedFirst ? "MATCH" : "MISMATCH"}"`,
+        );
       } else if (!extracted.given_names) {
-        issues.push('Could not read given names from passport');
+        issues.push("Could not read given names from passport");
       }
     }
 
     // 2f. Date of birth — EXACT match required
     if (extracted.dob && submittedData.date_of_birth) {
       if (extracted.dob !== submittedData.date_of_birth) {
-        issues.push(`Date of birth mismatch: passport shows "${extracted.dob}" but you entered "${submittedData.date_of_birth}"`);
+        issues.push(
+          `Date of birth mismatch: passport shows "${extracted.dob}" but you entered "${submittedData.date_of_birth}"`,
+        );
       }
-      reasoning.push(`DOB: extracted="${extracted.dob}" submitted="${submittedData.date_of_birth}" ${extracted.dob === submittedData.date_of_birth ? 'MATCH' : 'MISMATCH'}`);
+      reasoning.push(
+        `DOB: extracted="${extracted.dob}" submitted="${submittedData.date_of_birth}" ${extracted.dob === submittedData.date_of_birth ? "MATCH" : "MISMATCH"}`,
+      );
     } else if (!extracted.dob) {
-      issues.push('Could not read date of birth from passport');
+      issues.push("Could not read date of birth from passport");
     }
 
     // 2g. Passport expiry — must not be expired
@@ -263,14 +320,18 @@ export async function verifyPassport(
       if (expiryDate < now) {
         issues.push(`Passport has expired (${extracted.expiry})`);
       }
-      reasoning.push(`Expiry: ${extracted.expiry} ${expiryDate < now ? 'EXPIRED' : 'valid'}`);
+      reasoning.push(
+        `Expiry: ${extracted.expiry} ${expiryDate < now ? "EXPIRED" : "valid"}`,
+      );
     } else if (ai.document_valid) {
-      issues.push('Could not read expiry date from passport');
+      issues.push("Could not read expiry date from passport");
     }
 
     // 2h. MRZ consistency
     if (ai.mrz_consistent === false) {
-      issues.push('MRZ data does not match visual data on passport — possible alteration');
+      issues.push(
+        "MRZ data does not match visual data on passport — possible alteration",
+      );
     }
 
     // 2i. Document concerns from AI
@@ -279,69 +340,90 @@ export async function verifyPassport(
     }
 
     // Step 3: Determine pass/fail based on hard rules
-    const hasNameMismatch = issues.some(i => i.includes('name mismatch') || i.includes('Name mismatch'));
-    const hasDobMismatch = issues.some(i => i.includes('Date of birth mismatch'));
-    const hasExpired = issues.some(i => i.includes('expired'));
-    const hasInvalidDoc = issues.some(i => i.includes('not appear to be a valid passport') || i.includes('too blurry'));
+    const hasNameMismatch = issues.some(
+      (i) => i.includes("name mismatch") || i.includes("Name mismatch"),
+    );
+    const hasDobMismatch = issues.some((i) =>
+      i.includes("Date of birth mismatch"),
+    );
+    const hasExpired = issues.some((i) => i.includes("expired"));
+    const hasInvalidDoc = issues.some(
+      (i) =>
+        i.includes("not appear to be a valid passport") ||
+        i.includes("too blurry"),
+    );
     const hasSelfieInvalid = !selfieValid;
-    const hasLowSelfieConfidence = selfieValid && selfieConfidence < SELFIE_PASS_THRESHOLD;
-    const hasMrzIssue = issues.some(i => i.includes('MRZ data does not match'));
-    const missingCritical = !extracted.surname || !extracted.given_names || !extracted.dob;
+    const hasLowSelfieConfidence =
+      selfieValid && selfieConfidence < SELFIE_PASS_THRESHOLD;
+    const hasMrzIssue = issues.some((i) =>
+      i.includes("MRZ data does not match"),
+    );
+    const missingCritical =
+      !extracted.surname || !extracted.given_names || !extracted.dob;
 
-    const pass = !hasNameMismatch && !hasDobMismatch && !hasExpired && !hasInvalidDoc && !hasSelfieInvalid && !hasLowSelfieConfidence && !hasMrzIssue && !missingCritical;
+    const pass =
+      !hasNameMismatch &&
+      !hasDobMismatch &&
+      !hasExpired &&
+      !hasInvalidDoc &&
+      !hasSelfieInvalid &&
+      !hasLowSelfieConfidence &&
+      !hasMrzIssue &&
+      !missingCritical;
 
     // Step 4: Generate user guidance if failed
     let user_guidance: UserGuidance | null = null;
     if (!pass) {
       if (hasNameMismatch || hasDobMismatch) {
         user_guidance = {
-          title: 'Your details don\'t match your passport',
-          explanation: 'The information you entered doesn\'t match what\'s printed on your passport.',
+          title: "Your details don't match your passport",
+          explanation:
+            "The information you entered doesn't match what's printed on your passport.",
           steps_to_fix: [
-            'Check your surname and given names match your passport exactly',
-            'Check your date of birth matches your passport exactly',
-            'Re-enter your details and try again',
+            "Check your surname and given names match your passport exactly",
+            "Check your date of birth matches your passport exactly",
+            "Re-enter your details and try again",
           ],
         };
       } else if (hasSelfieInvalid || hasLowSelfieConfidence) {
         user_guidance = {
-          title: 'We were unable to verify your ID',
-          explanation: 'We were not able to match your ID to your selfie with high confidence. To be verified successfully, please try again with the tips below.',
+          title: "We were unable to verify your ID",
+          explanation:
+            "We were not able to match your ID to your selfie with high confidence. To be verified successfully, please try again with the tips below.",
           steps_to_fix: [
-            'Face the camera directly with your whole face clearly visible',
-            'Remove any sunglasses, hats, or face coverings',
-            'Use good, even lighting — natural light works best',
-            'Keep a neutral expression and ensure the photo is in focus',
-            'A plain background helps improve accuracy',
-            'If you continue having trouble, you can submit for manual review instead',
+            "Face the camera directly with your whole face clearly visible",
+            "Remove any sunglasses, hats, or face coverings",
+            "Use good, even lighting — natural light works best",
+            "Keep a neutral expression and ensure the photo is in focus",
+            "A plain background helps improve accuracy",
+            "If you continue having trouble, you can submit for manual review instead",
           ],
         };
       } else if (hasInvalidDoc) {
         user_guidance = {
-          title: 'We couldn\'t read your passport',
-          explanation: 'The passport image wasn\'t clear enough to verify.',
+          title: "We couldn't read your passport",
+          explanation: "The passport image wasn't clear enough to verify.",
           steps_to_fix: [
-            'Take a photo of your passport biographical page in good lighting',
-            'Make sure all text is sharp and readable',
-            'Avoid glare from holograms — tilt the passport slightly if needed',
+            "Take a photo of your passport biographical page in good lighting",
+            "Make sure all text is sharp and readable",
+            "Avoid glare from holograms — tilt the passport slightly if needed",
           ],
         };
       } else if (hasExpired) {
         user_guidance = {
-          title: 'Your passport has expired',
-          explanation: 'We can only accept a current, non-expired passport.',
-          steps_to_fix: [
-            'Upload a valid, non-expired passport',
-          ],
+          title: "Your passport has expired",
+          explanation: "We can only accept a current, non-expired passport.",
+          steps_to_fix: ["Upload a valid, non-expired passport"],
         };
       } else {
         user_guidance = {
-          title: 'We couldn\'t verify your identity',
-          explanation: 'Some required information couldn\'t be read from your passport.',
+          title: "We couldn't verify your identity",
+          explanation:
+            "Some required information couldn't be read from your passport.",
           steps_to_fix: [
-            'Re-upload a clearer photo of your passport biographical page',
-            'Make sure all text is readable',
-            'Try again or submit for manual review',
+            "Re-upload a clearer photo of your passport biographical page",
+            "Make sure all text is readable",
+            "Try again or submit for manual review",
           ],
         };
       }
@@ -351,33 +433,45 @@ export async function verifyPassport(
       pass,
       extracted,
       selfie_confidence: selfieValid ? selfieConfidence : null,
-      reasoning: reasoning.join('\n'),
+      reasoning: reasoning.join("\n"),
       issues,
       user_guidance,
     };
   } catch (error) {
-    console.error('[verifyPassport] AI analysis failed:', error);
+    console.error("[verifyPassport] AI analysis failed:", error);
 
     // Detect OpenAI unsupported image format error
     const errorMsg = error instanceof Error ? error.message : String(error);
-    const isUnsupportedFormat = errorMsg.includes('unsupported image') || errorMsg.includes('Could not process image');
+    const isUnsupportedFormat =
+      errorMsg.includes("unsupported image") ||
+      errorMsg.includes("Could not process image");
 
     return {
       pass: false,
-      extracted: { surname: null, given_names: null, dob: null, nationality: null, passport_number: null, expiry: null },
+      extracted: {
+        surname: null,
+        given_names: null,
+        dob: null,
+        nationality: null,
+        passport_number: null,
+        expiry: null,
+      },
       selfie_confidence: null,
       reasoning: `AI analysis failed: ${errorMsg}`,
-      issues: [isUnsupportedFormat
-        ? 'Unsupported image format — only PNG, JPEG, GIF, and WebP are accepted'
-        : 'AI analysis failed — please review manually'],
+      issues: [
+        isUnsupportedFormat
+          ? "Unsupported image format — only PNG, JPEG, GIF, and WebP are accepted"
+          : "AI analysis failed — please review manually",
+      ],
       user_guidance: isUnsupportedFormat
         ? {
-            title: 'Unsupported Image Format',
-            explanation: 'One of your uploaded images is in a format we can\'t process (e.g. HEIC). We only support PNG, JPEG, and WebP.',
+            title: "Unsupported Image Format",
+            explanation:
+              "One of your uploaded images is in a format we can't process (e.g. HEIC). We only support PNG, JPEG, and WebP.",
             steps_to_fix: [
-              'Re-upload your passport as a PNG or JPEG image',
-              'Re-upload your selfie as a PNG or JPEG image',
-              'On iPhone, take a screenshot of the photo and upload that instead',
+              "Re-upload your passport as a PNG or JPEG image",
+              "Re-upload your selfie as a PNG or JPEG image",
+              "On iPhone, take a screenshot of the photo and upload that instead",
             ],
           }
         : null,

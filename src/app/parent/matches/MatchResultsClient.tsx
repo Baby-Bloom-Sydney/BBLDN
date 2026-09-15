@@ -3,7 +3,15 @@
 import { useState } from "react";
 import { MatchCard } from "@/components/MatchCard";
 import type { MatchResult } from "@/lib/matching/types";
-import { Users, MapPin, Briefcase, Sparkles, CheckCircle, Clock, PartyPopper } from "lucide-react";
+import {
+  Users,
+  MapPin,
+  Briefcase,
+  Sparkles,
+  CheckCircle,
+  Clock,
+  PartyPopper,
+} from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -23,7 +31,7 @@ interface DfyStatusData {
   notifiedCount: number;
   interestedCount: number;
   connectedCount: number;
-  tier: 'standard' | 'priority' | null;
+  tier: "standard" | "priority" | null;
   maxRespondents: number;
   positionId: string | null;
 }
@@ -48,13 +56,9 @@ function sortMatches(matches: MatchResult[], sortBy: SortKey): MatchResult[] {
     case "experience":
       return sorted.sort((a, b) => {
         const ea =
-          b.nanny.nanny_experience_years ??
-          b.nanny.total_experience_years ??
-          0;
+          b.nanny.nanny_experience_years ?? b.nanny.total_experience_years ?? 0;
         const eb =
-          a.nanny.nanny_experience_years ??
-          a.nanny.total_experience_years ??
-          0;
+          a.nanny.nanny_experience_years ?? a.nanny.total_experience_years ?? 0;
         return ea - eb;
       });
     default:
@@ -87,7 +91,7 @@ export function MatchResultsClient({
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     if (days > 0) return `${days}d ${hours}h remaining`;
     if (hours > 0) return `${hours}h remaining`;
-    return 'Less than 1h remaining';
+    return "Less than 1h remaining";
   })();
 
   return (
@@ -102,7 +106,8 @@ export function MatchResultsClient({
               Let us find your nanny
             </h3>
             <p className="text-sm text-violet-700 mt-1">
-              We&apos;ll contact your top matches and let interested nannies come to you.
+              We&apos;ll contact your top matches and let interested nannies
+              come to you.
             </p>
           </div>
           <Link href="/parent/matches/checkout">
@@ -116,15 +121,19 @@ export function MatchResultsClient({
         /* State 2: Active — celebration banner */
         <div className="relative overflow-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 border border-green-200 rounded-xl p-5 sm:p-6">
           {/* Subtle sparkle background */}
-          <div className="absolute top-2 right-3 text-green-200 opacity-50"><Sparkles className="w-8 h-8" /></div>
-          <div className="absolute bottom-2 left-4 text-emerald-200 opacity-30"><Sparkles className="w-5 h-5" /></div>
+          <div className="absolute top-2 right-3 text-green-200 opacity-50">
+            <Sparkles className="w-8 h-8" />
+          </div>
+          <div className="absolute bottom-2 left-4 text-emerald-200 opacity-30">
+            <Sparkles className="w-5 h-5" />
+          </div>
 
           <div className="relative flex flex-col gap-3">
             {/* Header row with tier badge + countdown */}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <PartyPopper className="w-5 h-5 text-green-600" />
-                {dfyStatus?.tier === 'priority' ? (
+                {dfyStatus?.tier === "priority" ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-sm">
                     <Sparkles className="w-3 h-3" />
                     Priority Matchmaking
@@ -157,9 +166,13 @@ export function MatchResultsClient({
               <div className="flex items-center gap-2 mt-1">
                 <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-800">
                   <Users className="w-4 h-4" />
-                  {dfyStatus.interestedCount} nann{dfyStatus.interestedCount !== 1 ? "ies" : "y"} interested
+                  {dfyStatus.interestedCount} nann
+                  {dfyStatus.interestedCount !== 1 ? "ies" : "y"} interested
                 </span>
-                <a href="/parent" className="text-sm text-violet-600 hover:text-violet-700 underline font-medium">
+                <a
+                  href="/parent"
+                  className="text-sm text-violet-600 hover:text-violet-700 underline font-medium"
+                >
                   View responses
                 </a>
               </div>
@@ -175,9 +188,21 @@ export function MatchResultsClient({
               Your search has completed
             </h3>
             <p className="text-sm text-amber-700 mt-1">
-              {dfyStatus?.interestedCount
-                ? <>{dfyStatus.interestedCount} nann{dfyStatus.interestedCount !== 1 ? "ies" : "y"} still interested &mdash; <a href="/parent" className="underline font-medium">view interested nannies</a></>
-                : <>All matched nannies have been notified. Boost again to reach more nannies.</>}
+              {dfyStatus?.interestedCount ? (
+                <>
+                  {dfyStatus.interestedCount} nann
+                  {dfyStatus.interestedCount !== 1 ? "ies" : "y"} still
+                  interested &mdash;{" "}
+                  <a href="/parent" className="underline font-medium">
+                    view interested nannies
+                  </a>
+                </>
+              ) : (
+                <>
+                  All matched nannies have been notified. Boost again to reach
+                  more nannies.
+                </>
+              )}
             </p>
           </div>
           <Link href="/parent/matches/checkout">
@@ -221,10 +246,7 @@ export function MatchResultsClient({
       {/* Match grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {sorted.map((match) => (
-          <MatchCard
-            key={match.nannyId}
-            match={match}
-          />
+          <MatchCard key={match.nannyId} match={match} />
         ))}
       </div>
     </>

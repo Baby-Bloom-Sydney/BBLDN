@@ -10,21 +10,54 @@ interface SuburbEntry {
   postcode: string;
 }
 
-const DAY_OPTIONS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const DAY_OPTIONS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 const DAY_SHORT: Record<string, string> = {
-  Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed", Thursday: "Thu",
-  Friday: "Fri", Saturday: "Sat", Sunday: "Sun",
+  Monday: "Mon",
+  Tuesday: "Tue",
+  Wednesday: "Wed",
+  Thursday: "Thu",
+  Friday: "Fri",
+  Saturday: "Sat",
+  Sunday: "Sun",
 };
 const DAY_KEY: Record<string, string> = {
-  Monday: "monday", Tuesday: "tuesday", Wednesday: "wednesday", Thursday: "thursday",
-  Friday: "friday", Saturday: "saturday", Sunday: "sunday",
+  Monday: "monday",
+  Tuesday: "tuesday",
+  Wednesday: "wednesday",
+  Thursday: "thursday",
+  Friday: "friday",
+  Saturday: "saturday",
+  Sunday: "sunday",
 };
 
 const TIME_BLOCKS = [
-  { key: "morning", label: "Morning", sublabel: "6am - 10am", short: "6am-10am" },
+  {
+    key: "morning",
+    label: "Morning",
+    sublabel: "6am - 10am",
+    short: "6am-10am",
+  },
   { key: "midday", label: "Midday", sublabel: "10am - 2pm", short: "10am-2pm" },
-  { key: "afternoon", label: "Afternoon", sublabel: "2pm - 6pm", short: "2pm-6pm" },
-  { key: "evening", label: "Evening", sublabel: "6pm - 10pm", short: "6pm-10pm" },
+  {
+    key: "afternoon",
+    label: "Afternoon",
+    sublabel: "2pm - 6pm",
+    short: "2pm-6pm",
+  },
+  {
+    key: "evening",
+    label: "Evening",
+    sublabel: "6pm - 10pm",
+    short: "6pm-10pm",
+  },
 ];
 
 /** Compact quickmatch widget: availability first → suburb → search. Designed to embed in tiles. */
@@ -36,12 +69,16 @@ export function InlineQuickMatch() {
   const [query, setQuery] = useState("");
   const [filtered, setFiltered] = useState<SuburbEntry[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedSuburb, setSelectedSuburb] = useState<SuburbEntry | null>(null);
+  const [selectedSuburb, setSelectedSuburb] = useState<SuburbEntry | null>(
+    null,
+  );
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Availability
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
-  const [availability, setAvailability] = useState<Record<string, string[]>>({});
+  const [availability, setAvailability] = useState<Record<string, string[]>>(
+    {},
+  );
 
   // UI
   const [loading, setLoading] = useState(false);
@@ -56,7 +93,10 @@ export function InlineQuickMatch() {
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setShowDropdown(false);
       }
     };
@@ -70,7 +110,9 @@ export function InlineQuickMatch() {
     if (val.trim().length >= 2) {
       const q = val.toLowerCase().trim();
       const matches = suburbs
-        .filter((s) => s.suburb.toLowerCase().includes(q) || s.postcode.includes(q))
+        .filter(
+          (s) => s.suburb.toLowerCase().includes(q) || s.postcode.includes(q),
+        )
         .slice(0, 8);
       setFiltered(matches);
       setShowDropdown(matches.length > 0);
@@ -115,7 +157,9 @@ export function InlineQuickMatch() {
     });
   }, []);
 
-  const sortedSelectedDays = DAY_OPTIONS.filter((d) => selectedDays.includes(d));
+  const sortedSelectedDays = DAY_OPTIONS.filter((d) =>
+    selectedDays.includes(d),
+  );
 
   const allDaysHaveBrackets =
     sortedSelectedDays.length > 0 &&
@@ -135,7 +179,7 @@ export function InlineQuickMatch() {
         suburb: selectedSuburb.suburb,
         postcode: selectedSuburb.postcode,
         availability,
-      })
+      }),
     );
     router.push("/results");
   };
@@ -144,8 +188,12 @@ export function InlineQuickMatch() {
     <div className="space-y-4">
       {/* Heading */}
       <div className="text-center pt-1">
-        <p className="text-sm font-semibold text-slate-800">Schedule doesn&apos;t match?</p>
-        <p className="text-xs text-slate-500 mt-0.5">Tell us your availability and we&apos;ll find nannies that fit</p>
+        <p className="text-sm font-semibold text-slate-800">
+          Schedule doesn&apos;t match?
+        </p>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Tell us your availability and we&apos;ll find nannies that fit
+        </p>
       </div>
 
       {/* Step 1: Day selection */}
@@ -197,7 +245,10 @@ export function InlineQuickMatch() {
             <div className="grid grid-cols-[38px_repeat(4,1fr)] sm:grid-cols-[60px_repeat(4,1fr)] gap-1 sm:gap-1.5 mb-1.5">
               <div />
               {TIME_BLOCKS.map((block) => (
-                <div key={block.key} className="text-center flex flex-col justify-end">
+                <div
+                  key={block.key}
+                  className="text-center flex flex-col justify-end"
+                >
                   <p className="text-[10px] min-[400px]:text-[11px] font-semibold text-slate-600 tracking-tight">
                     {block.label}
                   </p>
@@ -260,7 +311,9 @@ export function InlineQuickMatch() {
               type="text"
               value={query}
               onChange={(e) => handleSuburbChange(e.target.value)}
-              onFocus={() => { if (filtered.length > 0) setShowDropdown(true); }}
+              onFocus={() => {
+                if (filtered.length > 0) setShowDropdown(true);
+              }}
               placeholder="Search suburb or postcode..."
               className="w-full h-10 pl-10 pr-4 rounded-lg border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-colors"
             />

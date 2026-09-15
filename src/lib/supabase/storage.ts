@@ -15,7 +15,7 @@ interface UploadResult {
 export async function uploadFile(
   bucket: StorageBucket,
   userId: string,
-  file: File
+  file: File,
 ): Promise<UploadResult> {
   const supabase = createClient();
 
@@ -23,12 +23,10 @@ export async function uploadFile(
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const filePath = `${userId}/${timestamp}-${safeName}`;
 
-  const { error } = await supabase.storage
-    .from(bucket)
-    .upload(filePath, file, {
-      cacheControl: "3600",
-      upsert: false,
-    });
+  const { error } = await supabase.storage.from(bucket).upload(filePath, file, {
+    cacheControl: "3600",
+    upsert: false,
+  });
 
   if (error) {
     console.error("Storage upload error:", error);
@@ -63,15 +61,26 @@ export async function uploadFileWithProgress(
     const supabase = createClient();
 
     // Force a server round-trip to validate/refresh the auth token.
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userErr,
+    } = await supabase.auth.getUser();
     if (userErr || !user) {
-      return { url: null, error: "Not authenticated — please refresh the page and try again" };
+      return {
+        url: null,
+        error: "Not authenticated — please refresh the page and try again",
+      };
     }
 
     // Now getSession() will have the freshly-refreshed token
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session?.access_token) {
-      return { url: null, error: "Session expired — please refresh the page and try again" };
+      return {
+        url: null,
+        error: "Session expired — please refresh the page and try again",
+      };
     }
 
     // Check if already aborted before starting XHR
@@ -104,21 +113,32 @@ export async function uploadFileWithProgress(
         signal?.removeEventListener("abort", handleAbort);
         if (xhr.status >= 200 && xhr.status < 300) {
           if (bucket === "profile-pictures") {
-            const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+            const { data } = supabase.storage
+              .from(bucket)
+              .getPublicUrl(filePath);
             resolve({ url: data.publicUrl, error: null });
           } else {
             resolve({ url: filePath, error: null });
           }
         } else if (xhr.status === 401 || xhr.status === 403) {
-          resolve({ url: null, error: "Session expired — please refresh the page and try again" });
+          resolve({
+            url: null,
+            error: "Session expired — please refresh the page and try again",
+          });
         } else {
-          resolve({ url: null, error: `Upload failed (${xhr.status}) — please try again` });
+          resolve({
+            url: null,
+            error: `Upload failed (${xhr.status}) — please try again`,
+          });
         }
       });
 
       xhr.addEventListener("error", () => {
         signal?.removeEventListener("abort", handleAbort);
-        resolve({ url: null, error: "Upload failed — check your connection and try again" });
+        resolve({
+          url: null,
+          error: "Upload failed — check your connection and try again",
+        });
       });
 
       xhr.addEventListener("timeout", () => {
@@ -134,6 +154,9 @@ export async function uploadFileWithProgress(
     });
   } catch (err) {
     console.error("Upload error:", err);
-    return { url: null, error: "Upload failed unexpectedly — please try again" };
+    return {
+      url: null,
+      error: "Upload failed unexpectedly — please try again",
+    };
   }
 }

@@ -1,41 +1,49 @@
-'use client';
+"use client";
 
-import { useCallback } from 'react';
-import { StageProps } from '../../FunnelOrchestrator';
-import { SingleSelectTags } from '../../shared/SingleSelectTags';
-import { YesNoTags } from '../../shared/YesNoTags';
-import { ProgressiveReveal } from '../../shared/ProgressiveReveal';
-import { CompoundPageShell } from '../../shared/CompoundPageShell';
-import { LANGUAGE_OPTIONS } from '@/types/nanny-leads';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useCallback } from "react";
+import { StageProps } from "../../FunnelOrchestrator";
+import { SingleSelectTags } from "../../shared/SingleSelectTags";
+import { YesNoTags } from "../../shared/YesNoTags";
+import { ProgressiveReveal } from "../../shared/ProgressiveReveal";
+import { CompoundPageShell } from "../../shared/CompoundPageShell";
+import { LANGUAGE_OPTIONS } from "@/types/nanny-leads";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
-export function N3AboutYou({ state, dispatch, goNext, goBack, progress, questionNumber }: StageProps) {
+export function N3AboutYou({
+  state,
+  dispatch,
+  goNext,
+  goBack,
+  progress,
+  questionNumber,
+}: StageProps) {
   const { matching } = state;
 
   const update = useCallback(
     (payload: Partial<typeof matching>) => {
-      dispatch({ type: 'UPDATE_MATCHING', payload });
+      dispatch({ type: "UPDATE_MATCHING", payload });
     },
-    [dispatch]
+    [dispatch],
   );
 
-  const selectedLanguage = matching.languages.length > 0 ? matching.languages[0] : null;
+  const selectedLanguage =
+    matching.languages.length > 0 ? matching.languages[0] : null;
 
   const showOtherLanguages =
-    selectedLanguage === 'Foreign Language' ||
-    selectedLanguage === 'Multiple';
+    selectedLanguage === "Foreign Language" || selectedLanguage === "Multiple";
 
   const showDriversLicense =
     selectedLanguage !== null &&
-    (!showOtherLanguages || (matching.other_languages !== null && matching.other_languages.trim() !== ''));
+    (!showOtherLanguages ||
+      (matching.other_languages !== null &&
+        matching.other_languages.trim() !== ""));
 
   const showCar = matching.drivers_license === true;
 
   const showVaccination =
-    matching.drivers_license === false ||
-    matching.has_car !== null;
+    matching.drivers_license === false || matching.has_car !== null;
 
   const showNonSmoker = matching.vaccination_status !== null;
 
@@ -65,7 +73,8 @@ export function N3AboutYou({ state, dispatch, goNext, goBack, progress, question
             options={LANGUAGE_OPTIONS}
             selected={selectedLanguage}
             onChange={(val) => {
-              const needsOther = val === 'Foreign Language' || val === 'Multiple';
+              const needsOther =
+                val === "Foreign Language" || val === "Multiple";
               update({
                 languages: val ? [val] : [],
                 ...(!needsOther ? { other_languages: null } : {}),
@@ -85,8 +94,10 @@ export function N3AboutYou({ state, dispatch, goNext, goBack, progress, question
               Which other languages do you speak?
             </Label>
             <Input
-              value={matching.other_languages || ''}
-              onChange={(e) => update({ other_languages: e.target.value || null })}
+              value={matching.other_languages || ""}
+              onChange={(e) =>
+                update({ other_languages: e.target.value || null })
+              }
               placeholder="e.g. French, Mandarin..."
               className="h-11 border-slate-200 focus:border-violet-500 focus:ring-violet-500"
             />

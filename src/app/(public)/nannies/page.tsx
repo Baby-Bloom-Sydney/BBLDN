@@ -3,17 +3,22 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ChevronLeft } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { NannyPreviewCard, type NannyPreview } from "@/components/landing/NannyPreviewCard";
+import {
+  NannyPreviewCard,
+  type NannyPreview,
+} from "@/components/landing/NannyPreviewCard";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: 'Browse Verified Nannies in Sydney',
-  description: 'Browse trusted, WWCC-verified nannies available in Sydney. Every nanny on Baby Bloom is background-checked, ID-verified, and education-focused.',
-  alternates: { canonical: '/nannies' },
+  title: "Browse Verified Nannies in Sydney",
+  description:
+    "Browse trusted, WWCC-verified nannies available in Sydney. Every nanny on Baby Bloom is background-checked, ID-verified, and education-focused.",
+  alternates: { canonical: "/nannies" },
   openGraph: {
-    title: 'Browse Verified Nannies in Sydney | Baby Bloom',
-    description: 'Browse trusted, WWCC-verified nannies available in Sydney. Every nanny on Baby Bloom is background-checked, ID-verified, and education-focused.',
+    title: "Browse Verified Nannies in Sydney | Baby Bloom",
+    description:
+      "Browse trusted, WWCC-verified nannies available in Sydney. Every nanny on Baby Bloom is background-checked, ID-verified, and education-focused.",
   },
 };
 
@@ -40,7 +45,9 @@ async function getTopNannies(): Promise<NannyPreview[]> {
 
   const { data: nannies, error } = await supabase
     .from("nannies")
-    .select("id, user_id, hourly_rate_min, total_experience_years, under_3_experience_years, verification_tier, verification_level, ai_content")
+    .select(
+      "id, user_id, hourly_rate_min, total_experience_years, under_3_experience_years, verification_tier, verification_level, ai_content",
+    )
     .eq("profile_visible", true);
 
   if (error || !nannies?.length) return [];
@@ -61,7 +68,12 @@ async function getTopNannies(): Promise<NannyPreview[]> {
   ]);
 
   const profileMap = new Map((profiles || []).map((p) => [p.user_id, p]));
-  const qualMap = new Map((credentials || []).map((c) => [c.nanny_id, c.qualification_type as string]));
+  const qualMap = new Map(
+    (credentials || []).map((c) => [
+      c.nanny_id,
+      c.qualification_type as string,
+    ]),
+  );
 
   const mapped: NannyPreview[] = nannies
     .map((nanny) => {
@@ -86,10 +98,15 @@ async function getTopNannies(): Promise<NannyPreview[]> {
 
   // Sort: highest experience first, then highest qualification as tiebreaker
   mapped.sort((a, b) => {
-    const expDiff = (b.total_experience_years ?? 0) - (a.total_experience_years ?? 0);
+    const expDiff =
+      (b.total_experience_years ?? 0) - (a.total_experience_years ?? 0);
     if (expDiff !== 0) return expDiff;
-    const qualA = a.highest_qualification ? (QUAL_RANK[a.highest_qualification] ?? 0) : 0;
-    const qualB = b.highest_qualification ? (QUAL_RANK[b.highest_qualification] ?? 0) : 0;
+    const qualA = a.highest_qualification
+      ? (QUAL_RANK[a.highest_qualification] ?? 0)
+      : 0;
+    const qualB = b.highest_qualification
+      ? (QUAL_RANK[b.highest_qualification] ?? 0)
+      : 0;
     return qualB - qualA;
   });
 
@@ -112,8 +129,8 @@ export default async function BrowseNanniesPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Our Top Nannies</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Our most experienced and qualified nannies in Sydney.
-          Sign up to see availability and connect.
+          Our most experienced and qualified nannies in Sydney. Sign up to see
+          availability and connect.
         </p>
       </div>
 
@@ -125,7 +142,9 @@ export default async function BrowseNanniesPage() {
         </div>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
-          <p className="text-sm text-slate-500">No nannies available right now. Check back soon!</p>
+          <p className="text-sm text-slate-500">
+            No nannies available right now. Check back soon!
+          </p>
         </div>
       )}
 
@@ -134,7 +153,8 @@ export default async function BrowseNanniesPage() {
           Want to find your perfect match?
         </h2>
         <p className="text-sm text-slate-500">
-          Try our free matchmaking to find nannies who fit your schedule and location.
+          Try our free matchmaking to find nannies who fit your schedule and
+          location.
         </p>
         <Button asChild className="bg-violet-500 hover:bg-violet-600">
           <Link href="/#quick-match">

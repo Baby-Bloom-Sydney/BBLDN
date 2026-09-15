@@ -27,8 +27,7 @@ export default function AboutPage() {
           <div className="max-w-4xl">
             <h1 className="text-[2.5rem] md:text-[3.5rem] lg:text-[4.25rem] font-bold text-slate-900 leading-[1.08] tracking-tight">
               The early years shape{" "}
-              <span className="text-violet-500">everything</span>{" "}
-              that follows.
+              <span className="text-violet-500">everything</span> that follows.
             </h1>
           </div>
         </div>
@@ -42,7 +41,8 @@ export default function AboutPage() {
             <div>
               <div className="w-10 h-1 bg-violet-500 rounded-full mb-8" />
               <h2 className="text-2xl md:text-3xl font-bold text-slate-900 leading-snug">
-                A child who explores with confidence at two asks better questions at five.
+                A child who explores with confidence at two asks better
+                questions at five.
               </h2>
             </div>
 
@@ -50,8 +50,8 @@ export default function AboutPage() {
             <div className="space-y-5 text-slate-600 leading-relaxed text-[15px] md:text-base lg:pt-2">
               <p>
                 How a child plays. How they are spoken to. How their curiosity
-                is received. It all compounds — quietly, relentlessly — into
-                the person they become.
+                is received. It all compounds — quietly, relentlessly — into the
+                person they become.
               </p>
               <p>
                 The first five years are not preparation for life. They are the
@@ -73,15 +73,14 @@ export default function AboutPage() {
         <div className="container mx-auto px-4 md:px-6">
           <div className="max-w-2xl mx-auto space-y-6 text-slate-600 leading-relaxed text-[15px] md:text-base">
             <p>
-              Structured play that builds towards something. Milestones
-              noticed, not just waited for. A carer who sees your child — not
-              as a routine, but as a person becoming.
+              Structured play that builds towards something. Milestones noticed,
+              not just waited for. A carer who sees your child — not as a
+              routine, but as a person becoming.
             </p>
             <p>
-              This is what it looks like when the care is right. The child
-              is calmer. More curious. More willing to try. Not because
-              anyone is pushing — because the environment makes growth feel
-              natural.
+              This is what it looks like when the care is right. The child is
+              calmer. More curious. More willing to try. Not because anyone is
+              pushing — because the environment makes growth feel natural.
             </p>
             <p className="text-slate-900 font-medium">
               Everything starts here.
@@ -121,9 +120,7 @@ export default function AboutPage() {
       <section className="py-8 border-t border-slate-100">
         <div className="container mx-auto px-4 md:px-6">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-center">
-            <p className="text-sm text-slate-500">
-              Childcare professional?
-            </p>
+            <p className="text-sm text-slate-500">Childcare professional?</p>
             <Link
               href="/apply"
               className="text-sm font-medium text-violet-600 hover:text-violet-700 transition-colors inline-flex items-center gap-1"

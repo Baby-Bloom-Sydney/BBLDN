@@ -8,9 +8,5 @@ export default async function ParentProgressPage({
 }) {
   const result = await getDashboardData(params.childId);
 
-  return (
-    <BAppProgressView
-      dashboard={result.data}
-    />
-  );
+  return <BAppProgressView dashboard={result.data} />;
 }

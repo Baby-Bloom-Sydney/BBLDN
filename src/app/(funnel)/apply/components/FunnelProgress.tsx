@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { FunnelStage } from '@/types/nanny-leads';
+import { FunnelStage } from "@/types/nanny-leads";
 
 interface FunnelProgressProps {
   currentStage: FunnelStage;
@@ -9,16 +9,20 @@ interface FunnelProgressProps {
 }
 
 const STAGE_LABELS: Record<FunnelStage, string> = {
-  N1: 'Application',
-  N2: 'Approval',
-  N3: 'Portfolio',
-  N4: 'Profile',
-  N5: 'Account',
+  N1: "Application",
+  N2: "Approval",
+  N3: "Portfolio",
+  N4: "Profile",
+  N5: "Account",
 };
 
-const STAGES: FunnelStage[] = ['N1', 'N2', 'N3', 'N4', 'N5'];
+const STAGES: FunnelStage[] = ["N1", "N2", "N3", "N4", "N5"];
 
-export function FunnelProgress({ currentStage, currentPage, totalPages }: FunnelProgressProps) {
+export function FunnelProgress({
+  currentStage,
+  currentPage,
+  totalPages,
+}: FunnelProgressProps) {
   const stageIndex = STAGES.indexOf(currentStage);
   const progressPercent = Math.round(((currentPage + 1) / totalPages) * 100);
 
@@ -35,10 +39,10 @@ export function FunnelProgress({ currentStage, currentPage, totalPages }: Funnel
               <div
                 className={`flex items-center justify-center transition-all duration-300 ${
                   isActive
-                    ? 'text-xs font-semibold text-violet-700 bg-violet-100 px-3 py-1 rounded-full'
+                    ? "text-xs font-semibold text-violet-700 bg-violet-100 px-3 py-1 rounded-full"
                     : isCompleted
-                    ? 'w-2 h-2 rounded-full bg-violet-400'
-                    : 'w-2 h-2 rounded-full bg-slate-200'
+                      ? "w-2 h-2 rounded-full bg-violet-400"
+                      : "w-2 h-2 rounded-full bg-slate-200"
                 }`}
               >
                 {isActive && STAGE_LABELS[stage]}
@@ -46,7 +50,7 @@ export function FunnelProgress({ currentStage, currentPage, totalPages }: Funnel
               {i < STAGES.length - 1 && (
                 <div
                   className={`w-6 h-0.5 mx-1 transition-colors duration-300 ${
-                    i < stageIndex ? 'bg-violet-400' : 'bg-slate-200'
+                    i < stageIndex ? "bg-violet-400" : "bg-slate-200"
                   }`}
                 />
               )}

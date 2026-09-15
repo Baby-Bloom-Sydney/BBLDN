@@ -63,7 +63,12 @@ import { GlanceItem } from "@/components/profile/GlanceItem";
 import { StatBox } from "@/components/profile/StatBox";
 import { AvailabilityGrid } from "@/components/profile/AvailabilityGrid";
 import { ProfilePhotoViewer } from "@/components/profile/ProfilePhotoViewer";
-import { computeAge, ageRangeToFriendly, childrenCountLabel, BADGE_ICONS } from "@/components/profile/profile-helpers";
+import {
+  computeAge,
+  ageRangeToFriendly,
+  childrenCountLabel,
+  BADGE_ICONS,
+} from "@/components/profile/profile-helpers";
 import { checkAllFields } from "@/lib/profanity";
 
 // ── Option constants ──
@@ -75,9 +80,25 @@ const QUALIFICATION_OPTIONS = [
   "Bachelor of Early Childhood Education (Or Equivalent)",
   "No Qualifications",
 ];
-const CERTIFICATE_OPTIONS = ["CPR", "First Aid", "First Aid in Education & Care Setting", "Child Protection"];
-const ROLE_TYPE_OPTIONS = ["Mothers Help", "Back-to-Work Support", "Pick Up & Drop Off", "Child Development", "Home Management"];
-const LEVEL_OF_SUPPORT_OPTIONS = ["Supervision", "Engagement and Play", "Educational Support", "Developmental Assistance"];
+const CERTIFICATE_OPTIONS = [
+  "CPR",
+  "First Aid",
+  "First Aid in Education & Care Setting",
+  "Child Protection",
+];
+const ROLE_TYPE_OPTIONS = [
+  "Mothers Help",
+  "Back-to-Work Support",
+  "Pick Up & Drop Off",
+  "Child Development",
+  "Home Management",
+];
+const LEVEL_OF_SUPPORT_OPTIONS = [
+  "Supervision",
+  "Engagement and Play",
+  "Educational Support",
+  "Developmental Assistance",
+];
 const LANGUAGE_OPTIONS = ["English", "Foreign Language", "Multiple"];
 const MIN_AGE_OPTIONS = [
   { label: "Newborn", months: 0 },
@@ -108,32 +129,75 @@ const MOTIVATION_OPTIONS = [
 ];
 const ASSURANCE_OPTIONS = ["National Police Check", "References"];
 const PERSONALITY_TRAIT_OPTIONS = [
-  "Patient", "Creative", "Energetic", "Nurturing", "Calm", "Organised",
-  "Warm", "Reliable", "Adaptable", "Empathetic", "Playful", "Attentive",
+  "Patient",
+  "Creative",
+  "Energetic",
+  "Nurturing",
+  "Calm",
+  "Organised",
+  "Warm",
+  "Reliable",
+  "Adaptable",
+  "Empathetic",
+  "Playful",
+  "Attentive",
 ];
 const PROFESSIONAL_VALUE_OPTIONS = [
-  "Encouraging independence", "Being consistent and dependable", "Staying calm under pressure",
-  "Teaching through play", "Taking accountability", "Adapting to each family's style",
-  "Being in tune with a child's needs", "Anticipating needs", "Being open and transparent",
-  "Understanding child development", "Following routines with care", "Adapting quickly to change",
+  "Encouraging independence",
+  "Being consistent and dependable",
+  "Staying calm under pressure",
+  "Teaching through play",
+  "Taking accountability",
+  "Adapting to each family's style",
+  "Being in tune with a child's needs",
+  "Anticipating needs",
+  "Being open and transparent",
+  "Understanding child development",
+  "Following routines with care",
+  "Adapting quickly to change",
 ];
 const CHILDCARE_ROLE_OPTIONS = [
-  "Nanny", "Babysitter", "Au pair", "Daycare", "Pre-school",
-  "School teacher", "After-school care", "Other",
+  "Nanny",
+  "Babysitter",
+  "Au pair",
+  "Daycare",
+  "Pre-school",
+  "School teacher",
+  "After-school care",
+  "Other",
 ];
 
 // ── Availability constants ──
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
-const TIME_SLOTS = ["Morning (6am-10am)", "Midday (10am-2pm)", "Afternoon (2pm-6pm)", "Evening (6pm-10pm)"] as const;
+const DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;
+const TIME_SLOTS = [
+  "Morning (6am-10am)",
+  "Midday (10am-2pm)",
+  "Afternoon (2pm-6pm)",
+  "Evening (6pm-10pm)",
+] as const;
 const SLOT_LABELS = ["Morning", "Midday", "Afternoon", "Evening"];
 
 // ── Tag UI ──
 
 const TAG_ACTIVE = "bg-violet-600 text-white shadow-sm border-transparent";
-const TAG_INACTIVE = "border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50";
+const TAG_INACTIVE =
+  "border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50";
 
-function MultiSelectTags({ options, selected, onChange, max }: {
+function MultiSelectTags({
+  options,
+  selected,
+  onChange,
+  max,
+}: {
   options: string[];
   selected: string[];
   onChange: (v: string[]) => void;
@@ -165,7 +229,11 @@ function MultiSelectTags({ options, selected, onChange, max }: {
   );
 }
 
-function SingleSelectTags({ options, value, onChange }: {
+function SingleSelectTags({
+  options,
+  value,
+  onChange,
+}: {
   options: string[];
   value: string | null;
   onChange: (v: string) => void;
@@ -188,7 +256,13 @@ function SingleSelectTags({ options, value, onChange }: {
   );
 }
 
-function BooleanTags({ value, onChange }: { value: boolean | null; onChange: (v: boolean) => void }) {
+function BooleanTags({
+  value,
+  onChange,
+}: {
+  value: boolean | null;
+  onChange: (v: boolean) => void;
+}) {
   return (
     <div className="flex gap-1.5">
       {[true, false].map((opt) => (
@@ -254,19 +328,26 @@ function EditableAvailabilityGrid({
   update,
 }: {
   form: { available_days: string[]; schedule: Record<string, string[]> };
-  update: (key: "available_days" | "schedule", value: string[] | Record<string, string[]>) => void;
+  update: (
+    key: "available_days" | "schedule",
+    value: string[] | Record<string, string[]>,
+  ) => void;
 }) {
   const toggleCell = (day: string, slotIndex: number) => {
     const dayKey = day.toLowerCase();
     const slot = TIME_SLOTS[slotIndex];
     const currentSlots = form.schedule[dayKey] || [];
-    const isActive = form.available_days.includes(day) && currentSlots.includes(slot);
+    const isActive =
+      form.available_days.includes(day) && currentSlots.includes(slot);
 
     if (isActive) {
       const newSlots = currentSlots.filter((s) => s !== slot);
       const newSchedule = { ...form.schedule, [dayKey]: newSlots };
       if (newSlots.length === 0) {
-        update("available_days", form.available_days.filter((d) => d !== day));
+        update(
+          "available_days",
+          form.available_days.filter((d) => d !== day),
+        );
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { [dayKey]: _removed, ...rest } = newSchedule;
         update("schedule", rest);
@@ -274,9 +355,14 @@ function EditableAvailabilityGrid({
         update("schedule", newSchedule);
       }
     } else {
-      const newDays = form.available_days.includes(day) ? form.available_days : [...form.available_days, day];
+      const newDays = form.available_days.includes(day)
+        ? form.available_days
+        : [...form.available_days, day];
       update("available_days", newDays);
-      update("schedule", { ...form.schedule, [dayKey]: [...currentSlots, slot] });
+      update("schedule", {
+        ...form.schedule,
+        [dayKey]: [...currentSlots, slot],
+      });
     }
   };
 
@@ -287,7 +373,12 @@ function EditableAvailabilityGrid({
           <tr>
             <th className="py-2 pr-3 text-left text-xs font-medium text-slate-400" />
             {SLOT_LABELS.map((label) => (
-              <th key={label} className="px-1.5 py-2 text-center text-xs font-medium text-slate-400">{label}</th>
+              <th
+                key={label}
+                className="px-1.5 py-2 text-center text-xs font-medium text-slate-400"
+              >
+                {label}
+              </th>
             ))}
           </tr>
         </thead>
@@ -298,7 +389,9 @@ function EditableAvailabilityGrid({
             const isDayAvailable = form.available_days.includes(day);
             return (
               <tr key={day}>
-                <td className="py-1.5 pr-3 font-medium text-slate-600 text-sm whitespace-nowrap">{day.slice(0, 3)}</td>
+                <td className="py-1.5 pr-3 font-medium text-slate-600 text-sm whitespace-nowrap">
+                  {day.slice(0, 3)}
+                </td>
                 {TIME_SLOTS.map((slot, i) => {
                   const active = isDayAvailable && currentSlots.includes(slot);
                   return (
@@ -310,7 +403,7 @@ function EditableAvailabilityGrid({
                           "inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-medium transition-all",
                           active
                             ? "bg-violet-500 text-white shadow-sm hover:bg-violet-600"
-                            : "bg-slate-50 text-slate-300 hover:bg-violet-100 hover:text-violet-500"
+                            : "bg-slate-50 text-slate-300 hover:bg-violet-100 hover:text-violet-500",
                         )}
                       >
                         {active ? <Check className="h-3.5 w-3.5" /> : "–"}
@@ -345,7 +438,8 @@ function PhotoSlot({
   size?: "sm" | "md" | "lg";
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const dims = size === "lg" ? "h-32 w-32" : size === "md" ? "h-20 w-20" : "h-16 w-16";
+  const dims =
+    size === "lg" ? "h-32 w-32" : size === "md" ? "h-20 w-20" : "h-16 w-16";
 
   return (
     <div className="relative group">
@@ -379,7 +473,10 @@ function PhotoSlot({
       {url && !uploading && (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
           className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
         >
           <X className="h-3 w-3" />
@@ -408,12 +505,16 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
 
   const [editMode, setEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTabId>("about");
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const [error, setError] = useState<string | null>(null);
   const [showRegenOffer, setShowRegenOffer] = useState(false);
   const [regenModalOpen, setRegenModalOpen] = useState(false);
   const [regenStepIndex, setRegenStepIndex] = useState(0);
-  const [regenResult, setRegenResult] = useState<"pending" | "success" | "error">("pending");
+  const [regenResult, setRegenResult] = useState<
+    "pending" | "success" | "error"
+  >("pending");
   const [regenErrorMsg, setRegenErrorMsg] = useState<string | null>(null);
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
   const [photoViewerIndex, setPhotoViewerIndex] = useState(0);
@@ -425,7 +526,9 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
   const profilePhotoRef = useRef<HTMLInputElement>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [newProfilePicUrl, setNewProfilePicUrl] = useState<string | null>(null);
-  const [photoSlotUploading, setPhotoSlotUploading] = useState<Record<string, boolean>>({});
+  const [photoSlotUploading, setPhotoSlotUploading] = useState<
+    Record<string, boolean>
+  >({});
   const [newPhoto1, setNewPhoto1] = useState<string | null>(null);
   const [newPhoto2, setNewPhoto2] = useState<string | null>(null);
   const [newPhoto3, setNewPhoto3] = useState<string | null>(null);
@@ -440,7 +543,9 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
   // AI content extraction (V2 field paths)
   const ai = aiContent;
   const bioSummary = ai?.bio_summary;
-  const bioObj = (typeof bioSummary === "object" && bioSummary !== null ? bioSummary : null) as Record<string, string> | null;
+  const bioObj = (
+    typeof bioSummary === "object" && bioSummary !== null ? bioSummary : null
+  ) as Record<string, string> | null;
   const headline = (ai?.headline as string) || null;
   const aiAbout = bioObj?.about || null;
   const aiPersonality = bioObj?.personality || null;
@@ -452,11 +557,23 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
   // Badge pills
   const traitBadges: { icon: string; label: string; primary?: boolean }[] = [];
   if (profile.total_experience_years && profile.total_experience_years > 0)
-    traitBadges.push({ icon: "Clock", label: `${profile.total_experience_years}${profile.total_experience_years === 1 ? 'yr' : 'yrs'} experience`, primary: true });
+    traitBadges.push({
+      icon: "Clock",
+      label: `${profile.total_experience_years}${profile.total_experience_years === 1 ? "yr" : "yrs"} experience`,
+      primary: true,
+    });
   if (profile.under_3_experience_years && profile.under_3_experience_years > 0)
-    traitBadges.push({ icon: "Baby", label: `Toddlers, ${profile.under_3_experience_years}${profile.under_3_experience_years === 1 ? 'yr' : 'yrs'}`, primary: true });
+    traitBadges.push({
+      icon: "Baby",
+      label: `Toddlers, ${profile.under_3_experience_years}${profile.under_3_experience_years === 1 ? "yr" : "yrs"}`,
+      primary: true,
+    });
   if (profile.newborn_experience_years && profile.newborn_experience_years > 0)
-    traitBadges.push({ icon: "Baby", label: `Babies, ${profile.newborn_experience_years}${profile.newborn_experience_years === 1 ? 'yr' : 'yrs'}`, primary: true });
+    traitBadges.push({
+      icon: "Baby",
+      label: `Babies, ${profile.newborn_experience_years}${profile.newborn_experience_years === 1 ? "yr" : "yrs"}`,
+      primary: true,
+    });
   if (profile.highest_qualification) {
     let qual = profile.highest_qualification;
     if (qual.startsWith("Bachelor")) qual = "Bachelors";
@@ -469,22 +586,33 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
   // Stat boxes
   const statBoxes: { value: number; label: string }[] = [];
   if (profile.total_experience_years && profile.total_experience_years > 0)
-    statBoxes.push({ value: profile.total_experience_years, label: "Years Childcare" });
+    statBoxes.push({
+      value: profile.total_experience_years,
+      label: "Years Childcare",
+    });
   if (profile.under_3_experience_years && profile.under_3_experience_years > 0)
-    statBoxes.push({ value: profile.under_3_experience_years, label: "Years Under 3s" });
+    statBoxes.push({
+      value: profile.under_3_experience_years,
+      label: "Years Under 3s",
+    });
   if (profile.newborn_experience_years && profile.newborn_experience_years > 0)
-    statBoxes.push({ value: profile.newborn_experience_years, label: "Years Newborns" });
+    statBoxes.push({
+      value: profile.newborn_experience_years,
+      label: "Years Newborns",
+    });
 
   // Photos
   const profilePicUrl = newProfilePicUrl || profile.profile_picture_url;
   const photo1Url = newPhoto1 !== null ? newPhoto1 : profile.photo_1_url;
   const photo2Url = newPhoto2 !== null ? newPhoto2 : profile.photo_2_url;
   const photo3Url = newPhoto3 !== null ? newPhoto3 : profile.photo_3_url;
-  const additionalPhotos = [photo1Url, photo2Url, photo3Url].filter(Boolean) as string[];
+  const additionalPhotos = [photo1Url, photo2Url, photo3Url].filter(
+    Boolean,
+  ) as string[];
 
   // Languages for display — filter out preset category labels
   const displayLanguages = (profile.languages || []).filter(
-    (l: string) => l !== "Foreign Language" && l !== "Multiple"
+    (l: string) => l !== "Foreign Language" && l !== "Multiple",
   );
 
   // Regeneration rolling status messages
@@ -503,7 +631,9 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
   // Determine if motivation is a custom "Other" value
   const presetMotivations = MOTIVATION_OPTIONS.filter((o) => o !== "Other");
   const initialMotivation = profile.motivation || null;
-  const initialMotivationIsOther = initialMotivation !== null && !presetMotivations.includes(initialMotivation);
+  const initialMotivationIsOther =
+    initialMotivation !== null &&
+    !presetMotivations.includes(initialMotivation);
 
   const buildInitialForm = () => ({
     total_experience_years: profile.total_experience_years,
@@ -520,26 +650,40 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
     additional_needs_ok: profile.additional_needs_ok ?? false,
     hourly_rate_min: profile.hourly_rate_min,
     available_days: profile.availability?.days_available || [],
-    schedule: (profile.availability?.schedule || {}) as Record<string, string[]>,
+    schedule: (profile.availability?.schedule || {}) as Record<
+      string,
+      string[]
+    >,
     immediate_start_available: profile.immediate_start_available ?? false,
-    languages: (profile.languages || []).filter((l: string) => LANGUAGE_OPTIONS.includes(l)),
-    language_details: (profile.languages || []).filter((l: string) => !LANGUAGE_OPTIONS.includes(l)).join(", "),
+    languages: (profile.languages || []).filter((l: string) =>
+      LANGUAGE_OPTIONS.includes(l),
+    ),
+    language_details: (profile.languages || [])
+      .filter((l: string) => !LANGUAGE_OPTIONS.includes(l))
+      .join(", "),
     drivers_license: profile.drivers_license,
     has_car: profile.has_car,
     comfortable_with_pets: profile.comfortable_with_pets,
     vaccination_status: profile.vaccination_status,
     non_smoker: profile.non_smoker,
     // V2 fields
-    motivation: initialMotivationIsOther ? "Other" : (initialMotivation),
+    motivation: initialMotivationIsOther ? "Other" : initialMotivation,
     motivation_other: initialMotivationIsOther ? initialMotivation : "",
     personality_traits: profile.personality_traits || [],
     professional_values: profile.professional_values || [],
-    childcare_roles: (profile.childcare_roles || []) as { role: string; role_other?: string; duration: number }[],
+    childcare_roles: (profile.childcare_roles || []) as {
+      role: string;
+      role_other?: string;
+      duration: number;
+    }[],
   });
 
   const [form, setForm] = useState(buildInitialForm);
 
-  const update = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
+  const update = <K extends keyof typeof form>(
+    key: K,
+    value: (typeof form)[K],
+  ) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     setSaveStatus("idle");
   };
@@ -565,8 +709,14 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
     setUrl: (url: string | null) => void,
     slotKey?: string,
   ) => {
-    if (!file.type.startsWith("image/")) { setError("Please select an image file"); return; }
-    if (file.size > 5 * 1024 * 1024) { setError("Image must be under 5MB"); return; }
+    if (!file.type.startsWith("image/")) {
+      setError("Please select an image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image must be under 5MB");
+      return;
+    }
 
     if (slotKey) setPhotoSlotUploading((p) => ({ ...p, [slotKey]: true }));
     else setPhotoUploading(true);
@@ -574,11 +724,19 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
 
     try {
       const supabase = createClient();
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) { setError("You must be logged in"); return; }
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+      if (!authUser) {
+        setError("You must be logged in");
+        return;
+      }
 
       const result = await uploadFile("profile-pictures", authUser.id, file);
-      if (result.error || !result.url) { setError(result.error || "Upload failed"); return; }
+      if (result.error || !result.url) {
+        setError(result.error || "Upload failed");
+        return;
+      }
 
       setUrl(result.url);
       setSaveStatus("idle");
@@ -612,7 +770,11 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
       setSaveStatus("error");
       return;
     }
-    if ((form.languages.includes("Foreign Language") || form.languages.includes("Multiple")) && !form.language_details.trim()) {
+    if (
+      (form.languages.includes("Foreign Language") ||
+        form.languages.includes("Multiple")) &&
+      !form.language_details.trim()
+    ) {
       setError("Please specify which language(s) you speak.");
       setSaveStatus("error");
       return;
@@ -659,8 +821,15 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
     startTransition(async () => {
       // Combine language presets + custom language names
       const combinedLanguages = [...form.languages];
-      if ((combinedLanguages.includes("Foreign Language") || combinedLanguages.includes("Multiple")) && form.language_details.trim()) {
-        const customs = form.language_details.split(",").map((s: string) => s.trim()).filter(Boolean);
+      if (
+        (combinedLanguages.includes("Foreign Language") ||
+          combinedLanguages.includes("Multiple")) &&
+        form.language_details.trim()
+      ) {
+        const customs = form.language_details
+          .split(",")
+          .map((s: string) => s.trim())
+          .filter(Boolean);
         combinedLanguages.push(...customs);
       }
 
@@ -689,13 +858,19 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
         non_smoker: form.non_smoker,
         assurances: form.assurances.length > 0 ? form.assurances : [],
         // V2 fields
-        motivation: form.motivation === "Other" ? (form.motivation_other || null) : form.motivation,
-        personality_traits: form.personality_traits.length > 0 ? form.personality_traits : null,
-        professional_values: form.professional_values.length > 0 ? form.professional_values : null,
-        childcare_roles: form.childcare_roles.length > 0 ? form.childcare_roles : null,
-        photo_1_url: newPhoto1 !== null ? (newPhoto1 || null) : undefined,
-        photo_2_url: newPhoto2 !== null ? (newPhoto2 || null) : undefined,
-        photo_3_url: newPhoto3 !== null ? (newPhoto3 || null) : undefined,
+        motivation:
+          form.motivation === "Other"
+            ? form.motivation_other || null
+            : form.motivation,
+        personality_traits:
+          form.personality_traits.length > 0 ? form.personality_traits : null,
+        professional_values:
+          form.professional_values.length > 0 ? form.professional_values : null,
+        childcare_roles:
+          form.childcare_roles.length > 0 ? form.childcare_roles : null,
+        photo_1_url: newPhoto1 !== null ? newPhoto1 || null : undefined,
+        photo_2_url: newPhoto2 !== null ? newPhoto2 || null : undefined,
+        photo_3_url: newPhoto3 !== null ? newPhoto3 || null : undefined,
       });
 
       if (!result.success) {
@@ -710,7 +885,10 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
         for (const [key, value] of Object.entries(aiEdits)) {
           if (key.includes(".")) {
             const [parent, child] = key.split(".");
-            aiUpdates[parent] = { ...(aiUpdates[parent] as Record<string, unknown> || {}), [child]: value };
+            aiUpdates[parent] = {
+              ...((aiUpdates[parent] as Record<string, unknown>) || {}),
+              [child]: value,
+            };
           } else {
             aiUpdates[key] = value;
           }
@@ -764,7 +942,8 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
     } else {
       setRegenResult("error");
       setRegenErrorMsg(
-        result.error || "We were unable to regenerate your profile at this time. Please try again later."
+        result.error ||
+          "We were unable to regenerate your profile at this time. Please try again later.",
       );
     }
   };
@@ -785,7 +964,6 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
 
   return (
     <div className={cn("mx-auto max-w-2xl space-y-3", editMode && "pb-20")}>
-
       {/* ── Back to hub ── */}
       <Link
         href="/nanny"
@@ -849,7 +1027,8 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) handlePhotoUpload(file, setNewProfilePicUrl);
-                        if (profilePhotoRef.current) profilePhotoRef.current.value = "";
+                        if (profilePhotoRef.current)
+                          profilePhotoRef.current.value = "";
                       }}
                       className="hidden"
                     />
@@ -859,7 +1038,9 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                       disabled={photoUploading}
                       className={cn(
                         "absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity cursor-pointer rounded-full",
-                        photoUploading ? "opacity-100" : "opacity-0 hover:opacity-100"
+                        photoUploading
+                          ? "opacity-100"
+                          : "opacity-0 hover:opacity-100",
                       )}
                     >
                       {photoUploading ? (
@@ -880,24 +1061,30 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
 
             <div className="flex-1 min-w-0 pb-1 pt-4">
               <h1 className="text-2xl font-bold text-slate-900">
-                {profile.first_name.charAt(0).toUpperCase() + profile.first_name.slice(1)}{age ? `, ${age}` : ""}
+                {profile.first_name.charAt(0).toUpperCase() +
+                  profile.first_name.slice(1)}
+                {age ? `, ${age}` : ""}
               </h1>
               <div className="mt-1 flex items-center justify-between gap-2">
                 <div className="min-w-0 pr-2">
                   {profile.nationality && (
                     <p className="flex items-center gap-1 text-sm text-slate-500 mt-0.5">
-                      <Globe className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{profile.nationality}</span>
+                      <Globe className="h-3.5 w-3.5 shrink-0" />{" "}
+                      <span className="truncate">{profile.nationality}</span>
                     </p>
                   )}
                   {displayLanguages.length > 0 && (
                     <p className="flex items-center gap-1 text-xs text-slate-400 mt-0.5">
                       <Languages className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{displayLanguages.join(", ")}</span>
+                      <span className="truncate">
+                        {displayLanguages.join(", ")}
+                      </span>
                     </p>
                   )}
                   {profile.suburb && (
                     <p className="flex items-center gap-1 text-sm text-slate-500 mt-0.5">
-                      <MapPin className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{profile.suburb}</span>
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />{" "}
+                      <span className="truncate">{profile.suburb}</span>
                     </p>
                   )}
                 </div>
@@ -905,11 +1092,18 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                 {/* Photo fan */}
                 {additionalPhotos.length > 0 && !editMode && (
                   <button
-                    onClick={() => { setPhotoViewerIndex(0); setPhotoViewerOpen(true); }}
+                    onClick={() => {
+                      setPhotoViewerIndex(0);
+                      setPhotoViewerOpen(true);
+                    }}
                     className="relative shrink-0 w-[84px] h-[48px] cursor-pointer group"
                   >
                     {additionalPhotos.slice(0, 3).map((url, i) => {
-                      const rotations = ["-rotate-[15deg]", "rotate-0", "rotate-[15deg]"];
+                      const rotations = [
+                        "-rotate-[15deg]",
+                        "rotate-0",
+                        "rotate-[15deg]",
+                      ];
                       const offsets = ["left-0", "left-4", "left-8"];
                       const zIndexes = ["z-[3]", "z-[2]", "z-[1]"];
                       return (
@@ -917,10 +1111,16 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                           key={i}
                           className={cn(
                             "absolute top-0 h-11 w-11 overflow-hidden rounded-lg border-2 border-white shadow-md transition-transform group-hover:scale-105",
-                            rotations[i], offsets[i], zIndexes[i],
+                            rotations[i],
+                            offsets[i],
+                            zIndexes[i],
                           )}
                         >
-                          <img src={url} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
+                          <img
+                            src={url}
+                            alt={`Photo ${i + 1}`}
+                            className="h-full w-full object-cover"
+                          />
                         </div>
                       );
                     })}
@@ -933,7 +1133,9 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
           {/* Additional photos edit row */}
           {editMode && (
             <div className="mt-3 flex items-center gap-3">
-              <Label className="text-xs text-slate-500 shrink-0">Additional Photos</Label>
+              <Label className="text-xs text-slate-500 shrink-0">
+                Additional Photos
+              </Label>
               <div className="flex gap-2">
                 <PhotoSlot
                   url={photo1Url}
@@ -988,10 +1190,11 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                       "inline-flex items-center tracking-tight whitespace-nowrap shrink-0 gap-0.5 sm:gap-1.5 rounded-full px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] md:text-xs font-medium",
                       badge.primary
                         ? "bg-violet-50 text-violet-700 border border-violet-200"
-                        : "bg-slate-50 text-slate-600 border border-slate-200"
+                        : "bg-slate-50 text-slate-600 border border-slate-200",
                     )}
                   >
-                    <Icon className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" /> {badge.label}
+                    <Icon className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />{" "}
+                    {badge.label}
                   </span>
                 );
               })}
@@ -1014,7 +1217,7 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                 "flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all",
                 isActive
                   ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  : "text-slate-500 hover:text-slate-700",
               )}
             >
               {tab.label}
@@ -1028,38 +1231,60 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
          ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === "about" && (
         <div className="space-y-3">
-
           {/* 1. About */}
           {(aiAbout || profile.motivation || editMode) && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <Sparkles className="h-4 w-4 text-violet-400" />
-                <h3 className="text-sm font-semibold text-slate-900">About {profile.first_name}</h3>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  About {profile.first_name}
+                </h3>
               </div>
               {editMode && aiAbout ? (
-                <EditableSection html={aiAbout} editValue={aiEdits["bio_summary.about"]} onEdit={(v) => setAiEdit("bio_summary.about", v)} />
+                <EditableSection
+                  html={aiAbout}
+                  editValue={aiEdits["bio_summary.about"]}
+                  onEdit={(v) => setAiEdit("bio_summary.about", v)}
+                />
               ) : aiAbout ? (
-                <div className="text-sm text-slate-600 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0" dangerouslySetInnerHTML={{ __html: aiAbout }} />
+                <div
+                  className="text-sm text-slate-600 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0"
+                  dangerouslySetInnerHTML={{ __html: aiAbout }}
+                />
               ) : null}
               {editMode ? (
                 <div className="mt-3 space-y-2">
-                  <Label className="text-xs text-slate-500 mb-1.5 block">What drives me</Label>
-                  <SingleSelectTags options={MOTIVATION_OPTIONS} value={form.motivation} onChange={(v) => { update("motivation", v); if (v !== "Other") update("motivation_other", ""); }} />
+                  <Label className="text-xs text-slate-500 mb-1.5 block">
+                    What drives me
+                  </Label>
+                  <SingleSelectTags
+                    options={MOTIVATION_OPTIONS}
+                    value={form.motivation}
+                    onChange={(v) => {
+                      update("motivation", v);
+                      if (v !== "Other") update("motivation_other", "");
+                    }}
+                  />
                   {form.motivation === "Other" && (
                     <div className="relative">
                       <Input
                         value={form.motivation_other}
                         onChange={(e) => {
-                          if (e.target.value.length <= 50) update("motivation_other", e.target.value);
+                          if (e.target.value.length <= 50)
+                            update("motivation_other", e.target.value);
                         }}
                         placeholder="Tell us what drives you..."
                         className="pr-14 text-sm"
                         maxLength={50}
                       />
-                      <span className={cn(
-                        "absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums",
-                        (form.motivation_other?.length || 0) >= 45 ? "text-red-400" : "text-slate-300"
-                      )}>
+                      <span
+                        className={cn(
+                          "absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums",
+                          (form.motivation_other?.length || 0) >= 45
+                            ? "text-red-400"
+                            : "text-slate-300",
+                        )}
+                      >
                         {50 - (form.motivation_other?.length || 0)}
                       </span>
                     </div>
@@ -1069,7 +1294,8 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                 <div className="mt-3 flex items-center gap-2 rounded-lg bg-violet-50/50 border border-violet-100 px-3 py-2">
                   <Heart className="h-3.5 w-3.5 text-violet-400 shrink-0" />
                   <p className="text-xs text-violet-600">
-                    <span className="font-medium">What drives me:</span> {profile.motivation}
+                    <span className="font-medium">What drives me:</span>{" "}
+                    {profile.motivation}
                   </p>
                 </div>
               ) : null}
@@ -1077,26 +1303,48 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
           )}
 
           {/* 2. Personality */}
-          {(aiPersonality || (profile.personality_traits && profile.personality_traits.length > 0) || editMode) && (
+          {(aiPersonality ||
+            (profile.personality_traits &&
+              profile.personality_traits.length > 0) ||
+            editMode) && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <Smile className="h-4 w-4 text-violet-500" />
-                <h3 className="text-sm font-semibold text-slate-900">Personality</h3>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Personality
+                </h3>
               </div>
               {editMode && aiPersonality ? (
-                <EditableSection html={aiPersonality} editValue={aiEdits["bio_summary.personality"]} onEdit={(v) => setAiEdit("bio_summary.personality", v)} />
+                <EditableSection
+                  html={aiPersonality}
+                  editValue={aiEdits["bio_summary.personality"]}
+                  onEdit={(v) => setAiEdit("bio_summary.personality", v)}
+                />
               ) : aiPersonality ? (
-                <div className="text-sm text-slate-600 leading-relaxed mb-3 [&_p]:mb-2 [&_p:last-child]:mb-0" dangerouslySetInnerHTML={{ __html: aiPersonality }} />
+                <div
+                  className="text-sm text-slate-600 leading-relaxed mb-3 [&_p]:mb-2 [&_p:last-child]:mb-0"
+                  dangerouslySetInnerHTML={{ __html: aiPersonality }}
+                />
               ) : null}
               {editMode ? (
                 <div className="mt-3">
-                  <Label className="text-xs text-slate-500 mb-1.5 block">Personality traits (pick up to 5)</Label>
-                  <MultiSelectTags options={PERSONALITY_TRAIT_OPTIONS} selected={form.personality_traits as string[]} onChange={(v) => update("personality_traits", v)} max={5} />
+                  <Label className="text-xs text-slate-500 mb-1.5 block">
+                    Personality traits (pick up to 5)
+                  </Label>
+                  <MultiSelectTags
+                    options={PERSONALITY_TRAIT_OPTIONS}
+                    selected={form.personality_traits as string[]}
+                    onChange={(v) => update("personality_traits", v)}
+                    max={5}
+                  />
                 </div>
-              ) : profile.personality_traits && profile.personality_traits.length > 0 ? (
+              ) : profile.personality_traits &&
+                profile.personality_traits.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
                   {profile.personality_traits.map((trait) => (
-                    <Tag key={trait} variant="violet">{trait}</Tag>
+                    <Tag key={trait} variant="violet">
+                      {trait}
+                    </Tag>
                   ))}
                 </div>
               ) : null}
@@ -1104,26 +1352,48 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
           )}
 
           {/* 3. Values */}
-          {(aiValues || (profile.professional_values && profile.professional_values.length > 0) || editMode) && (
+          {(aiValues ||
+            (profile.professional_values &&
+              profile.professional_values.length > 0) ||
+            editMode) && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <HandHeart className="h-4 w-4 text-violet-400" />
-                <h3 className="text-sm font-semibold text-slate-900">My Values</h3>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  My Values
+                </h3>
               </div>
               {editMode && aiValues ? (
-                <EditableSection html={aiValues} editValue={aiEdits["bio_summary.values"]} onEdit={(v) => setAiEdit("bio_summary.values", v)} />
+                <EditableSection
+                  html={aiValues}
+                  editValue={aiEdits["bio_summary.values"]}
+                  onEdit={(v) => setAiEdit("bio_summary.values", v)}
+                />
               ) : aiValues ? (
-                <div className="text-sm text-slate-600 leading-relaxed mb-3 [&_p]:mb-2 [&_p:last-child]:mb-0" dangerouslySetInnerHTML={{ __html: aiValues }} />
+                <div
+                  className="text-sm text-slate-600 leading-relaxed mb-3 [&_p]:mb-2 [&_p:last-child]:mb-0"
+                  dangerouslySetInnerHTML={{ __html: aiValues }}
+                />
               ) : null}
               {editMode ? (
                 <div className="mt-3">
-                  <Label className="text-xs text-slate-500 mb-1.5 block">Professional values (pick up to 5)</Label>
-                  <MultiSelectTags options={PROFESSIONAL_VALUE_OPTIONS} selected={form.professional_values as string[]} onChange={(v) => update("professional_values", v)} max={5} />
+                  <Label className="text-xs text-slate-500 mb-1.5 block">
+                    Professional values (pick up to 5)
+                  </Label>
+                  <MultiSelectTags
+                    options={PROFESSIONAL_VALUE_OPTIONS}
+                    selected={form.professional_values as string[]}
+                    onChange={(v) => update("professional_values", v)}
+                    max={5}
+                  />
                 </div>
-              ) : profile.professional_values && profile.professional_values.length > 0 ? (
+              ) : profile.professional_values &&
+                profile.professional_values.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
                   {profile.professional_values.map((value) => (
-                    <Tag key={value} variant="violet">{value}</Tag>
+                    <Tag key={value} variant="violet">
+                      {value}
+                    </Tag>
                   ))}
                 </div>
               ) : null}
@@ -1131,35 +1401,63 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
           )}
 
           {/* 4. What I Offer */}
-          {(aiWhatIOffer || (profile.role_types_preferred && profile.role_types_preferred.length > 0) || editMode) && (
+          {(aiWhatIOffer ||
+            (profile.role_types_preferred &&
+              profile.role_types_preferred.length > 0) ||
+            editMode) && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <Briefcase className="h-4 w-4 text-violet-400" />
-                <h3 className="text-sm font-semibold text-slate-900">What I Offer</h3>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  What I Offer
+                </h3>
               </div>
               {editMode && aiWhatIOffer ? (
-                <EditableSection html={aiWhatIOffer} editValue={aiEdits["bio_summary.what_i_offer"]} onEdit={(v) => setAiEdit("bio_summary.what_i_offer", v)} />
+                <EditableSection
+                  html={aiWhatIOffer}
+                  editValue={aiEdits["bio_summary.what_i_offer"]}
+                  onEdit={(v) => setAiEdit("bio_summary.what_i_offer", v)}
+                />
               ) : aiWhatIOffer ? (
-                <div className="text-sm text-slate-600 leading-relaxed mb-3 [&_p]:mb-2 [&_p:last-child]:mb-0" dangerouslySetInnerHTML={{ __html: aiWhatIOffer }} />
+                <div
+                  className="text-sm text-slate-600 leading-relaxed mb-3 [&_p]:mb-2 [&_p:last-child]:mb-0"
+                  dangerouslySetInnerHTML={{ __html: aiWhatIOffer }}
+                />
               ) : null}
               {editMode ? (
                 <div className="mt-3 space-y-3">
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Role types</Label>
-                    <MultiSelectTags options={ROLE_TYPE_OPTIONS} selected={form.role_types_preferred} onChange={(v) => update("role_types_preferred", v)} />
+                    <Label className="text-xs text-slate-500 mb-1.5 block">
+                      Role types
+                    </Label>
+                    <MultiSelectTags
+                      options={ROLE_TYPE_OPTIONS}
+                      selected={form.role_types_preferred}
+                      onChange={(v) => update("role_types_preferred", v)}
+                    />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Level of support</Label>
-                    <MultiSelectTags options={LEVEL_OF_SUPPORT_OPTIONS} selected={form.level_of_support_offered} onChange={(v) => update("level_of_support_offered", v)} />
+                    <Label className="text-xs text-slate-500 mb-1.5 block">
+                      Level of support
+                    </Label>
+                    <MultiSelectTags
+                      options={LEVEL_OF_SUPPORT_OPTIONS}
+                      selected={form.level_of_support_offered}
+                      onChange={(v) => update("level_of_support_offered", v)}
+                    />
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
                   {profile.role_types_preferred?.map((tag) => (
-                    <Tag key={tag} variant="violet">{tag}</Tag>
+                    <Tag key={tag} variant="violet">
+                      {tag}
+                    </Tag>
                   ))}
                   {profile.level_of_support_offered?.map((s) => (
-                    <Tag key={s} variant="violet">{s}</Tag>
+                    <Tag key={s} variant="violet">
+                      {s}
+                    </Tag>
                   ))}
                 </div>
               )}
@@ -1173,25 +1471,44 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
          ═══════════════════════════════════════════════════════════════════ */}
       {activeTab === "experience" && (
         <div className="space-y-3">
-
           {/* 1. Experience */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <Briefcase className="h-4 w-4 text-violet-400" />
-              <h3 className="text-sm font-semibold text-slate-900">Experience</h3>
+              <h3 className="text-sm font-semibold text-slate-900">
+                Experience
+              </h3>
             </div>
             {editMode && aiExperience ? (
-              <EditableSection html={aiExperience} editValue={aiEdits["experience_summary"]} onEdit={(v) => setAiEdit("experience_summary", v)} />
+              <EditableSection
+                html={aiExperience}
+                editValue={aiEdits["experience_summary"]}
+                onEdit={(v) => setAiEdit("experience_summary", v)}
+              />
             ) : aiExperience ? (
-              <div className="text-sm text-slate-600 leading-relaxed mb-4 [&_p]:mb-2 [&_p:last-child]:mb-0" dangerouslySetInnerHTML={{ __html: aiExperience }} />
+              <div
+                className="text-sm text-slate-600 leading-relaxed mb-4 [&_p]:mb-2 [&_p:last-child]:mb-0"
+                dangerouslySetInnerHTML={{ __html: aiExperience }}
+              />
             ) : !editMode && profile.total_experience_years ? (
               <div className="space-y-1 text-sm text-slate-600 mb-4">
-                {profile.total_experience_years != null && <p>{profile.total_experience_years} years total childcare experience</p>}
+                {profile.total_experience_years != null && (
+                  <p>
+                    {profile.total_experience_years} years total childcare
+                    experience
+                  </p>
+                )}
               </div>
             ) : null}
             {editMode ? (
               <div className="mt-3 space-y-4">
-                {(["total_experience_years", "under_3_experience_years", "newborn_experience_years"] as const).map((key) => {
+                {(
+                  [
+                    "total_experience_years",
+                    "under_3_experience_years",
+                    "newborn_experience_years",
+                  ] as const
+                ).map((key) => {
                   const labels: Record<string, string> = {
                     total_experience_years: "Total Childcare Experience",
                     under_3_experience_years: "Under 3s Experience",
@@ -1200,9 +1517,16 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                   return (
                     <div key={key}>
                       <div className="flex items-center justify-between mb-1">
-                        <Label className="text-xs text-slate-500">{labels[key]}</Label>
+                        <Label className="text-xs text-slate-500">
+                          {labels[key]}
+                        </Label>
                         <span className="text-xs font-medium text-violet-600">
-                          {form[key] !== null ? (form[key]! >= 10 ? "10+" : `${form[key]}`) : "0"} years
+                          {form[key] !== null
+                            ? form[key]! >= 10
+                              ? "10+"
+                              : `${form[key]}`
+                            : "0"}{" "}
+                          years
                         </span>
                       </div>
                       <input
@@ -1219,12 +1543,14 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                 })}
               </div>
             ) : statBoxes.length > 0 ? (
-              <div className={cn(
-                "grid gap-2.5",
-                statBoxes.length === 1 && "grid-cols-1 max-w-[200px]",
-                statBoxes.length === 2 && "grid-cols-2",
-                statBoxes.length === 3 && "grid-cols-3",
-              )}>
+              <div
+                className={cn(
+                  "grid gap-2.5",
+                  statBoxes.length === 1 && "grid-cols-1 max-w-[200px]",
+                  statBoxes.length === 2 && "grid-cols-2",
+                  statBoxes.length === 3 && "grid-cols-3",
+                )}
+              >
                 {statBoxes.map((s) => (
                   <StatBox key={s.label} value={s.value} label={s.label} />
                 ))}
@@ -1236,43 +1562,76 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <CalendarCheck className="h-4 w-4 text-violet-400" />
-              <h3 className="text-sm font-semibold text-slate-900">Background</h3>
+              <h3 className="text-sm font-semibold text-slate-900">
+                Background
+              </h3>
             </div>
             {editMode && aiBackground ? (
-              <EditableSection html={aiBackground} editValue={aiEdits["bio_summary.background"]} onEdit={(v) => setAiEdit("bio_summary.background", v)} />
+              <EditableSection
+                html={aiBackground}
+                editValue={aiEdits["bio_summary.background"]}
+                onEdit={(v) => setAiEdit("bio_summary.background", v)}
+              />
             ) : aiBackground ? (
-              <div className="text-sm text-slate-600 leading-relaxed mb-4 [&_p]:mb-2 [&_p:last-child]:mb-0" dangerouslySetInnerHTML={{ __html: aiBackground }} />
+              <div
+                className="text-sm text-slate-600 leading-relaxed mb-4 [&_p]:mb-2 [&_p:last-child]:mb-0"
+                dangerouslySetInnerHTML={{ __html: aiBackground }}
+              />
             ) : null}
             {editMode ? (
               <div className="mt-3 space-y-4">
                 <div>
-                  <Label className="text-xs text-slate-500 mb-1.5 block">Highest Qualification</Label>
+                  <Label className="text-xs text-slate-500 mb-1.5 block">
+                    Highest Qualification
+                  </Label>
                   <select
                     value={form.highest_qualification || ""}
-                    onChange={(e) => update("highest_qualification", e.target.value || null)}
+                    onChange={(e) =>
+                      update("highest_qualification", e.target.value || null)
+                    }
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
                   >
                     <option value="">Select...</option>
-                    {QUALIFICATION_OPTIONS.map((q) => <option key={q} value={q}>{q}</option>)}
+                    {QUALIFICATION_OPTIONS.map((q) => (
+                      <option key={q} value={q}>
+                        {q}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500 mb-1.5 block">Childcare Roles</Label>
+                  <Label className="text-xs text-slate-500 mb-1.5 block">
+                    Childcare Roles
+                  </Label>
                   <div className="space-y-2">
                     {form.childcare_roles.map((role, idx) => (
-                      <div key={idx} className="rounded-lg bg-slate-50 px-3 py-2 space-y-2">
+                      <div
+                        key={idx}
+                        className="rounded-lg bg-slate-50 px-3 py-2 space-y-2"
+                      >
                         <div className="flex items-center gap-2">
                           <select
                             value={role.role}
                             onChange={(e) => {
                               const updated = [...form.childcare_roles];
-                              updated[idx] = { ...updated[idx], role: e.target.value, role_other: e.target.value === "Other" ? updated[idx].role_other : undefined };
+                              updated[idx] = {
+                                ...updated[idx],
+                                role: e.target.value,
+                                role_other:
+                                  e.target.value === "Other"
+                                    ? updated[idx].role_other
+                                    : undefined,
+                              };
                               update("childcare_roles", updated);
                             }}
                             className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-violet-500"
                           >
                             <option value="">Select role...</option>
-                            {CHILDCARE_ROLE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                            {CHILDCARE_ROLE_OPTIONS.map((o) => (
+                              <option key={o} value={o}>
+                                {o}
+                              </option>
+                            ))}
                           </select>
                           <div className="flex items-center gap-1.5 shrink-0">
                             <input
@@ -1282,7 +1641,10 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                               value={role.duration}
                               onChange={(e) => {
                                 const updated = [...form.childcare_roles];
-                                updated[idx] = { ...updated[idx], duration: parseInt(e.target.value) || 0 };
+                                updated[idx] = {
+                                  ...updated[idx],
+                                  duration: parseInt(e.target.value) || 0,
+                                };
                                 update("childcare_roles", updated);
                               }}
                               className="w-14 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-center outline-none focus:border-violet-500"
@@ -1292,7 +1654,14 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                           {form.childcare_roles.length > 1 && (
                             <button
                               type="button"
-                              onClick={() => update("childcare_roles", form.childcare_roles.filter((_, i) => i !== idx))}
+                              onClick={() =>
+                                update(
+                                  "childcare_roles",
+                                  form.childcare_roles.filter(
+                                    (_, i) => i !== idx,
+                                  ),
+                                )
+                              }
                               className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -1304,7 +1673,10 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                             value={role.role_other || ""}
                             onChange={(e) => {
                               const updated = [...form.childcare_roles];
-                              updated[idx] = { ...updated[idx], role_other: e.target.value };
+                              updated[idx] = {
+                                ...updated[idx],
+                                role_other: e.target.value,
+                              };
                               update("childcare_roles", updated);
                             }}
                             placeholder="Please specify the role..."
@@ -1315,7 +1687,12 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                     ))}
                     <button
                       type="button"
-                      onClick={() => update("childcare_roles", [...form.childcare_roles, { role: "", duration: 1 }])}
+                      onClick={() =>
+                        update("childcare_roles", [
+                          ...form.childcare_roles,
+                          { role: "", duration: 1 },
+                        ])
+                      }
                       className="flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-700 font-medium"
                     >
                       <Plus className="h-3.5 w-3.5" /> Add role
@@ -1328,23 +1705,33 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                 {profile.highest_qualification && (
                   <div className="flex items-start gap-2.5 rounded-lg bg-violet-50 border border-violet-100 px-3 py-2.5 mb-3">
                     <GraduationCap className="h-4 w-4 text-violet-500 mt-0.5 shrink-0" />
-                    <span className="text-sm font-medium text-violet-700">{profile.highest_qualification}</span>
+                    <span className="text-sm font-medium text-violet-700">
+                      {profile.highest_qualification}
+                    </span>
                   </div>
                 )}
-                {profile.childcare_roles && profile.childcare_roles.length > 0 && (
-                  <div className="space-y-2">
-                    {profile.childcare_roles.map((role, idx) => (
-                      <div key={`${role.role}-${idx}`} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2.5">
-                        <span className="text-sm font-medium text-slate-700">
-                          {role.role === "Other" && (role as { role_other?: string }).role_other
-                            ? (role as { role_other?: string }).role_other
-                            : role.role}
-                        </span>
-                        <span className="text-xs text-slate-500">{role.duration} {role.duration === 1 ? "year" : "years"}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {profile.childcare_roles &&
+                  profile.childcare_roles.length > 0 && (
+                    <div className="space-y-2">
+                      {profile.childcare_roles.map((role, idx) => (
+                        <div
+                          key={`${role.role}-${idx}`}
+                          className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2.5"
+                        >
+                          <span className="text-sm font-medium text-slate-700">
+                            {role.role === "Other" &&
+                            (role as { role_other?: string }).role_other
+                              ? (role as { role_other?: string }).role_other
+                              : role.role}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {role.duration}{" "}
+                            {role.duration === 1 ? "year" : "years"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
               </>
             )}
           </div>
@@ -1357,53 +1744,119 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
               "CPR",
               "Child Protection",
             ];
-            const currentCerts = editMode ? form.certificates : profile.certificates;
-            const orderedCerts = CERT_ORDER.filter((c) => currentCerts.includes(c));
-            const otherCerts = currentCerts.filter((c) => !CERT_ORDER.includes(c));
-            const currentVax = editMode ? form.vaccination_status : profile.vaccination_status;
-            const currentNonSmoker = editMode ? form.non_smoker : profile.non_smoker;
-            const hasItems = profile.wwcc_verified || orderedCerts.length > 0 || otherCerts.length > 0 || currentVax || currentNonSmoker || editMode;
+            const currentCerts = editMode
+              ? form.certificates
+              : profile.certificates;
+            const orderedCerts = CERT_ORDER.filter((c) =>
+              currentCerts.includes(c),
+            );
+            const otherCerts = currentCerts.filter(
+              (c) => !CERT_ORDER.includes(c),
+            );
+            const currentVax = editMode
+              ? form.vaccination_status
+              : profile.vaccination_status;
+            const currentNonSmoker = editMode
+              ? form.non_smoker
+              : profile.non_smoker;
+            const hasItems =
+              profile.wwcc_verified ||
+              orderedCerts.length > 0 ||
+              otherCerts.length > 0 ||
+              currentVax ||
+              currentNonSmoker ||
+              editMode;
             if (!hasItems) return null;
             return (
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
                   <ShieldCheck className="h-4 w-4 text-violet-400" />
-                  <h3 className="text-sm font-semibold text-slate-900">Safety & Assurance</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Safety & Assurance
+                  </h3>
                 </div>
                 {editMode ? (
                   <div className="space-y-4">
                     <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Certificates</Label>
-                      <MultiSelectTags options={CERTIFICATE_OPTIONS} selected={form.certificates} onChange={(v) => update("certificates", v)} />
+                      <Label className="text-xs text-slate-500 mb-1.5 block">
+                        Certificates
+                      </Label>
+                      <MultiSelectTags
+                        options={CERTIFICATE_OPTIONS}
+                        selected={form.certificates}
+                        onChange={(v) => update("certificates", v)}
+                      />
                     </div>
                     <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Assurances</Label>
-                      <MultiSelectTags options={ASSURANCE_OPTIONS} selected={form.assurances} onChange={(v) => update("assurances", v)} />
+                      <Label className="text-xs text-slate-500 mb-1.5 block">
+                        Assurances
+                      </Label>
+                      <MultiSelectTags
+                        options={ASSURANCE_OPTIONS}
+                        selected={form.assurances}
+                        onChange={(v) => update("assurances", v)}
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label className="text-xs text-slate-500 mb-1.5 block">Fully Vaccinated</Label>
-                        <BooleanTags value={form.vaccination_status} onChange={(v) => update("vaccination_status", v)} />
+                        <Label className="text-xs text-slate-500 mb-1.5 block">
+                          Fully Vaccinated
+                        </Label>
+                        <BooleanTags
+                          value={form.vaccination_status}
+                          onChange={(v) => update("vaccination_status", v)}
+                        />
                       </div>
                       <div>
-                        <Label className="text-xs text-slate-500 mb-1.5 block">Non-Smoker</Label>
-                        <BooleanTags value={form.non_smoker} onChange={(v) => update("non_smoker", v)} />
+                        <Label className="text-xs text-slate-500 mb-1.5 block">
+                          Non-Smoker
+                        </Label>
+                        <BooleanTags
+                          value={form.non_smoker}
+                          onChange={(v) => update("non_smoker", v)}
+                        />
                       </div>
                     </div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
                     {profile.wwcc_verified && (
-                      <GlanceItem icon={ShieldCheck} label="WWCC" variant="green" />
+                      <GlanceItem
+                        icon={ShieldCheck}
+                        label="WWCC"
+                        variant="green"
+                      />
                     )}
                     {orderedCerts.map((cert) => (
-                      <GlanceItem key={cert} icon={Award} label={cert} variant="green" />
+                      <GlanceItem
+                        key={cert}
+                        icon={Award}
+                        label={cert}
+                        variant="green"
+                      />
                     ))}
                     {otherCerts.map((cert) => (
-                      <GlanceItem key={cert} icon={Award} label={cert} variant="green" />
+                      <GlanceItem
+                        key={cert}
+                        icon={Award}
+                        label={cert}
+                        variant="green"
+                      />
                     ))}
-                    {currentVax && <GlanceItem icon={Stethoscope} label="Fully Vaccinated" variant="green" />}
-                    {currentNonSmoker && <GlanceItem icon={CigaretteOff} label="Non-Smoker" variant="green" />}
+                    {currentVax && (
+                      <GlanceItem
+                        icon={Stethoscope}
+                        label="Fully Vaccinated"
+                        variant="green"
+                      />
+                    )}
+                    {currentNonSmoker && (
+                      <GlanceItem
+                        icon={CigaretteOff}
+                        label="Non-Smoker"
+                        variant="green"
+                      />
+                    )}
                   </div>
                 )}
               </div>
@@ -1414,109 +1867,219 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <ThumbsUp className="h-4 w-4 text-violet-400" />
-              <h3 className="text-sm font-semibold text-slate-900">Good to Know</h3>
+              <h3 className="text-sm font-semibold text-slate-900">
+                Good to Know
+              </h3>
             </div>
             {editMode ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Min Child Age</Label>
+                    <Label className="text-xs text-slate-500 mb-1.5 block">
+                      Min Child Age
+                    </Label>
                     <select
                       value={form.min_child_age_months ?? ""}
-                      onChange={(e) => update("min_child_age_months", e.target.value ? parseInt(e.target.value) : null)}
+                      onChange={(e) =>
+                        update(
+                          "min_child_age_months",
+                          e.target.value ? parseInt(e.target.value) : null,
+                        )
+                      }
                       className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
                     >
                       <option value="">Any</option>
-                      {MIN_AGE_OPTIONS.map((o) => <option key={o.months} value={o.months}>{o.label}</option>)}
+                      {MIN_AGE_OPTIONS.map((o) => (
+                        <option key={o.months} value={o.months}>
+                          {o.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Max Child Age</Label>
+                    <Label className="text-xs text-slate-500 mb-1.5 block">
+                      Max Child Age
+                    </Label>
                     <select
                       value={form.max_child_age_months ?? ""}
-                      onChange={(e) => update("max_child_age_months", e.target.value ? parseInt(e.target.value) : null)}
+                      onChange={(e) =>
+                        update(
+                          "max_child_age_months",
+                          e.target.value ? parseInt(e.target.value) : null,
+                        )
+                      }
                       className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
                     >
                       <option value="">Any</option>
-                      {MAX_AGE_OPTIONS.map((o) => <option key={o.months} value={o.months}>{o.label}</option>)}
+                      {MAX_AGE_OPTIONS.map((o) => (
+                        <option key={o.months} value={o.months}>
+                          {o.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500 mb-1.5 block">Max Children</Label>
-                  <SingleSelectTags options={["1", "2", "3"]} value={form.max_children != null ? String(form.max_children) : null} onChange={(v) => update("max_children", parseInt(v))} />
+                  <Label className="text-xs text-slate-500 mb-1.5 block">
+                    Max Children
+                  </Label>
+                  <SingleSelectTags
+                    options={["1", "2", "3"]}
+                    value={
+                      form.max_children != null
+                        ? String(form.max_children)
+                        : null
+                    }
+                    onChange={(v) => update("max_children", parseInt(v))}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Additional Needs</Label>
-                    <BooleanTags value={form.additional_needs_ok} onChange={(v) => update("additional_needs_ok", v)} />
+                    <Label className="text-xs text-slate-500 mb-1.5 block">
+                      Additional Needs
+                    </Label>
+                    <BooleanTags
+                      value={form.additional_needs_ok}
+                      onChange={(v) => update("additional_needs_ok", v)}
+                    />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Comfortable with Pets</Label>
-                    <BooleanTags value={form.comfortable_with_pets} onChange={(v) => update("comfortable_with_pets", v)} />
+                    <Label className="text-xs text-slate-500 mb-1.5 block">
+                      Comfortable with Pets
+                    </Label>
+                    <BooleanTags
+                      value={form.comfortable_with_pets}
+                      onChange={(v) => update("comfortable_with_pets", v)}
+                    />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Driver&apos;s License</Label>
-                    <BooleanTags value={form.drivers_license} onChange={(v) => update("drivers_license", v)} />
+                    <Label className="text-xs text-slate-500 mb-1.5 block">
+                      Driver&apos;s License
+                    </Label>
+                    <BooleanTags
+                      value={form.drivers_license}
+                      onChange={(v) => update("drivers_license", v)}
+                    />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Access to Car</Label>
-                    <BooleanTags value={form.has_car} onChange={(v) => update("has_car", v)} />
+                    <Label className="text-xs text-slate-500 mb-1.5 block">
+                      Access to Car
+                    </Label>
+                    <BooleanTags
+                      value={form.has_car}
+                      onChange={(v) => update("has_car", v)}
+                    />
                   </div>
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500 mb-1.5 block">Hourly Rate ($)</Label>
+                  <Label className="text-xs text-slate-500 mb-1.5 block">
+                    Hourly Rate ($)
+                  </Label>
                   <Input
                     type="number"
                     min={25}
                     step={0.25}
                     value={form.hourly_rate_min ?? ""}
-                    onChange={(e) => update("hourly_rate_min", e.target.value ? parseFloat(e.target.value) : null)}
+                    onChange={(e) =>
+                      update(
+                        "hourly_rate_min",
+                        e.target.value ? parseFloat(e.target.value) : null,
+                      )
+                    }
                     className="max-w-[200px]"
                   />
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500 mb-1.5 block">Languages</Label>
-                  <MultiSelectTags options={LANGUAGE_OPTIONS} selected={form.languages} onChange={(v) => update("languages", v)} />
-                  {(form.languages.includes("Foreign Language") || form.languages.includes("Multiple")) && (
+                  <Label className="text-xs text-slate-500 mb-1.5 block">
+                    Languages
+                  </Label>
+                  <MultiSelectTags
+                    options={LANGUAGE_OPTIONS}
+                    selected={form.languages}
+                    onChange={(v) => update("languages", v)}
+                  />
+                  {(form.languages.includes("Foreign Language") ||
+                    form.languages.includes("Multiple")) && (
                     <div className="mt-2">
                       <Input
                         value={form.language_details}
-                        onChange={(e) => update("language_details", e.target.value)}
-                        placeholder={form.languages.includes("Multiple") ? "e.g. Mandarin, French, Spanish" : "e.g. Mandarin"}
+                        onChange={(e) =>
+                          update("language_details", e.target.value)
+                        }
+                        placeholder={
+                          form.languages.includes("Multiple")
+                            ? "e.g. Mandarin, French, Spanish"
+                            : "e.g. Mandarin"
+                        }
                         className="text-sm"
                       />
-                      <p className="text-xs text-slate-400 mt-1">Please specify which language(s)</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Please specify which language(s)
+                      </p>
                     </div>
                   )}
                 </div>
               </div>
             ) : (
               <>
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Best with supporting</h4>
+                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                  Best with supporting
+                </h4>
                 <div className="grid grid-cols-2 gap-2 mb-4">
-                  {profile.min_child_age_months != null && profile.max_child_age_months != null && (
-                    <GlanceItem icon={Baby} label={ageRangeToFriendly(profile.min_child_age_months, profile.max_child_age_months)} />
-                  )}
+                  {profile.min_child_age_months != null &&
+                    profile.max_child_age_months != null && (
+                      <GlanceItem
+                        icon={Baby}
+                        label={ageRangeToFriendly(
+                          profile.min_child_age_months,
+                          profile.max_child_age_months,
+                        )}
+                      />
+                    )}
                   {profile.max_children != null && (
-                    <GlanceItem icon={Users} label={childrenCountLabel(profile.max_children)} />
+                    <GlanceItem
+                      icon={Users}
+                      label={childrenCountLabel(profile.max_children)}
+                    />
                   )}
                 </div>
-                {(profile.additional_needs_ok || profile.comfortable_with_pets) && (
+                {(profile.additional_needs_ok ||
+                  profile.comfortable_with_pets) && (
                   <>
-                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Can support</h4>
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      Can support
+                    </h4>
                     <div className="grid grid-cols-2 gap-2 mb-4">
-                      {profile.additional_needs_ok && <GlanceItem icon={Accessibility} label="Children with additional needs" />}
-                      {profile.comfortable_with_pets && <GlanceItem icon={PawPrint} label="Families with pets" />}
+                      {profile.additional_needs_ok && (
+                        <GlanceItem
+                          icon={Accessibility}
+                          label="Children with additional needs"
+                        />
+                      )}
+                      {profile.comfortable_with_pets && (
+                        <GlanceItem
+                          icon={PawPrint}
+                          label="Families with pets"
+                        />
+                      )}
                     </div>
                   </>
                 )}
                 {(profile.drivers_license || profile.has_car) && (
                   <>
-                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Additionally</h4>
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      Additionally
+                    </h4>
                     <div className="grid grid-cols-2 gap-2">
-                      {profile.drivers_license && <GlanceItem icon={Car} label="I have my driver's license" />}
-                      {profile.has_car && <GlanceItem icon={Car} label="I have my own car" />}
+                      {profile.drivers_license && (
+                        <GlanceItem
+                          icon={Car}
+                          label="I have my driver's license"
+                        />
+                      )}
+                      {profile.has_car && (
+                        <GlanceItem icon={Car} label="I have my own car" />
+                      )}
                     </div>
                   </>
                 )}
@@ -1535,7 +2098,9 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-violet-400" />
-                <h3 className="text-sm font-semibold text-slate-900">Availability</h3>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Availability
+                </h3>
               </div>
               {!editMode && profile.immediate_start_available && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-medium text-green-700">
@@ -1546,26 +2111,44 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
             {editMode ? (
               <div className="space-y-4">
                 <div>
-                  <p className="text-xs text-slate-400 mb-2">Click cells to toggle availability</p>
+                  <p className="text-xs text-slate-400 mb-2">
+                    Click cells to toggle availability
+                  </p>
                   <EditableAvailabilityGrid
-                    form={{ available_days: form.available_days, schedule: form.schedule }}
+                    form={{
+                      available_days: form.available_days,
+                      schedule: form.schedule,
+                    }}
                     update={(key, value) => {
-                      if (key === "available_days") update("available_days", value as string[]);
-                      else update("schedule", value as Record<string, string[]>);
+                      if (key === "available_days")
+                        update("available_days", value as string[]);
+                      else
+                        update("schedule", value as Record<string, string[]>);
                     }}
                   />
                 </div>
                 <div className="border-t border-slate-100 pt-4">
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Immediate Start Available?</Label>
-                    <BooleanTags value={form.immediate_start_available} onChange={(v) => update("immediate_start_available", v)} />
+                    <Label className="text-xs text-slate-500 mb-1.5 block">
+                      Immediate Start Available?
+                    </Label>
+                    <BooleanTags
+                      value={form.immediate_start_available}
+                      onChange={(v) => update("immediate_start_available", v)}
+                    />
                   </div>
                 </div>
               </div>
-            ) : profile.availability?.schedule && Object.keys(profile.availability.schedule).length > 0 ? (
-              <AvailabilityGrid schedule={profile.availability.schedule} firstName={profile.first_name} />
+            ) : profile.availability?.schedule &&
+              Object.keys(profile.availability.schedule).length > 0 ? (
+              <AvailabilityGrid
+                schedule={profile.availability.schedule}
+                firstName={profile.first_name}
+              />
             ) : (
-              <p className="text-sm text-slate-400 italic">Availability not set yet.</p>
+              <p className="text-sm text-slate-400 italic">
+                Availability not set yet.
+              </p>
             )}
           </div>
         </div>
@@ -1589,7 +2172,9 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                   <span className="text-green-600 font-medium">Saved</span>
                 </>
               )}
-              {saveStatus === "error" && <span className="text-red-500 text-xs">{error}</span>}
+              {saveStatus === "error" && (
+                <span className="text-red-500 text-xs">{error}</span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -1607,7 +2192,10 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                 className="bg-violet-600 hover:bg-violet-700 text-white"
               >
                 {saveStatus === "saving" ? (
-                  <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Saving...</>
+                  <>
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    Saving...
+                  </>
                 ) : (
                   "Save"
                 )}
@@ -1625,13 +2213,18 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
             Changes Saved
           </DialogTitle>
           <DialogDescription className="text-sm text-slate-600 leading-relaxed">
-            Would you like us to regenerate your AI profile to reflect your updated information?
+            Would you like us to regenerate your AI profile to reflect your
+            updated information?
             <span className="block mt-2 text-xs text-slate-400">
               Note: you can only regenerate once per day.
             </span>
           </DialogDescription>
           <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" size="sm" onClick={() => setShowRegenOffer(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowRegenOffer(false)}
+            >
               Maybe Later
             </Button>
             <Button
@@ -1653,7 +2246,9 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
           onEscapeKeyDown={(e: Event) => e.preventDefault()}
         >
           <DialogTitle className="sr-only">Regenerating Profile</DialogTitle>
-          <DialogDescription className="sr-only">Please wait while we regenerate your profile</DialogDescription>
+          <DialogDescription className="sr-only">
+            Please wait while we regenerate your profile
+          </DialogDescription>
 
           {regenResult === "pending" && (
             <div className="flex flex-col items-center py-8 gap-5">
@@ -1663,7 +2258,9 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                 <Sparkles className="absolute inset-0 m-auto h-6 w-6 text-violet-500" />
               </div>
               <div className="text-center space-y-1">
-                <h3 className="text-base font-semibold text-slate-900">Regenerating Your Profile</h3>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Regenerating Your Profile
+                </h3>
                 <p className="text-sm text-violet-600 min-h-[20px] transition-opacity duration-300">
                   {REGEN_STEPS[regenStepIndex]}
                 </p>
@@ -1677,8 +2274,12 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                 <CheckCircle className="h-8 w-8 text-green-500" />
               </div>
               <div className="text-center space-y-1">
-                <h3 className="text-base font-semibold text-slate-900">Profile Regenerated!</h3>
-                <p className="text-sm text-slate-500">Your profile has been updated with fresh content.</p>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Profile Regenerated!
+                </h3>
+                <p className="text-sm text-slate-500">
+                  Your profile has been updated with fresh content.
+                </p>
               </div>
             </div>
           )}
@@ -1689,7 +2290,9 @@ export function NannyMyProfile({ profile }: { profile: NannyProfile }) {
                 <AlertTriangle className="h-8 w-8 text-red-400" />
               </div>
               <div className="text-center space-y-1">
-                <h3 className="text-base font-semibold text-slate-900">Unable to Regenerate</h3>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Unable to Regenerate
+                </h3>
                 <p className="text-sm text-slate-500">{regenErrorMsg}</p>
               </div>
               <Button

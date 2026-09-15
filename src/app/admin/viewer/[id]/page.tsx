@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { NannyHubClient, type NannyProfileAccordionData } from "@/app/nanny/NannyHubClient";
+import {
+  NannyHubClient,
+  type NannyProfileAccordionData,
+} from "@/app/nanny/NannyHubClient";
 import { ParentHubClient } from "@/app/parent/ParentHubClient";
 import { CONNECTION_STAGE, POSITION_STAGE } from "@/lib/position/constants";
 
@@ -36,7 +39,9 @@ export default async function AdminViewerHubPage({
   params: { id: string };
 }) {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const admin = createAdminClient();
@@ -72,13 +77,15 @@ async function renderNannyHub(admin: any, targetUserId: string) {
   const [profileRes, nannyRes] = await Promise.all([
     admin
       .from("user_profiles")
-      .select("first_name, last_name, profile_picture_url, suburb, date_of_birth")
+      .select(
+        "first_name, last_name, profile_picture_url, suburb, date_of_birth",
+      )
       .eq("user_id", targetUserId)
       .single(),
     admin
       .from("nannies")
       .select(
-        "id, verification_level, ai_content, nationality, total_experience_years, nanny_experience_years, under_3_experience_years, newborn_experience_years, role_types_preferred, level_of_support_offered, hourly_rate_min, max_children, min_child_age_months, max_child_age_months, drivers_license, has_car, comfortable_with_pets, vaccination_status, non_smoker, languages, hobbies_interests, strengths_traits, skills_training, verification_tier, motivation, personality_traits, professional_values, childcare_roles, photo_1_url, photo_2_url, photo_3_url, immediate_start_available, additional_needs_ok"
+        "id, verification_level, ai_content, nationality, total_experience_years, nanny_experience_years, under_3_experience_years, newborn_experience_years, role_types_preferred, level_of_support_offered, hourly_rate_min, max_children, min_child_age_months, max_child_age_months, drivers_license, has_car, comfortable_with_pets, vaccination_status, non_smoker, languages, hobbies_interests, strengths_traits, skills_training, verification_tier, motivation, personality_traits, professional_values, childcare_roles, photo_1_url, photo_2_url, photo_3_url, immediate_start_available, additional_needs_ok",
       )
       .eq("user_id", targetUserId)
       .single(),
@@ -86,7 +93,11 @@ async function renderNannyHub(admin: any, targetUserId: string) {
 
   const nannyId = nannyRes.data?.id;
   if (!nannyId) {
-    return <div className="p-6 text-center text-slate-500">Nanny record not found</div>;
+    return (
+      <div className="p-6 text-center text-slate-500">
+        Nanny record not found
+      </div>
+    );
   }
 
   // Phase 2: all parallel data fetches
@@ -101,14 +112,16 @@ async function renderNannyHub(admin: any, targetUserId: string) {
     // Placements
     admin
       .from("nanny_placements")
-      .select("id, parent_id, position_id, weekly_hours, hourly_rate, hired_at, start_date, status, end_notes")
+      .select(
+        "id, parent_id, position_id, weekly_hours, hourly_rate, hired_at, start_date, status, end_notes",
+      )
       .eq("nanny_id", nannyId)
       .order("hired_at", { ascending: false }),
     // Upcoming intros (connection requests)
     admin
       .from("connection_requests")
       .select(
-        "id, parent_id, position_id, connection_stage, confirmed_time, fill_initiated_by, trial_date, start_date, status, proposed_times, message, expires_at, nanny_phone_shared, source"
+        "id, parent_id, position_id, connection_stage, confirmed_time, fill_initiated_by, trial_date, start_date, status, proposed_times, message, expires_at, nanny_phone_shared, source",
       )
       .eq("nanny_id", nannyId)
       .in("connection_stage", [
@@ -127,7 +140,9 @@ async function renderNannyHub(admin: any, targetUserId: string) {
     // DFY notifications
     admin
       .from("dfy_match_notifications")
-      .select("id, position_id, match_score, distance_km, status, notified_at, viewed_at, responded_at")
+      .select(
+        "id, position_id, match_score, distance_km, status, notified_at, viewed_at, responded_at",
+      )
       .eq("nanny_id", nannyId)
       .in("status", ["notified", "viewed", "interested"])
       .order("match_score", { ascending: false }),
@@ -144,7 +159,7 @@ async function renderNannyHub(admin: any, targetUserId: string) {
         wwcc_grant_email_url, wwcc_service_nsw_screenshot_url,
         wwcc_doc_verified, wwcc_verified, wwcc_rejection_reason, wwcc_user_guidance,
         phone_number, address_line, city, state, postcode, country,
-        cross_check_reasoning, created_at, updated_at`
+        cross_check_reasoning, created_at, updated_at`,
       )
       .eq("user_id", targetUserId)
       .maybeSingle(),
@@ -162,14 +177,22 @@ async function renderNannyHub(admin: any, targetUserId: string) {
   ]);
 
   // Build placements data
-  const placements = await buildNannyPlacements(admin, placementsRes.data || []);
+  const placements = await buildNannyPlacements(
+    admin,
+    placementsRes.data || [],
+  );
 
   // Build upcoming intros
-  const upcomingIntros = await buildNannyUpcomingIntros(admin, introsConnections.data || []);
+  const upcomingIntros = await buildNannyUpcomingIntros(
+    admin,
+    introsConnections.data || [],
+  );
 
   // Build DFY notifications
-  const dfyData = await buildDfyNotifications(admin, dfyNotifications.data || []);
-
+  const dfyData = await buildDfyNotifications(
+    admin,
+    dfyNotifications.data || [],
+  );
 
   // Assemble accordion profile data
   const n = nannyRes.data;
@@ -201,22 +224,33 @@ async function renderNannyHub(admin: any, targetUserId: string) {
         availability: availRes.data
           ? {
               days_available: availRes.data.days_available,
-              schedule: availRes.data.schedule as Record<string, string[]> | null,
+              schedule: availRes.data.schedule as Record<
+                string,
+                string[]
+              > | null,
             }
           : null,
         highest_qualification:
           (credsRes.data || []).find(
-            (c: { credential_category: string }) => c.credential_category === "qualification"
+            (c: { credential_category: string }) =>
+              c.credential_category === "qualification",
           )?.qualification_type || null,
         certificates: (credsRes.data || [])
-          .filter((c: { credential_category: string }) => c.credential_category === "certification")
+          .filter(
+            (c: { credential_category: string }) =>
+              c.credential_category === "certification",
+          )
           .map((c: { certification_type: string }) => c.certification_type)
           .filter(Boolean) as string[],
         motivation: n.motivation || null,
         personality_traits: n.personality_traits || null,
         professional_values: n.professional_values || null,
-        childcare_roles: n.childcare_roles as { role: string; duration: number }[] | null,
-        additional_photos: [n.photo_1_url, n.photo_2_url, n.photo_3_url].filter(Boolean) as string[],
+        childcare_roles: n.childcare_roles as
+          | { role: string; duration: number }[]
+          | null,
+        additional_photos: [n.photo_1_url, n.photo_2_url, n.photo_3_url].filter(
+          Boolean,
+        ) as string[],
         immediate_start: n.immediate_start_available ?? false,
         additional_needs: n.additional_needs_ok ?? false,
       }
@@ -232,7 +266,9 @@ async function renderNannyHub(admin: any, targetUserId: string) {
         verificationData={verificationRes.data}
         nannyProfile={nannyProfile}
         placements={placements}
-        upcomingIntros={upcomingIntros as unknown as import("@/lib/actions/position-funnel").UpcomingIntro[]}
+        upcomingIntros={
+          upcomingIntros as unknown as import("@/lib/actions/position-funnel").UpcomingIntro[]
+        }
         dfyNotifications={dfyData}
         openPositions={[]}
         nannyApplications={[]}
@@ -252,7 +288,11 @@ async function renderParentHub(admin: any, targetUserId: string) {
     .single();
 
   if (!parentData) {
-    return <div className="p-6 text-center text-slate-500">Parent record not found</div>;
+    return (
+      <div className="p-6 text-center text-slate-500">
+        Parent record not found
+      </div>
+    );
   }
 
   const parentId = parentData.id;
@@ -307,20 +347,31 @@ async function renderParentHub(admin: any, targetUserId: string) {
       .gte("connection_stage", CONNECTION_STAGE.INTRO_SCHEDULED);
 
     if (conns && conns.length > 0) {
-      const nannyIds = Array.from(new Set(conns.map((c: { nanny_id: string }) => c.nanny_id)));
-      const { data: nannies } = await admin.from("nannies").select("id, user_id").in("id", nannyIds);
+      const nannyIds = Array.from(
+        new Set(conns.map((c: { nanny_id: string }) => c.nanny_id)),
+      );
+      const { data: nannies } = await admin
+        .from("nannies")
+        .select("id, user_id")
+        .in("id", nannyIds);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const nannyMap = new Map<string, any>((nannies || []).map((n: any) => [n.id, n]));
-      const nannyUserIds = (nannies || []).map((n: { user_id: string }) => n.user_id);
+      const nannyMap = new Map<string, any>(
+        (nannies || []).map((n: any) => [n.id, n]),
+      );
+      const nannyUserIds = (nannies || []).map(
+        (n: { user_id: string }) => n.user_id,
+      );
       const { data: profiles } = await admin
         .from("user_profiles")
         .select("user_id, first_name, last_name, suburb, profile_picture_url")
         .in("user_id", nannyUserIds);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const profileMap = new Map<string, any>((profiles || []).map((p: any) => [p.user_id, p]));
+      const profileMap = new Map<string, any>(
+        (profiles || []).map((p: any) => [p.user_id, p]),
+      );
 
       // Deduplicate — keep highest stage per nanny
-      const bestByNanny = new Map<string, typeof conns[0]>();
+      const bestByNanny = new Map<string, (typeof conns)[0]>();
       for (const c of conns) {
         const existing = bestByNanny.get(c.nanny_id);
         if (!existing || c.connection_stage > existing.connection_stage) {
@@ -334,7 +385,9 @@ async function renderParentHub(admin: any, targetUserId: string) {
         return {
           connectionId: c.id,
           nannyId: c.nanny_id,
-          nannyName: profile ? `${profile.first_name} ${profile.last_name}` : "Unknown",
+          nannyName: profile
+            ? `${profile.first_name} ${profile.last_name}`
+            : "Unknown",
           nannySuburb: profile?.suburb || "",
           nannyPhoto: profile?.profile_picture_url || null,
           connectionStage: c.connection_stage,
@@ -342,7 +395,10 @@ async function renderParentHub(admin: any, targetUserId: string) {
         };
       });
 
-      showFillButton = !placementRes && position.stage === POSITION_STAGE.CONNECTING && confirmedNannies.length > 0;
+      showFillButton =
+        !placementRes &&
+        position.stage === POSITION_STAGE.CONNECTING &&
+        confirmedNannies.length > 0;
     }
   }
 
@@ -369,30 +425,49 @@ async function buildNannyPlacements(admin: any, rawPlacements: any[]) {
   if (!rawPlacements.length) return [];
 
   const visible = rawPlacements.filter(
-    (p: { end_notes?: string }) => !p.end_notes?.includes("[NANNY_DISMISSED]")
+    (p: { end_notes?: string }) => !p.end_notes?.includes("[NANNY_DISMISSED]"),
   );
   if (!visible.length) return [];
 
-  const parentIds = Array.from(new Set(visible.map((p: { parent_id: string }) => p.parent_id)));
-  const { data: parents } = await admin.from("parents").select("id, user_id").in("id", parentIds);
+  const parentIds = Array.from(
+    new Set(visible.map((p: { parent_id: string }) => p.parent_id)),
+  );
+  const { data: parents } = await admin
+    .from("parents")
+    .select("id, user_id")
+    .in("id", parentIds);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const parentMap = new Map<string, any>((parents || []).map((p: any) => [p.id, p]));
-  const parentUserIds = (parents || []).map((p: { user_id: string }) => p.user_id);
+  const parentMap = new Map<string, any>(
+    (parents || []).map((p: any) => [p.id, p]),
+  );
+  const parentUserIds = (parents || []).map(
+    (p: { user_id: string }) => p.user_id,
+  );
 
   const { data: profiles } = await admin
     .from("user_profiles")
-    .select("user_id, first_name, last_name, suburb, profile_picture_url, date_of_birth, email, mobile_number")
+    .select(
+      "user_id, first_name, last_name, suburb, profile_picture_url, date_of_birth, email, mobile_number",
+    )
     .in("user_id", parentUserIds);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const profileMap = new Map<string, any>((profiles || []).map((p: any) => [p.user_id, p]));
+  const profileMap = new Map<string, any>(
+    (profiles || []).map((p: any) => [p.user_id, p]),
+  );
 
   const positionIds = visible
-    .filter((p: { position_id: string | null; status: string }) => p.position_id && p.status === "active")
+    .filter(
+      (p: { position_id: string | null; status: string }) =>
+        p.position_id && p.status === "active",
+    )
     .map((p: { position_id: string }) => p.position_id);
 
   const positionSuburbMap = new Map<string, string>();
   if (positionIds.length > 0) {
-    const { data: positions } = await admin.from("nanny_positions").select("id, suburb").in("id", positionIds);
+    const { data: positions } = await admin
+      .from("nanny_positions")
+      .select("id, suburb")
+      .in("id", positionIds);
     for (const pos of positions || []) {
       if (pos.suburb) positionSuburbMap.set(pos.id, pos.suburb);
     }
@@ -405,9 +480,12 @@ async function buildNannyPlacements(admin: any, rawPlacements: any[]) {
     const profile: any = parent ? profileMap.get(parent.user_id) : null;
     return {
       id: p.id,
-      parentName: profile ? `${profile.first_name} ${profile.last_name}` : "Unknown",
+      parentName: profile
+        ? `${profile.first_name} ${profile.last_name}`
+        : "Unknown",
       parentLastName: profile?.last_name || "",
-      parentSuburb: (p.position_id ? positionSuburbMap.get(p.position_id) : null) || "",
+      parentSuburb:
+        (p.position_id ? positionSuburbMap.get(p.position_id) : null) || "",
       parentPhoto: profile?.profile_picture_url || null,
       parentDateOfBirth: profile?.date_of_birth || null,
       weeklyHours: p.weekly_hours,
@@ -431,22 +509,37 @@ async function buildNannyPlacements(admin: any, rawPlacements: any[]) {
 async function buildNannyUpcomingIntros(admin: any, connections: any[]) {
   if (!connections.length) return [];
 
-  const parentIds = Array.from(new Set(connections.map((c: { parent_id: string }) => c.parent_id)));
-  const { data: parents } = await admin.from("parents").select("id, user_id").in("id", parentIds);
+  const parentIds = Array.from(
+    new Set(connections.map((c: { parent_id: string }) => c.parent_id)),
+  );
+  const { data: parents } = await admin
+    .from("parents")
+    .select("id, user_id")
+    .in("id", parentIds);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const parentMap = new Map<string, any>((parents || []).map((p: any) => [p.id, p]));
-  const parentUserIds = (parents || []).map((p: { user_id: string }) => p.user_id);
+  const parentMap = new Map<string, any>(
+    (parents || []).map((p: any) => [p.id, p]),
+  );
+  const parentUserIds = (parents || []).map(
+    (p: { user_id: string }) => p.user_id,
+  );
 
   const { data: profiles } = await admin
     .from("user_profiles")
     .select("user_id, first_name, last_name, suburb, profile_picture_url")
     .in("user_id", parentUserIds);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const profileMap = new Map<string, any>((profiles || []).map((p: any) => [p.user_id, p]));
+  const profileMap = new Map<string, any>(
+    (profiles || []).map((p: any) => [p.user_id, p]),
+  );
 
   // Fetch position data
   const positionIds = Array.from(
-    new Set(connections.map((c: { position_id: string | null }) => c.position_id).filter(Boolean))
+    new Set(
+      connections
+        .map((c: { position_id: string | null }) => c.position_id)
+        .filter(Boolean),
+    ),
   ) as string[];
   const positionMap = new Map<string, PositionSummary>();
 
@@ -454,7 +547,7 @@ async function buildNannyUpcomingIntros(admin: any, connections: any[]) {
     const { data: positions } = await admin
       .from("nanny_positions")
       .select(
-        "id, schedule_type, hours_per_week, days_required, level_of_support, hourly_rate, urgency, start_date, placement_length, reason_for_nanny, language_preference, qualification_requirement, certificate_requirements, vaccination_required, drivers_license_required, car_required, comfortable_with_pets_required, non_smoker_required, other_requirements_details, description, parent_id, suburb"
+        "id, schedule_type, hours_per_week, days_required, level_of_support, hourly_rate, urgency, start_date, placement_length, reason_for_nanny, language_preference, qualification_requirement, certificate_requirements, vaccination_required, drivers_license_required, car_required, comfortable_with_pets_required, non_smoker_required, other_requirements_details, description, parent_id, suburb",
       )
       .in("id", positionIds);
 
@@ -464,7 +557,10 @@ async function buildNannyUpcomingIntros(admin: any, connections: any[]) {
       .in("position_id", positionIds)
       .order("display_order");
 
-    const childrenByPosition = new Map<string, { ageMonths: number; gender: string | null }[]>();
+    const childrenByPosition = new Map<
+      string,
+      { ageMonths: number; gender: string | null }[]
+    >();
     for (const child of allChildren || []) {
       const arr = childrenByPosition.get(child.position_id) || [];
       arr.push({ ageMonths: child.age_months, gender: child.gender });
@@ -477,14 +573,16 @@ async function buildNannyUpcomingIntros(admin: any, connections: any[]) {
       .in("position_id", positionIds);
 
     const scheduleByPosition = new Map<string, Record<string, string[]>>(
-      (scheduleRows || []).map((s: { position_id: string; schedule: Record<string, string[]> }) => [
-        s.position_id,
-        s.schedule,
-      ])
+      (scheduleRows || []).map(
+        (s: { position_id: string; schedule: Record<string, string[]> }) => [
+          s.position_id,
+          s.schedule,
+        ],
+      ),
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const pos of positions || [] as any[]) {
+    for (const pos of positions || ([] as any[])) {
       positionMap.set(pos.id, {
         scheduleType: pos.schedule_type,
         hoursPerWeek: pos.hours_per_week,
@@ -520,7 +618,8 @@ async function buildNannyUpcomingIntros(admin: any, connections: any[]) {
     return {
       connectionId: c.id,
       otherPartyName: profile ? `${profile.last_name} Family` : "Unknown",
-      otherPartySuburb: (c.position_id ? positionMap.get(c.position_id)?.suburb : null) || "",
+      otherPartySuburb:
+        (c.position_id ? positionMap.get(c.position_id)?.suburb : null) || "",
       otherPartyPhoto: profile?.profile_picture_url || null,
       confirmedTime: c.confirmed_time || "",
       connectionStage: c.connection_stage,
@@ -533,7 +632,7 @@ async function buildNannyUpcomingIntros(admin: any, connections: any[]) {
       expiresAt: c.expires_at ?? null,
       nannyPhoneShared: c.nanny_phone_shared ?? null,
       positionId: c.position_id ?? null,
-      position: c.position_id ? positionMap.get(c.position_id) ?? null : null,
+      position: c.position_id ? (positionMap.get(c.position_id) ?? null) : null,
       source: c.source ?? null,
       nannyId: null,
     };
@@ -546,13 +645,15 @@ async function buildNannyUpcomingIntros(admin: any, connections: any[]) {
 async function buildDfyNotifications(admin: any, notifications: any[]) {
   if (!notifications.length) return [];
 
-  const positionIds = Array.from(new Set(notifications.map((n: { position_id: string }) => n.position_id)));
+  const positionIds = Array.from(
+    new Set(notifications.map((n: { position_id: string }) => n.position_id)),
+  );
 
   const [posRes, childrenRes, parentRes, scheduleRes] = await Promise.all([
     admin
       .from("nanny_positions")
       .select(
-        "id, parent_id, suburb, schedule_type, hourly_rate, hours_per_week, days_required, level_of_support, urgency, start_date, placement_length, reason_for_nanny, language_preference, qualification_requirement, certificate_requirements, vaccination_required, drivers_license_required, car_required, comfortable_with_pets_required, non_smoker_required, other_requirements_details, description, dfy_tier"
+        "id, parent_id, suburb, schedule_type, hourly_rate, hours_per_week, days_required, level_of_support, urgency, start_date, placement_length, reason_for_nanny, language_preference, qualification_requirement, certificate_requirements, vaccination_required, drivers_license_required, car_required, comfortable_with_pets_required, non_smoker_required, other_requirements_details, description, dfy_tier",
       )
       .in("id", positionIds),
     admin
@@ -561,12 +662,20 @@ async function buildDfyNotifications(admin: any, notifications: any[]) {
       .in("position_id", positionIds)
       .order("display_order", { ascending: true }),
     admin.from("parents").select("id, user_id"),
-    admin.from("position_schedule").select("position_id, schedule").in("position_id", positionIds),
+    admin
+      .from("position_schedule")
+      .select("position_id, schedule")
+      .in("position_id", positionIds),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const positionMap = new Map<string, any>((posRes.data || []).map((p: any) => [p.id, p]));
-  const childrenByPosition = new Map<string, { ageMonths: number; gender: string | null }[]>();
+  const positionMap = new Map<string, any>(
+    (posRes.data || []).map((p: any) => [p.id, p]),
+  );
+  const childrenByPosition = new Map<
+    string,
+    { ageMonths: number; gender: string | null }[]
+  >();
   for (const c of childrenRes.data || []) {
     const arr = childrenByPosition.get(c.position_id) || [];
     arr.push({ ageMonths: c.age_months, gender: c.gender });
@@ -574,15 +683,21 @@ async function buildDfyNotifications(admin: any, notifications: any[]) {
   }
 
   const scheduleByPosition = new Map<string, Record<string, string[]>>(
-    (scheduleRes.data || []).map((s: { position_id: string; schedule: Record<string, string[]> }) => [
-      s.position_id,
-      s.schedule,
-    ])
+    (scheduleRes.data || []).map(
+      (s: { position_id: string; schedule: Record<string, string[]> }) => [
+        s.position_id,
+        s.schedule,
+      ],
+    ),
   );
 
   // Get parent profiles
-  const parentIds = Array.from(new Set((posRes.data || []).map((p: { parent_id: string }) => p.parent_id)));
-  const allParents = (parentRes.data || []).filter((p: { id: string }) => parentIds.includes(p.id));
+  const parentIds = Array.from(
+    new Set((posRes.data || []).map((p: { parent_id: string }) => p.parent_id)),
+  );
+  const allParents = (parentRes.data || []).filter((p: { id: string }) =>
+    parentIds.includes(p.id),
+  );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const parentMap = new Map<string, any>(allParents.map((p: any) => [p.id, p]));
   const parentUserIds = allParents.map((p: { user_id: string }) => p.user_id);
@@ -595,7 +710,7 @@ async function buildDfyNotifications(admin: any, notifications: any[]) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const parentProfileMap = new Map<string, any>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (parentProfiles || []).map((p: any) => [p.user_id, p])
+    (parentProfiles || []).map((p: any) => [p.user_id, p]),
   );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -604,7 +719,9 @@ async function buildDfyNotifications(admin: any, notifications: any[]) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const parent: any = pos ? parentMap.get(pos.parent_id) : null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const parentProfile: any = parent ? parentProfileMap.get(parent.user_id) : null;
+    const parentProfile: any = parent
+      ? parentProfileMap.get(parent.user_id)
+      : null;
 
     return {
       id: n.id,
@@ -634,7 +751,8 @@ async function buildDfyNotifications(admin: any, notifications: any[]) {
         vaccinationRequired: pos?.vaccination_required ?? null,
         driversLicenseRequired: pos?.drivers_license_required ?? null,
         carRequired: pos?.car_required ?? null,
-        comfortableWithPetsRequired: pos?.comfortable_with_pets_required ?? null,
+        comfortableWithPetsRequired:
+          pos?.comfortable_with_pets_required ?? null,
         nonSmokerRequired: pos?.non_smoker_required ?? null,
         otherRequirements: pos?.other_requirements_details ?? null,
         description: pos?.description ?? null,
@@ -664,7 +782,9 @@ async function buildParentPlacement(admin: any, parentId: string) {
 
   const { data: nanny } = await admin
     .from("nannies")
-    .select("user_id, total_experience_years, nanny_experience_years, wwcc_verified, hourly_rate_min")
+    .select(
+      "user_id, total_experience_years, nanny_experience_years, wwcc_verified, hourly_rate_min",
+    )
     .eq("id", placement.nanny_id)
     .single();
 
@@ -678,7 +798,9 @@ async function buildParentPlacement(admin: any, parentId: string) {
   if (nanny) {
     const { data: profile } = await admin
       .from("user_profiles")
-      .select("first_name, last_name, suburb, profile_picture_url, date_of_birth, email, mobile_number")
+      .select(
+        "first_name, last_name, suburb, profile_picture_url, date_of_birth, email, mobile_number",
+      )
       .eq("user_id", nanny.user_id)
       .single();
 
@@ -700,10 +822,16 @@ async function buildParentPlacement(admin: any, parentId: string) {
   let highestQualification: string | null = null;
   const certifications: string[] = [];
   for (const cred of credentials || []) {
-    if (cred.credential_category === "qualification" && cred.qualification_type) {
+    if (
+      cred.credential_category === "qualification" &&
+      cred.qualification_type
+    ) {
       highestQualification = cred.qualification_type;
     }
-    if (cred.credential_category === "certification" && cred.certification_type) {
+    if (
+      cred.credential_category === "certification" &&
+      cred.certification_type
+    ) {
       certifications.push(cred.certification_type);
     }
   }
@@ -739,7 +867,7 @@ async function buildParentUpcomingIntros(admin: any, parentId: string) {
   const { data: connections } = await admin
     .from("connection_requests")
     .select(
-      "id, nanny_id, connection_stage, confirmed_time, fill_initiated_by, trial_date, start_date, status, proposed_times, message, expires_at, nanny_phone_shared, source"
+      "id, nanny_id, connection_stage, confirmed_time, fill_initiated_by, trial_date, start_date, status, proposed_times, message, expires_at, nanny_phone_shared, source",
     )
     .eq("parent_id", parentId)
     .in("connection_stage", [
@@ -758,18 +886,29 @@ async function buildParentUpcomingIntros(admin: any, parentId: string) {
 
   if (!connections || connections.length === 0) return [];
 
-  const nannyIds = Array.from(new Set(connections.map((c: { nanny_id: string }) => c.nanny_id)));
-  const { data: nannies } = await admin.from("nannies").select("id, user_id").in("id", nannyIds);
+  const nannyIds = Array.from(
+    new Set(connections.map((c: { nanny_id: string }) => c.nanny_id)),
+  );
+  const { data: nannies } = await admin
+    .from("nannies")
+    .select("id, user_id")
+    .in("id", nannyIds);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nannyMap = new Map<string, any>((nannies || []).map((n: any) => [n.id, n]));
-  const nannyUserIds = (nannies || []).map((n: { user_id: string }) => n.user_id);
+  const nannyMap = new Map<string, any>(
+    (nannies || []).map((n: any) => [n.id, n]),
+  );
+  const nannyUserIds = (nannies || []).map(
+    (n: { user_id: string }) => n.user_id,
+  );
 
   const { data: profiles } = await admin
     .from("user_profiles")
     .select("user_id, first_name, last_name, suburb, profile_picture_url")
     .in("user_id", nannyUserIds);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const profileMap = new Map<string, any>((profiles || []).map((p: any) => [p.user_id, p]));
+  const profileMap = new Map<string, any>(
+    (profiles || []).map((p: any) => [p.user_id, p]),
+  );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return connections.map((c: any) => {
@@ -778,7 +917,9 @@ async function buildParentUpcomingIntros(admin: any, parentId: string) {
     const profile: any = nanny ? profileMap.get(nanny.user_id) : null;
     return {
       connectionId: c.id,
-      otherPartyName: profile ? `${profile.first_name} ${profile.last_name}` : "Unknown",
+      otherPartyName: profile
+        ? `${profile.first_name} ${profile.last_name}`
+        : "Unknown",
       otherPartySuburb: profile?.suburb || "",
       otherPartyPhoto: profile?.profile_picture_url || null,
       confirmedTime: c.confirmed_time || "",
@@ -824,9 +965,11 @@ async function buildDfyStatus(admin: any, parentId: string) {
     .maybeSingle();
 
   if (!position) return defaultResult;
-  if (!position.dfy_activated_at) return { ...defaultResult, positionId: position.id };
+  if (!position.dfy_activated_at)
+    return { ...defaultResult, positionId: position.id };
 
-  const activatedTier = (position.dfy_tier as "standard" | "priority") || "standard";
+  const activatedTier =
+    (position.dfy_tier as "standard" | "priority") || "standard";
   const isExpired = position.dfy_expires_at
     ? new Date(position.dfy_expires_at) <= new Date()
     : false;

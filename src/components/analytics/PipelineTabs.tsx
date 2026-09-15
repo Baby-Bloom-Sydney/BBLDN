@@ -1,34 +1,51 @@
-'use client';
+"use client";
 
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { Suspense } from 'react';
-import { CustomPipelineBuilder, type CatalogCategory } from './CustomPipelineBuilder';
-import { ChartBuilder } from './ChartBuilder';
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { Suspense } from "react";
+import {
+  CustomPipelineBuilder,
+  type CatalogCategory,
+} from "./CustomPipelineBuilder";
+import { ChartBuilder } from "./ChartBuilder";
 
 const TABS = [
-  { key: 'metrics', label: 'Key Metrics' },
-  { key: 'custom', label: 'Custom' },
-  { key: 'charts', label: 'Charts' },
+  { key: "metrics", label: "Key Metrics" },
+  { key: "custom", label: "Custom" },
+  { key: "charts", label: "Charts" },
 ] as const;
 
 interface PipelineTabsProps {
   children: React.ReactNode;
   catalog: CatalogCategory[];
-  customStages: { label: string; tooltip?: string; total: number; liveTotal?: number; tags?: ('N' | 'P' | 'T' | 'V')[]; override?: { count?: 'all' | 'unique'; min?: number; max?: number; mode?: 'alltime' | 'live' }; medianDwell?: number | null }[];
+  customStages: {
+    label: string;
+    tooltip?: string;
+    total: number;
+    liveTotal?: number;
+    tags?: ("N" | "P" | "T" | "V")[];
+    override?: {
+      count?: "all" | "unique";
+      min?: number;
+      max?: number;
+      mode?: "alltime" | "live";
+    };
+    medianDwell?: number | null;
+  }[];
 }
 
 function TabsInner({ children, catalog, customStages }: PipelineTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const current = (searchParams.get('tab') as typeof TABS[number]['key']) || 'metrics';
+  const current =
+    (searchParams.get("tab") as (typeof TABS)[number]["key"]) || "metrics";
 
   function setTab(key: string) {
     const params = new URLSearchParams(searchParams.toString());
-    if (key === 'metrics') {
-      params.delete('tab');
+    if (key === "metrics") {
+      params.delete("tab");
     } else {
-      params.set('tab', key);
+      params.set("tab", key);
     }
     const qs = params.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname);
@@ -43,8 +60,8 @@ function TabsInner({ children, catalog, customStages }: PipelineTabsProps) {
             onClick={() => setTab(tab.key)}
             className={`px-4 py-1.5 text-xs font-medium transition-colors ${
               current === tab.key
-                ? 'bg-slate-800 text-white'
-                : 'bg-white text-slate-500 hover:bg-slate-50'
+                ? "bg-slate-800 text-white"
+                : "bg-white text-slate-500 hover:bg-slate-50"
             }`}
           >
             {tab.label}
@@ -52,23 +69,27 @@ function TabsInner({ children, catalog, customStages }: PipelineTabsProps) {
         ))}
       </div>
 
-      {current === 'metrics' && children}
+      {current === "metrics" && children}
 
-      {current === 'custom' && (
+      {current === "custom" && (
         <CustomPipelineBuilder catalog={catalog} customStages={customStages} />
       )}
 
-      {current === 'charts' && (
-        <ChartBuilder catalog={catalog} />
-      )}
+      {current === "charts" && <ChartBuilder catalog={catalog} />}
     </>
   );
 }
 
-export function PipelineTabs({ children, catalog, customStages }: PipelineTabsProps) {
+export function PipelineTabs({
+  children,
+  catalog,
+  customStages,
+}: PipelineTabsProps) {
   return (
     <Suspense fallback={null}>
-      <TabsInner catalog={catalog} customStages={customStages}>{children}</TabsInner>
+      <TabsInner catalog={catalog} customStages={customStages}>
+        {children}
+      </TabsInner>
     </Suspense>
   );
 }

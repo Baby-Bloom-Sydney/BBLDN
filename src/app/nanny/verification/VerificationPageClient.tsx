@@ -52,10 +52,20 @@ type PollResponse = {
 type StepState = "completed" | "current" | "future";
 
 function stepLineColor(step: StepState): string {
-  return step === "completed" ? "bg-green-300" : step === "current" ? "bg-violet-200" : "bg-slate-200";
+  return step === "completed"
+    ? "bg-green-300"
+    : step === "current"
+      ? "bg-violet-200"
+      : "bg-slate-200";
 }
 
-function StepIndicator({ state, isFirst, isLast, topLineColor, bottomLineColor }: {
+function StepIndicator({
+  state,
+  isFirst,
+  isLast,
+  topLineColor,
+  bottomLineColor,
+}: {
   state: StepState;
   isFirst?: boolean;
   isLast?: boolean;
@@ -67,27 +77,40 @@ function StepIndicator({ state, isFirst, isLast, topLineColor, bottomLineColor }
 
   return (
     <div className="flex w-7 shrink-0 flex-col items-center">
-      <div className={`w-0.5 h-3.5 ${!isFirst && topLineColor ? topLineColor : "bg-transparent"}`} />
+      <div
+        className={`w-0.5 h-3.5 ${!isFirst && topLineColor ? topLineColor : "bg-transparent"}`}
+      />
       <div
         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 ${
           isCompleted
             ? "border-green-500 bg-green-500"
             : isCurrent
-            ? "border-violet-500 bg-violet-50 ring-2 ring-violet-200"
-            : "border-slate-200 bg-white"
+              ? "border-violet-500 bg-violet-50 ring-2 ring-violet-200"
+              : "border-slate-200 bg-white"
         }`}
       >
         {isCompleted && <Check className="h-4 w-4 text-white" />}
-        {isCurrent && <div className="h-2.5 w-2.5 rounded-full bg-violet-500" />}
+        {isCurrent && (
+          <div className="h-2.5 w-2.5 rounded-full bg-violet-500" />
+        )}
       </div>
-      {!isLast && <div className={`w-0.5 flex-1 ${bottomLineColor ?? stepLineColor(state)}`} />}
+      {!isLast && (
+        <div
+          className={`w-0.5 flex-1 ${bottomLineColor ?? stepLineColor(state)}`}
+        />
+      )}
     </div>
   );
 }
 
-export function VerificationPageClient({ initialData, profileData }: VerificationPageClientProps) {
+export function VerificationPageClient({
+  initialData,
+  profileData,
+}: VerificationPageClientProps) {
   const router = useRouter();
-  const [verification, setVerification] = useState<VerificationData | null>(initialData);
+  const [verification, setVerification] = useState<VerificationData | null>(
+    initialData,
+  );
 
   // Determine which sections are unlocked
   const identityStatus = verification?.identity_status ?? "not_started";
@@ -98,7 +121,8 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
   const verificationStatus = verification?.verification_status ?? 0;
   const identityInReview = identityStatus === "review";
   const identityLocked = contactStatus !== "saved";
-  const wwccLocked = contactStatus !== "saved" || identityStatus === "not_started";
+  const wwccLocked =
+    contactStatus !== "saved" || identityStatus === "not_started";
 
   // Determine which sections to open by default
   const getDefaultOpen = useCallback((): string[] => {
@@ -108,7 +132,19 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
     if (["failed", "rejected"].includes(identityStatus)) return ["identity"];
     if (wwccStatus === "not_started" && !wwccLocked) return ["wwcc"];
     if (identityStatus === "processing") return ["wwcc"];
-    if (["failed", "review", "rejected", "ocg_not_found", "closed", "application_pending", "barred", "expired"].includes(wwccStatus)) return ["wwcc"];
+    if (
+      [
+        "failed",
+        "review",
+        "rejected",
+        "ocg_not_found",
+        "closed",
+        "application_pending",
+        "barred",
+        "expired",
+      ].includes(wwccStatus)
+    )
+      return ["wwcc"];
     return ["contact"];
   }, [identityStatus, wwccStatus, contactStatus, wwccLocked, identityInReview]);
 
@@ -116,8 +152,10 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
 
   // Poll for status updates when sections are processing or pending
   const isProcessing =
-    identityStatus === "processing" || identityStatus === "pending" ||
-    wwccStatus === "processing" || wwccStatus === "pending";
+    identityStatus === "processing" ||
+    identityStatus === "pending" ||
+    wwccStatus === "processing" ||
+    wwccStatus === "pending";
 
   useEffect(() => {
     if (!isProcessing) return;
@@ -139,8 +177,10 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
             surname: data.surname ?? prev.surname,
             given_names: data.given_names ?? prev.given_names,
             date_of_birth: data.date_of_birth ?? prev.date_of_birth,
-            extracted_passport_number: data.extracted_passport_number ?? prev.extracted_passport_number,
-            extracted_nationality: data.extracted_nationality ?? prev.extracted_nationality,
+            extracted_passport_number:
+              data.extracted_passport_number ?? prev.extracted_passport_number,
+            extracted_nationality:
+              data.extracted_nationality ?? prev.extracted_nationality,
             wwcc_status: data.wwcc_status,
             wwcc_number: data.wwcc_number ?? prev.wwcc_number,
             wwcc_expiry_date: data.wwcc_expiry_date ?? prev.wwcc_expiry_date,
@@ -162,10 +202,20 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
     return () => clearInterval(interval);
   }, [isProcessing]);
 
-  const handleIdentitySaved = (verificationId: string, data: { surname: string; givenNames: string; dob: string }) => {
+  const handleIdentitySaved = (
+    verificationId: string,
+    data: { surname: string; givenNames: string; dob: string },
+  ) => {
     setVerification((prev) => {
       if (prev) {
-        return { ...prev, identity_status: "processing", identity_user_guidance: null, surname: data.surname, given_names: data.givenNames, date_of_birth: data.dob };
+        return {
+          ...prev,
+          identity_status: "processing",
+          identity_user_guidance: null,
+          surname: data.surname,
+          given_names: data.givenNames,
+          date_of_birth: data.dob,
+        };
       }
       // First save — create minimal verification data
       return {
@@ -244,16 +294,32 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
 
   const getBadgeStatus = (sectionStatus: string) => {
     switch (sectionStatus) {
-      case "not_started": return null;
-      case "pending": return "processing" as const;
-      case "processing": return "processing" as const;
-      case "verified": case "doc_verified": case "passed": return "verified" as const;
-      case "saved": return "verified" as const;
-      case "review": case "application_pending": return "review" as const;
-      case "rejected": case "barred": return "rejected" as const;
-      case "failed": case "ocg_not_found": case "closed": return "failed" as const;
-      case "expired": return "expired" as const;
-      default: return null;
+      case "not_started":
+        return null;
+      case "pending":
+        return "processing" as const;
+      case "processing":
+        return "processing" as const;
+      case "verified":
+      case "doc_verified":
+      case "passed":
+        return "verified" as const;
+      case "saved":
+        return "verified" as const;
+      case "review":
+      case "application_pending":
+        return "review" as const;
+      case "rejected":
+      case "barred":
+        return "rejected" as const;
+      case "failed":
+      case "ocg_not_found":
+      case "closed":
+        return "failed" as const;
+      case "expired":
+        return "expired" as const;
+      default:
+        return null;
     }
   };
 
@@ -281,15 +347,26 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
   }, [allVerified, router]);
 
   // Stepper states (order: Residence → Identity → WWCC → Connect)
-  const contactStep: StepState = contactStatus === "saved" ? "completed" : "current";
-  const identityStep: StepState = identityLocked ? "future" : identityStatus === "verified" ? "completed" : "current";
-  const wwccStep: StepState = wwccLocked ? "future" : ["verified", "doc_verified"].includes(wwccStatus) ? "completed" : "current";
+  const contactStep: StepState =
+    contactStatus === "saved" ? "completed" : "current";
+  const identityStep: StepState = identityLocked
+    ? "future"
+    : identityStatus === "verified"
+      ? "completed"
+      : "current";
+  const wwccStep: StepState = wwccLocked
+    ? "future"
+    : ["verified", "doc_verified"].includes(wwccStatus)
+      ? "completed"
+      : "current";
   const goalStep: StepState = allVerified ? "completed" : "future";
 
   return (
     <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-sm p-4 sm:p-5 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800 text-center">Verification</h1>
+        <h1 className="text-2xl font-bold text-slate-800 text-center">
+          Verification
+        </h1>
         {allVerified ? (
           <p className="text-sm text-green-600 mt-1 font-medium flex items-center justify-center gap-1.5">
             <Shield className="h-4 w-4" />
@@ -302,7 +379,11 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
         )}
       </div>
 
-      <Accordion type="multiple" value={openSections} onValueChange={setOpenSections}>
+      <Accordion
+        type="multiple"
+        value={openSections}
+        onValueChange={setOpenSections}
+      >
         {/* Step 1: Verify Residence (independent — always available) */}
         <div className="flex gap-2 sm:gap-3">
           <StepIndicator state={contactStep} isFirst />
@@ -314,7 +395,9 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
                     Verify Residence
                   </span>
                   {getBadgeStatus(contactStatus) && (
-                    <SectionStatusBadge status={getBadgeStatus(contactStatus)!} />
+                    <SectionStatusBadge
+                      status={getBadgeStatus(contactStatus)!}
+                    />
                   )}
                 </div>
               </AccordionTrigger>
@@ -331,16 +414,32 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
 
         {/* Step 2: Verify ID */}
         <div className="flex gap-2 sm:gap-3">
-          <StepIndicator state={identityStep} topLineColor={stepLineColor(contactStep)} />
+          <StepIndicator
+            state={identityStep}
+            topLineColor={stepLineColor(contactStep)}
+          />
           <div className="flex-1 min-w-0 overflow-hidden pb-3">
-            <AccordionItem value="identity" className="border-0" disabled={identityLocked}>
-              <AccordionTrigger className="hover:no-underline" disabled={identityLocked}>
+            <AccordionItem
+              value="identity"
+              className="border-0"
+              disabled={identityLocked}
+            >
+              <AccordionTrigger
+                className="hover:no-underline"
+                disabled={identityLocked}
+              >
                 <div className="flex items-center justify-between w-full mr-2">
-                  <span className={`text-base font-semibold ${identityLocked ? "text-slate-400" : "text-slate-800"}`}>Verify ID</span>
+                  <span
+                    className={`text-base font-semibold ${identityLocked ? "text-slate-400" : "text-slate-800"}`}
+                  >
+                    Verify ID
+                  </span>
                   {!identityLocked && getBadgeStatus(identityStatus) && (
                     <SectionStatusBadge
                       status={getBadgeStatus(identityStatus)!}
-                      customLabel={identityInReview ? "Pending review" : undefined}
+                      customLabel={
+                        identityInReview ? "Pending review" : undefined
+                      }
                     />
                   )}
                 </div>
@@ -360,12 +459,25 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
 
         {/* Step 3: Verify WWCC */}
         <div className="flex gap-2 sm:gap-3">
-          <StepIndicator state={wwccStep} topLineColor={stepLineColor(identityStep)} bottomLineColor={stepLineColor(goalStep)} />
+          <StepIndicator
+            state={wwccStep}
+            topLineColor={stepLineColor(identityStep)}
+            bottomLineColor={stepLineColor(goalStep)}
+          />
           <div className="flex-1 min-w-0 overflow-hidden pb-3">
-            <AccordionItem value="wwcc" className="border-0" disabled={wwccLocked}>
-              <AccordionTrigger className="hover:no-underline" disabled={wwccLocked}>
+            <AccordionItem
+              value="wwcc"
+              className="border-0"
+              disabled={wwccLocked}
+            >
+              <AccordionTrigger
+                className="hover:no-underline"
+                disabled={wwccLocked}
+              >
                 <div className="flex items-center justify-between w-full mr-2">
-                  <span className={`text-base font-semibold ${wwccLocked ? "text-slate-400" : "text-slate-800"}`}>
+                  <span
+                    className={`text-base font-semibold ${wwccLocked ? "text-slate-400" : "text-slate-800"}`}
+                  >
                     Verify WWCC
                   </span>
                   {!wwccLocked && getBadgeStatus(wwccStatus) && (
@@ -382,9 +494,15 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
 
         {/* Step 4: Connect with Families (goal step — no accordion) */}
         <div className="flex gap-2 sm:gap-3">
-          <StepIndicator state={goalStep} isLast topLineColor={stepLineColor(goalStep)} />
+          <StepIndicator
+            state={goalStep}
+            isLast
+            topLineColor={stepLineColor(goalStep)}
+          />
           <div className="py-4">
-            <span className={`text-base font-semibold ${allVerified ? "text-green-700" : "text-slate-300"}`}>
+            <span
+              className={`text-base font-semibold ${allVerified ? "text-green-700" : "text-slate-300"}`}
+            >
               Connect with Families
             </span>
           </div>
@@ -394,7 +512,9 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
       {allVerified && (
         <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-green-200 bg-green-50 p-6">
           <CheckCircle className="h-8 w-8 text-green-500" />
-          <p className="text-lg font-semibold text-green-700">You&apos;re fully verified!</p>
+          <p className="text-lg font-semibold text-green-700">
+            You&apos;re fully verified!
+          </p>
           <p className="text-sm text-green-600">
             Redirecting you to your hub in {redirectCountdown}...
           </p>
@@ -406,7 +526,8 @@ export function VerificationPageClient({ initialData, profileData }: Verificatio
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
           <p className="font-medium">Cross-check under review</p>
           <p className="mt-1">
-            {verification?.cross_check_reasoning ?? "Our team is reviewing a discrepancy between your passport and WWCC details."}
+            {verification?.cross_check_reasoning ??
+              "Our team is reviewing a discrepancy between your passport and WWCC details."}
           </p>
         </div>
       )}

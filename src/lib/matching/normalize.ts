@@ -1,18 +1,18 @@
 // ── Data normalization & distance utilities ──
 
-import { NANNY_BLOCK_MAP } from './constants';
+import { NANNY_BLOCK_MAP } from "./constants";
 
 // Time block boundaries (24h)
 const BLOCKS = [
-  { name: 'morning', start: 6, end: 10 },
-  { name: 'midday', start: 10, end: 14 },
-  { name: 'afternoon', start: 14, end: 18 },
-  { name: 'evening', start: 18, end: 22 },
+  { name: "morning", start: 6, end: 10 },
+  { name: "midday", start: 10, end: 14 },
+  { name: "afternoon", start: 14, end: 18 },
+  { name: "evening", start: 18, end: 22 },
 ] as const;
 
 /** Convert "HH:MM" to decimal hours */
 function parseTime(t: string): number {
-  const [h, m] = t.split(':').map(Number);
+  const [h, m] = t.split(":").map(Number);
   return h + (m || 0) / 60;
 }
 
@@ -30,7 +30,7 @@ function timeRangeToBlocks(start: string, end: string): string[] {
  *   Format 2 (times):    { monday: { start: "07:30", end: "17:30", available: true } }
  */
 export function normalizeNannySchedule(
-  schedule: Record<string, unknown> | null
+  schedule: Record<string, unknown> | null,
 ): Record<string, string[]> {
   if (!schedule) return {};
 
@@ -41,15 +41,15 @@ export function normalizeNannySchedule(
     if (Array.isArray(value)) {
       // Format 1: array of label strings
       normalized[dayKey] = (value as string[])
-        .map((b) => NANNY_BLOCK_MAP[b] || b.toLowerCase().split(' ')[0])
+        .map((b) => NANNY_BLOCK_MAP[b] || b.toLowerCase().split(" ")[0])
         .filter(Boolean);
-    } else if (
-      value &&
-      typeof value === 'object' &&
-      'available' in value
-    ) {
+    } else if (value && typeof value === "object" && "available" in value) {
       // Format 2: { start, end, available }
-      const obj = value as { start: string | null; end: string | null; available: boolean };
+      const obj = value as {
+        start: string | null;
+        end: string | null;
+        available: boolean;
+      };
       if (obj.available && obj.start && obj.end) {
         normalized[dayKey] = timeRangeToBlocks(obj.start, obj.end);
       }
@@ -83,7 +83,7 @@ export function haversineDistance(
   lat1: number,
   lon1: number,
   lat2: number,
-  lon2: number
+  lon2: number,
 ): number {
   return rawHaversine([lat1, lon1], [lat2, lon2]);
 }

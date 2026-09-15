@@ -1,6 +1,12 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -26,9 +32,7 @@ export default function AdminSettingsPage() {
             <Shield className="h-5 w-5 text-violet-500" />
             Admin Account
           </CardTitle>
-          <CardDescription>
-            Your admin account details
-          </CardDescription>
+          <CardDescription>Your admin account details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -61,7 +65,7 @@ export default function AdminSettingsPage() {
           <div className="space-y-2">
             <Label>Role</Label>
             <Input
-              value={role === 'super_admin' ? 'Super Admin' : 'Admin'}
+              value={role === "super_admin" ? "Super Admin" : "Admin"}
               disabled
             />
           </div>
@@ -75,13 +79,13 @@ export default function AdminSettingsPage() {
             <Bell className="h-5 w-5 text-violet-500" />
             Notification Settings
           </CardTitle>
-          <CardDescription>
-            Configure admin notifications
-          </CardDescription>
+          <CardDescription>Configure admin notifications</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <p className="text-sm text-slate-500">Notification settings coming soon</p>
+            <p className="text-sm text-slate-500">
+              Notification settings coming soon
+            </p>
             <p className="mt-1 text-xs text-slate-400">
               Configure alerts for new users, verifications, and system events
             </p>
@@ -96,9 +100,7 @@ export default function AdminSettingsPage() {
             <Settings className="h-5 w-5 text-violet-500" />
             Platform Settings
           </CardTitle>
-          <CardDescription>
-            Global platform configuration
-          </CardDescription>
+          <CardDescription>Global platform configuration</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -140,7 +142,7 @@ export default function AdminSettingsPage() {
       </Card>
 
       {/* Database Info */}
-      {role === 'super_admin' && (
+      {role === "super_admin" && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -159,10 +161,14 @@ export default function AdminSettingsPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-500">Region</span>
-                <span className="font-mono text-sm">ap-northeast-1 (Tokyo)</span>
+                <span className="font-mono text-sm">
+                  ap-northeast-1 (Tokyo)
+                </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500">PostgreSQL Version</span>
+                <span className="text-sm text-slate-500">
+                  PostgreSQL Version
+                </span>
                 <span className="font-mono text-sm">17.6</span>
               </div>
               <div className="flex items-center justify-between">
@@ -177,7 +183,9 @@ export default function AdminSettingsPage() {
       {/* Coming Soon */}
       <Card className="border-violet-200 bg-violet-50">
         <CardHeader>
-          <CardTitle className="text-violet-900">More Settings Coming Soon</CardTitle>
+          <CardTitle className="text-violet-900">
+            More Settings Coming Soon
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <ul className="grid gap-2 text-sm text-violet-800 sm:grid-cols-2">

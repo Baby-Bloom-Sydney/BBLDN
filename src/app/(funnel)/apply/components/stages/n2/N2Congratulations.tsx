@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { StageProps } from '../../FunnelOrchestrator';
-import { Button } from '@/components/ui/button';
-import { PartyPopper } from 'lucide-react';
+import { StageProps } from "../../FunnelOrchestrator";
+import { Button } from "@/components/ui/button";
+import { PartyPopper } from "lucide-react";
 
 export function N2Congratulations({ state, goNext }: StageProps) {
   return (
@@ -14,7 +14,7 @@ export function N2Congratulations({ state, goNext }: StageProps) {
 
         <div className="flex flex-col gap-3">
           <h1 className="text-4xl font-bold text-slate-800">
-            Congratulations, {state.first_name || 'there'}!
+            Congratulations, {state.first_name || "there"}!
           </h1>
           <p className="text-xl text-emerald-600 font-semibold">
             Your application has been approved.
@@ -23,10 +23,13 @@ export function N2Congratulations({ state, goNext }: StageProps) {
 
         <div className="flex flex-col gap-4 max-w-md text-slate-600 text-base leading-relaxed">
           <p>
-            After reviewing your application we know that you are a perfect fit for the families we want to help the most and cannot wait to bring the two of you together!
+            After reviewing your application we know that you are a perfect fit
+            for the families we want to help the most and cannot wait to bring
+            the two of you together!
           </p>
           <p>
-            Before we start connecting you, tell us a little more about the families you wish to match with.
+            Before we start connecting you, tell us a little more about the
+            families you wish to match with.
           </p>
         </div>
       </div>

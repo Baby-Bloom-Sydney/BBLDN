@@ -29,7 +29,7 @@ export function StatsCard({
           <div
             className={cn(
               "flex h-12 w-12 items-center justify-center rounded-lg",
-              iconBgColor
+              iconBgColor,
             )}
           >
             <Icon className={cn("h-6 w-6", iconColor)} />
@@ -42,7 +42,7 @@ export function StatsCard({
             <div
               className={cn(
                 "text-sm font-medium",
-                trend.isPositive ? "text-green-600" : "text-red-600"
+                trend.isPositive ? "text-green-600" : "text-red-600",
               )}
             >
               {trend.isPositive ? "+" : "-"}

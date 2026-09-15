@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { scoreLocation, scoreSchedule, calculateFinalScore } from "@/lib/matching/scoring";
-import { haversineDistance, normalizeNannySchedule, ageFromDob } from "@/lib/matching/normalize";
+import {
+  scoreLocation,
+  scoreSchedule,
+  calculateFinalScore,
+} from "@/lib/matching/scoring";
+import {
+  haversineDistance,
+  normalizeNannySchedule,
+  ageFromDob,
+} from "@/lib/matching/normalize";
 
 /**
  * Public quick match API — no auth required, no database writes.
@@ -41,10 +49,16 @@ export async function POST(req: NextRequest) {
 
     // Validate input
     if (!body.suburb || typeof body.suburb !== "string") {
-      return NextResponse.json({ error: "suburb is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "suburb is required" },
+        { status: 400 },
+      );
     }
     if (!body.availability || typeof body.availability !== "object") {
-      return NextResponse.json({ error: "availability is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "availability is required" },
+        { status: 400 },
+      );
     }
 
     const supabase = createAdminClient();
@@ -52,7 +66,9 @@ export async function POST(req: NextRequest) {
     // ── Fetch all visible nannies ──
     const { data: nannies, error: nannyError } = await supabase
       .from("nannies")
-      .select("id, user_id, has_car, total_experience_years, under_3_experience_years, verification_tier, verification_level, ai_content")
+      .select(
+        "id, user_id, has_car, total_experience_years, under_3_experience_years, verification_tier, verification_level, ai_content",
+      )
       .eq("profile_visible", true);
 
     if (nannyError || !nannies?.length) {
@@ -66,7 +82,9 @@ export async function POST(req: NextRequest) {
     const [profilesRes, availabilityRes, credentialsRes] = await Promise.all([
       supabase
         .from("user_profiles")
-        .select("user_id, first_name, suburb, profile_picture_url, date_of_birth")
+        .select(
+          "user_id, first_name, suburb, profile_picture_url, date_of_birth",
+        )
         .in("user_id", userIds),
       supabase
         .from("nanny_availability")
@@ -80,16 +98,19 @@ export async function POST(req: NextRequest) {
     ]);
 
     const profileMap = new Map(
-      (profilesRes.data ?? []).map((p) => [p.user_id, p])
+      (profilesRes.data ?? []).map((p) => [p.user_id, p]),
     );
     const availabilityMap = new Map(
       (availabilityRes.data ?? []).map((a) => [
         a.nanny_id,
         normalizeNannySchedule(a.schedule as Record<string, unknown>),
-      ])
+      ]),
     );
     const qualMap = new Map(
-      (credentialsRes.data ?? []).map((c) => [c.nanny_id, c.qualification_type as string])
+      (credentialsRes.data ?? []).map((c) => [
+        c.nanny_id,
+        c.qualification_type as string,
+      ]),
     );
 
     // ── Fetch postcodes for distance calc ──
@@ -108,7 +129,7 @@ export async function POST(req: NextRequest) {
       (postcodes ?? []).map((pc) => [
         pc.suburb.toLowerCase(),
         { latitude: Number(pc.latitude), longitude: Number(pc.longitude) },
-      ])
+      ]),
     );
 
     const parentLocation = postcodeMap.get(body.suburb.toLowerCase());
@@ -132,8 +153,8 @@ export async function POST(req: NextRequest) {
               parentLocation.latitude,
               parentLocation.longitude,
               nannyLocation.latitude,
-              nannyLocation.longitude
-            )
+              nannyLocation.longitude,
+            ),
           );
         }
       }
@@ -143,7 +164,7 @@ export async function POST(req: NextRequest) {
       const { score: scheduleScore, overlapPercent } = scoreSchedule(
         body.availability,
         nannySchedule,
-        false // not flexible — we don't know from quick match
+        false, // not flexible — we don't know from quick match
       );
 
       const basicScore = locationScore * 0.45 + scheduleScore * 0.55;
@@ -183,7 +204,9 @@ export async function POST(req: NextRequest) {
     const displayTop3 = top3.map((n) => ({
       ...n,
       // Only bolster scores to 85% when padding (fewer than 3 real ≥85% matches)
-      logistical_score: needsPadding ? Math.max(85, n.logistical_score) : n.logistical_score,
+      logistical_score: needsPadding
+        ? Math.max(85, n.logistical_score)
+        : n.logistical_score,
     }));
 
     return NextResponse.json({
@@ -192,6 +215,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("[quick-match] Error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

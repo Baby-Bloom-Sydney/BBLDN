@@ -69,7 +69,7 @@ export function DaysTimesCompound({
 
   // Sort selected days in week order
   const sortedSelectedDays = DAY_OPTIONS.filter((d) =>
-    weeklyRoster.includes(d)
+    weeklyRoster.includes(d),
   );
 
   // Continue only when every selected day has at least one bracket
@@ -103,17 +103,23 @@ export function DaysTimesCompound({
         <div className="flex flex-col gap-6 w-full px-2">
           {/* Heading — fade in */}
           {question && (
-            <h2 className={`text-xl sm:text-2xl font-semibold text-slate-800 leading-snug text-center transition-opacity duration-300 ${
-              questionVisible ? "opacity-100" : "opacity-0"
-            }`}>
+            <h2
+              className={`text-xl sm:text-2xl font-semibold text-slate-800 leading-snug text-center transition-opacity duration-300 ${
+                questionVisible ? "opacity-100" : "opacity-0"
+              }`}
+            >
               {question}
             </h2>
           )}
 
           {/* Day selection + time grid — slide up together */}
-          <div className={`flex flex-col gap-6 transition-all duration-500 ease-out ${
-            contentVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-          }`}>
+          <div
+            className={`flex flex-col gap-6 transition-all duration-500 ease-out ${
+              contentVisible
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-8"
+            }`}
+          >
             <div className="flex flex-col gap-2">
               <div className="grid grid-cols-4 gap-2">
                 {DAY_OPTIONS.slice(0, 4).map((day) => dayButton(day))}
@@ -126,75 +132,79 @@ export function DaysTimesCompound({
             {/* Time bracket grid */}
             {sortedSelectedDays.length > 0 && (
               <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium text-slate-700 text-center">
-                When during the day?
-              </p>
+                <p className="text-sm font-medium text-slate-700 text-center">
+                  When during the day?
+                </p>
 
-              <div className="overflow-x-auto">
-                <div className="min-w-[320px]">
-                  {/* Column headers */}
-                  <div className="grid grid-cols-[80px_repeat(4,1fr)] gap-1 mb-1">
-                    <div />
-                    {TIME_BLOCK_OPTIONS.map((block) => (
-                      <div key={block.key} className="text-center">
-                        <p className="text-[11px] font-semibold text-slate-600">
-                          {block.label}
-                        </p>
-                        <p className="text-[9px] text-slate-400">
-                          {block.sublabel}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Day rows */}
-                  {sortedSelectedDays.map((day) => {
-                    const fieldKey = DAY_ROSTER_FIELD[day];
-                    const currentTimes =
-                      (data[fieldKey] as string[] | undefined) ?? [];
-
-                    return (
-                      <div
-                        key={day}
-                        className="grid grid-cols-[80px_repeat(4,1fr)] gap-1 mb-1"
-                      >
-                        <div className="flex items-center">
-                          <p className="text-xs font-semibold text-slate-600">
-                            {DAY_SHORT[day]}
+                <div className="overflow-x-auto">
+                  <div className="min-w-[320px]">
+                    {/* Column headers */}
+                    <div className="grid grid-cols-[80px_repeat(4,1fr)] gap-1 mb-1">
+                      <div />
+                      {TIME_BLOCK_OPTIONS.map((block) => (
+                        <div key={block.key} className="text-center">
+                          <p className="text-[11px] font-semibold text-slate-600">
+                            {block.label}
+                          </p>
+                          <p className="text-[9px] text-slate-400">
+                            {block.sublabel}
                           </p>
                         </div>
-                        {TIME_BLOCK_OPTIONS.map((block) => {
-                          const isSelected = currentTimes.includes(block.key);
-                          return (
-                            <button
-                              key={block.key}
-                              type="button"
-                              onClick={() => toggleTimeBlock(day, block.key)}
-                              className={`h-9 rounded-md border text-xs font-medium transition-colors cursor-pointer ${
-                                isSelected
-                                  ? "bg-violet-500 text-white border-violet-500"
-                                  : "bg-white text-slate-400 border-slate-200 hover:border-violet-400"
-                              }`}
-                            >
-                              {isSelected ? "\u2713" : ""}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
+                      ))}
+                    </div>
+
+                    {/* Day rows */}
+                    {sortedSelectedDays.map((day) => {
+                      const fieldKey = DAY_ROSTER_FIELD[day];
+                      const currentTimes =
+                        (data[fieldKey] as string[] | undefined) ?? [];
+
+                      return (
+                        <div
+                          key={day}
+                          className="grid grid-cols-[80px_repeat(4,1fr)] gap-1 mb-1"
+                        >
+                          <div className="flex items-center">
+                            <p className="text-xs font-semibold text-slate-600">
+                              {DAY_SHORT[day]}
+                            </p>
+                          </div>
+                          {TIME_BLOCK_OPTIONS.map((block) => {
+                            const isSelected = currentTimes.includes(block.key);
+                            return (
+                              <button
+                                key={block.key}
+                                type="button"
+                                onClick={() => toggleTimeBlock(day, block.key)}
+                                className={`h-9 rounded-md border text-xs font-medium transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? "bg-violet-500 text-white border-violet-500"
+                                    : "bg-white text-slate-400 border-slate-200 hover:border-violet-400"
+                                }`}
+                              >
+                                {isSelected ? "\u2713" : ""}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
           </div>
         </div>
       </div>
 
       {/* Continue — pinned to bottom, matching QuestionShell position */}
-      <div className={`w-full pb-12 px-2 transition-all duration-500 ease-out ${
-        contentVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-      }`}>
+      <div
+        className={`w-full pb-12 px-2 transition-all duration-500 ease-out ${
+          contentVisible
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 translate-y-8"
+        }`}
+      >
         {allDaysHaveBrackets && (
           <Button
             onClick={onAdvance}

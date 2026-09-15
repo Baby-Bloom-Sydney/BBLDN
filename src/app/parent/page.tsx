@@ -1,9 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
-import {
-  getPosition,
-  PositionWithChildren,
-} from "@/lib/actions/parent";
+import { getPosition, PositionWithChildren } from "@/lib/actions/parent";
 import {
   getParentPlacement,
   getConfirmedConnections,

@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { createContext, useContext } from 'react';
-import { User } from '@supabase/supabase-js';
-import { UserRole, UserProfile } from '@/lib/auth/types';
+import { createContext, useContext } from "react";
+import { User } from "@supabase/supabase-js";
+import { UserRole, UserProfile } from "@/lib/auth/types";
 
 export interface AuthContextType {
   user: User | null;
@@ -12,12 +12,14 @@ export interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(
+  undefined,
+);
 
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within a SessionProvider');
+    throw new Error("useAuth must be used within a SessionProvider");
   }
   return context;
 }

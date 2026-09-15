@@ -23,13 +23,23 @@ export function FunnelProgress({ currentStep, steps }: FunnelProgressProps) {
                   i < currentStep
                     ? "bg-violet-600 text-white"
                     : i === currentStep
-                    ? "bg-violet-100 text-violet-700 ring-2 ring-violet-600"
-                    : "bg-slate-100 text-slate-400"
+                      ? "bg-violet-100 text-violet-700 ring-2 ring-violet-600"
+                      : "bg-slate-100 text-slate-400"
                 }`}
               >
                 {i < currentStep ? (
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 ) : (
                   i + 1
@@ -59,7 +69,9 @@ export function FunnelProgress({ currentStep, steps }: FunnelProgressProps) {
         <span className="text-sm font-medium text-slate-700">
           Step {currentStep + 1} of {steps.length}
         </span>
-        <span className="text-sm text-slate-500">{steps[currentStep]?.label}</span>
+        <span className="text-sm text-slate-500">
+          {steps[currentStep]?.label}
+        </span>
       </div>
 
       {/* Progress bar */}

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
 interface AutoAdvanceProps {
   shouldAdvance: boolean;
@@ -8,7 +8,11 @@ interface AutoAdvanceProps {
   delay?: number;
 }
 
-export function AutoAdvance({ shouldAdvance, onAdvance, delay = 300 }: AutoAdvanceProps) {
+export function AutoAdvance({
+  shouldAdvance,
+  onAdvance,
+  delay = 300,
+}: AutoAdvanceProps) {
   // Start as true if condition already met (restored state) — prevents auto-advance on back-nav
   const hasAdvanced = useRef(shouldAdvance);
 

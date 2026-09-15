@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { MapPin, ShieldCheck } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { trackEvent } from '@/lib/analytics/trackEvent';
+import Link from "next/link";
+import { MapPin, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/analytics/trackEvent";
 
 interface NannyProfileTileProps {
   firstName: string;
@@ -15,7 +15,7 @@ interface NannyProfileTileProps {
 }
 
 function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, '').trim();
+  return html.replace(/<[^>]*>/g, "").trim();
 }
 
 export function NannyProfileTile({
@@ -27,7 +27,7 @@ export function NannyProfileTile({
   aiHeadline,
 }: NannyProfileTileProps) {
   const fullName = `${firstName} ${lastName}`.trim();
-  const initials = `${firstName[0] || ''}${lastName[0] || ''}`;
+  const initials = `${firstName[0] || ""}${lastName[0] || ""}`;
   const isVerified = verificationLevel >= 3;
   const bio = aiHeadline ? stripHtml(aiHeadline) : null;
 
@@ -88,8 +88,8 @@ export function NannyProfileTile({
             className="w-full bg-violet-600 hover:bg-violet-700 text-white h-10 font-medium"
             onClick={() => {
               trackEvent({
-                event_name: 'nanny_hub_profile_tile_clicked',
-                user_role: 'nanny',
+                event_name: "nanny_hub_profile_tile_clicked",
+                user_role: "nanny",
               });
             }}
           >

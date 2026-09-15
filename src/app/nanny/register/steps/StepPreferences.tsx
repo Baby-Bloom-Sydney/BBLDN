@@ -51,12 +51,16 @@ interface MultiSelectTagsProps {
   onChange: (val: string[]) => void;
 }
 
-function MultiSelectTags({ options, selected, onChange }: MultiSelectTagsProps) {
+function MultiSelectTags({
+  options,
+  selected,
+  onChange,
+}: MultiSelectTagsProps) {
   const toggle = (opt: string) => {
     onChange(
       selected.includes(opt)
         ? selected.filter((v) => v !== opt)
-        : [...selected, opt]
+        : [...selected, opt],
     );
   };
   return (
@@ -85,7 +89,11 @@ interface SingleSelectTagsProps {
   onChange: (val: string) => void;
 }
 
-function SingleSelectTags({ options, selected, onChange }: SingleSelectTagsProps) {
+function SingleSelectTags({
+  options,
+  selected,
+  onChange,
+}: SingleSelectTagsProps) {
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((opt) => (
@@ -106,7 +114,12 @@ function SingleSelectTags({ options, selected, onChange }: SingleSelectTagsProps
   );
 }
 
-export function StepPreferences({ data, updateData, goNext, goBack }: StepProps) {
+export function StepPreferences({
+  data,
+  updateData,
+  goNext,
+  goBack,
+}: StepProps) {
   const {
     role_types = [],
     level_of_support = [],
@@ -135,7 +148,6 @@ export function StepPreferences({ data, updateData, goNext, goBack }: StepProps)
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-6 pb-8">
-
         {/* Role Types */}
         <div className="flex flex-col gap-2">
           <Label className="text-sm font-medium text-slate-700">
@@ -246,8 +258,8 @@ export function StepPreferences({ data, updateData, goNext, goBack }: StepProps)
                 additional_needs === true
                   ? "Yes"
                   : additional_needs === false
-                  ? "No"
-                  : null
+                    ? "No"
+                    : null
               }
               onChange={(val) =>
                 updateData({ additional_needs: val === "Yes" })

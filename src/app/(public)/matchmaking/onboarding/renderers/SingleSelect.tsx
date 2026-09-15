@@ -31,8 +31,8 @@ export function SingleSelect({
     cols === 2
       ? "grid grid-cols-2 gap-2"
       : cols === 3
-      ? "grid grid-cols-3 gap-2"
-      : "flex flex-col gap-2";
+        ? "grid grid-cols-3 gap-2"
+        : "flex flex-col gap-2";
 
   return (
     <div className={gridClass}>

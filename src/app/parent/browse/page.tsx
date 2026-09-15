@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ChevronLeft, ChevronRight, Sparkles, ClipboardList, Users } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  ClipboardList,
+  Users,
+} from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { type NannyCardData, EmptyNannyState } from "@/components/NannyCard";
@@ -30,12 +37,17 @@ const QUAL_RANK: Record<string, number> = {
   "No Qualifications": 1,
 };
 
-async function getNannies(sortBy: SortKey = "newest", page: number = 1): Promise<{ nannies: NannyCardData[]; total: number }> {
+async function getNannies(
+  sortBy: SortKey = "newest",
+  page: number = 1,
+): Promise<{ nannies: NannyCardData[]; total: number }> {
   const supabase = createAdminClient();
 
   const { data: nannies, error } = await supabase
     .from("nannies")
-    .select("id, user_id, hourly_rate_min, nanny_experience_years, total_experience_years, under_3_experience_years, newborn_experience_years, verification_tier, verification_level, drivers_license, vaccination_status, languages, role_types_preferred, ai_content")
+    .select(
+      "id, user_id, hourly_rate_min, nanny_experience_years, total_experience_years, under_3_experience_years, newborn_experience_years, verification_tier, verification_level, drivers_license, vaccination_status, languages, role_types_preferred, ai_content",
+    )
     .eq("profile_visible", true)
     .order("created_at", { ascending: false });
 
@@ -50,7 +62,9 @@ async function getNannies(sortBy: SortKey = "newest", page: number = 1): Promise
   const [{ data: profiles }, { data: credentials }] = await Promise.all([
     supabase
       .from("user_profiles")
-      .select("user_id, first_name, last_name, suburb, profile_picture_url, date_of_birth")
+      .select(
+        "user_id, first_name, last_name, suburb, profile_picture_url, date_of_birth",
+      )
       .in("user_id", userIds),
     supabase
       .from("nanny_credentials")
@@ -59,11 +73,12 @@ async function getNannies(sortBy: SortKey = "newest", page: number = 1): Promise
       .eq("credential_category", "qualification"),
   ]);
 
-  const profileMap = new Map(
-    (profiles || []).map((p) => [p.user_id, p])
-  );
+  const profileMap = new Map((profiles || []).map((p) => [p.user_id, p]));
   const qualMap = new Map(
-    (credentials || []).map((c) => [c.nanny_id, c.qualification_type as string])
+    (credentials || []).map((c) => [
+      c.nanny_id,
+      c.qualification_type as string,
+    ]),
   );
 
   const mapped = nannies
@@ -103,12 +118,17 @@ async function getNannies(sortBy: SortKey = "newest", page: number = 1): Promise
       if (!a.date_of_birth && !b.date_of_birth) return 0;
       if (!a.date_of_birth) return 1;
       if (!b.date_of_birth) return -1;
-      return new Date(a.date_of_birth).getTime() - new Date(b.date_of_birth).getTime();
+      return (
+        new Date(a.date_of_birth).getTime() -
+        new Date(b.date_of_birth).getTime()
+      );
     });
   } else if (sortBy === "qualification") {
     sorted = [...mapped].sort((a, b) => {
-      const rankA = (a.highest_qualification && QUAL_RANK[a.highest_qualification]) || 0;
-      const rankB = (b.highest_qualification && QUAL_RANK[b.highest_qualification]) || 0;
+      const rankA =
+        (a.highest_qualification && QUAL_RANK[a.highest_qualification]) || 0;
+      const rankB =
+        (b.highest_qualification && QUAL_RANK[b.highest_qualification]) || 0;
       return rankB - rankA;
     });
   }
@@ -143,17 +163,22 @@ export default async function ParentBrowsePage({
 }: {
   searchParams: { sort?: string; page?: string; view?: string };
 }) {
-  const view: ViewType = searchParams.view === "matches" ? "matches" as const : "all" as const;
-  const sortBy = (SORT_OPTIONS.some((o) => o.key === searchParams.sort)
-    ? searchParams.sort
-    : "newest") as SortKey;
+  const view: ViewType =
+    searchParams.view === "matches" ? ("matches" as const) : ("all" as const);
+  const sortBy = (
+    SORT_OPTIONS.some((o) => o.key === searchParams.sort)
+      ? searchParams.sort
+      : "newest"
+  ) as SortKey;
   const page = Math.max(1, parseInt(searchParams.page || "1", 10) || 1);
 
   // Check if user is a logged-in parent
   let isParent = false;
   try {
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (user) {
       const admin = createAdminClient();
       const { data: role } = await admin
@@ -167,7 +192,10 @@ export default async function ParentBrowsePage({
 
   // Fetch data based on view
   let browseData: { nannies: NannyCardData[]; total: number } | null = null;
-  let matchData: { matches: import("@/lib/matching/types").MatchResult[]; stats: { totalEligible: number; returned: number } } | null = null;
+  let matchData: {
+    matches: import("@/lib/matching/types").MatchResult[];
+    stats: { totalEligible: number; returned: number };
+  } | null = null;
   let hasPosition = false;
 
   if (view === "matches" && isParent) {
@@ -200,7 +228,10 @@ export default async function ParentBrowsePage({
       <div className="flex items-start justify-between mb-1">
         <h1 className="text-2xl font-bold text-slate-900">Our Nannies</h1>
         {isParent && (
-          <Button asChild className="bg-violet-600 hover:bg-violet-700 text-sm h-10 px-4 shrink-0">
+          <Button
+            asChild
+            className="bg-violet-600 hover:bg-violet-700 text-sm h-10 px-4 shrink-0"
+          >
             <Link href="/parent/matchmaking">
               <Sparkles className="h-4 w-4 mr-1.5" />
               Find my best match!
@@ -274,7 +305,11 @@ export default async function ParentBrowsePage({
           {browseData && browseData.nannies.length > 0 ? (
             <div className="space-y-3">
               {browseData.nannies.map((nanny) => (
-                <NannyCardBK key={nanny.id} nanny={nanny} linkBase="/parent/browse" />
+                <NannyCardBK
+                  key={nanny.id}
+                  nanny={nanny}
+                  linkBase="/parent/browse"
+                />
               ))}
             </div>
           ) : (
@@ -315,7 +350,9 @@ export default async function ParentBrowsePage({
           {/* Count */}
           {browseData && browseData.nannies.length > 0 && (
             <p className="mt-3 text-center text-xs text-slate-400">
-              Showing {(page - 1) * PAGE_SIZE + 1}&ndash;{Math.min(page * PAGE_SIZE, browseData.total)} of {browseData.total} nann{browseData.total === 1 ? "y" : "ies"}
+              Showing {(page - 1) * PAGE_SIZE + 1}&ndash;
+              {Math.min(page * PAGE_SIZE, browseData.total)} of{" "}
+              {browseData.total} nann{browseData.total === 1 ? "y" : "ies"}
             </p>
           )}
 

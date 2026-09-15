@@ -82,11 +82,9 @@ function makeAdminClient(options: AdminMockOptions = {}) {
   const insert = vi.fn().mockReturnValue({ select: insertSelect });
 
   // For maybeActivateChild's child_client select
-  const childSelectSingle = vi
-    .fn()
-    .mockResolvedValue({
-      data: options.childRow ?? { status: "active_nanny" },
-    });
+  const childSelectSingle = vi.fn().mockResolvedValue({
+    data: options.childRow ?? { status: "active_nanny" },
+  });
   const childSelectEq = vi.fn().mockReturnValue({ single: childSelectSingle });
   const childSelect = vi.fn().mockReturnValue({ eq: childSelectEq });
 

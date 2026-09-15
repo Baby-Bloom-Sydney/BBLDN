@@ -3,12 +3,14 @@ import { isProfileComplete, getNannyProfile } from "@/lib/actions/nanny";
 import { NannyRegistrationFunnel } from "./NannyRegistrationFunnel";
 import { createClient } from "@/lib/supabase/server";
 
-const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
 export default async function NannyRegisterPage() {
   if (!isDevMode) {
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       redirect("/login");
@@ -26,7 +28,9 @@ export default async function NannyRegisterPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Complete Your Profile</h1>
+          <h1 className="text-2xl font-bold text-slate-900">
+            Complete Your Profile
+          </h1>
           <p className="mt-1 text-slate-500">
             Tell us about yourself to start connecting with families
           </p>
@@ -47,7 +51,9 @@ export default async function NannyRegisterPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Complete Your Profile</h1>
+        <h1 className="text-2xl font-bold text-slate-900">
+          Complete Your Profile
+        </h1>
         <p className="mt-1 text-slate-500">
           Tell us about yourself to start connecting with families
         </p>

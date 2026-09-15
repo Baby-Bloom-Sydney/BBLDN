@@ -5,7 +5,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { UsersTab } from "./UsersTab";
 import { VerificationTab } from "./VerificationTab";
 import { Users, ShieldCheck } from "lucide-react";
-import type { UserData, UserStats, VerificationStats, PendingIdentityCheck, PendingWWCCCheck } from "./page";
+import type {
+  UserData,
+  UserStats,
+  VerificationStats,
+  PendingIdentityCheck,
+  PendingWWCCCheck,
+} from "./page";
 
 interface AdminUsersClientProps {
   users: UserData[];

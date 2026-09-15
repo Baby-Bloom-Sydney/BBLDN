@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 interface NannyQuestionShellProps {
   question: string;
@@ -47,11 +47,10 @@ export function NannyQuestionShell({
       {/* Question text — centered on page */}
       <div
         className={`flex-1 flex items-center justify-center px-4 transition-opacity duration-300 ${
-          questionVisible ? 'opacity-100' : 'opacity-0'
+          questionVisible ? "opacity-100" : "opacity-0"
         }`}
       >
         <div className="text-center max-w-lg">
-
           {question && (
             <h2 className="text-xl sm:text-2xl font-semibold text-slate-800 leading-snug">
               {question}
@@ -68,9 +67,7 @@ export function NannyQuestionShell({
       {/* Options — pinned to bottom, staggered entrance */}
       <div
         className={`w-full max-w-md mx-auto pb-6 px-4 transition-all duration-500 ease-out ${
-          optionsVisible
-            ? 'opacity-100'
-            : 'opacity-0 translate-y-8'
+          optionsVisible ? "opacity-100" : "opacity-0 translate-y-8"
         }`}
       >
         {children}

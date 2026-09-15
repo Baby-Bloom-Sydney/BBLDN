@@ -9,12 +9,14 @@ const TRUST_ITEMS = [
   {
     icon: UserCheck,
     title: "Expertly Vetted",
-    description: "Identity, credentials, and experience verified before joining",
+    description:
+      "Identity, credentials, and experience verified before joining",
   },
   {
     icon: GraduationCap,
     title: "Developmental Focus",
-    description: "Child development, structured play, and early learning as standard",
+    description:
+      "Child development, structured play, and early learning as standard",
   },
 ];
 

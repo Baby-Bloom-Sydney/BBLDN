@@ -1,6 +1,6 @@
-import { openai } from './client';
+import { openai } from "./client";
 
-import type { UserGuidance } from '@/lib/verification';
+import type { UserGuidance } from "@/lib/verification";
 
 export interface DriversLicenseVerificationResult {
   pass: boolean;
@@ -120,42 +120,42 @@ export async function verifyDriversLicense(
     given_names: string;
     date_of_birth: string;
     issuing_country: string;
-  }
+  },
 ): Promise<DriversLicenseVerificationResult> {
   try {
     // 1. Call OpenAI with the two images
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5.4-nano',
+      model: "gpt-5.4-nano",
       messages: [
         {
-          role: 'system',
+          role: "system",
           content: DRIVERS_LICENSE_SYSTEM_PROMPT,
         },
         {
-          role: 'user',
+          role: "user",
           content: [
             {
-              type: 'text',
+              type: "text",
               text: `Please analyze these images:\n1. Driver's License\n2. Selfie\n\nSubmitted data for comparison:\n- Surname: ${submittedData.surname}\n- Given Names: ${submittedData.given_names}\n- DOB: ${submittedData.date_of_birth}\n- Issuing Country: ${submittedData.issuing_country}`,
             },
             {
-              type: 'image_url',
-              image_url: { url: licenseSignedUrl, detail: 'high' },
+              type: "image_url",
+              image_url: { url: licenseSignedUrl, detail: "high" },
             },
             {
-              type: 'image_url',
-              image_url: { url: selfieSignedUrl, detail: 'auto' },
+              type: "image_url",
+              image_url: { url: selfieSignedUrl, detail: "auto" },
             },
           ],
         },
       ],
-      response_format: { type: 'json_object' },
+      response_format: { type: "json_object" },
       max_completion_tokens: 2000,
     });
 
     const rawContent = completion.choices[0]?.message?.content;
     if (!rawContent) {
-      throw new Error('No response from OpenAI');
+      throw new Error("No response from OpenAI");
     }
 
     const aiResult = JSON.parse(rawContent);
@@ -167,13 +167,13 @@ export async function verifyDriversLicense(
 
     // 2a. Document validity
     if (!aiResult.document_valid) {
-      issues.push('Invalid or unrecognizable driver\'s license document');
+      issues.push("Invalid or unrecognizable driver's license document");
       pass = false;
     }
 
     // 2b. Selfie validity
     if (!aiResult.selfie_valid) {
-      issues.push('Selfie does not meet quality requirements');
+      issues.push("Selfie does not meet quality requirements");
       pass = false;
     }
 
@@ -190,20 +190,22 @@ export async function verifyDriversLicense(
     const surnameMatch = extractedSurname === submittedSurname;
     if (!surnameMatch && extractedSurname) {
       issues.push(
-        `Surname mismatch: extracted "${aiResult.extracted.surname}" vs submitted "${submittedData.surname}"`
+        `Surname mismatch: extracted "${aiResult.extracted.surname}" vs submitted "${submittedData.surname}"`,
       );
       pass = false;
     }
 
     // 2e. Given names comparison (first name only)
-    const extractedGivenNames = aiResult.extracted?.given_names?.toLowerCase().trim();
+    const extractedGivenNames = aiResult.extracted?.given_names
+      ?.toLowerCase()
+      .trim();
     const submittedGivenNames = submittedData.given_names.toLowerCase().trim();
     const extractedFirstName = extractedGivenNames?.split(/\s+/)[0];
     const submittedFirstName = submittedGivenNames.split(/\s+/)[0];
     const givenNamesMatch = extractedFirstName === submittedFirstName;
     if (!givenNamesMatch && extractedGivenNames) {
       issues.push(
-        `Given names mismatch: extracted "${aiResult.extracted.given_names}" vs submitted "${submittedData.given_names}"`
+        `Given names mismatch: extracted "${aiResult.extracted.given_names}" vs submitted "${submittedData.given_names}"`,
       );
       pass = false;
     }
@@ -214,7 +216,7 @@ export async function verifyDriversLicense(
     const dobMatch = extractedDob === submittedDob;
     if (!dobMatch && extractedDob) {
       issues.push(
-        `Date of birth mismatch: extracted "${extractedDob}" vs submitted "${submittedDob}"`
+        `Date of birth mismatch: extracted "${extractedDob}" vs submitted "${submittedDob}"`,
       );
       pass = false;
     }
@@ -232,67 +234,70 @@ export async function verifyDriversLicense(
 
     // 2h. Document concerns
     if (aiResult.document_concerns?.length > 0) {
-      issues.push(...aiResult.document_concerns.map((c: string) => `Document concern: ${c}`));
+      issues.push(
+        ...aiResult.document_concerns.map(
+          (c: string) => `Document concern: ${c}`,
+        ),
+      );
     }
 
     // 3. Generate user guidance based on failure reasons
     if (!pass) {
       const hasNameMismatch = !surnameMatch || !givenNamesMatch;
-      const hasSelfieIssue = !aiResult.selfie_valid || selfieConfidence < SELFIE_PASS_THRESHOLD;
+      const hasSelfieIssue =
+        !aiResult.selfie_valid || selfieConfidence < SELFIE_PASS_THRESHOLD;
       const hasInvalidDoc = !aiResult.document_valid;
-      const hasExpiredDoc = licenseExpiry && new Date(licenseExpiry) < new Date();
+      const hasExpiredDoc =
+        licenseExpiry && new Date(licenseExpiry) < new Date();
 
       if (hasNameMismatch) {
         userGuidance = {
-          title: 'Name Mismatch Detected',
+          title: "Name Mismatch Detected",
           explanation:
-            'The name on your driver\'s license does not match the name you provided.',
+            "The name on your driver's license does not match the name you provided.",
           steps_to_fix: [
-            'Check your surname and given names match your license exactly',
-            'Re-enter your details and try again',
+            "Check your surname and given names match your license exactly",
+            "Re-enter your details and try again",
           ],
         };
       } else if (hasSelfieIssue) {
         userGuidance = {
-          title: 'Selfie Quality Issue',
+          title: "Selfie Quality Issue",
           explanation:
-            'Your selfie did not meet our verification requirements.',
+            "Your selfie did not meet our verification requirements.",
           steps_to_fix: [
-            'Face the camera directly with your whole face clearly visible',
-            'Remove any sunglasses, hats, or face coverings',
-            'Use good, even lighting — natural light works best',
-            'Take a new selfie and try again',
+            "Face the camera directly with your whole face clearly visible",
+            "Remove any sunglasses, hats, or face coverings",
+            "Use good, even lighting — natural light works best",
+            "Take a new selfie and try again",
           ],
         };
       } else if (hasInvalidDoc) {
         userGuidance = {
-          title: 'Invalid Driver\'s License Document',
-          explanation:
-            'We could not verify your driver\'s license document.',
+          title: "Invalid Driver's License Document",
+          explanation: "We could not verify your driver's license document.",
           steps_to_fix: [
-            'Take a clear photo of your driver\'s license in good lighting',
-            'Make sure all text is sharp and readable',
-            'Avoid glare — tilt the document slightly if needed',
+            "Take a clear photo of your driver's license in good lighting",
+            "Make sure all text is sharp and readable",
+            "Avoid glare — tilt the document slightly if needed",
           ],
         };
       } else if (hasExpiredDoc) {
         userGuidance = {
-          title: 'Expired Driver\'s License',
+          title: "Expired Driver's License",
           explanation:
-            'Your driver\'s license has expired. We can only accept current, valid licenses.',
-          steps_to_fix: [
-            'Upload a valid, non-expired driver\'s license',
-          ],
+            "Your driver's license has expired. We can only accept current, valid licenses.",
+          steps_to_fix: ["Upload a valid, non-expired driver's license"],
         };
       } else {
         userGuidance = {
-          title: 'Verification Failed',
+          title: "Verification Failed",
           explanation:
-            'We were unable to verify your driver\'s license at this time.',
+            "We were unable to verify your driver's license at this time.",
           steps_to_fix: [
-            'Ensure your driver\'s license photo is clear and complete',
-            'Ensure your selfie is well-lit and clearly shows your face',
-            'Try again or submit for manual review',
+            "Ensure your driver's license photo is clear and complete",
+            "Ensure your selfie is well-lit and clearly shows your face",
+            "Try again or submit for manual review",
           ],
         };
       }
@@ -310,16 +315,18 @@ export async function verifyDriversLicense(
         license_class: aiResult.extracted?.license_class ?? null,
       },
       selfie_confidence: selfieConfidence,
-      reasoning: aiResult.selfie_reasoning || 'No reasoning provided',
+      reasoning: aiResult.selfie_reasoning || "No reasoning provided",
       issues,
       user_guidance: userGuidance,
     };
   } catch (error) {
-    console.error('Error verifying driver\'s license:', error);
+    console.error("Error verifying driver's license:", error);
 
     // Detect OpenAI unsupported image format error
     const errorMsg = error instanceof Error ? error.message : String(error);
-    const isUnsupportedFormat = errorMsg.includes('unsupported image') || errorMsg.includes('Could not process image');
+    const isUnsupportedFormat =
+      errorMsg.includes("unsupported image") ||
+      errorMsg.includes("Could not process image");
 
     return {
       pass: false,
@@ -334,23 +341,27 @@ export async function verifyDriversLicense(
       },
       selfie_confidence: null,
       reasoning: `Error during verification: ${errorMsg}`,
-      issues: [isUnsupportedFormat
-        ? 'Unsupported image format — only PNG, JPEG, GIF, and WebP are accepted'
-        : 'Verification process failed'],
+      issues: [
+        isUnsupportedFormat
+          ? "Unsupported image format — only PNG, JPEG, GIF, and WebP are accepted"
+          : "Verification process failed",
+      ],
       user_guidance: isUnsupportedFormat
         ? {
-            title: 'Unsupported Image Format',
-            explanation: 'One of your uploaded images is in a format we can\'t process (e.g. HEIC). We only support PNG, JPEG, and WebP.',
+            title: "Unsupported Image Format",
+            explanation:
+              "One of your uploaded images is in a format we can't process (e.g. HEIC). We only support PNG, JPEG, and WebP.",
             steps_to_fix: [
-              'Re-upload your driver\'s license as a PNG or JPEG image',
-              'Re-upload your selfie as a PNG or JPEG image',
-              'On iPhone, take a screenshot of the photo and upload that instead',
+              "Re-upload your driver's license as a PNG or JPEG image",
+              "Re-upload your selfie as a PNG or JPEG image",
+              "On iPhone, take a screenshot of the photo and upload that instead",
             ],
           }
         : {
-            title: 'Verification Error',
-            explanation: 'An error occurred during verification. Please try again.',
-            steps_to_fix: ['Re-upload your driver\'s license and selfie.'],
+            title: "Verification Error",
+            explanation:
+              "An error occurred during verification. Please try again.",
+            steps_to_fix: ["Re-upload your driver's license and selfie."],
           },
     };
   }

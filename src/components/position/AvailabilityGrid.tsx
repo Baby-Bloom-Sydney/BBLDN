@@ -17,12 +17,12 @@ export function AvailabilityGrid({
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const next7Days = getNext7Days();
   const allSlots = next7Days.flatMap((day) =>
-    BRACKET_KEYS.map((bracket) => `${day.date}_${bracket}`)
+    BRACKET_KEYS.map((bracket) => `${day.date}_${bracket}`),
   );
 
   const toggleSlot = (slot: string) => {
     setSelectedSlots((prev) =>
-      prev.includes(slot) ? prev.filter((s) => s !== slot) : [...prev, slot]
+      prev.includes(slot) ? prev.filter((s) => s !== slot) : [...prev, slot],
     );
   };
 
@@ -53,8 +53,14 @@ export function AvailabilityGrid({
           type="button"
           variant="outline"
           size="sm"
-          onClick={selectedSlots.length === allSlots.length ? clearAll : selectAll}
-          className={selectedSlots.length === allSlots.length ? "bg-violet-100 border-violet-300 text-violet-700" : ""}
+          onClick={
+            selectedSlots.length === allSlots.length ? clearAll : selectAll
+          }
+          className={
+            selectedSlots.length === allSlots.length
+              ? "bg-violet-100 border-violet-300 text-violet-700"
+              : ""
+          }
         >
           {selectedSlots.length === allSlots.length ? "Clear All" : "Anytime"}
         </Button>
@@ -73,18 +79,27 @@ export function AvailabilityGrid({
             <div />
             {BRACKET_KEYS.map((bracket) => (
               <div key={bracket} className="text-center">
-                <p className="text-xs font-semibold text-slate-600">{TIME_BRACKETS[bracket].label}</p>
-                <p className="text-[10px] text-slate-400">{TIME_BRACKETS[bracket].sublabel}</p>
+                <p className="text-xs font-semibold text-slate-600">
+                  {TIME_BRACKETS[bracket].label}
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  {TIME_BRACKETS[bracket].sublabel}
+                </p>
               </div>
             ))}
           </div>
 
           {/* Date rows */}
           {next7Days.map((day) => (
-            <div key={day.date} className="grid grid-cols-[90px_repeat(4,1fr)] gap-1 mb-1">
+            <div
+              key={day.date}
+              className="grid grid-cols-[90px_repeat(4,1fr)] gap-1 mb-1"
+            >
               <div className="flex items-center">
                 <div>
-                  <p className="text-xs font-semibold text-slate-600">{day.dayLabel}</p>
+                  <p className="text-xs font-semibold text-slate-600">
+                    {day.dayLabel}
+                  </p>
                   <p className="text-[10px] text-slate-400">{day.dateLabel}</p>
                 </div>
               </div>
@@ -113,14 +128,23 @@ export function AvailabilityGrid({
 
       {/* Validation hints */}
       <div className="space-y-1">
-        <p className={`text-xs ${hasEnoughSlots ? "text-green-600" : "text-slate-400"}`}>
-          {hasEnoughSlots ? "\u2713" : "\u25CB"} At least 5 slots selected ({selectedSlots.length}/5)
+        <p
+          className={`text-xs ${hasEnoughSlots ? "text-green-600" : "text-slate-400"}`}
+        >
+          {hasEnoughSlots ? "\u2713" : "\u25CB"} At least 5 slots selected (
+          {selectedSlots.length}/5)
         </p>
-        <p className={`text-xs ${hasAllBrackets ? "text-green-600" : "text-slate-400"}`}>
-          {hasAllBrackets ? "\u2713" : "\u25CB"} All 4 time brackets covered ({selectedBrackets.size}/4)
+        <p
+          className={`text-xs ${hasAllBrackets ? "text-green-600" : "text-slate-400"}`}
+        >
+          {hasAllBrackets ? "\u2713" : "\u25CB"} All 4 time brackets covered (
+          {selectedBrackets.size}/4)
         </p>
-        <p className={`text-xs ${hasEnoughDays ? "text-green-600" : "text-slate-400"}`}>
-          {hasEnoughDays ? "\u2713" : "\u25CB"} At least 3 different days ({selectedDays.size}/3)
+        <p
+          className={`text-xs ${hasEnoughDays ? "text-green-600" : "text-slate-400"}`}
+        >
+          {hasEnoughDays ? "\u2713" : "\u25CB"} At least 3 different days (
+          {selectedDays.size}/3)
         </p>
       </div>
 
@@ -140,7 +164,10 @@ export function AvailabilityGrid({
           onClick={() => onConfirm(selectedSlots)}
         >
           {submitting ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Confirming...</>
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Confirming...
+            </>
           ) : (
             "Confirm Availability"
           )}

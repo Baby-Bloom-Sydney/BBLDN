@@ -12,7 +12,12 @@ interface SidebarItemProps {
   collapsed?: boolean;
 }
 
-export function SidebarItem({ href, icon: Icon, label, collapsed }: SidebarItemProps) {
+export function SidebarItem({
+  href,
+  icon: Icon,
+  label,
+  collapsed,
+}: SidebarItemProps) {
   const pathname = usePathname();
   const isActive = pathname === href;
 
@@ -26,7 +31,7 @@ export function SidebarItem({ href, icon: Icon, label, collapsed }: SidebarItemP
           "flex items-center justify-center rounded-lg p-2 transition-colors",
           isActive
             ? "bg-violet-500 text-white"
-            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
         )}
       >
         <Icon className="h-5 w-5" />
@@ -42,7 +47,7 @@ export function SidebarItem({ href, icon: Icon, label, collapsed }: SidebarItemP
         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
         isActive
           ? "bg-violet-500 text-white"
-          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
       )}
     >
       <Icon className="h-5 w-5" />

@@ -6,12 +6,20 @@ interface ProfessionalHireEmailParams {
   edtechLink: string;
 }
 
-export function buildProfessionalHireConfirmationEmail(params: ProfessionalHireEmailParams): {
+export function buildProfessionalHireConfirmationEmail(
+  params: ProfessionalHireEmailParams,
+): {
   subject: string;
   html: string;
   text: string;
 } {
-  const { professionalName, clientName, referenceNumber, hireDate, edtechLink } = params;
+  const {
+    professionalName,
+    clientName,
+    referenceNumber,
+    hireDate,
+    edtechLink,
+  } = params;
 
   const subject = `Congratulations! Your placement with ${clientName} is confirmed — Ref: ${referenceNumber}`;
 

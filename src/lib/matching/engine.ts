@@ -1,6 +1,6 @@
 // ── Matchmaking engine — orchestrates data fetching + scoring ──
 
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   PositionMatchData,
   PositionChildData,
@@ -10,8 +10,12 @@ import type {
   PostcodeData,
   MatchResult,
   MatchingResult,
-} from './types';
-import { normalizeNannySchedule, haversineDistance, ageFromDob } from './normalize';
+} from "./types";
+import {
+  normalizeNannySchedule,
+  haversineDistance,
+  ageFromDob,
+} from "./normalize";
 import {
   scoreLocation,
   scoreSchedule,
@@ -19,8 +23,8 @@ import {
   calculateRequirementMultiplier,
   calculateOverQualifiedMultiplier,
   calculateFinalScore,
-} from './scoring';
-import { QUAL_SCORES } from './constants';
+} from "./scoring";
+import { QUAL_SCORES } from "./constants";
 
 /**
  * Shared scoring pipeline: fetches all eligible nannies, scores them against
@@ -30,18 +34,20 @@ import { QUAL_SCORES } from './constants';
 export async function fetchAndScoreNannies(
   position: PositionMatchData,
   children: PositionChildData[],
-  positionSchedule: Record<string, string[]> | null
+  positionSchedule: Record<string, string[]> | null,
 ): Promise<MatchingResult> {
   const supabase = createAdminClient();
 
   // ── Fetch all visible nannies (single query for nannies, then batch related) ──
   const { data: nannies, error: nannyError } = await supabase
-    .from('nannies')
-    .select('id, user_id, total_experience_years, nanny_experience_years, under_3_experience_years, newborn_experience_years, max_children, min_child_age_months, max_child_age_months, additional_needs_ok, drivers_license, has_car, vaccination_status, non_smoker, comfortable_with_pets, hourly_rate_min, nationality, languages, role_types_preferred, level_of_support_offered, immediate_start_available, ai_content')
-    .gte('verification_level', 3);
+    .from("nannies")
+    .select(
+      "id, user_id, total_experience_years, nanny_experience_years, under_3_experience_years, newborn_experience_years, max_children, min_child_age_months, max_child_age_months, additional_needs_ok, drivers_license, has_car, vaccination_status, non_smoker, comfortable_with_pets, hourly_rate_min, nationality, languages, role_types_preferred, level_of_support_offered, immediate_start_available, ai_content",
+    )
+    .gte("verification_level", 3);
 
   if (nannyError || !nannies || nannies.length === 0) {
-    if (nannyError) console.error('Nanny fetch error:', nannyError);
+    if (nannyError) console.error("Nanny fetch error:", nannyError);
     return { matches: [], totalEligible: 0 };
   }
 
@@ -52,17 +58,21 @@ export async function fetchAndScoreNannies(
   // Batch fetch related data
   const [profilesRes, availabilityRes, credentialsRes] = await Promise.all([
     supabase
-      .from('user_profiles')
-      .select('user_id, first_name, last_name, suburb, postcode, date_of_birth, profile_picture_url')
-      .in('user_id', userIds),
+      .from("user_profiles")
+      .select(
+        "user_id, first_name, last_name, suburb, postcode, date_of_birth, profile_picture_url",
+      )
+      .in("user_id", userIds),
     supabase
-      .from('nanny_availability')
-      .select('nanny_id, days_available, schedule')
-      .in('nanny_id', nannyIds),
+      .from("nanny_availability")
+      .select("nanny_id, days_available, schedule")
+      .in("nanny_id", nannyIds),
     supabase
-      .from('nanny_credentials')
-      .select('nanny_id, credential_category, qualification_type, certification_type')
-      .in('nanny_id', nannyIds),
+      .from("nanny_credentials")
+      .select(
+        "nanny_id, credential_category, qualification_type, certification_type",
+      )
+      .in("nanny_id", nannyIds),
   ]);
 
   // Build lookup maps
@@ -75,7 +85,7 @@ export async function fetchAndScoreNannies(
   for (const a of availabilityRes.data ?? []) {
     availabilityMap.set(
       a.nanny_id,
-      normalizeNannySchedule(a.schedule as Record<string, unknown>)
+      normalizeNannySchedule(a.schedule as Record<string, unknown>),
     );
   }
 
@@ -96,9 +106,9 @@ export async function fetchAndScoreNannies(
   const postcodeMap = new Map<string, PostcodeData>();
   if (allSuburbs.size > 0) {
     const { data: postcodes } = await supabase
-      .from('sydney_postcodes')
-      .select('suburb, latitude, longitude')
-      .in('suburb', Array.from(allSuburbs));
+      .from("sydney_postcodes")
+      .select("suburb, latitude, longitude")
+      .in("suburb", Array.from(allSuburbs));
 
     for (const pc of postcodes ?? []) {
       postcodeMap.set(pc.suburb.toLowerCase(), {
@@ -133,7 +143,7 @@ export async function fetchAndScoreNannies(
           parentPostcode.latitude,
           parentPostcode.longitude,
           nannyPostcode.latitude,
-          nannyPostcode.longitude
+          nannyPostcode.longitude,
         );
         distanceKm = Math.floor(distanceKm); // whole km, rounded down
       }
@@ -143,16 +153,19 @@ export async function fetchAndScoreNannies(
     const nannyAge = ageFromDob(profile.date_of_birth);
 
     // Layer 1: Quality Base
-    const { score: qualityBase, breakdown, scheduleOverlapPercent } =
-      calculateQualityBase(
-        position,
-        children,
-        nanny,
-        nannyCredentials,
-        distanceKm,
-        nannySchedule,
-        positionSchedule
-      );
+    const {
+      score: qualityBase,
+      breakdown,
+      scheduleOverlapPercent,
+    } = calculateQualityBase(
+      position,
+      children,
+      nanny,
+      nannyCredentials,
+      distanceKm,
+      nannySchedule,
+      positionSchedule,
+    );
 
     // Layer 2: Requirement Multiplier
     const { multiplier: reqMultiplier, unmetRequirements } =
@@ -160,20 +173,28 @@ export async function fetchAndScoreNannies(
 
     // Layer 3: Over-qualified Multiplier
     const { multiplier: oqMultiplier, bonuses: oqBonuses } =
-      calculateOverQualifiedMultiplier(position, nanny, nannyCredentials, nannyAge);
+      calculateOverQualifiedMultiplier(
+        position,
+        nanny,
+        nannyCredentials,
+        nannyAge,
+      );
 
     // Final score
     const { rawScore, finalScore } = calculateFinalScore(
       qualityBase,
       reqMultiplier,
-      oqMultiplier
+      oqMultiplier,
     );
 
     // Highest qualification for display
     let highestQualification: string | null = null;
     let highestQualScore = 0;
     for (const cred of nannyCredentials) {
-      if (cred.credential_category === 'qualification' && cred.qualification_type) {
+      if (
+        cred.credential_category === "qualification" &&
+        cred.qualification_type
+      ) {
         const qs = QUAL_SCORES[cred.qualification_type] ?? 0;
         if (qs > highestQualScore) {
           highestQualScore = qs;
@@ -184,18 +205,23 @@ export async function fetchAndScoreNannies(
 
     // Specific certification names for display
     const rawCerts = nannyCredentials
-      .filter((c) => c.credential_category === 'certification' && c.certification_type)
+      .filter(
+        (c) =>
+          c.credential_category === "certification" && c.certification_type,
+      )
       .map((c) => c.certification_type!);
     // "First Aid in Childcare Setting" → "Child First Aid" and takes priority over plain "First Aid"
-    const hasChildFirstAid = rawCerts.some((c) =>
-      c.toLowerCase().includes('childcare') || c.toLowerCase().includes('child first aid')
+    const hasChildFirstAid = rawCerts.some(
+      (c) =>
+        c.toLowerCase().includes("childcare") ||
+        c.toLowerCase().includes("child first aid"),
     );
     const certifications = rawCerts
       .map((c) => {
-        if (c.toLowerCase().includes('childcare')) return 'Child First Aid';
+        if (c.toLowerCase().includes("childcare")) return "Child First Aid";
         return c;
       })
-      .filter((c) => !(hasChildFirstAid && c === 'First Aid'));
+      .filter((c) => !(hasChildFirstAid && c === "First Aid"));
 
     results.push({
       nannyId: nanny.id,
@@ -223,29 +249,33 @@ export async function fetchAndScoreNannies(
   return { matches: results, totalEligible };
 }
 
-export async function runMatchmaking(positionId: string): Promise<MatchingResult> {
+export async function runMatchmaking(
+  positionId: string,
+): Promise<MatchingResult> {
   const supabase = createAdminClient();
 
   // ── Fetch position data (3 parallel queries) ──
   const [positionRes, childrenRes, scheduleRes] = await Promise.all([
     supabase
-      .from('nanny_positions')
-      .select('id, parent_id, drivers_license_required, car_required, vaccination_required, non_smoker_required, comfortable_with_pets_required, minimum_age_requirement, years_of_experience, language_preference, language_preference_details, reason_for_nanny, schedule_type, urgency, suburb, postcode, details')
-      .eq('id', positionId)
+      .from("nanny_positions")
+      .select(
+        "id, parent_id, drivers_license_required, car_required, vaccination_required, non_smoker_required, comfortable_with_pets_required, minimum_age_requirement, years_of_experience, language_preference, language_preference_details, reason_for_nanny, schedule_type, urgency, suburb, postcode, details",
+      )
+      .eq("id", positionId)
       .single(),
     supabase
-      .from('position_children')
-      .select('age_months')
-      .eq('position_id', positionId),
+      .from("position_children")
+      .select("age_months")
+      .eq("position_id", positionId),
     supabase
-      .from('position_schedule')
-      .select('schedule')
-      .eq('position_id', positionId)
+      .from("position_schedule")
+      .select("schedule")
+      .eq("position_id", positionId)
       .maybeSingle(),
   ]);
 
   if (positionRes.error || !positionRes.data) {
-    console.error('Position fetch error:', positionRes.error);
+    console.error("Position fetch error:", positionRes.error);
     return { matches: [], totalEligible: 0 };
   }
 
@@ -253,7 +283,8 @@ export async function runMatchmaking(positionId: string): Promise<MatchingResult
   const children: PositionChildData[] = (childrenRes.data ?? []).map((c) => ({
     age_months: c.age_months,
   }));
-  const positionSchedule = (scheduleRes.data?.schedule as Record<string, string[]>) ?? null;
+  const positionSchedule =
+    (scheduleRes.data?.schedule as Record<string, string[]>) ?? null;
 
   return fetchAndScoreNannies(position, children, positionSchedule);
 }
@@ -263,39 +294,42 @@ export async function runMatchmaking(positionId: string): Promise<MatchingResult
  * Only scores location (distance + car) and schedule overlap.
  * Skips credentials fetch, requirement checks, and over-qualified bonuses.
  */
-export async function runBasicMatchmaking(positionId: string): Promise<MatchingResult> {
+export async function runBasicMatchmaking(
+  positionId: string,
+): Promise<MatchingResult> {
   const supabase = createAdminClient();
 
   // ── Step 1: Fetch position data (3 parallel queries) ──
   const [positionRes, scheduleRes] = await Promise.all([
     supabase
-      .from('nanny_positions')
-      .select('id, parent_id, suburb, postcode, schedule_type')
-      .eq('id', positionId)
+      .from("nanny_positions")
+      .select("id, parent_id, suburb, postcode, schedule_type")
+      .eq("id", positionId)
       .single(),
     supabase
-      .from('position_schedule')
-      .select('schedule')
-      .eq('position_id', positionId)
+      .from("position_schedule")
+      .select("schedule")
+      .eq("position_id", positionId)
       .maybeSingle(),
   ]);
 
   if (positionRes.error || !positionRes.data) {
-    console.error('Position fetch error:', positionRes.error);
+    console.error("Position fetch error:", positionRes.error);
     return { matches: [], totalEligible: 0 };
   }
 
   const position = positionRes.data;
-  const positionSchedule = (scheduleRes.data?.schedule as Record<string, string[]>) ?? null;
+  const positionSchedule =
+    (scheduleRes.data?.schedule as Record<string, string[]>) ?? null;
 
   // ── Step 2: Fetch all visible nannies ──
   const { data: nannies, error: nannyError } = await supabase
-    .from('nannies')
-    .select('id, user_id, has_car, ai_content')
-    .gte('verification_level', 3);
+    .from("nannies")
+    .select("id, user_id, has_car, ai_content")
+    .gte("verification_level", 3);
 
   if (nannyError || !nannies || nannies.length === 0) {
-    if (nannyError) console.error('Nanny fetch error:', nannyError);
+    if (nannyError) console.error("Nanny fetch error:", nannyError);
     return { matches: [], totalEligible: 0 };
   }
 
@@ -306,13 +340,15 @@ export async function runBasicMatchmaking(positionId: string): Promise<MatchingR
   // Batch fetch profiles + availability (skip credentials)
   const [profilesRes, availabilityRes] = await Promise.all([
     supabase
-      .from('user_profiles')
-      .select('user_id, first_name, last_name, suburb, postcode, date_of_birth, profile_picture_url')
-      .in('user_id', userIds),
+      .from("user_profiles")
+      .select(
+        "user_id, first_name, last_name, suburb, postcode, date_of_birth, profile_picture_url",
+      )
+      .in("user_id", userIds),
     supabase
-      .from('nanny_availability')
-      .select('nanny_id, days_available, schedule')
-      .in('nanny_id', nannyIds),
+      .from("nanny_availability")
+      .select("nanny_id, days_available, schedule")
+      .in("nanny_id", nannyIds),
   ]);
 
   // Build lookup maps
@@ -325,7 +361,7 @@ export async function runBasicMatchmaking(positionId: string): Promise<MatchingR
   for (const a of availabilityRes.data ?? []) {
     availabilityMap.set(
       a.nanny_id,
-      normalizeNannySchedule(a.schedule as Record<string, unknown>)
+      normalizeNannySchedule(a.schedule as Record<string, unknown>),
     );
   }
 
@@ -339,9 +375,9 @@ export async function runBasicMatchmaking(positionId: string): Promise<MatchingR
   const postcodeMap = new Map<string, PostcodeData>();
   if (allSuburbs.size > 0) {
     const { data: postcodes } = await supabase
-      .from('sydney_postcodes')
-      .select('suburb, latitude, longitude')
-      .in('suburb', Array.from(allSuburbs));
+      .from("sydney_postcodes")
+      .select("suburb, latitude, longitude")
+      .in("suburb", Array.from(allSuburbs));
 
     for (const pc of postcodes ?? []) {
       postcodeMap.set(pc.suburb.toLowerCase(), {
@@ -374,18 +410,18 @@ export async function runBasicMatchmaking(positionId: string): Promise<MatchingR
           parentPostcode.latitude,
           parentPostcode.longitude,
           nannyPostcode.latitude,
-          nannyPostcode.longitude
+          nannyPostcode.longitude,
         );
         distanceKm = Math.floor(distanceKm);
       }
     }
 
     const locationScore = scoreLocation(distanceKm, nanny.has_car ?? false);
-    const isFlexible = position.schedule_type === 'Flexible';
+    const isFlexible = position.schedule_type === "Flexible";
     const { score: scheduleScore, overlapPercent } = scoreSchedule(
       positionSchedule,
       nannySchedule,
-      isFlexible
+      isFlexible,
     );
 
     const basicScore = locationScore * 0.45 + scheduleScore * 0.55;
@@ -414,7 +450,7 @@ export async function runBasicMatchmaking(positionId: string): Promise<MatchingR
       level_of_support_offered: null,
       immediate_start_available: null,
       nationality: null,
-      ai_content: nanny.ai_content as NannyMatchData['ai_content'],
+      ai_content: nanny.ai_content as NannyMatchData["ai_content"],
     };
 
     results.push({

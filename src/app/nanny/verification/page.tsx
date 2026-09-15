@@ -6,7 +6,9 @@ import { VerificationPageClient } from "./VerificationPageClient";
 
 export default async function NannyVerificationPage() {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const { data: verification } = await getVerificationData();
@@ -22,11 +24,15 @@ export default async function NannyVerificationPage() {
   return (
     <VerificationPageClient
       initialData={verification}
-      profileData={profile ? {
-        firstName: profile.first_name ?? "",
-        lastName: profile.last_name ?? "",
-        dateOfBirth: profile.date_of_birth ?? "",
-      } : null}
+      profileData={
+        profile
+          ? {
+              firstName: profile.first_name ?? "",
+              lastName: profile.last_name ?? "",
+              dateOfBirth: profile.date_of_birth ?? "",
+            }
+          : null
+      }
     />
   );
 }

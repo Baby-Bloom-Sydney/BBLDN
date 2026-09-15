@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
 interface DevPrefillProps {
   onPrefill: () => void;

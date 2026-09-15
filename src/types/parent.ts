@@ -31,7 +31,7 @@ export interface ParentVerificationData {
   identification_photo_url: string | null;
   identity_verified: boolean;
   identity_rejection_reason: string | null;
-  identity_user_guidance: import('@/lib/verification').UserGuidance | null;
+  identity_user_guidance: import("@/lib/verification").UserGuidance | null;
   selfie_confidence: number | null;
   // AI Extraction: Common
   extracted_surname: string | null;

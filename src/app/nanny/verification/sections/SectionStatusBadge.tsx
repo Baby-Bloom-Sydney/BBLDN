@@ -1,10 +1,27 @@
 "use client";
 
-import { Loader2, CheckCircle2, XCircle, Clock, AlertTriangle } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  AlertTriangle,
+} from "lucide-react";
 
-type BadgeVariant = "pending" | "processing" | "verified" | "failed" | "review" | "rejected" | "expired" | "saved";
+type BadgeVariant =
+  | "pending"
+  | "processing"
+  | "verified"
+  | "failed"
+  | "review"
+  | "rejected"
+  | "expired"
+  | "saved";
 
-const BADGE_CONFIG: Record<BadgeVariant, { icon: React.ReactNode; label: string; className: string }> = {
+const BADGE_CONFIG: Record<
+  BadgeVariant,
+  { icon: React.ReactNode; label: string; className: string }
+> = {
   pending: {
     icon: <Clock className="h-4 w-4" />,
     label: "Pending",
@@ -57,7 +74,9 @@ export function SectionStatusBadge({
   const config = BADGE_CONFIG[status] ?? BADGE_CONFIG.pending;
 
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${config.className}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${config.className}`}
+    >
       {config.icon}
       {customLabel ?? config.label}
     </span>

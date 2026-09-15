@@ -9,7 +9,8 @@ export const POSITION_STAGE = {
   CLOSED: 60,
 } as const;
 
-export type PositionStage = typeof POSITION_STAGE[keyof typeof POSITION_STAGE];
+export type PositionStage =
+  (typeof POSITION_STAGE)[keyof typeof POSITION_STAGE];
 
 // ─── Position Status (detailed, grouped by tens) ───
 
@@ -29,7 +30,8 @@ export const POSITION_STATUS = {
   CLOSED_NO_CANDIDATES: 61,
 } as const;
 
-export type PositionStatus = typeof POSITION_STATUS[keyof typeof POSITION_STATUS];
+export type PositionStatus =
+  (typeof POSITION_STATUS)[keyof typeof POSITION_STATUS];
 
 // ─── Connection Stage (per-nanny pipeline) ───
 
@@ -39,10 +41,10 @@ export const CONNECTION_STAGE = {
   REQUEST_EXPIRED: 1,
   DECLINED: 2,
   REQUEST_CANCELLED: 3,
-  NANNY_APPLIED_PENDING: 4,  // Held application — nanny applied at level 3
+  NANNY_APPLIED_PENDING: 4, // Held application — nanny applied at level 3
   NANNY_APPLIED: 5,
   // 10-19: Scheduling
-  ACCEPTED_PENDING: 9,       // Held acceptance — nanny accepted/interested at level 3
+  ACCEPTED_PENDING: 9, // Held acceptance — nanny accepted/interested at level 3
   ACCEPTED: 10,
   SCHEDULE_EXPIRED: 11,
   // 20-29: Meet (user-facing: "Meet and Greet"; internal code still uses "intro")
@@ -65,59 +67,60 @@ export const CONNECTION_STAGE = {
   CANCELLED_BY_NANNY: 51,
 } as const;
 
-export type ConnectionStage = typeof CONNECTION_STAGE[keyof typeof CONNECTION_STAGE];
+export type ConnectionStage =
+  (typeof CONNECTION_STAGE)[keyof typeof CONNECTION_STAGE];
 
 // ─── Labels ───
 
 export const POSITION_STAGE_LABELS: Record<PositionStage, string> = {
-  [POSITION_STAGE.DRAFT]: 'Draft',
-  [POSITION_STAGE.OPEN]: 'Open',
-  [POSITION_STAGE.CONNECTING]: 'Connecting',
-  [POSITION_STAGE.ACTIVE]: 'Active',
-  [POSITION_STAGE.ENDED]: 'Ended',
-  [POSITION_STAGE.CLOSED]: 'Closed',
+  [POSITION_STAGE.DRAFT]: "Draft",
+  [POSITION_STAGE.OPEN]: "Open",
+  [POSITION_STAGE.CONNECTING]: "Connecting",
+  [POSITION_STAGE.ACTIVE]: "Active",
+  [POSITION_STAGE.ENDED]: "Ended",
+  [POSITION_STAGE.CLOSED]: "Closed",
 };
 
 export const POSITION_STATUS_LABELS: Record<PositionStatus, string> = {
-  [POSITION_STATUS.DRAFT]: 'Draft',
-  [POSITION_STATUS.OPEN]: 'Open',
-  [POSITION_STATUS.CONNECTING]: 'Connecting',
-  [POSITION_STATUS.ACTIVE]: 'Active',
-  [POSITION_STATUS.ENDED_NATURAL]: 'Ended — Natural',
-  [POSITION_STATUS.ENDED_NANNY_LEFT]: 'Ended — Nanny Left',
-  [POSITION_STATUS.ENDED_NO_LONGER_NEEDED]: 'Ended — No Longer Needed',
-  [POSITION_STATUS.ENDED_MUTUAL]: 'Ended — Mutual Agreement',
-  [POSITION_STATUS.ENDED_CHILD_AGED_OUT]: 'Ended — Child Aged Out',
-  [POSITION_STATUS.ENDED_RELOCATION]: 'Ended — Relocation',
-  [POSITION_STATUS.ENDED_OTHER]: 'Ended — Other',
-  [POSITION_STATUS.CLOSED]: 'Closed',
-  [POSITION_STATUS.CLOSED_NO_CANDIDATES]: 'Closed — No Candidates',
+  [POSITION_STATUS.DRAFT]: "Draft",
+  [POSITION_STATUS.OPEN]: "Open",
+  [POSITION_STATUS.CONNECTING]: "Connecting",
+  [POSITION_STATUS.ACTIVE]: "Active",
+  [POSITION_STATUS.ENDED_NATURAL]: "Ended — Natural",
+  [POSITION_STATUS.ENDED_NANNY_LEFT]: "Ended — Nanny Left",
+  [POSITION_STATUS.ENDED_NO_LONGER_NEEDED]: "Ended — No Longer Needed",
+  [POSITION_STATUS.ENDED_MUTUAL]: "Ended — Mutual Agreement",
+  [POSITION_STATUS.ENDED_CHILD_AGED_OUT]: "Ended — Child Aged Out",
+  [POSITION_STATUS.ENDED_RELOCATION]: "Ended — Relocation",
+  [POSITION_STATUS.ENDED_OTHER]: "Ended — Other",
+  [POSITION_STATUS.CLOSED]: "Closed",
+  [POSITION_STATUS.CLOSED_NO_CANDIDATES]: "Closed — No Candidates",
 };
 
 export const CONNECTION_STAGE_LABELS: Record<ConnectionStage, string> = {
-  [CONNECTION_STAGE.REQUEST_SENT]: 'Request Sent',
-  [CONNECTION_STAGE.REQUEST_EXPIRED]: 'Request Expired',
-  [CONNECTION_STAGE.DECLINED]: 'Declined',
-  [CONNECTION_STAGE.REQUEST_CANCELLED]: 'Request Cancelled',
-  [CONNECTION_STAGE.NANNY_APPLIED_PENDING]: 'Applied',
-  [CONNECTION_STAGE.NANNY_APPLIED]: 'Applied',
-  [CONNECTION_STAGE.ACCEPTED_PENDING]: 'Accepted',
-  [CONNECTION_STAGE.ACCEPTED]: 'Accepted',
-  [CONNECTION_STAGE.SCHEDULE_EXPIRED]: 'Schedule Expired',
-  [CONNECTION_STAGE.INTRO_SCHEDULED]: 'Meet Scheduled',
-  [CONNECTION_STAGE.INTRO_COMPLETE]: 'Meet Complete',
-  [CONNECTION_STAGE.INTRO_INCOMPLETE]: 'Meet Incomplete',
-  [CONNECTION_STAGE.AWAITING_RESPONSE]: 'Awaiting Response',
-  [CONNECTION_STAGE.TRIAL_ARRANGED]: 'Trial Arranged',
-  [CONNECTION_STAGE.TRIAL_COMPLETE]: 'Trial Complete',
-  [CONNECTION_STAGE.OFFERED]: 'Offered',
-  [CONNECTION_STAGE.CONFIRMED]: 'Confirmed',
-  [CONNECTION_STAGE.NOT_HIRED]: 'Not Hired',
-  [CONNECTION_STAGE.NOT_SELECTED]: 'Not Selected',
-  [CONNECTION_STAGE.ACTIVE]: 'Active',
-  [CONNECTION_STAGE.FINISHED]: 'Finished',
-  [CONNECTION_STAGE.CANCELLED_BY_PARENT]: 'Cancelled by Parent',
-  [CONNECTION_STAGE.CANCELLED_BY_NANNY]: 'Cancelled by Nanny',
+  [CONNECTION_STAGE.REQUEST_SENT]: "Request Sent",
+  [CONNECTION_STAGE.REQUEST_EXPIRED]: "Request Expired",
+  [CONNECTION_STAGE.DECLINED]: "Declined",
+  [CONNECTION_STAGE.REQUEST_CANCELLED]: "Request Cancelled",
+  [CONNECTION_STAGE.NANNY_APPLIED_PENDING]: "Applied",
+  [CONNECTION_STAGE.NANNY_APPLIED]: "Applied",
+  [CONNECTION_STAGE.ACCEPTED_PENDING]: "Accepted",
+  [CONNECTION_STAGE.ACCEPTED]: "Accepted",
+  [CONNECTION_STAGE.SCHEDULE_EXPIRED]: "Schedule Expired",
+  [CONNECTION_STAGE.INTRO_SCHEDULED]: "Meet Scheduled",
+  [CONNECTION_STAGE.INTRO_COMPLETE]: "Meet Complete",
+  [CONNECTION_STAGE.INTRO_INCOMPLETE]: "Meet Incomplete",
+  [CONNECTION_STAGE.AWAITING_RESPONSE]: "Awaiting Response",
+  [CONNECTION_STAGE.TRIAL_ARRANGED]: "Trial Arranged",
+  [CONNECTION_STAGE.TRIAL_COMPLETE]: "Trial Complete",
+  [CONNECTION_STAGE.OFFERED]: "Offered",
+  [CONNECTION_STAGE.CONFIRMED]: "Confirmed",
+  [CONNECTION_STAGE.NOT_HIRED]: "Not Hired",
+  [CONNECTION_STAGE.NOT_SELECTED]: "Not Selected",
+  [CONNECTION_STAGE.ACTIVE]: "Active",
+  [CONNECTION_STAGE.FINISHED]: "Finished",
+  [CONNECTION_STAGE.CANCELLED_BY_PARENT]: "Cancelled by Parent",
+  [CONNECTION_STAGE.CANCELLED_BY_NANNY]: "Cancelled by Nanny",
 };
 
 // ─── Stage Groups ───
@@ -199,12 +202,27 @@ export type EndReason = keyof typeof END_REASON_TO_STATUS;
 // ─── Legacy Status ↔ Stage Sync ───
 
 /** Map legacy text status to new integer stage + position_status */
-export const LEGACY_POSITION_STATUS_MAP: Record<string, { stage: PositionStage; position_status: PositionStatus }> = {
-  draft: { stage: POSITION_STAGE.DRAFT, position_status: POSITION_STATUS.DRAFT },
+export const LEGACY_POSITION_STATUS_MAP: Record<
+  string,
+  { stage: PositionStage; position_status: PositionStatus }
+> = {
+  draft: {
+    stage: POSITION_STAGE.DRAFT,
+    position_status: POSITION_STATUS.DRAFT,
+  },
   active: { stage: POSITION_STAGE.OPEN, position_status: POSITION_STATUS.OPEN },
-  paused: { stage: POSITION_STAGE.DRAFT, position_status: POSITION_STATUS.DRAFT },
-  filled: { stage: POSITION_STAGE.ACTIVE, position_status: POSITION_STATUS.ACTIVE },
-  cancelled: { stage: POSITION_STAGE.CLOSED, position_status: POSITION_STATUS.CLOSED },
+  paused: {
+    stage: POSITION_STAGE.DRAFT,
+    position_status: POSITION_STATUS.DRAFT,
+  },
+  filled: {
+    stage: POSITION_STAGE.ACTIVE,
+    position_status: POSITION_STATUS.ACTIVE,
+  },
+  cancelled: {
+    stage: POSITION_STAGE.CLOSED,
+    position_status: POSITION_STATUS.CLOSED,
+  },
 };
 
 /** Map legacy connection text status to new integer connection_stage */
@@ -244,12 +262,19 @@ export function isPositionTerminal(status: PositionStatus): boolean {
 /** Get the legacy text status equivalent for a position stage (for dual-write) */
 export function getLegacyPositionStatus(stage: PositionStage): string {
   switch (stage) {
-    case POSITION_STAGE.DRAFT: return 'draft';
-    case POSITION_STAGE.OPEN: return 'active';
-    case POSITION_STAGE.CONNECTING: return 'active';
-    case POSITION_STAGE.ACTIVE: return 'filled';
-    case POSITION_STAGE.ENDED: return 'filled';
-    case POSITION_STAGE.CLOSED: return 'cancelled';
-    default: return 'active';
+    case POSITION_STAGE.DRAFT:
+      return "draft";
+    case POSITION_STAGE.OPEN:
+      return "active";
+    case POSITION_STAGE.CONNECTING:
+      return "active";
+    case POSITION_STAGE.ACTIVE:
+      return "filled";
+    case POSITION_STAGE.ENDED:
+      return "filled";
+    case POSITION_STAGE.CLOSED:
+      return "cancelled";
+    default:
+      return "active";
   }
 }

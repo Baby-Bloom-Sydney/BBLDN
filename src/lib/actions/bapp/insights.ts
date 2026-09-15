@@ -44,7 +44,7 @@ export async function generateTileInsight(
     note: string | null;
     milestoneDescriptions: string[];
     masteryLevel?: string | null;
-  }
+  },
 ): Promise<void> {
   try {
     const name = context.childName ?? "the child";
@@ -123,7 +123,7 @@ export async function getChildContext(childId: string): Promise<{
   const ageMonths = data.date_of_birth
     ? Math.floor(
         (Date.now() - new Date(data.date_of_birth).getTime()) /
-          (1000 * 60 * 60 * 24 * 30.44)
+          (1000 * 60 * 60 * 24 * 30.44),
       )
     : null;
 

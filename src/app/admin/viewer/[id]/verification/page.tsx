@@ -9,7 +9,9 @@ export default async function AdminViewerVerificationPage({
   params: { id: string };
 }) {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const admin = createAdminClient();
@@ -30,7 +32,8 @@ export default async function AdminViewerVerificationPage({
     // Fetch nanny verification data
     const { data: verification } = await admin
       .from("verifications")
-      .select(`
+      .select(
+        `
         id,
         identity_status, wwcc_status, contact_status, cross_check_status,
         verification_status,
@@ -44,7 +47,8 @@ export default async function AdminViewerVerificationPage({
         phone_number, address_line, city, state, postcode, country,
         cross_check_reasoning,
         created_at, updated_at
-      `)
+      `,
+      )
       .eq("user_id", targetUserId)
       .maybeSingle();
 

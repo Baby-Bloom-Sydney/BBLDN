@@ -38,7 +38,7 @@ export function Navbar() {
         "sticky top-0 z-50 w-full transition-all duration-200",
         isScrolled
           ? "bg-white/80 backdrop-blur-md border-b border-slate-200/50 shadow-sm"
-          : "bg-white"
+          : "bg-white",
       )}
     >
       <nav className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
@@ -95,7 +95,10 @@ export function Navbar() {
                     Log in
                   </Link>
                 </Button>
-                <Button asChild className="w-full bg-violet-500 hover:bg-violet-600">
+                <Button
+                  asChild
+                  className="w-full bg-violet-500 hover:bg-violet-600"
+                >
                   <Link href="/signup" onClick={() => setIsOpen(false)}>
                     Sign Up
                   </Link>
