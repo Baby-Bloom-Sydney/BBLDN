@@ -250,3 +250,37 @@ describe("config.env — the public reader (01 §3.3 build-time inlining)", () =
     ).toEqual(["NEXT_PUBLIC_SUPABASE_ANON_KEY"]);
   });
 });
+
+describe("config.env — environment resolution (06 §2.1; fail closed off-Vercel)", () => {
+  it("resolves VERCEL_ENV first, then NODE_ENV=production at runtime as production, a build as development", () => {
+    // the preview column: its ● names are missing from the dev fixture, so the failure carries the resolved environment
+    expect(
+      failure(() => parseEnv({ ...dotEnvTest, VERCEL_ENV: "preview" }))
+        .environment,
+    ).toBe("preview");
+    expect(
+      failure(() => parseEnv({ ...dotEnvTest, NODE_ENV: "production" }))
+        .environment,
+    ).toBe("production");
+    expect(
+      parseEnv({
+        ...dotEnvTest,
+        NODE_ENV: "production",
+        NEXT_PHASE: "phase-production-build",
+      }).environment,
+    ).toBe("development");
+    expect(parseEnv({ ...dotEnvTest, NODE_ENV: undefined }).environment).toBe(
+      "development",
+    );
+    expect(
+      failure(() => parseEnv({ ...dotEnvTest, VERCEL_ENV: "staging" })).names,
+    ).toEqual(["VERCEL_ENV"]);
+  });
+
+  it("reads a malformed boolean on a default-on flag as false — the 01 §3.3 rule, pinned so it is a choice, not a surprise", () => {
+    expect(
+      parseEnv({ ...dotEnvTest, PAYMENTS_ENABLED: "1" }).server
+        .PAYMENTS_ENABLED,
+    ).toBe(false);
+  });
+});

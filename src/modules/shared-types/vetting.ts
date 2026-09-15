@@ -1,4 +1,5 @@
 // 03 §4.2 — the vetting-providers contract types. Importer of the module: `verification` only.
+import type { Brand } from "./brand";
 import type {
   AdminId,
   ConsentRecordId,
@@ -50,8 +51,8 @@ export type RejectReason =
   | "expired"
   | "adverse"
   | "unsupported-evidence";
-/** Copy key for the nanny's guidance on a rejected section (04 §8 owns the copy). */
-export type GuidanceKey = string;
+/** Copy key for the nanny's guidance on a rejected section (04 §8 owns the copy); branded so it never mixes with `hint`. */
+export type GuidanceKey = Brand<string, "GuidanceKey">;
 
 export type CheckStatus =
   | { readonly kind: "pending" }
@@ -67,6 +68,7 @@ export type CheckStatus =
     }
   | { readonly kind: "needs-admin"; readonly hint?: string };
 
+/** Verbatim 03 §4.2 — the trailing `(string & {})` keeps the union open for future providers (a deliberate contract choice). */
 export type ProviderId =
   | "stub-manual"
   | "admin-manual"

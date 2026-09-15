@@ -68,5 +68,9 @@ describe("config — the environment is read only by the two readers (01 §1.3 r
         readFileSync(resolve(REPO_ROOT, path), "utf8").includes(ENV_READ),
       );
     expect(offenders).toEqual([]);
+    expect(
+      listFiles(resolve(REPO_ROOT, "src/modules"), { extensions: [".ts"] })
+        .length,
+    ).toBeGreaterThan(20);
   });
 });

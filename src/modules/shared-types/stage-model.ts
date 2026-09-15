@@ -32,14 +32,15 @@ export type EntityRef =
 
 export type TransitionId = (typeof TRANSITION_IDS)[number];
 export type SystemJobName = (typeof SYSTEM_JOB_NAMES)[number];
-export type Mover = "user:parent" | "user:nanny" | "admin" | "system";
+/** The 03 §2.4 "Movers" column (U-P · U-N · A · S) — not the DB `mover` enum. */
+export type TransitionMover = "user:parent" | "user:nanny" | "admin" | "system";
 
 export type TransitionSpec = {
   readonly id: TransitionId;
   readonly entity: EntityRef["kind"];
   readonly from: ReadonlyArray<Stage | null>;
   readonly to: Stage;
-  readonly movers: ReadonlyArray<Mover>;
+  readonly movers: ReadonlyArray<TransitionMover>;
   readonly systemJobs?: ReadonlyArray<SystemJobName>;
   readonly idempotency: "noop" | "reject" | "key";
 };

@@ -1,6 +1,7 @@
 // Boot failure of the env schema (01 §3.3; 01 §4b `ALERT_ENV_INVALID`): the message carries NAMES only, never a value.
 export class EnvInvalidError extends Error {
   readonly names: ReadonlyArray<string>;
+  /** A label for the message — an `Environment`, or `public/<NODE_ENV>` from the client reader. */
   readonly environment: string;
 
   constructor(environment: string, names: ReadonlyArray<string>) {

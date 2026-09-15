@@ -22,7 +22,7 @@ function baseSchema(entry: EnvEntry): z.ZodType<unknown> {
     case "number":
       return numberFromString;
     case "enum":
-      return z.enum(entry.values as [string, ...string[]]);
+      return z.enum(entry.values);
     case "url":
       return z.url();
     case "uuid":

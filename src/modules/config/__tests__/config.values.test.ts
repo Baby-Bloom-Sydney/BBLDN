@@ -8,9 +8,18 @@ import * as server from "@/modules/config/server";
 import type {
   BucketKey as ConfigBucketKey,
   EvidenceType as ConfigEvidenceType,
+  PaymentLinkKind as ConfigPaymentLinkKind,
+  VerificationLevelKey as ConfigVerificationLevelKey,
+  VettingProviderId as ConfigVettingProviderId,
 } from "@/modules/config/types";
 import { SYSTEM_JOB_NAMES } from "@/modules/shared-types";
-import type { BucketKey, EvidenceType } from "@/modules/shared-types";
+import type {
+  BucketKey,
+  EnumValue,
+  EvidenceType,
+  ProviderId,
+} from "@/modules/shared-types";
+import { ENUMS } from "@/modules/shared-types";
 
 const CONFIG_DIR = resolve(__dirname, "..");
 const BARRELS = new Set(["index.ts", "types.ts"]);
@@ -28,6 +37,17 @@ type Equals<A, B> =
     : false;
 const evidenceTypesAgree: Equals<ConfigEvidenceType, EvidenceType> = true;
 const bucketKeysAgree: Equals<ConfigBucketKey, BucketKey> = true;
+const linkKindsAgree: Equals<
+  ConfigPaymentLinkKind,
+  EnumValue<"payment_link_kind">
+> = true;
+const levelKeysAgree: Equals<
+  ConfigVerificationLevelKey,
+  EnumValue<"verification_level">
+> = true;
+const providerIdsAgree: ConfigVettingProviderId extends ProviderId
+  ? true
+  : false = true;
 
 function exportLines(file: string): string[] {
   return readFileSync(file, "utf8")
@@ -200,7 +220,16 @@ describe("config — values from the foundations (01 §3.1)", () => {
       expect(universal.VETTING.providers[type]).toBe("stub-manual");
     expect(universal.LAUNCH.minVerifiedNannies).toBe(25);
     expect(universal.APP.chatAttachmentTtlDays).toBe(7);
-    expect(evidenceTypesAgree && bucketKeysAgree).toBe(true);
+    expect(
+      evidenceTypesAgree &&
+        bucketKeysAgree &&
+        linkKindsAgree &&
+        levelKeysAgree &&
+        providerIdsAgree,
+    ).toBe(true);
+    expect(Object.keys(universal.VETTING.requiredChecksByLevel)).toEqual([
+      ...ENUMS.verification_level,
+    ]);
   });
 
   it("CRONS names every 01 §4f cron with a valid London schedule and a SystemJobName where it moves a stage", () => {

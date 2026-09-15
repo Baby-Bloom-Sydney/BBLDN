@@ -24,12 +24,17 @@ export const VETTING = Object.freeze({
     "uk_driving_licence",
     "evisa_share_code",
   ] as const),
-  providers: Object.freeze(
-    Object.fromEntries(
-      ACCEPTED_EVIDENCE.map((type) => [type, "stub-manual"]),
-    ) as Record<EvidenceType, VettingProviderId>,
-  ),
+  providers: Object.freeze({
+    "identity-document": "stub-manual",
+    selfie: "stub-manual",
+    "dbs-certificate": "stub-manual",
+    "dbs-update-service": "stub-manual",
+    "right-to-work-passport": "stub-manual",
+    "right-to-work-share-code": "stub-manual",
+    "right-to-work-document": "stub-manual",
+  } satisfies Record<EvidenceType, VettingProviderId>),
   requiredChecksByLevel: Object.freeze({
+    L0_SIGNED_UP: Object.freeze([]),
     L1_REGISTERED: Object.freeze([]),
     L2_ID_VERIFIED: Object.freeze(["identity-document", "selfie"]),
     L3_PROVISIONALLY_VERIFIED: Object.freeze([

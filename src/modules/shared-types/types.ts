@@ -8,7 +8,7 @@ export type EnumName = keyof typeof ENUMS;
 export type { Brand } from "./brand";
 export type * from "./scalars";
 export type * from "./ids";
-export type { AppError } from "./app-error";
+export type { AppError, AppErrorDetails, ClientAppError } from "./app-error";
 export type { Result } from "./result";
 export type ErrorCode = (typeof import("./error-codes").ERROR_CODES)[number];
 export type ModuleName = (typeof import("./module-names").MODULE_NAMES)[number];

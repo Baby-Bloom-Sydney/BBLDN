@@ -4,6 +4,7 @@
 // `src/modules/config/**`. Built-in exclusions are 05 §6's (generated types, *.d.ts, vercel.json, .env*, docs, README)
 // plus this folder (the patterns live here). The legacy tree is excluded by the committed `literal-exclusions.json`
 // (emptied by F-d — HANDOFF §7, §10 C2). `// config-literal-ok: <reason>` is the only inline escape; it is counted.
+// `literal-exclusions.json` is shared with check-env-reads.mjs (src only); this check also scans tests/ + scripts/.
 // Reports check `banned-literals` (HANDOFF §9). Exit 0 = clean; 1 = hits listed.
 import { readFileSync } from "node:fs";
 import { resolve, dirname, relative } from "node:path";
@@ -116,6 +117,12 @@ const isExcluded = (file) => {
 const files = SCAN_ROOTS.flatMap((root) =>
   listFiles(resolve(REPO_ROOT, root), { extensions: SOURCE_EXTENSIONS }),
 ).filter((file) => !isExcluded(file));
+if (files.length === 0) {
+  console.error(
+    "check-config-literals: FAIL — scanned zero files; the scan roots or the exclusions are wrong",
+  );
+  process.exit(1);
+}
 const results = files.map(scanFile);
 const hits = results.flatMap((result) => result.hits);
 const escapes = results.reduce((sum, result) => sum + result.escapes, 0);

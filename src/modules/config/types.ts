@@ -1,6 +1,6 @@
 // config — the module's type surface (01 §2.5). Types only; every value lives in its own one-export file.
-// `config` imports nothing (01 §2.3 leaf), so unions that mirror `shared-types` are restated here and pinned
-// equal by the config tests (EvidenceType, BucketKey, PricePreset).
+// `config` imports nothing (01 §2.3 leaf), so unions that mirror `shared-types` are restated here and pinned by
+// the config tests: EvidenceType · BucketKey · PaymentLinkKind · VerificationLevelKey equal; VettingProviderId ⊆ ProviderId.
 
 /** 06 §2.5 marks: ● required · ○ optional · — absent / not expected. */
 export type EnvMark = "●" | "○" | "—";
@@ -26,12 +26,9 @@ export type EnvGroup =
   | "Flags (Katie)"
   | "Monitoring";
 
-export type EnvEntry = {
+type EnvEntryBase = {
   readonly group: EnvGroup;
   readonly scope: EnvScope;
-  readonly kind: EnvKind;
-  /** enum kinds only — the closed value set */
-  readonly values?: ReadonlyArray<string>;
   readonly purpose: string;
   readonly dev: EnvMark;
   readonly preview: EnvMark;
@@ -41,6 +38,17 @@ export type EnvEntry = {
   /** server-only secret of 07 §7 item 3 (bundle string scan) */
   readonly secret?: true;
 };
+
+/** Discriminated on `kind`: an enum entry must carry its closed, non-empty value set; no other kind may. */
+export type EnvEntry =
+  | (EnvEntryBase & {
+      readonly kind: "enum";
+      readonly values: readonly [string, ...string[]];
+    })
+  | (EnvEntryBase & {
+      readonly kind: Exclude<EnvKind, "enum">;
+      readonly values?: never;
+    });
 
 export type Environment = "development" | "preview" | "production";
 
@@ -77,6 +85,7 @@ export type VettingProviderId =
   | "dbs-update-service"
   | "home-office-share-code";
 export type VerificationLevelKey =
+  | "L0_SIGNED_UP"
   | "L1_REGISTERED"
   | "L2_ID_VERIFIED"
   | "L3_PROVISIONALLY_VERIFIED"

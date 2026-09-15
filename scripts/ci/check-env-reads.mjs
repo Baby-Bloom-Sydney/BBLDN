@@ -41,6 +41,12 @@ const candidates = listFiles(SCAN_ROOT, {
     !isLegacyExcluded(path)
   );
 });
+if (candidates.length === 0) {
+  console.error(
+    "check-env-reads: FAIL — scanned zero files; the scan root or the exclusions are wrong",
+  );
+  process.exit(1);
+}
 const hits = candidates.flatMap(findEnvReads);
 
 if (hits.length > 0) {

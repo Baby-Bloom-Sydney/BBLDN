@@ -1,6 +1,6 @@
 // 03 §1.4 — the `platform` unit of work and the narrow data surface (copied as types; the inside is S3 / S4).
 import type { Result } from "./result";
-import type { Instant } from "./scalars";
+import type { Instant, Uuid } from "./scalars";
 
 declare const UowBrand: unique symbol;
 /** Opaque transaction token minted by `platform.withUnitOfWork`; no driver type crosses a connector (R4). */
@@ -58,14 +58,15 @@ export interface TableQuery<DB extends DatabaseShape, T extends TableName<DB>> {
     columns?: ReadonlyArray<keyof TableRow<DB, T> & string>,
   ): Promise<ReadonlyArray<TableRow<DB, T>>>;
   insert(row: DB["Tables"][T]["Insert"]): Promise<TableRow<DB, T>>;
-  update(
-    id: string,
-    patch: DB["Tables"][T]["Update"],
-  ): Promise<TableRow<DB, T>>;
+  update(id: Uuid, patch: DB["Tables"][T]["Update"]): Promise<TableRow<DB, T>>;
 }
 
-/** Typed table + RPC access over the generated DB types, scoped by the port; no raw client, no admin methods. */
-export interface Query<DB extends DatabaseShape = DatabaseShape> {
+/**
+ * Typed table + RPC access over the generated DB types, scoped by the port; no raw client, no admin methods.
+ * No default for `DB` on purpose: every call site names its shape, so the S5 switch to `Database["public"]`
+ * surfaces each one. `exec(q): Promise<T>` throws on a driver error and the port maps it to `INTERNAL` (03 §1.4).
+ */
+export interface Query<DB extends DatabaseShape> {
   from<T extends TableName<DB>>(table: T): TableQuery<DB, T>;
   rpc<N extends RpcName<DB>>(
     name: N,

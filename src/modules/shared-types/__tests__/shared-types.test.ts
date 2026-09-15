@@ -45,6 +45,10 @@ describe("shared-types enum register (02 §3)", () => {
     );
   });
 
+  it("pins every enum's exact order — a reorder or an insertion moves ordinals and must be a deliberate snapshot update (02 C-1)", () => {
+    expect(ENUMS).toMatchSnapshot();
+  });
+
   it("keeps the reserved values the register names (ADR-099, R-12)", () => {
     expect(ENUMS.guarantee_promise).toContain("nanny-bonus");
     expect(ENUMS.user_role).not.toContain("super_admin");
