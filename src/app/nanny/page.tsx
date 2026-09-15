@@ -5,7 +5,6 @@ import {
   getNannyPlacements,
   getNannyUpcomingIntros,
 } from "@/lib/actions/position-funnel";
-import { getNannyBabysittingJobs } from "@/lib/actions/babysitting";
 import { getDfyNotificationsForNanny } from "@/lib/actions/matching";
 import { getVerificationData } from "@/lib/actions/verification";
 import { getPendingInvitesForUser } from "@/lib/actions/bapp/child-invites";
@@ -246,7 +245,6 @@ export default async function NannyHubPage() {
   const [
     placementsRes,
     introsRes,
-    bsrRes,
     dfyRes,
     verificationRes,
     availRes,
@@ -258,7 +256,6 @@ export default async function NannyHubPage() {
   ] = await Promise.all([
     getNannyPlacements(),
     getNannyUpcomingIntros(),
-    getNannyBabysittingJobs(),
     getDfyNotificationsForNanny(),
     getVerificationData(),
     nannyId
@@ -392,9 +389,6 @@ export default async function NannyHubPage() {
         dfyNotifications={dfyRes.data || []}
         openPositions={openPositions}
         nannyApplications={nannyApplications}
-        babysittingJobs={bsrRes.data || []}
-        bsrBanned={bsrRes.banned || false}
-        bsrBanUntil={bsrRes.banUntil || null}
         shareUnlocked={shareUnlocked}
         educationChildren={educationChildrenRows}
         subscribedChildIds={subscribedChildIds}

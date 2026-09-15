@@ -19,7 +19,7 @@ import {
   type DfyNotification,
 } from "@/lib/actions/matching";
 import { asUserFacingRole } from "./utils";
-import { distanceText, childrenSummary } from "./bsr-translator";
+import { distanceText, childrenSummary } from "./job-match-prose";
 import { POSITION_STAGE } from "@/lib/position/constants";
 
 interface JobMatchSummary {

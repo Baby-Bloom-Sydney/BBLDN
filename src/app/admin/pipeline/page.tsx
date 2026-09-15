@@ -84,7 +84,6 @@ const TABLE_NAMES: Record<string, string> = {
   kn: 'Key Nanny Metrics', kp: 'Key Parent Metrics',
   df: 'DFY Matchmaking', dc: 'DFY Connections',
   vn: 'Nanny Shares', vp: 'Position Shares', vb: 'BSR Shares',
-  bs: 'Babysitting', bn: 'BSR Notifications',
 };
 
 const ENTITY_TAGS: Record<string, ('N' | 'P' | 'T' | 'V')[] | undefined> = {
@@ -95,7 +94,6 @@ const ENTITY_TAGS: Record<string, ('N' | 'P' | 'T' | 'V')[] | undefined> = {
   kn: ['N'], kp: ['P'],
   df: undefined, dc: ['N'],
   vn: ['N'], vp: ['P'], vb: ['P'],
-  bs: ['P'], bn: ['N'],
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -402,7 +400,7 @@ async function fetchCohort(admin: any, range: DateRange) {
 /** Fetch non-date-filtered shared data (run once) */
 async function fetchShared(admin: any) {
   const [connectionsRes, userStatsRes, connectionStatsRes, verificationsRes,
-         dfyNotificationsRes, viralSharesRes, bsrRequestsRes, bsrNotificationsRes, dfyPositionsRes,
+         dfyNotificationsRes, viralSharesRes, dfyPositionsRes,
          testFlagRes, testEmailRes, allNanniesRes, allParentsRes] =
     await Promise.all([
       admin.from("connection_requests").select("id, nanny_id, parent_id, position_id, connection_stage, created_at"),
@@ -415,8 +413,6 @@ async function fetchShared(admin: any) {
       admin.from("verifications").select("user_id, identity_status, wwcc_status, identity_status_at, wwcc_status_at, verification_status, created_at"),
       admin.from("dfy_match_notifications").select("id, position_id, nanny_id, status, wave, notified_at, viewed_at, responded_at, created_at").then((r: any) => r).catch(() => ({ data: null })),
       admin.from("viral_shares").select("id, user_id, case_type, reference_id, share_status, created_at, shared_at, submitted_at, approved_at, failed_at, bypassed_at, retry_count").then((r: any) => r).catch(() => ({ data: null })),
-      admin.from("babysitting_requests").select("id, parent_id, status, accepted_nanny_id, accepted_at, created_at, expires_at").then((r: any) => r).catch(() => ({ data: null })),
-      admin.from("bsr_notifications").select("id, babysitting_request_id, nanny_id, notified_at, viewed_at, requested_at, accepted_at, declined_at, created_at").then((r: any) => r).catch(() => ({ data: null })),
       admin.from("nanny_positions").select("id, parent_id, dfy_activated_at, dfy_tier, dfy_expires_at, source, created_at").not('dfy_activated_at', 'is', null).eq("source", "parent").then((r: any) => r).catch(() => ({ data: null })),
       // Test account identification (is_test flag + email domain fallback)
       admin.from("user_profiles").select("user_id").eq("is_test", true).then((r: any) => r).catch(() => ({ data: [] })),
@@ -439,10 +435,8 @@ async function fetchShared(admin: any) {
 
   // Build derived test ID sets for cross-referenced entities
   const rawDfyPositions = (dfyPositionsRes.data || []) as any[];
-  const rawBsrRequests = (bsrRequestsRes.data || []) as any[];
   const rawUserStats = (userStatsRes.data || []) as any[];
   const testPositionIds = new Set(rawDfyPositions.filter((p: any) => testParentIds.has(p.parent_id)).map((p: any) => p.id));
-  const testBsrIds = new Set(rawBsrRequests.filter((r: any) => testParentIds.has(r.parent_id)).map((r: any) => r.id));
   const testLeadIds = new Set(rawUserStats.filter((us: any) => testUserIds.has(us.user_id) && us.lead_id).map((us: any) => us.lead_id as string));
 
   // ── Filter all shared data to exclude test accounts ──
@@ -453,8 +447,6 @@ async function fetchShared(admin: any) {
     verificationsData: ((verificationsRes.data || []) as any[]).filter((v: any) => !testUserIds.has(v.user_id)),
     dfyNotifications: ((dfyNotificationsRes.data || []) as any[]).filter((n: any) => !testNannyIds.has(n.nanny_id) && !testPositionIds.has(n.position_id)),
     viralShares: ((viralSharesRes.data || []) as any[]).filter((s: any) => !testUserIds.has(s.user_id)),
-    bsrRequests: rawBsrRequests.filter((r: any) => !testParentIds.has(r.parent_id)),
-    bsrNotifications: ((bsrNotificationsRes.data || []) as any[]).filter((n: any) => !testNannyIds.has(n.nanny_id) && !testBsrIds.has(n.babysitting_request_id)),
     dfyPositions: rawDfyPositions.filter((p: any) => !testParentIds.has(p.parent_id)),
     testUserIds,
     testNannyIds,
@@ -541,7 +533,7 @@ async function getPipelineData(
 
   const cohort = (section: keyof typeof eff) => cohortCache.get(rk(eff[section]))!;
 
-  const { connections, userStats, verificationsData, dfyNotifications, viralShares: viralSharesData, bsrRequests: bsrRequestsData, bsrNotifications: bsrNotificationsData, dfyPositions } = shared;
+  const { connections, userStats, verificationsData, dfyNotifications, viralShares: viralSharesData, dfyPositions } = shared;
 
   // Build user-activity maps from user_stats (keyed by user_id and lead_id)
   const userLastActive = new Map<string, number>();
@@ -689,7 +681,6 @@ async function getPipelineData(
     { value: 'profile', label: 'Nanny Profile' },
     { value: 'quick_match', label: 'Quick Match' },
     { value: 'advanced_match', label: 'Advanced Match' },
-    { value: 'bsr', label: 'BSR Page' },
     { value: 'position', label: 'Position Page' },
     { value: 'pricing', label: 'Pricing' },
   ];
@@ -958,7 +949,6 @@ async function getPipelineData(
     { label: "Signup Pages", tooltip: "Visits to /signup pages", match: (p) => p.startsWith("/signup") },
     { label: "Login", tooltip: "Visits to /login", match: (p) => p === "/login" },
     { label: "Nanny Profiles", tooltip: "Visits to individual nanny profile pages (shared to Facebook)", match: (p) => /^\/nannies\/[^/]+/.test(p) },
-    { label: "BSR Pages", tooltip: "Visits to shared babysitting request pages", match: (p) => /^\/babysitting\/[^/]+/.test(p) },
     { label: "Position Pages", tooltip: "Visits to shared position pages", match: (p) => /^\/position\/[^/]+/.test(p) },
   ];
 
@@ -1069,8 +1059,7 @@ async function getPipelineData(
     wtPageRecords[9],                          // Signup Pages [T]
     wtPageRecords[10],                         // Login [T]
     { ...wtPageRecords[11], tags: TN },        // Nanny Profiles [T][N]
-    { ...wtPageRecords[12], tags: TP },        // BSR Pages [T][P]
-    { ...wtPageRecords[13], tags: TP },        // Position Pages [T][P]
+    { ...wtPageRecords[12], tags: TP },        // Position Pages [T][P]
     ...wtRefRecords,
   ]);
 
@@ -1367,125 +1356,10 @@ async function getPipelineData(
   internalCatalog.set('vp', buildViralCatalog(vpShares));
   internalCatalog.set('vb', buildViralCatalog(vbShares));
 
-  // ── Babysitting Requests ──
-  const bsCfg = configs.bs || { count: 'unique' as const };
-  const bsRo = bsCfg.rows || {};
-  const bsFilterDate = (records: any[]) => {
-    const range = eff.bs;
-    if (!range.from && !range.to) return records;
-    return records.filter((r: any) => {
-      const ts = r.created_at;
-      if (!ts) return true;
-      if (range.from && range.from !== '1970-01-01' && ts < `${range.from}T00:00:00`) return false;
-      if (range.to && ts > `${range.to}T23:59:59`) return false;
-      return true;
-    });
-  };
-  const bsReqs = bsFilterDate(bsrRequestsData);
-  const bsCnt = (idx: number, records: any[], idKey: string) =>
-    countWithOverride(records, idKey, bsCfg.count, bsRo[idx]);
-
-  const bsrMetrics = [
-    { label: "Created", tooltip: "Total babysitting requests created", total: bsCnt(0, bsReqs, 'parent_id'), override: bsRo[0] },
-    { label: "Open", tooltip: "Requests currently seeking a babysitter", total: bsCnt(1, bsReqs.filter((r: any) => r.status === 'open'), 'parent_id'), override: bsRo[1] },
-    { label: "Filled", tooltip: "A babysitter has been accepted", total: bsCnt(2, bsReqs.filter((r: any) => r.status === 'filled' || r.status === 'completed'), 'parent_id'), override: bsRo[2] },
-    { label: "Completed", tooltip: "Babysitting job completed", total: bsCnt(3, bsReqs.filter((r: any) => r.status === 'completed'), 'parent_id'), override: bsRo[3] },
-    { label: "Expired", tooltip: "Request expired without being filled", total: bsCnt(4, bsReqs.filter((r: any) => r.status === 'expired'), 'parent_id'), override: bsRo[4] },
-    { label: "Cancelled", tooltip: "Request cancelled by parent", total: bsCnt(5, bsReqs.filter((r: any) => r.status === 'cancelled'), 'parent_id'), override: bsRo[5] },
-  ];
-
-  const bsrLive = [
-    { label: "Created", total: bsReqs.length },
-    { label: "Open", total: bsReqs.filter((r: any) => r.status === 'open').length },
-    { label: "Filled", total: bsReqs.filter((r: any) => r.status === 'filled').length },
-    { label: "Completed", total: bsReqs.filter((r: any) => r.status === 'completed').length },
-    { label: "Expired", total: bsReqs.filter((r: any) => r.status === 'expired').length },
-    { label: "Cancelled", total: bsReqs.filter((r: any) => r.status === 'cancelled').length },
-  ];
-
-  const bsrTimestamps: (number | null)[][] = bsReqs.map((r: any) => [
-    toMs(r.created_at),  // Created
-    r.status === 'open' ? toMs(r.created_at) : null, // Open
-    toMs(r.accepted_at), // Filled
-    null,                // Completed (auto, no explicit timestamp)
-    r.status === 'expired' ? toMs(r.expires_at) : null, // Expired
-    null,                // Cancelled
-  ]);
-
-  internalCatalog.set('bs', [
-    { label: "Created", tooltip: "Total babysitting requests created", records: bsReqs, liveRecords: bsReqs, idKey: 'parent_id' },
-    { label: "Open", tooltip: "Requests currently seeking a babysitter", records: bsReqs.filter((r: any) => r.status === 'open'), idKey: 'parent_id' },
-    { label: "Filled", tooltip: "A babysitter has been accepted", records: bsReqs.filter((r: any) => r.status === 'filled' || r.status === 'completed'), liveRecords: bsReqs.filter((r: any) => r.status === 'filled'), idKey: 'parent_id' },
-    { label: "Completed", tooltip: "Babysitting job completed", records: bsReqs.filter((r: any) => r.status === 'completed'), idKey: 'parent_id' },
-    { label: "Expired", tooltip: "Request expired without being filled", records: bsReqs.filter((r: any) => r.status === 'expired'), idKey: 'parent_id' },
-    { label: "Cancelled", tooltip: "Request cancelled by parent", records: bsReqs.filter((r: any) => r.status === 'cancelled'), idKey: 'parent_id' },
-  ]);
-
-  // ── BSR Notifications (nanny response funnel) ──
-  const bnCfg = configs.bn || { count: 'unique' as const };
-  const bnRo = bnCfg.rows || {};
-  const bnFilterDate = (records: any[]) => {
-    const range = eff.bn;
-    if (!range.from && !range.to) return records;
-    return records.filter((r: any) => {
-      const ts = r.created_at;
-      if (!ts) return true;
-      if (range.from && range.from !== '1970-01-01' && ts < `${range.from}T00:00:00`) return false;
-      if (range.to && ts > `${range.to}T23:59:59`) return false;
-      return true;
-    });
-  };
-  const bnNotifs = bnFilterDate(bsrNotificationsData);
-  const bnCnt = (idx: number, records: any[], idKey: string) =>
-    countWithOverride(records, idKey, bnCfg.count, bnRo[idx]);
-
-  const bnViewed = bnNotifs.filter((n: any) => n.viewed_at);
-  const bnRequested = bnNotifs.filter((n: any) => n.requested_at);
-  const bnAccepted = bnNotifs.filter((n: any) => n.accepted_at);
-  const bnDeclined = bnNotifs.filter((n: any) => n.declined_at);
-
-  const bsrNotifMetrics = [
-    { label: "Notified", tooltip: "Nannies sent a babysitting notification", total: bnCnt(0, bnNotifs, 'nanny_id'), override: bnRo[0] },
-    { label: "Viewed", tooltip: "Nannies who viewed the babysitting request", total: bnCnt(1, bnViewed, 'nanny_id'), override: bnRo[1] },
-    { label: "Requested", tooltip: "Nannies who expressed interest in the job", total: bnCnt(2, bnRequested, 'nanny_id'), override: bnRo[2] },
-    { label: "Accepted", tooltip: "Nannies accepted for the babysitting job", total: bnCnt(3, bnAccepted, 'nanny_id'), override: bnRo[3] },
-    { label: "Declined", tooltip: "Nannies who declined the babysitting request", total: bnCnt(4, bnDeclined, 'nanny_id'), override: bnRo[4] },
-  ];
-
-  // Live: exact current state (no subsequent action taken)
-  const bnNotifOnly = bnNotifs.filter((n: any) => !n.viewed_at && !n.requested_at && !n.accepted_at && !n.declined_at);
-  const bnViewedOnly = bnNotifs.filter((n: any) => n.viewed_at && !n.requested_at && !n.accepted_at && !n.declined_at);
-  const bnRequestedOnly = bnNotifs.filter((n: any) => n.requested_at && !n.accepted_at && !n.declined_at);
-
-  const bsrNotifLive = [
-    { label: "Notified", total: bnNotifOnly.length },
-    { label: "Viewed", total: bnViewedOnly.length },
-    { label: "Requested", total: bnRequestedOnly.length },
-    { label: "Accepted", total: bnAccepted.length },
-    { label: "Declined", total: bnDeclined.length },
-  ];
-
-  const bsrNotifTimestamps: (number | null)[][] = bnNotifs.map((n: any) => [
-    toMs(n.notified_at || n.created_at), // Notified
-    toMs(n.viewed_at),     // Viewed
-    toMs(n.requested_at),  // Requested
-    toMs(n.accepted_at),   // Accepted
-    toMs(n.declined_at),   // Declined
-  ]);
-
-  internalCatalog.set('bn', [
-    { label: "Notified", tooltip: "Nannies sent a babysitting notification", records: bnNotifs, liveRecords: bnNotifOnly, idKey: 'nanny_id' },
-    { label: "Viewed", tooltip: "Nannies who viewed the request", records: bnViewed, liveRecords: bnViewedOnly, idKey: 'nanny_id' },
-    { label: "Requested", tooltip: "Nannies who expressed interest", records: bnRequested, liveRecords: bnRequestedOnly, idKey: 'nanny_id' },
-    { label: "Accepted", tooltip: "Nannies accepted for the job", records: bnAccepted, idKey: 'nanny_id' },
-    { label: "Declined", tooltip: "Nannies who declined the request", records: bnDeclined, idKey: 'nanny_id' },
-  ]);
-
   // ── Key Metrics (broad summary stages for custom tab dropdown) ──
   const activeNannies = g.nannies.filter((n: any) => n.verification_level >= 2);
   const babysitters = g.nannies.filter((n: any) => n.visible_in_bsr === true);
   const activeConnsAll = connections.filter((c: any) => !TERMINAL_STAGES.has(c.connection_stage));
-  const openBsr = bsrRequestsData.filter((r: any) => r.status === 'open');
 
   internalCatalog.set('kn', [
     { label: "Nannies", tooltip: "Total nanny accounts", records: g.nannies, idKey: 'user_id' },
@@ -1498,7 +1372,6 @@ async function getPipelineData(
     { label: "Parents", tooltip: "Total parent accounts", records: g.parents, idKey: 'user_id' },
     { label: "Positions", tooltip: "Total position listings", records: g.positions, idKey: 'id' },
     { label: "Connections", tooltip: "Total connection requests", records: connections, liveRecords: activeConnsAll, idKey: 'id' },
-    { label: "Active BSR", tooltip: "Currently open babysitting requests", records: openBsr, idKey: 'id' },
     { label: "Placements", tooltip: "Parents with a confirmed placement", records: g.placements, idKey: 'parent_id' },
   ]);
 
@@ -1517,10 +1390,6 @@ async function getPipelineData(
   annotateTimings(internalCatalog.get('vn')!, nannySharesTimestamps, [0, 1, 2, 3, 4, 5]);
   annotateTimings(internalCatalog.get('vp')!, positionSharesTimestamps, [0, 1, 2, 3, 4, 5]);
   annotateTimings(internalCatalog.get('vb')!, bsrSharesTimestamps, [0, 1, 2, 3, 4, 5]);
-  // bs: 6 stages → bsrTimestamps[0-5]
-  annotateTimings(internalCatalog.get('bs')!, bsrTimestamps, [0, 1, 2, 3, 4, 5]);
-  // bn: 5 stages → bsrNotifTimestamps[0-4]
-  annotateTimings(internalCatalog.get('bn')!, bsrNotifTimestamps, [0, 1, 2, 3, 4]);
 
   // ── Compute custom stages ──
   const customCfg = configs.custom || { count: 'unique' as const };
@@ -1592,8 +1461,6 @@ async function getPipelineData(
     nannySharesMetrics, nannySharesLive, nannySharesTimestamps,
     positionSharesMetrics, positionSharesLive, positionSharesTimestamps,
     bsrSharesMetrics, bsrSharesLive, bsrSharesTimestamps,
-    bsrMetrics, bsrLive, bsrTimestamps,
-    bsrNotifMetrics, bsrNotifLive, bsrNotifTimestamps,
     catalog,
     customStages,
   };
@@ -1982,36 +1849,6 @@ export default async function AdminPipelinePage({
             liveStages={data.bsrSharesLive}
             timestamps={data.bsrSharesTimestamps.length > 0 ? data.bsrSharesTimestamps : undefined}
             tableKey="vb"
-          />
-        </CardContent>
-      </Card>
-
-      {/* Babysitting Requests */}
-      <Card>
-        <CardContent className="pt-5">
-          <PipelineTable
-            title="Babysitting Requests"
-            subtitle="One-time babysitting job request lifecycle"
-            metricType="cumulative"
-            stages={data.bsrMetrics}
-            liveStages={data.bsrLive}
-            timestamps={data.bsrTimestamps.length > 0 ? data.bsrTimestamps : undefined}
-            tableKey="bs"
-          />
-        </CardContent>
-      </Card>
-
-      {/* BSR Notifications */}
-      <Card>
-        <CardContent className="pt-5">
-          <PipelineTable
-            title="BSR Notifications"
-            subtitle="Nanny response funnel for babysitting notifications"
-            metricType="cumulative"
-            stages={data.bsrNotifMetrics}
-            liveStages={data.bsrNotifLive}
-            timestamps={data.bsrNotifTimestamps.length > 0 ? data.bsrNotifTimestamps : undefined}
-            tableKey="bn"
           />
         </CardContent>
       </Card>

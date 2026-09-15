@@ -17,10 +17,7 @@ import {
   getDfyNotificationsForNanny,
   type DfyNotification,
 } from "@/lib/actions/matching";
-import {
-  distanceText,
-  childrenSummary,
-} from "@/lib/chat/modules/bsr-translator";
+import { distanceText, childrenSummary } from "@/lib/chat/modules/job-match-prose";
 
 export const runtime = "nodejs";
 

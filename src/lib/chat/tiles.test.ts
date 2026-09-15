@@ -40,10 +40,8 @@ describe("isChatTile", () => {
     ).toBe(false);
   });
 
-  it("accepts bsr_job and job_match id-only tiles", () => {
-    expect(isChatTile({ kind: "bsr_job", data: { id: "bsr-1" } })).toBe(true);
+  it("accepts job_match id-only tiles", () => {
     expect(isChatTile({ kind: "job_match", data: { id: "m-1" } })).toBe(true);
-    expect(isChatTile({ kind: "bsr_job", data: { id: "" } })).toBe(false);
     expect(isChatTile({ kind: "job_match", data: {} })).toBe(false);
   });
 

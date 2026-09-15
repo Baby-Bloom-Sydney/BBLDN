@@ -7,15 +7,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = createAdminClient();
 
   // Fetch dynamic content in parallel
-  const [nannyRes, bsrRes, positionRes] = await Promise.all([
+  const [nannyRes, positionRes] = await Promise.all([
     supabase
       .from('nannies')
       .select('id, updated_at')
       .eq('profile_visible', true),
-    supabase
-      .from('babysitting_requests')
-      .select('id, updated_at')
-      .eq('status', 'active'),
     supabase
       .from('nanny_positions')
       .select('id, updated_at')
@@ -102,14 +98,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  // Active babysitting request pages
-  const bsrPages: MetadataRoute.Sitemap = (bsrRes.data ?? []).map((b) => ({
-    url: `${BASE_URL}/babysitting/${b.id}`,
-    lastModified: b.updated_at ? new Date(b.updated_at) : undefined,
-    changeFrequency: 'daily' as const,
-    priority: 0.6,
-  }));
-
   // Active position pages
   const positionPages: MetadataRoute.Sitemap = (positionRes.data ?? []).map((p) => ({
     url: `${BASE_URL}/position/${p.id}`,
@@ -118,5 +106,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  return [...staticPages, ...nannyPages, ...bsrPages, ...positionPages];
+  return [...staticPages, ...nannyPages, ...positionPages];
 }

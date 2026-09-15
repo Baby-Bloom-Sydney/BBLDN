@@ -3,7 +3,6 @@ import { AlertCircle } from "lucide-react";
 import { getPosition, PositionWithChildren } from "@/lib/actions/parent";
 import { getParentPlacement, getConfirmedConnections, getParentUpcomingIntros } from "@/lib/actions/position-funnel";
 import { getDfyStatus } from "@/lib/actions/matching";
-import { getParentBabysittingRequests } from "@/lib/actions/babysitting";
 import { POSITION_STAGE } from "@/lib/position/constants";
 import { PositionPageClient } from "./PositionPageClient";
 
@@ -20,12 +19,11 @@ export default async function ParentPositionPage() {
   }
 
   // Fetch placement + confirmed connections for Path B + upcoming intros
-  const [placementResult, connectionsResult, introsResult, dfyStatusResult, bsrResult] = await Promise.all([
+  const [placementResult, connectionsResult, introsResult, dfyStatusResult] = await Promise.all([
     getParentPlacement(),
     position?.id ? getConfirmedConnections(position.id) : Promise.resolve({ data: [], error: null }),
     getParentUpcomingIntros(),
     getDfyStatus(),
-    getParentBabysittingRequests(),
   ]);
 
   const placement = placementResult.data;
@@ -34,7 +32,6 @@ export default async function ParentPositionPage() {
   const dfyTier = dfyStatusResult.tier;
   const dfyExpiresAt = dfyStatusResult.expiresAt;
   const dfyActivated = dfyStatusResult.activated;
-  const babysittingRequests = bsrResult.data ?? [];
   const showFillButton = position && !placement &&
     (position as PositionWithChildren & { stage?: number }).stage === POSITION_STAGE.CONNECTING &&
     confirmedNannies.length > 0;
@@ -67,7 +64,6 @@ export default async function ParentPositionPage() {
         dfyTier={dfyTier}
         dfyExpiresAt={dfyExpiresAt}
         dfyActivated={dfyActivated}
-        babysittingRequests={babysittingRequests}
       />
     </div>
   );

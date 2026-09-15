@@ -117,7 +117,7 @@ export async function computeSnapshot(): Promise<SectionSnapshot[]> {
 
   const [
     connectionsRes, userStatsRes, verificationsRes,
-    dfyNotificationsRes, viralSharesRes, bsrRequestsRes, bsrNotificationsRes, dfyPositionsRes,
+    dfyNotificationsRes, viralSharesRes, dfyPositionsRes,
     testFlagRes, testEmailRes,
     visitsRes, applyVisitsRes, nanniesRes, parentsRes, placementsRes, positionsRes, leadsRes,
   ] = await Promise.all([
@@ -126,8 +126,6 @@ export async function computeSnapshot(): Promise<SectionSnapshot[]> {
     admin.from("verifications").select("user_id, identity_status, wwcc_status, created_at"),
     admin.from("dfy_match_notifications").select("id, position_id, nanny_id, status, wave, notified_at, viewed_at, responded_at, created_at").then((r: any) => r, () => ({ data: null })),
     admin.from("viral_shares").select("id, user_id, case_type, share_status, created_at, shared_at, submitted_at, approved_at, failed_at, bypassed_at").then((r: any) => r, () => ({ data: null })),
-    admin.from("babysitting_requests").select("id, parent_id, status, accepted_at, created_at, expires_at").then((r: any) => r, () => ({ data: null })),
-    admin.from("bsr_notifications").select("id, babysitting_request_id, nanny_id, notified_at, viewed_at, requested_at, accepted_at, declined_at, created_at").then((r: any) => r, () => ({ data: null })),
     admin.from("nanny_positions").select("id, parent_id, dfy_activated_at, dfy_tier, dfy_expires_at, source, created_at").not('dfy_activated_at', 'is', null).eq("source", "parent").then((r: any) => r, () => ({ data: null })),
     admin.from("user_profiles").select("user_id").eq("is_test", true).then((r: any) => r, () => ({ data: [] })),
     admin.from("user_profiles").select("user_id").ilike("email", "%babybloomsydney.com.au"),
@@ -151,10 +149,8 @@ export async function computeSnapshot(): Promise<SectionSnapshot[]> {
   const testParentIds = new Set(allParentsRaw.filter((p: any) => testUserIds.has(p.user_id)).map((p: any) => p.id as string));
 
   const rawDfyPos = (dfyPositionsRes.data || []) as any[];
-  const rawBsr = (bsrRequestsRes.data || []) as any[];
   const rawUS = (userStatsRes.data || []) as any[];
   const testPosIds = new Set(rawDfyPos.filter((p: any) => testParentIds.has(p.parent_id)).map((p: any) => p.id));
-  const testBsrIds = new Set(rawBsr.filter((r: any) => testParentIds.has(r.parent_id)).map((r: any) => r.id));
   const testLeadIds = new Set(rawUS.filter((us: any) => testUserIds.has(us.user_id) && us.lead_id).map((us: any) => us.lead_id as string));
 
   // ── Apply filters ──
@@ -163,8 +159,6 @@ export async function computeSnapshot(): Promise<SectionSnapshot[]> {
   const verifs = ((verificationsRes.data || []) as any[]).filter((v: any) => !testUserIds.has(v.user_id));
   const dfyNotifs = ((dfyNotificationsRes.data || []) as any[]).filter((n: any) => !testNannyIds.has(n.nanny_id) && !testPosIds.has(n.position_id));
   const viralAll = ((viralSharesRes.data || []) as any[]).filter((s: any) => !testUserIds.has(s.user_id));
-  const bsrReqs = rawBsr.filter((r: any) => !testParentIds.has(r.parent_id));
-  const bsrNots = ((bsrNotificationsRes.data || []) as any[]).filter((n: any) => !testNannyIds.has(n.nanny_id) && !testBsrIds.has(n.babysitting_request_id));
   const dfyPos = rawDfyPos.filter((p: any) => !testParentIds.has(p.parent_id));
 
   const visits = (visitsRes.data || []) as any[];
@@ -248,7 +242,6 @@ export async function computeSnapshot(): Promise<SectionSnapshot[]> {
     { label: "Signup Pages", match: p => p.startsWith("/signup") },
     { label: "Login", match: p => p === "/login" },
     { label: "Nanny Profiles", match: p => /^\/nannies\/[^/]+/.test(p) },
-    { label: "BSR Pages", match: p => /^\/babysitting\/[^/]+/.test(p) },
     { label: "Position Pages", match: p => /^\/position\/[^/]+/.test(p) },
   ];
 
@@ -528,52 +521,6 @@ export async function computeSnapshot(): Promise<SectionSnapshot[]> {
   sections.push({ section_key: 'vb', stages: snap(vbStages, ['P']) });
 
   // ═══════════════════════════════════════════════
-  // BABYSITTING REQUESTS (6 stages)
-  // ═══════════════════════════════════════════════
-  const bsStages: IntStage[] = [
-    { label: "Created", records: bsrReqs, liveRecords: bsrReqs, idKey: 'parent_id' },
-    { label: "Open", records: bsrReqs.filter((r: any) => r.status === 'open'), idKey: 'parent_id' },
-    { label: "Filled", records: bsrReqs.filter((r: any) => r.status === 'filled' || r.status === 'completed'), liveRecords: bsrReqs.filter((r: any) => r.status === 'filled'), idKey: 'parent_id' },
-    { label: "Completed", records: bsrReqs.filter((r: any) => r.status === 'completed'), idKey: 'parent_id' },
-    { label: "Expired", records: bsrReqs.filter((r: any) => r.status === 'expired'), idKey: 'parent_id' },
-    { label: "Cancelled", records: bsrReqs.filter((r: any) => r.status === 'cancelled'), idKey: 'parent_id' },
-  ];
-
-  const bsTS: (number | null)[][] = bsrReqs.map((r: any) => [
-    toMs(r.created_at), r.status === 'open' ? toMs(r.created_at) : null,
-    toMs(r.accepted_at), null,
-    r.status === 'expired' ? toMs(r.expires_at) : null, null,
-  ]);
-  annotateDwell(bsStages, bsTS, [0, 1, 2, 3, 4, 5]);
-  sections.push({ section_key: 'bs', stages: snap(bsStages, ['P']) });
-
-  // ═══════════════════════════════════════════════
-  // BSR NOTIFICATIONS (5 stages)
-  // ═══════════════════════════════════════════════
-  const bnViewed = bsrNots.filter((n: any) => n.viewed_at);
-  const bnReqd = bsrNots.filter((n: any) => n.requested_at);
-  const bnAcc = bsrNots.filter((n: any) => n.accepted_at);
-  const bnDec = bsrNots.filter((n: any) => n.declined_at);
-  const bnNotifOnly = bsrNots.filter((n: any) => !n.viewed_at && !n.requested_at && !n.accepted_at && !n.declined_at);
-  const bnViewedOnly = bsrNots.filter((n: any) => n.viewed_at && !n.requested_at && !n.accepted_at && !n.declined_at);
-  const bnReqdOnly = bsrNots.filter((n: any) => n.requested_at && !n.accepted_at && !n.declined_at);
-
-  const bnStages: IntStage[] = [
-    { label: "Notified", records: bsrNots, liveRecords: bnNotifOnly, idKey: 'nanny_id' },
-    { label: "Viewed", records: bnViewed, liveRecords: bnViewedOnly, idKey: 'nanny_id' },
-    { label: "Requested", records: bnReqd, liveRecords: bnReqdOnly, idKey: 'nanny_id' },
-    { label: "Accepted", records: bnAcc, idKey: 'nanny_id' },
-    { label: "Declined", records: bnDec, idKey: 'nanny_id' },
-  ];
-
-  const bnTS: (number | null)[][] = bsrNots.map((n: any) => [
-    toMs(n.notified_at || n.created_at), toMs(n.viewed_at),
-    toMs(n.requested_at), toMs(n.accepted_at), toMs(n.declined_at),
-  ]);
-  annotateDwell(bnStages, bnTS, [0, 1, 2, 3, 4]);
-  sections.push({ section_key: 'bn', stages: snap(bnStages, ['N']) });
-
-  // ═══════════════════════════════════════════════
   // PARENT SIGNUP SOURCES (ps)
   // ═══════════════════════════════════════════════
   const SIGNUP_SOURCES = [
@@ -582,7 +529,6 @@ export async function computeSnapshot(): Promise<SectionSnapshot[]> {
     { value: 'profile', label: 'Nanny Profile' },
     { value: 'quick_match', label: 'Quick Match' },
     { value: 'advanced_match', label: 'Advanced Match' },
-    { value: 'bsr', label: 'BSR Page' },
     { value: 'position', label: 'Position Page' },
     { value: 'pricing', label: 'Pricing' },
   ];
@@ -631,7 +577,6 @@ export async function computeSnapshot(): Promise<SectionSnapshot[]> {
   const activeNannies = nannies.filter((n: any) => n.verification_level >= 2);
   const babysitters = nannies.filter((n: any) => n.visible_in_bsr === true);
   const allActiveConns = connections.filter((c: any) => !TERMINAL_STAGES.has(c.connection_stage));
-  const openBsr = bsrReqs.filter((r: any) => r.status === 'open');
 
   const knStages: IntStage[] = [
     { label: "Nannies", records: nannies, idKey: 'user_id' },
@@ -648,7 +593,6 @@ export async function computeSnapshot(): Promise<SectionSnapshot[]> {
     { label: "Parents", records: parents, idKey: 'user_id' },
     { label: "Positions", records: positions, idKey: 'id' },
     { label: "Connections", records: connections, liveRecords: allActiveConns, idKey: 'id' },
-    { label: "Active BSR", records: openBsr, idKey: 'id' },
     { label: "Placements", records: placements, idKey: 'parent_id' },
   ];
   sections.push({ section_key: 'kp', stages: snap(kpStages, ['P']) });

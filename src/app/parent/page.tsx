@@ -11,7 +11,6 @@ import {
   getParentUpcomingIntros,
 } from "@/lib/actions/position-funnel";
 import { getDfyStatus } from "@/lib/actions/matching";
-import { getParentBabysittingRequests } from "@/lib/actions/babysitting";
 import { getPendingInvitesForUser } from "@/lib/actions/bapp/child-invites";
 import { POSITION_STAGE } from "@/lib/position/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -58,7 +57,6 @@ export default async function ParentHubPage({
     connectionsResult,
     introsResult,
     dfyStatusResult,
-    bsrResult,
     parentVerified,
     educationChildrenRes,
     pendingInvitesResult,
@@ -69,7 +67,6 @@ export default async function ParentHubPage({
       : Promise.resolve({ data: [], error: null }),
     getParentUpcomingIntros(),
     getDfyStatus(),
-    getParentBabysittingRequests(),
     verificationPromise,
     user
       ? admin
@@ -88,7 +85,6 @@ export default async function ParentHubPage({
   const dfyTier = dfyStatusResult.tier;
   const dfyExpiresAt = dfyStatusResult.expiresAt;
   const dfyActivated = dfyStatusResult.activated;
-  const babysittingRequests = bsrResult.data ?? [];
   const showFillButton =
     position &&
     !placement &&
@@ -120,7 +116,6 @@ export default async function ParentHubPage({
         dfyTier={dfyTier}
         dfyExpiresAt={dfyExpiresAt}
         dfyActivated={dfyActivated}
-        babysittingRequests={babysittingRequests}
         parentVerified={parentVerified}
         initialTab={searchParams.t}
         initialSub={searchParams.s}

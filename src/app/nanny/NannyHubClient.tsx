@@ -39,8 +39,6 @@ import {
   type Placement,
 } from "./positions/NannyPositionsClient";
 import { NannyJobsView, type OpenPosition } from "./jobs/NannyJobsView";
-import { NannyBabysittingClient } from "./babysitting/NannyBabysittingClient";
-import type { NannyBabysittingJob } from "@/lib/actions/babysitting";
 import type { UpcomingIntro } from "@/lib/actions/position-funnel";
 import type { DfyNotification } from "@/lib/actions/matching";
 import { ChildCardGrid } from "@/components/bapp/ChildCardGrid";
@@ -123,9 +121,6 @@ interface NannyHubClientProps {
   dfyNotifications: DfyNotification[];
   openPositions: OpenPosition[];
   nannyApplications: NannyApplication[];
-  babysittingJobs: NannyBabysittingJob[];
-  bsrBanned: boolean;
-  bsrBanUntil: string | null;
   shareUnlocked: boolean;
   educationChildren: ChildClient[];
   /** Subscribed-family tick state per child — DSS §8 Q8. */
@@ -140,7 +135,7 @@ interface NannyHubClientProps {
 // content — so "Children" is the user-visible label and the internal id
 // matches. Old `?t=education` URL-aliasing happens at the parse site
 // (ParentHubClient — the nanny hub doesn't currently read ?t= for tab).
-type MainTabId = "verification" | "nannying" | "babysitting" | "children";
+type MainTabId = "verification" | "nannying" | "children";
 
 const PROFILE_TABS = [
   { id: "about" as const, label: "About" },
@@ -164,9 +159,6 @@ export function NannyHubClient({
   dfyNotifications,
   openPositions,
   nannyApplications,
-  babysittingJobs,
-  bsrBanned,
-  bsrBanUntil,
   shareUnlocked,
   educationChildren,
   subscribedChildIds,
@@ -950,15 +942,13 @@ export function NannyHubClient({
 
       {/* ═══════════════════════════════════════════════════════════════════
           MAIN TAB BAR — Verification (only at level<3) + Nannying +
-          Children + Babysitting. Bailey 2026-05-19 amendments 1 + 3:
+          Children. Bailey 2026-05-19 amendments 1 + 3:
             • Children tab is ALWAYS visible (was hidden when locked) — was
               dropping unverified users out of a discoverable surface.
             • Nannying tab is ALWAYS unlocked (was locked at level<3) —
               backend gates every state-changing action server-side, so
               there's no safety value in the UI lock. Lets unverified
               nannies browse Jobs + see their existing placements.
-            • Babysitting stays locked at level<3 (separate gate — needs
-              level>=4 + babysitter_eligible).
             • Verification tab appears only at level<3 as the primary CTA.
          ═══════════════════════════════════════════════════════════════════ */}
       <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
@@ -974,11 +964,6 @@ export function NannyHubClient({
             : []),
           { id: "nannying" as MainTabId, label: "Nannying", locked: false },
           { id: "children" as MainTabId, label: "Children", locked: false },
-          {
-            id: "babysitting" as MainTabId,
-            label: "Babysitting",
-            locked: isTabsLocked,
-          },
         ].map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -1067,15 +1052,6 @@ export function NannyHubClient({
             />
           )}
         </div>
-      )}
-      {activeTab === "babysitting" && (
-        <NannyBabysittingClient
-          jobs={babysittingJobs}
-          banned={bsrBanned}
-          banUntil={bsrBanUntil}
-          hideHeader
-          shareUnlocked={shareUnlocked}
-        />
       )}
       {activeTab === "children" && (
         <>

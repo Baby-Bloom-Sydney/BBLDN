@@ -51,7 +51,6 @@ const nannyNavItems = [
   { href: "/nanny/share", icon: Share2, label: "Share Profile" },
   { href: "/nanny/inbox", icon: Inbox, label: "Inbox" },
   { href: "/nanny/positions", icon: Award, label: "My Positions" },
-  { href: "/nanny/babysitting", icon: Briefcase, label: "Babysitting Jobs" },
   { href: "/nanny/apply", icon: PlusCircle, label: "Apply" },
   { href: "/nanny/settings", icon: Settings, label: "Settings" },
 ];
@@ -65,7 +64,6 @@ const parentNavItems = [
   { href: "/parent/request", icon: PlusCircle, label: "Nanny Request" },
   { href: "/parent", icon: Link2, label: "Connections" },
   { href: "/parent/inbox", icon: Inbox, label: "Inbox" },
-  { href: "/parent/babysitting", icon: Baby, label: "Babysitting" },
   { href: "/parent/settings", icon: Settings, label: "Settings" },
 ];
 

@@ -93,7 +93,6 @@ async function renderNannyHub(admin: any, targetUserId: string) {
   const [
     placementsRes,
     introsConnections,
-    bsrNotifications,
     dfyNotifications,
     verificationRes,
     availRes,
@@ -125,14 +124,6 @@ async function renderNannyHub(admin: any, targetUserId: string) {
         CONNECTION_STAGE.NOT_HIRED,
       ])
       .order("created_at", { ascending: false }),
-    // BSR notifications
-    admin
-      .from("bsr_notifications")
-      .select(
-        "babysitting_request_id, distance_km, notified_at, viewed_at, requested_at, accepted_at, declined_at, notified_filled"
-      )
-      .eq("nanny_id", nannyId)
-      .order("notified_at", { ascending: false }),
     // DFY notifications
     admin
       .from("dfy_match_notifications")
@@ -176,21 +167,8 @@ async function renderNannyHub(admin: any, targetUserId: string) {
   // Build upcoming intros
   const upcomingIntros = await buildNannyUpcomingIntros(admin, introsConnections.data || []);
 
-  // Build babysitting jobs
-  const babysittingJobs = await buildNannyBabysittingJobs(admin, nannyId, bsrNotifications.data || []);
-
   // Build DFY notifications
   const dfyData = await buildDfyNotifications(admin, dfyNotifications.data || []);
-
-  // Check ban status
-  const { data: banData } = await admin
-    .from("nannies")
-    .select("bsr_banned_until")
-    .eq("id", nannyId)
-    .single();
-
-  const banned = !!(banData?.bsr_banned_until && new Date(banData.bsr_banned_until) > new Date());
-  const banUntil = banned ? banData!.bsr_banned_until : null;
 
   const shareUnlocked = nannyRes.data?.visible_in_bsr === true;
 
@@ -257,12 +235,9 @@ async function renderNannyHub(admin: any, targetUserId: string) {
         placements={placements}
         upcomingIntros={upcomingIntros as unknown as import("@/lib/actions/position-funnel").UpcomingIntro[]}
         dfyNotifications={dfyData}
-        babysittingJobs={babysittingJobs.data as unknown as import("@/lib/actions/babysitting").NannyBabysittingJob[]}
         openPositions={[]}
         nannyApplications={[]}
         educationChildren={[]}
-        bsrBanned={banned}
-        bsrBanUntil={banUntil}
         shareUnlocked={shareUnlocked}
       />
     </div>
@@ -306,15 +281,13 @@ async function renderParentHub(admin: any, targetUserId: string) {
   }
 
   // Parallel fetches
-  const [placementRes, introsRes, dfyStatusRes, bsrRes] = await Promise.all([
+  const [placementRes, introsRes, dfyStatusRes] = await Promise.all([
     // Placement
     buildParentPlacement(admin, parentId),
     // Upcoming intros
     buildParentUpcomingIntros(admin, parentId),
     // DFY status
     buildDfyStatus(admin, parentId),
-    // Babysitting requests
-    buildParentBabysittingRequests(admin, parentId),
   ]);
 
   // Confirmed connections
@@ -387,7 +360,6 @@ async function renderParentHub(admin: any, targetUserId: string) {
         dfyTier={dfyStatusRes.tier}
         dfyExpiresAt={dfyStatusRes.expiresAt}
         dfyActivated={dfyStatusRes.activated}
-        babysittingRequests={bsrRes}
         parentVerified={parentVerified}
       />
     </div>
@@ -570,89 +542,6 @@ async function buildNannyUpcomingIntros(admin: any, connections: any[]) {
       nannyId: null,
     };
   });
-}
-
-// ── Helper: Build nanny babysitting jobs ────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function buildNannyBabysittingJobs(admin: any, nannyId: string, notifications: any[]) {
-  if (!notifications.length) return { data: [], banned: false, banUntil: null };
-
-  const bsrIds = notifications.map((n: { babysitting_request_id: string }) => n.babysitting_request_id);
-
-  const [bsrRes, slotsRes] = await Promise.all([
-    admin
-      .from("babysitting_requests")
-      .select(
-        "id, title, special_requirements, suburb, postcode, address, hourly_rate, estimated_total, children, status, accepted_nanny_id, created_at, expires_at, parent_id"
-      )
-      .in("id", bsrIds),
-    admin
-      .from("bsr_time_slots")
-      .select("id, babysitting_request_id, slot_date, start_time, end_time, is_selected")
-      .in("babysitting_request_id", bsrIds),
-  ]);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const bsrMap = new Map<string, any>((bsrRes.data || []).map((b: any) => [b.id, b]));
-  const slotMap = new Map<string, typeof slotsRes.data>();
-  for (const slot of slotsRes.data || []) {
-    const existing = slotMap.get(slot.babysitting_request_id) ?? [];
-    existing.push(slot);
-    slotMap.set(slot.babysitting_request_id, existing);
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const results = notifications.map((notif: any) => {
-    const bsr = bsrMap.get(notif.babysitting_request_id);
-    if (!bsr) return null;
-
-    const slots = (slotMap.get(bsr.id) ?? []).map((s: { id: string; slot_date: string; start_time: string; end_time: string; is_selected: boolean }) => ({
-      id: s.id,
-      slot_date: s.slot_date,
-      start_time: s.start_time,
-      end_time: s.end_time,
-      is_selected: s.is_selected,
-    }));
-
-    const children = ((bsr.children ?? []) as Array<{ ageMonths: number; gender: string }>).map(
-      (c: { ageMonths: number; gender: string }) => ({
-        age_months: c.ageMonths,
-        gender: c.gender,
-      })
-    );
-
-    const isNannyAccepted = bsr.status === "filled" && bsr.accepted_nanny_id === nannyId;
-
-    return {
-      id: bsr.id,
-      title: bsr.title,
-      special_requirements: bsr.special_requirements,
-      suburb: bsr.suburb,
-      postcode: bsr.postcode,
-      address: isNannyAccepted ? (bsr.address ?? null) : null,
-      hourly_rate: bsr.hourly_rate ? Number(bsr.hourly_rate) : null,
-      estimated_total: bsr.estimated_total ? Number(bsr.estimated_total) : null,
-      status: bsr.status,
-      accepted_nanny_id: bsr.accepted_nanny_id,
-      created_at: bsr.created_at,
-      expires_at: bsr.expires_at,
-      slots,
-      notification: {
-        distanceKm: notif.distance_km != null ? Math.floor(Number(notif.distance_km)) : null,
-        notifiedAt: notif.notified_at,
-        viewedAt: notif.viewed_at,
-        requestedAt: notif.requested_at ?? null,
-        acceptedAt: notif.accepted_at,
-        declinedAt: notif.declined_at,
-        notifiedFilled: notif.notified_filled ?? false,
-      },
-      children,
-      clashSlotIds: [],
-    };
-  });
-
-  return { data: results.filter(Boolean), banned: false, banUntil: null };
 }
 
 // ── Helper: Build DFY notifications ─────────────────────────────────────────
@@ -974,166 +863,4 @@ async function buildDfyStatus(admin: any, parentId: string) {
     maxRespondents: activatedTier === "priority" ? 10 : 5,
     positionId: position.id,
   };
-}
-
-// ── Helper: Build parent babysitting requests ───────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function buildParentBabysittingRequests(admin: any, parentId: string) {
-  const { data: bsrs } = await admin
-    .from("babysitting_requests")
-    .select("*")
-    .eq("parent_id", parentId)
-    .order("created_at", { ascending: false });
-
-  if (!bsrs || bsrs.length === 0) return [];
-
-  const bsrIds = bsrs.map((b: { id: string }) => b.id);
-
-  const { data: allSlots } = await admin
-    .from("bsr_time_slots")
-    .select("id, babysitting_request_id, slot_date, start_time, end_time, is_selected")
-    .in("babysitting_request_id", bsrIds);
-
-  const slotMap = new Map<string, typeof allSlots>();
-  for (const slot of allSlots ?? []) {
-    const existing = slotMap.get(slot.babysitting_request_id) ?? [];
-    existing.push(slot);
-    slotMap.set(slot.babysitting_request_id, existing);
-  }
-
-  // Get accepted nanny details
-  const acceptedNannyIds = bsrs
-    .filter((b: { accepted_nanny_id: string | null }) => b.accepted_nanny_id)
-    .map((b: { accepted_nanny_id: string }) => b.accepted_nanny_id);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nannyDetailsMap = new Map<string, any>();
-
-  if (acceptedNannyIds.length > 0) {
-    const { data: nannies } = await admin
-      .from("nannies")
-      .select("id, user_id")
-      .in("id", acceptedNannyIds);
-
-    if (nannies) {
-      const userIds = nannies.map((n: { user_id: string }) => n.user_id);
-      const { data: profiles } = await admin
-        .from("user_profiles")
-        .select("user_id, first_name, last_name, date_of_birth, suburb, profile_picture_url, mobile_number")
-        .in("user_id", userIds);
-
-      for (const nanny of nannies) {
-        const profile = (profiles || []).find((p: { user_id: string }) => p.user_id === nanny.user_id);
-        if (profile) {
-          nannyDetailsMap.set(nanny.id, {
-            firstName: profile.first_name ?? "",
-            lastName: profile.last_name ?? "",
-            dateOfBirth: profile.date_of_birth ?? null,
-            suburb: profile.suburb,
-            profilePicUrl: profile.profile_picture_url,
-            distanceKm: null,
-            phone: profile.mobile_number ?? null,
-          });
-        }
-      }
-    }
-  }
-
-  // Get requesting nannies for open BSRs
-  const openBsrIds = bsrs.filter((b: { status: string }) => b.status === "open").map((b: { id: string }) => b.id);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const requestingNanniesMap = new Map<string, any[]>();
-
-  if (openBsrIds.length > 0) {
-    const { data: requestNotifs } = await admin
-      .from("bsr_notifications")
-      .select("babysitting_request_id, nanny_id, distance_km, requested_at")
-      .in("babysitting_request_id", openBsrIds)
-      .not("requested_at", "is", null)
-      .is("declined_at", null)
-      .is("accepted_at", null);
-
-    if (requestNotifs && requestNotifs.length > 0) {
-      const reqNannyIds = requestNotifs.map((n: { nanny_id: string }) => n.nanny_id);
-      const { data: reqNannies } = await admin
-        .from("nannies")
-        .select("id, user_id, total_experience_years, hourly_rate_min, verification_tier, verification_level, languages")
-        .in("id", reqNannyIds);
-
-      const reqUserIds = (reqNannies ?? []).map((n: { user_id: string }) => n.user_id);
-      const { data: reqProfiles } = await admin
-        .from("user_profiles")
-        .select("user_id, first_name, last_name, date_of_birth, suburb, profile_picture_url")
-        .in("user_id", reqUserIds);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const reqNannyMap = new Map<string, any>((reqNannies ?? []).map((n: any) => [n.id, n]));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const reqProfileByUserId = new Map<string, any>((reqProfiles ?? []).map((p: any) => [p.user_id, p]));
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const notif of requestNotifs as any[]) {
-        const nanny = reqNannyMap.get(notif.nanny_id);
-        if (!nanny) continue;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const profile: any = reqProfileByUserId.get(nanny.user_id);
-        if (!profile) continue;
-
-        const entry = {
-          nannyId: notif.nanny_id,
-          firstName: profile.first_name ?? "",
-          lastName: profile.last_name ?? "",
-          dateOfBirth: profile.date_of_birth ?? null,
-          suburb: profile.suburb,
-          profilePicUrl: profile.profile_picture_url,
-          distanceKm: notif.distance_km != null ? Math.floor(Number(notif.distance_km)) : null,
-          requestedAt: notif.requested_at,
-          experienceYears: nanny.total_experience_years,
-          hourlyRateMin: nanny.hourly_rate_min ? Number(nanny.hourly_rate_min) : null,
-          verificationTier: nanny.verification_tier,
-          verificationLevel: nanny.verification_level ?? 0,
-          aiHeadline: null,
-          languages: nanny.languages,
-        };
-
-        const existing = requestingNanniesMap.get(notif.babysitting_request_id) ?? [];
-        existing.push(entry);
-        requestingNanniesMap.set(notif.babysitting_request_id, existing);
-      }
-    }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return bsrs.map((bsr: any) => {
-    const bsrSlots = (slotMap.get(bsr.id) ?? []).map((s: { id: string; slot_date: string; start_time: string; end_time: string; is_selected: boolean }) => ({
-      id: s.id,
-      slot_date: s.slot_date,
-      start_time: s.start_time,
-      end_time: s.end_time,
-      is_selected: s.is_selected,
-    }));
-
-    return {
-      id: bsr.id,
-      parent_id: bsr.parent_id,
-      title: bsr.title,
-      description: bsr.description,
-      special_requirements: bsr.special_requirements,
-      suburb: bsr.suburb,
-      postcode: bsr.postcode,
-      address: bsr.address ?? null,
-      hourly_rate: bsr.hourly_rate ? Number(bsr.hourly_rate) : null,
-      status: bsr.status,
-      accepted_nanny_id: bsr.accepted_nanny_id,
-      accepted_at: bsr.accepted_at,
-      nannies_notified_count: bsr.nannies_notified_count ?? 0,
-      created_at: bsr.created_at,
-      expires_at: bsr.expires_at,
-      cancelled_by: bsr.cancelled_by,
-      slots: bsrSlots,
-      acceptedNanny: bsr.accepted_nanny_id ? nannyDetailsMap.get(bsr.accepted_nanny_id) : undefined,
-      requestingNannies: requestingNanniesMap.get(bsr.id) ?? [],
-    };
-  });
 }
