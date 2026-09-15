@@ -1,6 +1,6 @@
 // The identity-layer limiter (07 §8): windows from a `SECURITY.rateLimits` policy, RATE_LIMITED with
 // retryAfterSeconds on a trip, burst alert at `SECURITY.burstAlertMultiple`, a store failure denies (fail closed).
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SECURITY } from "@/modules/config";
 import type { Instant } from "@/modules/shared-types";
 import {
@@ -12,6 +12,9 @@ import {
   rateLimiter,
 } from "@/modules/platform";
 import type { LogLine, RateLimitStore } from "@/modules/platform";
+// S3b: internal to the module — the guard is boot wiring, deliberately not part of the connector surface.
+import { assertSharedStore } from "../rate-limit/lib/assert-shared-store";
+import { RATE_LIMIT_BACKEND_REGISTRY } from "../rate-limit/lib/rate-limit-backend-registry";
 
 const T0 = Date.parse("2026-09-15T08:00:00.000Z");
 const at = (offsetSeconds: number) =>
@@ -128,4 +131,90 @@ describe("platform/rate-limit — consume", () => {
     configureRateLimiter(limiter);
     expect((await rateLimiter.consume("default-key", policy)).ok).toBe(true);
   });
+});
+
+// S3b — the S3 security review's MEDIUM on the limiter: the per-instance memory store was the silent production
+// default. The shared `rate_limit_buckets` store (07 §8; S5) is still a later unit — this is only the assertion
+// that its absence in production is loud and fails closed instead of silently limiting per Vercel instance.
+describe("platform/rate-limit — the shared store is asserted in production (S3b)", () => {
+  it("passes outside production, whatever the backend is", () => {
+    expect(assertSharedStore("memory", false)).toBeNull();
+    expect(assertSharedStore("shared", false)).toBeNull();
+  });
+
+  it("passes in production once boot has declared a shared store", () => {
+    expect(assertSharedStore("shared", true)).toBeNull();
+  });
+
+  it("fails closed in production while the backend is still memory, with ALERT_ENV_INVALID", () => {
+    const lines: LogLine[] = [];
+    const denied = assertSharedStore(
+      "memory",
+      true,
+      createLogger({ sink: (line) => void lines.push(line) }),
+    );
+    expect(denied?.ok).toBe(false);
+    if (denied && !denied.ok) {
+      expect(denied.error.code).toBe("INTERNAL");
+      expect(denied.error.message).not.toContain("memory");
+    }
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      level: "error",
+      alert: "ALERT_ENV_INVALID",
+      module: "platform",
+      reason: "rate-limit-store-not-configured",
+      backend: "memory",
+    });
+  });
+
+  it("a second memory-backed limiter installed at boot does NOT satisfy the assertion", () => {
+    // The guard keys on the declared backend, not on the identity of the default limiter: `configureRateLimiter`
+    // without a backend argument means "still memory", which is what production must not run on.
+    configureRateLimiter(harness().limiter);
+    expect(RATE_LIMIT_BACKEND_REGISTRY.get()).toBe("memory");
+    expect(assertSharedStore(RATE_LIMIT_BACKEND_REGISTRY.get(), true)).not.toBe(
+      null,
+    );
+  });
+
+  it("denies through the module-level limiter when the runtime is production and no backend was declared", async () => {
+    // `publicEnv` is parsed once at import and NODE_ENV is `test` for the whole suite, so the wiring can only be
+    // exercised on a fresh module graph with the config module stubbed — without this the assertion could be
+    // deleted from `default-rate-limiter.ts` and every other test here would still pass.
+    vi.resetModules();
+    vi.doMock("@/modules/config", async () => {
+      const actual =
+        await vi.importActual<typeof import("@/modules/config")>(
+          "@/modules/config",
+        );
+      return {
+        ...actual,
+        publicEnv: { ...actual.publicEnv, NODE_ENV: "production" },
+      };
+    });
+    const { rateLimiter: isolated } =
+      await import("../rate-limit/lib/default-rate-limiter");
+    const denied = await isolated.consume("guarded", {
+      key: "ip",
+      perMinute: 5,
+    });
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) expect(denied.error.code).toBe("INTERNAL");
+  });
+
+  it("the module-level limiter routes every consume through the assertion", async () => {
+    configureRateLimiter(harness().limiter, "shared");
+    expect(RATE_LIMIT_BACKEND_REGISTRY.get()).toBe("shared");
+    const result = await rateLimiter.consume("guarded", {
+      key: "ip",
+      perMinute: 5,
+    });
+    expect(result.ok).toBe(true);
+  });
+});
+
+afterEach(() => {
+  vi.doUnmock("@/modules/config");
+  vi.resetModules();
 });

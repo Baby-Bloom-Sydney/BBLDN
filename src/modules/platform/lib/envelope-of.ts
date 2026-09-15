@@ -10,6 +10,8 @@ const REQUEST_ID_HEADER = "x-request-id";
 const RETRY_AFTER_HEADER = "Retry-After";
 const NO_CONTENT = 204;
 
+// Reads the *raw* error, not the `toClientError` copy, and must: the header needs the true number of seconds,
+// which a redaction could only ever damage. Numbers in `details` are checked by `safeDetails` for the body only.
 function retryAfter(
   error: AppError<AppErrorDetails>,
 ): Readonly<Record<string, string>> {

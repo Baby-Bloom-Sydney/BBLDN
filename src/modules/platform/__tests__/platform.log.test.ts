@@ -14,7 +14,7 @@ import {
   scrubPii,
   sentryErrorTracker,
 } from "@/modules/platform";
-import type { LogLine } from "@/modules/platform";
+import type { ConsentContext, LogLine } from "@/modules/platform";
 
 const FIXED = "2026-09-15T08:00:00.000Z" as Instant;
 const clock = () => FIXED;
@@ -296,5 +296,284 @@ describe("platform/log — console sink + error tracker resolution", () => {
       msg: "configured",
       requestId: "r-9",
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S3b — the S3 security review's findings (docs/build-progress.md ★ entry).
+// ---------------------------------------------------------------------------
+
+const REDACTED = "[redacted]";
+
+describe("platform/log — S3b HIGH-2: sensitive keys (01 §4b; 07 §2.7(a))", () => {
+  it("redacts the plural forms the ($|_) boundary used to miss", () => {
+    expect(
+      scrubPii({
+        apiKeys: ["k1", "k2"],
+        tokens: ["t"],
+        emails: ["a@b.test"],
+        phones: ["0000"],
+        secrets: { stripe: "s" },
+        passwords: ["p"],
+        documents: ["d"],
+        names: ["Ann"],
+        addresses: ["1 High St"],
+      }),
+    ).toEqual({
+      apiKeys: REDACTED,
+      tokens: REDACTED,
+      emails: REDACTED,
+      phones: REDACTED,
+      secrets: REDACTED,
+      passwords: REDACTED,
+      documents: REDACTED,
+      names: REDACTED,
+      addresses: REDACTED,
+    });
+  });
+
+  it("redacts contactNumber, userAgent, sessionId and a bare ip / ip_address", () => {
+    expect(
+      scrubPii({
+        contactNumber: "020 7946 0000", // config-literal-ok: a PII fixture the scrubber must redact
+        userAgent: "Mozilla/5.0 (X11; Linux x86_64)",
+        sessionId: "sess-abc",
+        ip: "203.0.113.7",
+        ip_address: "203.0.113.7",
+        ipAddress: "203.0.113.7",
+        clientIp: "203.0.113.7",
+      }),
+    ).toEqual({
+      contactNumber: REDACTED,
+      userAgent: REDACTED,
+      sessionId: REDACTED,
+      ip: REDACTED,
+      ip_address: REDACTED,
+      ipAddress: REDACTED,
+      clientIp: REDACTED,
+    });
+  });
+
+  it("normalises acronym runs, so IPAddress is redacted like ipAddress is", () => {
+    expect(
+      scrubPii({
+        IPAddress: "203.0.113.7",
+        UserAgent: "Mozilla/5.0",
+        SessionID: "sess-abc",
+        telephone: "020 7946 0000", // config-literal-ok: a PII fixture the scrubber must redact
+      }),
+    ).toEqual({
+      IPAddress: REDACTED,
+      UserAgent: REDACTED,
+      SessionID: REDACTED,
+      telephone: REDACTED,
+    });
+  });
+
+  it("keeps the consent audit fields readable — they are ids, not document contents", () => {
+    // `documentId` / `documentVersion` are `consent/types.ts`'s `DocumentVersion`: the audit signal of a consent
+    // event. The `document` prefix used to swallow them; `sessionId` must stay redacted all the same.
+    expect(
+      scrubPii({
+        documentId: "privacy-policy",
+        documentVersion: 3,
+        consentRecordId: "cr-1",
+        cookieConsentId: "cc-1",
+        documentContents: "the whole notice",
+        sessionId: "sess-abc",
+      }),
+    ).toEqual({
+      documentId: "privacy-policy",
+      documentVersion: 3,
+      consentRecordId: "cr-1",
+      cookieConsentId: "cc-1",
+      documentContents: REDACTED,
+      sessionId: REDACTED,
+    });
+  });
+
+  it("keeps the safe keys the logger needs (they are not collateral of the plural boundary)", () => {
+    expect(
+      scrubPii({
+        requestId: "req-1",
+        idempotencyKey: "idem-1",
+        eventName: "position.created",
+        templateId: "welcome",
+        module: "platform",
+        action: "emit",
+        bucketKey: "b/k",
+        sinkId: "memory",
+        durationMs: 12,
+      }),
+    ).toEqual({
+      requestId: "req-1",
+      idempotencyKey: "idem-1",
+      eventName: "position.created",
+      templateId: "welcome",
+      module: "platform",
+      action: "emit",
+      bucketKey: "b/k",
+      sinkId: "memory",
+      durationMs: 12,
+    });
+  });
+
+  it("a ConsentContext passed as log fields leaks none of its three tracked values (consent/types.ts)", () => {
+    const context: ConsentContext = {
+      ipAddress: "203.0.113.7",
+      userAgent: "Mozilla/5.0 (X11; Linux x86_64)",
+      sessionId: "sess-abc",
+    };
+    const { lines, sink } = capture();
+    createLogger({ sink, clock }).info("consent recorded", {
+      context,
+      purpose: "privacy-policy",
+    });
+    const written = JSON.stringify(lines[0]);
+    expect(written).not.toContain("203.0.113.7");
+    expect(written).not.toContain("Mozilla");
+    expect(written).not.toContain("sess-abc");
+    expect(lines[0]).toMatchObject({ purpose: "privacy-policy" });
+  });
+});
+
+describe("platform/log — S3b MEDIUM: non-string values are content-checked too", () => {
+  it("exempts a millisecond epoch — a timestamp is 13 digits and must stay readable", () => {
+    expect(
+      scrubPii({ finishedAtMs: 1758000000000, startedAtMs: 1000000000000 }),
+    ).toEqual({ finishedAtMs: 1758000000000, startedAtMs: 1000000000000 });
+  });
+
+  it("redacts a PII-shaped number under a non-sensitive key, keeps ordinary numbers", () => {
+    expect(
+      scrubPii({
+        contact: 447700900123, // config-literal-ok: a PII fixture the scrubber must redact
+        durationMs: 3,
+        count: 1234,
+        stamp: 20260915,
+        nested: { alt: [447700900123] }, // config-literal-ok: same fixture, nested
+      }),
+    ).toEqual({
+      contact: REDACTED,
+      durationMs: 3,
+      count: 1234,
+      stamp: 20260915,
+      nested: { alt: [REDACTED] },
+    });
+  });
+});
+
+describe("platform/log — S3b: the scrubber is bounded and cannot be a DoS lever", () => {
+  it("scrubs a very long message in linear time — the input is cut before any pattern runs", () => {
+    // `EMAIL` is unanchored with two greedy quantifiers, so a long string holding an `@` but no valid address
+    // makes the engine retry at every offset — measured at 3.3 s for this input unbounded, against 0 ms bounded.
+    // Scrubbing ran over the *untruncated* message, so one logged provider body could hold the event loop.
+    // Bounded first, scrubbed second.
+    const hostile = `${"a".repeat(40_000)}@${"b".repeat(40_000)}`;
+    const started = performance.now();
+    const { lines, sink } = capture();
+    createLogger({ sink, clock }).warn(hostile);
+    const elapsed = performance.now() - started;
+    expect(String(lines[0]?.msg).length).toBeLessThan(2100);
+    expect(lines[0]?.msg).toMatch(/…\[truncated\]$/);
+    expect(elapsed).toBeLessThan(250);
+  });
+
+  it("still finds PII inside the part it scans", () => {
+    const { lines, sink } = capture();
+    createLogger({ sink, clock }).warn(`ann@example.test ${"x ".repeat(4000)}`);
+    expect(lines[0]?.msg).not.toContain("ann@example.test");
+    expect(lines[0]?.msg).toContain("[redacted]");
+  });
+});
+
+describe("platform/log — S3b: a failing scrub never reaches the caller", () => {
+  it("reports on stderr and writes a placeholder line instead of throwing", () => {
+    const stderr = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const { lines, sink } = capture();
+    const logger = createLogger({
+      sink,
+      clock: () => FIXED,
+      base: {
+        get boom(): string {
+          throw new Error("field getter exploded");
+        },
+      },
+    });
+    expect(() => logger.info("still fine")).not.toThrow();
+    expect(lines[0]?.msg).toBe("[log line could not be built]");
+    expect(stderr).toHaveBeenCalled();
+    stderr.mockRestore();
+  });
+});
+
+describe("platform/log — S3b HIGH-1: `msg` is scrubbed before any sink or tracker sees it", () => {
+  const cases: ReadonlyArray<readonly [string, string, string]> = [
+    ["an email", "signup failed for ann@example.test", "ann@example.test"],
+    ["a spaced phone", "sms to +44 7700 900123 failed", "7700 900123"], // config-literal-ok: PII fixture
+    [
+      "a JWT",
+      "token abcdefghijkl.mnopqrstuvwx.yz0123456789_- rejected",
+      "abcdefghijkl",
+    ],
+    ["a provider key", "stripe said sk_live_ci-dummy is dead", "sk_live"],
+    [
+      "a bearer token",
+      "header Authorization: Bearer abcdef123456xyz rejected",
+      "abcdef123456xyz",
+    ],
+  ];
+
+  it.each(cases)("redacts %s in msg at every level", (_name, msg, secret) => {
+    for (const level of ["debug", "info", "warn", "error"] as const) {
+      const { lines, sink } = capture();
+      createLogger({ sink, clock, minLevel: "debug" })[level](msg);
+      expect(lines[0]?.msg, level).not.toContain(secret);
+      expect(lines[0]?.msg, level).toContain(REDACTED);
+    }
+  });
+
+  it("leaves a clean message alone and still truncates a very long one", () => {
+    const { lines, sink } = capture();
+    const logger = createLogger({ sink, clock });
+    logger.info("position created", { requestId: "req-1" });
+    expect(lines[0]?.msg).toBe("position created");
+    logger.info("y".repeat(5000));
+    expect(String(lines[1]?.msg).length).toBeLessThan(2100);
+    expect(lines[1]?.msg).toMatch(/…\[truncated\]$/);
+  });
+
+  it("pins the documented fail-closed trade-off: a 9–15-digit run in prose is redacted in place", () => {
+    // Deliberate (README): `msg` is prose, ids belong in `fields`. The run goes, the message survives.
+    const { lines, sink } = capture();
+    const logger = createLogger({ sink, clock });
+    logger.info("order 4471234567 refunded");
+    expect(lines[0]?.msg).toBe("order [redacted] refunded");
+    logger.info("run started at 2026-09-15 08:00 London");
+    expect(lines[1]?.msg).toBe("run started at [redacted]:00 London");
+    // Shorter and longer digit runs are not phone-shaped and survive untouched.
+    logger.info("cron processed 12345678 rows in 1234 ms");
+    expect(lines[2]?.msg).toBe("cron processed 12345678 rows in 1234 ms");
+    logger.info("user 00000000-0000-4000-8000-000000000000 advanced");
+    expect(lines[3]?.msg).toBe(
+      "user 00000000-0000-4000-8000-000000000000 advanced",
+    );
+  });
+
+  it("the error tracker receives the scrubbed message, not the raw one", () => {
+    const captured: string[] = [];
+    const tracker = sentryErrorTracker(
+      (message) => void captured.push(message),
+    );
+    const { lines, sink } = capture();
+    createLogger({ sink, clock, tracker }).error(
+      "payout failed for ann@example.test",
+      { alert: "ALERT_PROVIDER_DOWN" },
+    );
+    expect(captured[0]).not.toContain("ann@example.test");
+    expect(captured[0]).toContain(REDACTED);
+    expect(captured[0]).toBe(lines[0]?.msg);
   });
 });

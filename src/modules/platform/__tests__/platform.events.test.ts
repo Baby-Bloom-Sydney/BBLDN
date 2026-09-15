@@ -116,6 +116,39 @@ describe("platform/events — per-event schemas (03 §9.3; swap test 8 table che
     ).toBe(false);
   });
 
+  it("rejects a token embedded mid-value, not only one that starts the string (S3b)", () => {
+    // `looksLikePii` anchors JWT / provider key / bearer at the start, so these used to pass validation and
+    // enter the event pipeline. The props guard now runs the same free-text scrubber the log message uses.
+    expect(
+      EVENT_SCHEMAS["ui.click"].safeParse({
+        surface: "pricing",
+        target: "retry with sk_live_ci-dummy",
+      }).success,
+    ).toBe(false);
+    expect(
+      EVENT_SCHEMAS["ui.click"].safeParse({
+        surface: "pricing",
+        target: "auth Bearer abcdef123456",
+      }).success,
+    ).toBe(false);
+    expect(
+      EVENT_SCHEMAS["ui.click"].safeParse({
+        surface: "pricing",
+        target: "jwt abcdefghijkl.mnopqrstuvwx.yz0123456789_-",
+      }).success,
+    ).toBe(false);
+    // Ordinary labels, paths and districts still pass.
+    expect(
+      EVENT_SCHEMAS["ui.click"].safeParse({
+        surface: "pricing",
+        target: "cta-primary",
+      }).success,
+    ).toBe(true);
+    expect(
+      EVENT_SCHEMAS.visit.safeParse({ path: "/apply/step-2" }).success,
+    ).toBe(true);
+  });
+
   it("every ClientEventName is an EventName and isClientEventName is the allow-list", () => {
     for (const name of CLIENT_EVENT_NAMES) expect(EVENT_NAMES).toContain(name);
     expect(isClientEventName("ui.click")).toBe(true);

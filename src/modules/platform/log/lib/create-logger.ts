@@ -1,6 +1,7 @@
 // 01 §4b — the structured logger: `ts · level · msg · fields`, scrubbed, one sink, `error` lines forwarded to
-// the tracker. A logger never throws into business code: a failing sink is reported on stderr and swallowed
-// there — the one deliberate catch in this module, and it is not silent.
+// the tracker. A logger never throws into business code: a failing sink — and a failing *scrub*, since building
+// the line now runs two regex pipelines over caller-supplied text — is reported on stderr and swallowed there.
+// Those are the deliberate catches in this module, and none of them is silent.
 import type { Instant } from "@/modules/shared-types";
 import type {
   ErrorTracker,
@@ -10,6 +11,7 @@ import type {
   LogLine,
   LoggerDeps,
 } from "../types";
+import { scrubFreeText } from "../../lib/scrub-free-text";
 import { nullErrorTracker } from "./null-error-tracker";
 import { scrubPii } from "./scrub-pii";
 import { reportSinkFailure } from "./report-sink-failure";
@@ -41,8 +43,31 @@ function buildLine(
     ...scrubbed,
     ts: deps.clock(),
     level,
-    msg,
+    // `msg` is scrubbed here, not at the sink: the tracker is handed `line.msg` too (`sentryErrorTracker`).
+    msg: scrubFreeText(msg),
   }) as LogLine;
+}
+
+const UNBUILDABLE = "[log line could not be built]";
+
+/** Scrubbing runs over caller-supplied text; a throw here must not reach the caller, and must not be silent. */
+function safeLine(
+  deps: Resolved,
+  level: LogLevel,
+  msg: string,
+  fields: LogFields | undefined,
+): LogLine {
+  try {
+    return buildLine(deps, level, msg, fields);
+  } catch (thrown) {
+    const line = Object.freeze({
+      ts: deps.clock(),
+      level,
+      msg: UNBUILDABLE,
+    }) as LogLine;
+    reportSinkFailure(line, thrown);
+    return line;
+  }
 }
 
 function write(
@@ -52,7 +77,7 @@ function write(
   fields?: LogFields,
 ): void {
   if (LEVEL_RANK[level] < LEVEL_RANK[deps.minLevel]) return;
-  const line = buildLine(deps, level, msg, fields);
+  const line = safeLine(deps, level, msg, fields);
   try {
     deps.sink(line);
   } catch (thrown) {
