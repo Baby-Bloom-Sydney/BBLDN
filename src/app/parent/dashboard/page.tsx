@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, ClipboardList, Calendar, Eye, Search, Heart, Baby, MessageSquare } from "lucide-react";
+import { Loader2, ClipboardList, Calendar, Eye, Search, Heart } from "lucide-react";
 
 export default function ParentDashboardPage() {
   const { profile, isLoading } = useAuth();
@@ -86,33 +86,6 @@ export default function ParentDashboardPage() {
             </Card>
           </Link>
 
-          <Link href="/parent/babysitting">
-            <Card className="cursor-pointer transition-shadow hover:shadow-md">
-              <CardContent className="flex items-center gap-4 p-6">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-100">
-                  <Baby className="h-6 w-6 text-violet-500" />
-                </div>
-                <div>
-                  <h3 className="font-medium">Babysitting</h3>
-                  <p className="text-sm text-slate-500">One-time care</p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href="/parent/interviews">
-            <Card className="cursor-pointer transition-shadow hover:shadow-md">
-              <CardContent className="flex items-center gap-4 p-6">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-100">
-                  <MessageSquare className="h-6 w-6 text-violet-500" />
-                </div>
-                <div>
-                  <h3 className="font-medium">Interviews</h3>
-                  <p className="text-sm text-slate-500">View scheduled</p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
         </div>
       </div>
 

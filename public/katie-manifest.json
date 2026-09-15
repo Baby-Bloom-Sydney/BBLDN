@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-06-03T07:05:02.627Z",
+  "generated_at": "2026-09-15T04:44:30.118Z",
   "summary": {
-    "route_count": 64,
-    "page_count": 115,
-    "cron_count": 15,
-    "migration_count": 41,
-    "server_action_file_count": 47
+    "route_count": 48,
+    "page_count": 84,
+    "cron_count": 13,
+    "migration_count": 0,
+    "server_action_file_count": 41
   },
   "routes": [
     {
@@ -14,20 +14,6 @@
         "GET"
       ],
       "file": "src/app/api/address-search/route.ts"
-    },
-    {
-      "path": "/api/admin/analytics",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/admin/analytics/route.ts"
-    },
-    {
-      "path": "/api/admin/debug",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/admin/debug/route.ts"
     },
     {
       "path": "/api/admin/pipeline-snapshots",
@@ -86,32 +72,11 @@
       "file": "src/app/api/auth/signout/route.ts"
     },
     {
-      "path": "/api/babysitting",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/babysitting/route.ts"
-    },
-    {
-      "path": "/api/bookings",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/bookings/route.ts"
-    },
-    {
       "path": "/api/chat/bot-info",
       "methods": [
         "GET"
       ],
       "file": "src/app/api/chat/bot-info/route.ts"
-    },
-    {
-      "path": "/api/chat/bsr/[id]",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/chat/bsr/[id]/route.ts"
     },
     {
       "path": "/api/chat/connections/[id]",
@@ -177,13 +142,6 @@
       "file": "src/app/api/chat/upload/route.ts"
     },
     {
-      "path": "/api/check-share-screenshot",
-      "methods": [
-        "POST"
-      ],
-      "file": "src/app/api/check-share-screenshot/route.ts"
-    },
-    {
       "path": "/api/cron/audit-consent-expiry",
       "methods": [
         "GET"
@@ -247,20 +205,6 @@
       "file": "src/app/api/cron/proactive/route.ts"
     },
     {
-      "path": "/api/cron/release-payouts",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/cron/release-payouts/route.ts"
-    },
-    {
-      "path": "/api/cron/schedule-upfront-cycles",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/cron/schedule-upfront-cycles/route.ts"
-    },
-    {
       "path": "/api/cron/send-delayed-emails",
       "methods": [
         "GET"
@@ -289,13 +233,6 @@
       "file": "src/app/api/cron/trial-reminders/route.ts"
     },
     {
-      "path": "/api/interviews",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/interviews/route.ts"
-    },
-    {
       "path": "/api/legal/cookie-consent",
       "methods": [
         "POST"
@@ -308,27 +245,6 @@
         "GET"
       ],
       "file": "src/app/api/nannies/route.ts"
-    },
-    {
-      "path": "/api/nanny/earnings-badge",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/nanny/earnings-badge/route.ts"
-    },
-    {
-      "path": "/api/nanny/payout-status",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/nanny/payout-status/route.ts"
-    },
-    {
-      "path": "/api/og/babysitting/[id]",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/og/babysitting/[id]/route.tsx"
     },
     {
       "path": "/api/og/nanny/[id]",
@@ -350,13 +266,6 @@
         "GET"
       ],
       "file": "src/app/api/og/position/[id]/route.tsx"
-    },
-    {
-      "path": "/api/parent-verification-status",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/parent-verification-status/route.ts"
     },
     {
       "path": "/api/parents",
@@ -397,13 +306,6 @@
       "file": "src/app/api/run-verification/route.ts"
     },
     {
-      "path": "/api/sydney-postcodes",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/sydney-postcodes/route.ts"
-    },
-    {
       "path": "/api/test-email",
       "methods": [
         "GET"
@@ -425,25 +327,11 @@
       "file": "src/app/api/upload/nanny-photo/route.ts"
     },
     {
-      "path": "/api/validate-wwcc-pdf",
-      "methods": [
-        "POST"
-      ],
-      "file": "src/app/api/validate-wwcc-pdf/route.ts"
-    },
-    {
       "path": "/api/verification-status",
       "methods": [
         "GET"
       ],
       "file": "src/app/api/verification-status/route.ts"
-    },
-    {
-      "path": "/api/webhooks/ocg-verification",
-      "methods": [
-        "POST"
-      ],
-      "file": "src/app/api/webhooks/ocg-verification/route.ts"
     },
     {
       "path": "/api/webhooks",
@@ -504,10 +392,6 @@
     {
       "path": "/about",
       "file": "src/app/(public)/about/page.tsx"
-    },
-    {
-      "path": "/babysitting/[id]",
-      "file": "src/app/(public)/babysitting/[id]/page.tsx"
     },
     {
       "path": "/childcare-professionals",
@@ -582,10 +466,6 @@
       "file": "src/app/(public)/pricing/page.tsx"
     },
     {
-      "path": "/admin/analytics",
-      "file": "src/app/admin/analytics/page.tsx"
-    },
-    {
       "path": "/admin/dashboard",
       "file": "src/app/admin/dashboard/page.tsx"
     },
@@ -600,10 +480,6 @@
     {
       "path": "/admin/leads",
       "file": "src/app/admin/leads/page.tsx"
-    },
-    {
-      "path": "/admin/payouts",
-      "file": "src/app/admin/payouts/page.tsx"
     },
     {
       "path": "/admin/pipeline",
@@ -662,28 +538,12 @@
       "file": "src/app/admin/viewer/[id]/verification/page.tsx"
     },
     {
-      "path": "/bb/test/onboarding-verification",
-      "file": "src/app/bb/test/onboarding-verification/page.tsx"
-    },
-    {
-      "path": "/bb/test/position-apply",
-      "file": "src/app/bb/test/position-apply/page.tsx"
-    },
-    {
-      "path": "/brandkit1",
-      "file": "src/app/brandkit1/page.tsx"
-    },
-    {
       "path": "/invite/[token]",
       "file": "src/app/invite/[token]/page.tsx"
     },
     {
       "path": "/invite/connect/[inviteId]",
       "file": "src/app/invite/connect/[inviteId]/page.tsx"
-    },
-    {
-      "path": "/nanny/babysitting",
-      "file": "src/app/nanny/babysitting/page.tsx"
     },
     {
       "path": "/nanny/dashboard",
@@ -710,10 +570,6 @@
       "file": "src/app/nanny/inbox/page.tsx"
     },
     {
-      "path": "/nanny/interviews",
-      "file": "src/app/nanny/interviews/page.tsx"
-    },
-    {
       "path": "/nanny/onboarding/add-child",
       "file": "src/app/nanny/onboarding/add-child/page.tsx"
     },
@@ -726,26 +582,6 @@
       "file": "src/app/nanny/page.tsx"
     },
     {
-      "path": "/nanny/payouts/[familyId]",
-      "file": "src/app/nanny/payouts/[familyId]/page.tsx"
-    },
-    {
-      "path": "/nanny/payouts/history",
-      "file": "src/app/nanny/payouts/history/page.tsx"
-    },
-    {
-      "path": "/nanny/payouts/onboarding",
-      "file": "src/app/nanny/payouts/onboarding/page.tsx"
-    },
-    {
-      "path": "/nanny/payouts",
-      "file": "src/app/nanny/payouts/page.tsx"
-    },
-    {
-      "path": "/nanny/payouts/terms",
-      "file": "src/app/nanny/payouts/terms/page.tsx"
-    },
-    {
       "path": "/nanny/positions",
       "file": "src/app/nanny/positions/page.tsx"
     },
@@ -754,20 +590,12 @@
       "file": "src/app/nanny/profile/page.tsx"
     },
     {
-      "path": "/nanny/profiletest",
-      "file": "src/app/nanny/profiletest/page.tsx"
-    },
-    {
       "path": "/nanny/register",
       "file": "src/app/nanny/register/page.tsx"
     },
     {
       "path": "/nanny/settings",
       "file": "src/app/nanny/settings/page.tsx"
-    },
-    {
-      "path": "/nanny/share",
-      "file": "src/app/nanny/share/page.tsx"
     },
     {
       "path": "/nanny/team",
@@ -780,18 +608,6 @@
     {
       "path": "/nanny/verify",
       "file": "src/app/nanny/verify/page.tsx"
-    },
-    {
-      "path": "/parent/babysitting/[id]/payment",
-      "file": "src/app/parent/babysitting/[id]/payment/page.tsx"
-    },
-    {
-      "path": "/parent/babysitting/[id]/share",
-      "file": "src/app/parent/babysitting/[id]/share/page.tsx"
-    },
-    {
-      "path": "/parent/babysitting",
-      "file": "src/app/parent/babysitting/page.tsx"
     },
     {
       "path": "/parent/browse/[id]",
@@ -830,28 +646,8 @@
       "file": "src/app/parent/inbox/page.tsx"
     },
     {
-      "path": "/parent/interviews",
-      "file": "src/app/parent/interviews/page.tsx"
-    },
-    {
-      "path": "/parent/matches/checkout",
-      "file": "src/app/parent/matches/checkout/page.tsx"
-    },
-    {
-      "path": "/parent/matches/matchmaker",
-      "file": "src/app/parent/matches/matchmaker/page.tsx"
-    },
-    {
       "path": "/parent/matches",
       "file": "src/app/parent/matches/page.tsx"
-    },
-    {
-      "path": "/parent/matches/share",
-      "file": "src/app/parent/matches/share/page.tsx"
-    },
-    {
-      "path": "/parent/matchmaking",
-      "file": "src/app/parent/matchmaking/page.tsx"
     },
     {
       "path": "/parent",
@@ -886,40 +682,8 @@
       "file": "src/app/parent/subscription/page.tsx"
     },
     {
-      "path": "/parent/verification",
-      "file": "src/app/parent/verification/page.tsx"
-    },
-    {
-      "path": "/parent/verify",
-      "file": "src/app/parent/verify/page.tsx"
-    },
-    {
       "path": "/subscribe-for/[token]",
       "file": "src/app/subscribe-for/[token]/page.tsx"
-    },
-    {
-      "path": "/test/ProfileOGTAGS",
-      "file": "src/app/test/ProfileOGTAGS/page.tsx"
-    },
-    {
-      "path": "/test",
-      "file": "src/app/test/page.tsx"
-    },
-    {
-      "path": "/test/shareprofile",
-      "file": "src/app/test/shareprofile/page.tsx"
-    },
-    {
-      "path": "/ui/embed/[component]",
-      "file": "src/app/ui/embed/[component]/page.tsx"
-    },
-    {
-      "path": "/ui",
-      "file": "src/app/ui/page.tsx"
-    },
-    {
-      "path": "/ui2",
-      "file": "src/app/ui2/page.tsx"
     }
   ],
   "crons": [
@@ -968,229 +732,15 @@
       "schedule": "15 3 * * *"
     },
     {
-      "path": "/api/cron/schedule-upfront-cycles",
-      "schedule": "0 4 * * *"
-    },
-    {
       "path": "/api/cron/trial-reminders",
       "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/release-payouts",
-      "schedule": "0 21 * * *"
     },
     {
       "path": "/api/cron/audit-consent-expiry",
       "schedule": "5 21 * * *"
     }
   ],
-  "migrations": [
-    {
-      "filename": "abn-collection-rollback.sql",
-      "bytes": 3713,
-      "modified_at": "2026-06-03T06:45:30.018Z"
-    },
-    {
-      "filename": "abn-collection.sql",
-      "bytes": 8673,
-      "modified_at": "2026-06-03T06:45:30.018Z"
-    },
-    {
-      "filename": "bonus-program-onboarding-rollback.sql",
-      "bytes": 907,
-      "modified_at": "2026-06-03T06:45:30.019Z"
-    },
-    {
-      "filename": "bonus-program-onboarding.sql",
-      "bytes": 4105,
-      "modified_at": "2026-06-03T06:45:30.019Z"
-    },
-    {
-      "filename": "cancel-freeze-trigger-rollback.sql",
-      "bytes": 1268,
-      "modified_at": "2026-06-03T06:45:30.019Z"
-    },
-    {
-      "filename": "cancel-freeze-trigger.sql",
-      "bytes": 6328,
-      "modified_at": "2026-06-03T06:45:30.019Z"
-    },
-    {
-      "filename": "cancel-inflight-trigger-v2-rollback.sql",
-      "bytes": 1514,
-      "modified_at": "2026-06-03T06:45:30.019Z"
-    },
-    {
-      "filename": "cancel-inflight-trigger-v2.sql",
-      "bytes": 4028,
-      "modified_at": "2026-06-03T06:45:30.019Z"
-    },
-    {
-      "filename": "education-app.sql",
-      "bytes": 13414,
-      "modified_at": "2026-06-03T06:40:32.846Z"
-    },
-    {
-      "filename": "expand-milestones-210.sql",
-      "bytes": 20941,
-      "modified_at": "2026-06-03T06:40:32.846Z"
-    },
-    {
-      "filename": "frozen-rows-to-cancelled-rollback.sql",
-      "bytes": 1442,
-      "modified_at": "2026-06-03T06:45:30.020Z"
-    },
-    {
-      "filename": "frozen-rows-to-cancelled.sql",
-      "bytes": 873,
-      "modified_at": "2026-06-03T06:45:30.020Z"
-    },
-    {
-      "filename": "katie-admin-edits-rollback.sql",
-      "bytes": 94,
-      "modified_at": "2026-06-03T06:40:32.846Z"
-    },
-    {
-      "filename": "katie-admin-edits.sql",
-      "bytes": 2505,
-      "modified_at": "2026-06-03T06:40:32.846Z"
-    },
-    {
-      "filename": "katie-foundation-rollback.sql",
-      "bytes": 4660,
-      "modified_at": "2026-06-03T06:40:32.846Z"
-    },
-    {
-      "filename": "katie-foundation.sql",
-      "bytes": 23806,
-      "modified_at": "2026-06-03T06:40:32.847Z"
-    },
-    {
-      "filename": "katie-internal-notes-rollback.sql",
-      "bytes": 111,
-      "modified_at": "2026-06-03T06:40:32.847Z"
-    },
-    {
-      "filename": "katie-internal-notes.sql",
-      "bytes": 2437,
-      "modified_at": "2026-06-03T06:40:32.847Z"
-    },
-    {
-      "filename": "katie-proposals-rollback.sql",
-      "bytes": 89,
-      "modified_at": "2026-06-03T06:40:32.847Z"
-    },
-    {
-      "filename": "katie-proposals.sql",
-      "bytes": 3103,
-      "modified_at": "2026-06-03T06:40:32.847Z"
-    },
-    {
-      "filename": "katie-tiles-rollback.sql",
-      "bytes": 153,
-      "modified_at": "2026-06-03T06:40:32.847Z"
-    },
-    {
-      "filename": "katie-tiles.sql",
-      "bytes": 1041,
-      "modified_at": "2026-06-03T06:40:32.847Z"
-    },
-    {
-      "filename": "lead-signals-rollback.sql",
-      "bytes": 764,
-      "modified_at": "2026-06-03T06:45:30.020Z"
-    },
-    {
-      "filename": "lead-signals.sql",
-      "bytes": 2873,
-      "modified_at": "2026-06-03T06:45:30.020Z"
-    },
-    {
-      "filename": "nannies-payout-status-constraint-fix.sql",
-      "bytes": 1038,
-      "modified_at": "2026-06-03T06:45:30.020Z"
-    },
-    {
-      "filename": "nanny-leads-v2.sql",
-      "bytes": 3424,
-      "modified_at": "2026-06-03T06:40:32.847Z"
-    },
-    {
-      "filename": "payments-foundation-rollback.sql",
-      "bytes": 3561,
-      "modified_at": "2026-06-03T06:40:32.847Z"
-    },
-    {
-      "filename": "payments-foundation.sql",
-      "bytes": 22403,
-      "modified_at": "2026-06-03T06:40:32.847Z"
-    },
-    {
-      "filename": "payments-frontend-rollback.sql",
-      "bytes": 4294,
-      "modified_at": "2026-06-03T06:45:30.020Z"
-    },
-    {
-      "filename": "payments-frontend.sql",
-      "bytes": 13521,
-      "modified_at": "2026-06-03T06:45:30.020Z"
-    },
-    {
-      "filename": "relax-email-logs-email-type-constraint.sql",
-      "bytes": 1866,
-      "modified_at": "2026-06-03T06:40:32.847Z"
-    },
-    {
-      "filename": "reset-test-user.sql",
-      "bytes": 1289,
-      "modified_at": "2026-06-03T06:40:32.847Z"
-    },
-    {
-      "filename": "sync-user-profile-email-rollback.sql",
-      "bytes": 173,
-      "modified_at": "2026-06-03T06:40:32.847Z"
-    },
-    {
-      "filename": "sync-user-profile-email.sql",
-      "bytes": 4863,
-      "modified_at": "2026-06-03T06:40:32.847Z"
-    },
-    {
-      "filename": "T-015-media-consent-seed.sql",
-      "bytes": 1964,
-      "modified_at": "2026-06-03T06:45:30.016Z"
-    },
-    {
-      "filename": "T-017-load-v2-policies.sql",
-      "bytes": 78007,
-      "modified_at": "2026-06-03T06:45:30.016Z"
-    },
-    {
-      "filename": "T-032-nanny-contact-management-rollback.sql",
-      "bytes": 1042,
-      "modified_at": "2026-06-03T06:45:30.016Z"
-    },
-    {
-      "filename": "T-032-nanny-contact-management.sql",
-      "bytes": 18285,
-      "modified_at": "2026-06-03T06:45:30.017Z"
-    },
-    {
-      "filename": "T-032b-expand-lead-statuses.rollback.sql",
-      "bytes": 1653,
-      "modified_at": "2026-06-03T06:45:30.017Z"
-    },
-    {
-      "filename": "T-032b-expand-lead-statuses.sql",
-      "bytes": 2177,
-      "modified_at": "2026-06-03T06:45:30.017Z"
-    },
-    {
-      "filename": "T-032c-expand-lead-statuses-fix.sql",
-      "bytes": 1583,
-      "modified_at": "2026-06-03T06:45:30.018Z"
-    }
-  ],
+  "migrations": [],
   "server_actions": [
     {
       "file": "src/lib/actions/account-security.ts",
@@ -1220,8 +770,6 @@
         "adminDeleteUser",
         "adminChangeRole",
         "adminResetVerification",
-        "adminVerifyParentIdentity",
-        "adminRejectParentIdentity",
         "adminRegenerateNannyBio",
         "adminSendEmail"
       ]
@@ -1230,24 +778,6 @@
       "file": "src/lib/actions/autofire-matchmaking.ts",
       "functions": [
         "autofireMatchmaking"
-      ]
-    },
-    {
-      "file": "src/lib/actions/babysitting.ts",
-      "functions": [
-        "getPublicBsrProfile",
-        "createBabysittingRequest",
-        "activateBsr",
-        "requestBabysittingJob",
-        "applyToBsrPublic",
-        "parentAcceptNanny",
-        "parentDeclineNanny",
-        "declineBabysittingRequest",
-        "cancelBabysittingRequest",
-        "nannyCancelBabysittingRequest",
-        "getParentBabysittingRequests",
-        "getNannyBabysittingJobs",
-        "getSydneySuburbs"
       ]
     },
     {
@@ -1411,17 +941,6 @@
       ]
     },
     {
-      "file": "src/lib/actions/interview.ts",
-      "functions": [
-        "createInterviewRequest",
-        "getParentInterviewRequests",
-        "getNannyInterviewRequests",
-        "acceptInterviewRequest",
-        "declineInterviewRequest",
-        "cancelInterviewRequest"
-      ]
-    },
-    {
       "file": "src/lib/actions/jobs.ts",
       "functions": [
         "applyToPosition"
@@ -1451,7 +970,6 @@
         "declineDfyConnection",
         "processDfyWaves",
         "getDfyStatus",
-        "confirmMatchmaking",
         "activateDfyPosition",
         "getPublicPositionProfile"
       ]
@@ -1493,15 +1011,6 @@
       ]
     },
     {
-      "file": "src/lib/actions/parent-verification.ts",
-      "functions": [
-        "submitParentIdentitySection",
-        "submitParentIdentityForManualReview",
-        "submitParentContactSection",
-        "getParentVerificationData"
-      ]
-    },
-    {
       "file": "src/lib/actions/parent.ts",
       "functions": [
         "getParentId",
@@ -1528,12 +1037,6 @@
       ]
     },
     {
-      "file": "src/lib/actions/payments/createConnectAccountSession.ts",
-      "functions": [
-        "createConnectAccountSession"
-      ]
-    },
-    {
       "file": "src/lib/actions/payments/createSubscribeInvite.ts",
       "functions": [
         "createSubscribeInvite"
@@ -1549,12 +1052,6 @@
       "file": "src/lib/actions/payments/portal.ts",
       "functions": [
         "createPortalSession"
-      ]
-    },
-    {
-      "file": "src/lib/actions/payments/startConnectOnboarding.ts",
-      "functions": [
-        "startConnectOnboarding"
       ]
     },
     {
@@ -1604,30 +1101,6 @@
         "submitWWCCSection",
         "submitContactSection",
         "getVerificationData"
-      ]
-    },
-    {
-      "file": "src/lib/actions/viral-loop.ts",
-      "functions": [
-        "getShareForUser",
-        "getSharesForUser",
-        "isViralAccessGranted",
-        "createShareRecord",
-        "markShareCompleted",
-        "submitShareScreenshot",
-        "beginScreenshotCheck",
-        "recordCheckResult",
-        "processScreenshotCheck",
-        "adminBypassShare",
-        "createNannyProfileShare",
-        "createParentPositionShare",
-        "createParentBsrShare",
-        "getNannySharePageData",
-        "getBsrSharePageData",
-        "isNannyViralCompliant",
-        "isPositionViralCompliant",
-        "isBsrViralCompliant",
-        "getPositionSharePageData"
       ]
     }
   ]

@@ -1485,43 +1485,6 @@ async function expireDfyNotifications(
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 11b. CONFIRM MATCHMAKING (activate DFY without share proof)
-// ════════════════════════════════════════════════════════════════════════════
-
-export async function confirmMatchmaking(): Promise<{ success: boolean; error?: string }> {
-  const parentId = await getParentId();
-  if (!parentId) {
-    return { success: false, error: 'Not authenticated as parent' };
-  }
-
-  const { data: position, error: positionError } = await getPosition();
-  if (positionError || !position) {
-    return { success: false, error: positionError || 'No active position found' };
-  }
-
-  const adminClient = createAdminClient();
-  const { data: pos } = await adminClient
-    .from('nanny_positions')
-    .select('id, dfy_activated_at')
-    .eq('id', position.id)
-    .single();
-
-  if (!pos) {
-    return { success: false, error: 'Position not found.' };
-  }
-
-  if (pos.dfy_activated_at) {
-    return { success: false, error: 'Matchmaking is already active.' };
-  }
-
-  // Activate DFY directly — standard tier
-  await activateDfyPosition(pos.id, 'standard');
-
-  revalidatePath('/parent/matches');
-  return { success: true };
-}
-
-// ════════════════════════════════════════════════════════════════════════════
 // 12. ACTIVATE DFY POSITION (called when share is approved)
 // ════════════════════════════════════════════════════════════════════════════
 

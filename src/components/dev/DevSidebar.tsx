@@ -4,10 +4,10 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Home, Users, Baby, Shield, Settings, LayoutDashboard,
-  FileText, Search, MessageSquare, Calendar, ChevronLeft,
+  Home, Users, Shield, Settings, LayoutDashboard,
+  FileText, Search, ChevronLeft,
   ChevronRight, LogIn, UserPlus, HelpCircle, Mail,
-  BarChart3, ClipboardList, Eye, FileCheck, PlusCircle, UserCircle
+  ClipboardList, Eye, FileCheck, PlusCircle, UserCircle
 } from 'lucide-react';
 
 const SECTIONS = [
@@ -43,8 +43,6 @@ const SECTIONS = [
       { path: '/nanny/profile', label: 'Edit Profile', icon: Users },
       { path: '/nanny/verification', label: 'Verification', icon: Shield },
       { path: '/nanny/verify', label: 'ID Verification', icon: FileCheck },
-      { path: '/nanny/interviews', label: 'Interviews', icon: MessageSquare },
-      { path: '/nanny/babysitting', label: 'Babysitting', icon: Baby },
       { path: '/nanny/settings', label: 'Settings', icon: Settings },
     ],
   },
@@ -56,8 +54,6 @@ const SECTIONS = [
       { path: '/parent', label: 'Create Position', icon: FileText },
       { path: '/parent/request', label: 'Nanny Request', icon: PlusCircle },
       { path: '/parent/browse', label: 'Browse (Parent)', icon: Search },
-      { path: '/parent/interviews', label: 'Interviews', icon: MessageSquare },
-      { path: '/parent/babysitting', label: 'Babysitting', icon: Calendar },
       { path: '/parent/settings', label: 'Settings', icon: Settings },
     ],
   },
