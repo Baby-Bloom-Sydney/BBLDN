@@ -133,7 +133,6 @@ describe("platform/rate-limit — consume", () => {
   });
 });
 
-
 // S3b — the S3 security review's MEDIUM on the limiter: the per-instance memory store was the silent production
 // default. The shared `rate_limit_buckets` store (07 §8; S5) is still a later unit — this is only the assertion
 // that its absence in production is loud and fails closed instead of silently limiting per Vercel instance.

@@ -11,6 +11,7 @@ import type {
   LoggerDeps,
 } from "../types";
 import { nullErrorTracker } from "./null-error-tracker";
+import { scrubMessage } from "./scrub-message";
 import { scrubPii } from "./scrub-pii";
 import { reportSinkFailure } from "./report-sink-failure";
 
@@ -41,7 +42,8 @@ function buildLine(
     ...scrubbed,
     ts: deps.clock(),
     level,
-    msg,
+    // `msg` is scrubbed here, not at the sink: the tracker is handed `line.msg` too (`sentryErrorTracker`).
+    msg: scrubMessage(msg),
   }) as LogLine;
 }
 

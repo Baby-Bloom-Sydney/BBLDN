@@ -200,7 +200,6 @@ describe("platform — envelope (01 §4c)", () => {
   });
 });
 
-
 // S3b — the S3 security review's MEDIUM on `toClientError`: `details` was only stripped for INTERNAL, so any
 // other code could carry a raw provider body, a stack or a PII-shaped string across the boundary.
 describe("platform — toClientError guards `details` on every code (S3b)", () => {
@@ -240,6 +239,15 @@ describe("platform — toClientError guards `details` on every code (S3b)", () =
     expect(client.details).toEqual(details);
     expect(Object.isFrozen(client)).toBe(true);
     expect(failed.error.details).toBe(details);
+  });
+
+  it("bounds the depth it walks, so a deep details object cannot hide a leak below it", () => {
+    const failed = err("VALIDATION", "check the form", {
+      a: { b: { c: { d: { e: "ann@example.test" } } } },
+    });
+    expect(JSON.stringify(toClientError(failed.error))).not.toContain(
+      "ann@example.test",
+    );
   });
 
   it("an error with no details still crosses the boundary unchanged", () => {

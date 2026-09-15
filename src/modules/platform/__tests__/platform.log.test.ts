@@ -299,7 +299,6 @@ describe("platform/log — console sink + error tracker resolution", () => {
   });
 });
 
-
 // ---------------------------------------------------------------------------
 // S3b — the S3 security review's findings (docs/build-progress.md ★ entry).
 // ---------------------------------------------------------------------------
@@ -458,7 +457,9 @@ describe("platform/log — S3b HIGH-1: `msg` is scrubbed before any sink or trac
 
   it("the error tracker receives the scrubbed message, not the raw one", () => {
     const captured: string[] = [];
-    const tracker = sentryErrorTracker((message) => void captured.push(message));
+    const tracker = sentryErrorTracker(
+      (message) => void captured.push(message),
+    );
     const { lines, sink } = capture();
     createLogger({ sink, clock, tracker }).error(
       "payout failed for ann@example.test",
