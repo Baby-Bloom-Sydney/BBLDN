@@ -82,6 +82,21 @@ Read the matching `~/.claude/skills/<name>/SKILL.md` **before** writing, summari
 
 Skipping a listed skill or agent is a process violation to call out in review, not a shortcut.
 
+### Model marking — `[Fable]` units (BAI, 2026-09-15)
+
+Most of this build is execution against a spec that already answers the hard questions, and the gates above are what hold quality. A unit tagged **`[Fable]`** in `HANDOFF.md` §11 or the L-005 `RESUME.md` is the exception: **do not start it on a lesser model — wait for the strongest available.** The tag marks work where the specification cannot carry the judgement:
+
+| Tag it when the unit | Why |
+|---|---|
+| Rewrites or decomposes a large existing file across module boundaries (build-standard §6) | subtle behaviour is easy to lose and hard to test back |
+| Sweeps a cross-cutting change over the legacy tree (F-d locale + literal sweep) | one wrong replacement is silent until production |
+| Turns BAI's intent into screens or copy rather than following a written contract (Phase 1+ journeys) | the foundations are thin here by design; the judgement is the work |
+| Hits a contradiction the foundations do not resolve | the answer becomes an ADR, and a wrong ADR compounds |
+
+Anything else — a named bug fix, a connector against a written contract, a migration the data model already specifies, a lint generator — is not `[Fable]`. Tagging everything defeats the point.
+
+An untagged unit that turns out to need this judgement mid-flight **stops**, logs why in `PROGRESS.md`, and waits. It does not guess.
+
 ### Workflow recipes (portable from Sydney's `BB/nanny-platform/CLAUDE.md`)
 
 - **New unit of work:** `planner` / `code-architect` → `tdd-guide` writes the failing test → minimum implementation → `[code-reviewer + typescript-reviewer + silent-failure-hunter]` in one batch → fix HIGH + MEDIUM → gates (§7) → commit → PROGRESS.md.
@@ -241,7 +256,7 @@ Sydney's `website/` CLAUDE.md chain is reference only; it does not govern this r
 ---
 
 <!-- audit
-Last edited: 2026-09-15T13:49+10:00 — BB-LDN-Planner-070926
+Last edited: 2026-09-15T18:59+10:00 — BB-LDN-Planner-070926
 Notes (F9, review fix pass): preamble bootstrap moment → 08 §2.1 step 0 / gate A0; linked-vs-vendored ADR governs ALL ../LDN/ paths (foundations + OPERATIONS), default linked; §5 reduced to pointers only (01 §2.3–2.5 / §4a / §6.3; 03 §1.4 / §2.1 / §3; 05 §7), restated rules + unratified slice-registration default removed; §6 BRANCHES.md created at bootstrap, else stop + create from Sydney pattern; §9 seed build-progress / CHANGELOG from _project-template shape before first commit; §4 fallback keeps README §2 as authority.
 Previous: Notes: initial authoring (L-004 wave 4) — code-repo CLAUDE.md seed: pointers + process only; five laws as merge blocks + five-question test; ECC hard rules; pointer table mirroring README §2 with real section numbers from 00–08 + DECISIONS + build-standard; module rules (folder shape, boundary lint, service leaves, auth no-client, UnitOfWork token, slice registration default pending 03 §12 item 35 / 01 §10 O-12, scheduling importers); branch/deploy/promote condensed from 06 §3–§4 with Sydney origin; efficiency + compaction (portable half of Sydney's nanny-platform CLAUDE.md); three build ledgers; never-list; precedence. Bootstrap decisions flagged: linked vs vendored foundations; slice-registration shape.
 -->
