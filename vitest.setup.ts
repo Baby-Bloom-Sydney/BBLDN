@@ -1,4 +1,8 @@
 import "@testing-library/jest-dom/vitest";
+import { config as loadDotEnv } from "dotenv";
+
+// .env.test is the schema fixture (05 §4.3): placeholder values for config/env.ts; existing (CI) values win.
+loadDotEnv({ path: ".env.test", quiet: true });
 
 // Prevent SDK clients from throwing at module-load time when tests don't
 // set real credentials. Tests that exercise AI calls mock the clients

@@ -40,23 +40,44 @@ concurrency:
 
 env:
   NODE_VERSION: "22"
-  # Placeholder-only build env (non-secret; module-load guards in the legacy tree need a value to exist).
-  NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
-  SUPABASE_URL: https://placeholder.supabase.co
-  SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role
+  # Placeholder-only env (non-secret) so `next build` can collect page data and `config/env.ts` parses (01 §3.3;
+  # 07 §7: real values live in Vercel env + the keychain, never here). Kept in step with .env.test — the config.env
+  # suite parses this block. Names: src/modules/config/lib/env-schema.ts (50; .env.example is generated from it).
   NEXT_PUBLIC_APP_URL: http://localhost:3000
-  NEXT_PUBLIC_SITE_URL: http://localhost:3000
-  NEXT_PUBLIC_INVITE_BASE_URL: http://localhost:3000
-  RESEND_API_KEY: re_placeholder
-  STRIPE_SECRET_KEY: sk_test_ci-dummy # hyphen keeps the gitleaks stripe rule from matching a placeholder
-  STRIPE_WEBHOOK_SECRET: whsec_placeholder
-  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
   CRON_SECRET: placeholder-cron-secret
   ADMIN_API_TOKEN: placeholder-admin-token
-  GOOGLE_AI_API_KEY: placeholder-google
-  OPENAI_API_KEY: placeholder-openai
+  SYSTEM_PARENT_ID: 00000000-0000-4000-8000-000000000000
+  ADMIN_EMAIL: admin@example.test
+  SUPPORT_INBOX: support@example.test
+  NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+  SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role
+  STRIPE_MODE: test
+  STRIPE_SECRET_KEY: sk_test_ci-dummy # hyphen keeps the gitleaks stripe rule from matching a placeholder
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+  STRIPE_WEBHOOK_SECRET: whsec_placeholder
+  STRIPE_PRICE_SELF_SERVE_APP_UPFRONT: price_placeholder_upfront
+  STRIPE_PRICE_SELF_SERVE_APP_MONTHLY: price_placeholder_monthly
+  PURCHASE_PROVIDER: stub-stripe
+  STUB_EVENT_SECRET: placeholder-stub-event-secret
+  EMAIL_PROVIDER: stub-email
+  SMS_PROVIDER: null-sms
+  AREAS_SOURCE: stub
+  RESEND_API_KEY: re_placeholder
   EMAIL_DEV_DRY_RUN: "true"
+  OPENAI_API_KEY: placeholder-openai
+  GOOGLE_AI_API_KEY: placeholder-google
+  KATIE_DAILY_LIMIT_USD: "2"
+  KATIE_ENABLED: "true"
+  NEXT_PUBLIC_KATIE_ENABLED: "true"
+  INVITE_LINKS_ENABLED: "true"
+  NEW_TRIALS_ENABLED: "true"
+  PAYMENTS_ENABLED: "true"
+  NEXT_PUBLIC_SENTRY_DSN: https://placeholder@o0.ingest.sentry.example.test/0 # the public reader uses the preview column under NODE_ENV=production
+  # Legacy-tree names only (never defined in London — 06 §2.5); module-load guards in the Sydney tree still read them until F-d.
+  SUPABASE_URL: https://placeholder.supabase.co
+  NEXT_PUBLIC_SITE_URL: http://localhost:3000
+  NEXT_PUBLIC_INVITE_BASE_URL: http://localhost:3000
 
 jobs:
   typecheck:
