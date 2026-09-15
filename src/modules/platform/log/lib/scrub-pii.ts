@@ -4,36 +4,29 @@
 // to every log line before any sink sees it: by key (the field's name says what it is) and by value (the string —
 // or the number — looks like one). Pure: returns a new structure, bounded in depth and string length, never
 // mutates the input.
-import { looksLikePii } from "../../lib/looks-like-pii";
+import { KEY_PATTERNS } from "../../lib/key-patterns";
+import { isPhoneLikeNumber } from "../../lib/phone-like-number";
+import { normaliseKey } from "../../lib/normalise-key";
 import { REDACTION_MARKS } from "../../lib/redaction-marks";
 import { scrubString } from "./scrub-string";
 
 const MAX_DEPTH = 4;
 
-/** camelCase / kebab-case → snake_case so one pattern set covers `userEmail`, `user_email`, `user-email`. */
-const normaliseKey = (key: string): string =>
-  key
-    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
-    .replace(/-/g, "_")
-    .toLowerCase();
-
-// The trailing `(e?s)?` is load-bearing: without it the `($|_)` boundary broke on every plural (`apiKeys`,
-// `tokens`, `emails`, `phones`, `secrets`, `addresses`) and let the field through in the clear.
-const SENSITIVE_KEY =
-  /(^|_)(e_?mail|phone|mobile|contact_number|token|secret|password|passwd|authorization|cookie|body|document[a-z_]*|address|name|first_name|last_name|full_name|display_name|surname|given_name|api_key|private_key|ip|user_agent|session_id)(e?s)?($|_)/;
-const SAFE_KEY =
-  /^(request_id|idempotency_key|event_name|template_id|module|action|bucket_key|sink_id|retention_row|scrubbed_tables)$/;
-
 const isSensitiveKey = (key: string): boolean => {
   const normalised = normaliseKey(key);
-  return !SAFE_KEY.test(normalised) && SENSITIVE_KEY.test(normalised);
+  return (
+    !KEY_PATTERNS.safe.test(normalised) &&
+    (KEY_PATTERNS.secret.test(normalised) ||
+      KEY_PATTERNS.personal.test(normalised))
+  );
 };
 
 function scrubValue(value: unknown, depth: number): unknown {
   if (typeof value === "string") return scrubString(value);
-  // A phone number logged as a number is still a phone number (07 §9.2).
+  // A phone number logged as a number is still a phone number (07 §9.2); `isPhoneLikeNumber` owns the
+  // millisecond-epoch exemption so timestamps stay readable.
   if (typeof value === "number" || typeof value === "bigint")
-    return looksLikePii(String(value)) ? REDACTION_MARKS.redacted : value;
+    return isPhoneLikeNumber(value) ? REDACTION_MARKS.redacted : value;
   if (value === null || typeof value !== "object") return value;
   if (depth >= MAX_DEPTH) return REDACTION_MARKS.truncated;
   if (value instanceof Error)

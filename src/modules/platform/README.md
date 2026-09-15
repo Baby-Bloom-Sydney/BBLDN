@@ -67,10 +67,22 @@ run inside prose (an epoch stamp, a date written `2026-09-15 08`, the numeric ta
 number and is redacted. That is the fail-closed side of the trade; `ts` is a field for exactly this reason.
 
 **What crosses to a client.** `toClientError` reduces `INTERNAL` to its code + a generic message, and for **every**
-code runs `lib/safe-details.ts` over `details`: `Error` instances and PII-shaped strings become `[redacted]`.
-It deliberately does **not** redact by key — a client `details` legitimately names the field it is about
-(01 §4c `details: { mobile: [...] }`) — and does not touch numbers, which are the caller's own data going back to
-that caller. `envelopeOf` and `toActionResult` both route through it, so it is one chokepoint.
+code runs `lib/safe-details.ts` over `details`, redacting three ways: **by key** (`KEY_PATTERNS.secret` only —
+a field named `apiKey` / `token` / `password` / `body` goes whatever its value looks like, because most real
+credentials match no value pattern; the `personal` class is _not_ applied, since a client `details` legitimately
+names its own field — 01 §4c `details: { mobile: [...] }`), **by value** (the same free-text scrubber the log
+message uses, so a key pasted mid-sentence in a provider's message is caught, plus the same number check the log
+line applies), and **by shape** (an `Error`, a `Date`, a `Map`, any non-plain object — redacted, never walked,
+because `Object.entries` on one silently yields `{}`). `envelopeOf` and `toActionResult` both route their **body**
+through it; `envelopeOf`'s `Retry-After` header deliberately reads the raw error, because that header needs the
+true number.
+
+**One free-text scrubber, three callers.** `lib/scrub-free-text.ts` is the token-wise pass (`Bearer <token>` pairs
+→ each whitespace token through `looksLikePii` → phone runs). `looksLikePii` anchors JWT / provider key / bearer
+at the _start_ of a value, so any boundary that sees prose must use the scrubber, not the predicate: the log
+message (`scrubMessage`), the client-error guard (`safeDetails`) and the event props guard (`piiSafeString`,
+which refuses a value the scrubber would change). Adding a fourth prose boundary means using this, not
+`looksLikePii` directly.
 
 **Not here.** `platform/events/client.ts` (`track` → `POST /api/events`) lands with the route (F-c); the
 `vercel-analytics` and `meta` sinks land with Phase 4c; `platform/privacy.exportUser` (07 §6.1) is Phase 3.

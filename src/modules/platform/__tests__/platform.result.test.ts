@@ -223,7 +223,7 @@ describe("platform — toClientError guards `details` on every code (S3b)", () =
         thrown: "[redacted]",
         contact: "[redacted]",
         key: "[redacted]",
-        note: "[redacted]",
+        note: "ring [redacted] back",
         nested: { deeper: { email: "[redacted]" } },
         list: ["fine", "[redacted]"],
         reason: "declined",
@@ -248,6 +248,90 @@ describe("platform — toClientError guards `details` on every code (S3b)", () =
     expect(JSON.stringify(toClientError(failed.error))).not.toContain(
       "ann@example.test",
     );
+  });
+
+  it("redacts a token embedded mid-sentence in a provider's message, not just a whole-value one", () => {
+    const failed = err("PROVIDER_ERROR", "stripe failed", {
+      providerMessage:
+        "Stripe declined: Authorization Bearer sk_live_ci-dummy is invalid",
+      trace:
+        "call rejected, jwt abcdefghijkl.mnopqrstuvwx.yz0123456789_- expired",
+      alsoFine: "declined by the issuer",
+    });
+    const details = toClientError(failed.error).details as Record<
+      string,
+      string
+    >;
+    expect(details.providerMessage).not.toContain("sk_live");
+    expect(details.providerMessage).not.toContain("Bearer");
+    expect(details.providerMessage).toContain("[redacted]");
+    expect(details.trace).not.toContain("abcdefghijkl");
+    expect(details.alsoFine).toBe("declined by the issuer");
+  });
+
+  it("checks numbers the same way the log line does, so the two boundaries agree", () => {
+    const failed = err("VALIDATION", "check the form", {
+      mobile: 447700900123, // config-literal-ok: a PII fixture the guard must redact
+      retryAfterSeconds: 30,
+      finishedAtMs: 1758000000000,
+    });
+    expect(toClientError(failed.error).details).toEqual({
+      mobile: "[redacted]",
+      retryAfterSeconds: 30,
+      finishedAtMs: 1758000000000,
+    });
+  });
+
+  it("redacts a secret-named field whatever its value looks like (most real credentials match no pattern)", () => {
+    const failed = err("PROVIDER_ERROR", "stripe failed", {
+      apiKey: "an-ordinary-looking-string",
+      token: "0123",
+      password: "hunter2",
+      authorization: "opaque",
+      body: { raw: "the provider's whole response" },
+      documentContents: "scan text",
+      provider: "stripe",
+    });
+    expect(toClientError(failed.error).details).toEqual({
+      apiKey: "[redacted]",
+      token: "[redacted]",
+      password: "[redacted]",
+      authorization: "[redacted]",
+      body: "[redacted]",
+      documentContents: "[redacted]",
+      provider: "stripe",
+    });
+  });
+
+  it("keeps the personal-named validation fields the envelope's own example uses (01 §4c)", () => {
+    const failed = err("VALIDATION", "check the form", {
+      mobile: ["UK mobile required"],
+      email: ["Email required"],
+      firstName: ["Required"],
+    });
+    expect(toClientError(failed.error).details).toEqual({
+      mobile: ["UK mobile required"],
+      email: ["Email required"],
+      firstName: ["Required"],
+    });
+  });
+
+  it("redacts anything that is not plain data — a Date, a Map, a class instance — rather than flattening it", () => {
+    class Opaque {
+      constructor(readonly secretInside: string) {}
+    }
+    const failed = err("CONFLICT", "not movable", {
+      when: new Date("2026-09-15T08:00:00.000Z"),
+      seen: new Map([["a", 1]]),
+      thing: new Opaque("ann@example.test"),
+      reason: "stage",
+    });
+    expect(toClientError(failed.error).details).toEqual({
+      when: "[redacted]",
+      seen: "[redacted]",
+      thing: "[redacted]",
+      reason: "stage",
+    });
   });
 
   it("an error with no details still crosses the boundary unchanged", () => {

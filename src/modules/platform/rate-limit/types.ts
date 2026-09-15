@@ -7,6 +7,8 @@ import type { Instant, Result } from "@/modules/shared-types";
 import type { Log } from "../log/types";
 
 export type RateLimitPolicy = RateLimit;
+/** What an installed limiter counts in — declared at boot (`configureRateLimiter`), asserted in production (07 §8). */
+export type RateLimitBackend = "memory" | "shared";
 export type RateLimitWindow = "minute" | "hour" | "day";
 
 export type RateLimitAllowance = {

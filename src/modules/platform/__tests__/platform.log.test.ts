@@ -400,6 +400,12 @@ describe("platform/log — S3b HIGH-2: sensitive keys (01 §4b; 07 §2.7(a))", (
 });
 
 describe("platform/log — S3b MEDIUM: non-string values are content-checked too", () => {
+  it("exempts a millisecond epoch — a timestamp is 13 digits and must stay readable", () => {
+    expect(
+      scrubPii({ finishedAtMs: 1758000000000, startedAtMs: 1000000000000 }),
+    ).toEqual({ finishedAtMs: 1758000000000, startedAtMs: 1000000000000 });
+  });
+
   it("redacts a PII-shaped number under a non-sensitive key, keeps ordinary numbers", () => {
     expect(
       scrubPii({
@@ -416,6 +422,28 @@ describe("platform/log — S3b MEDIUM: non-string values are content-checked too
       stamp: 20260915,
       nested: { alt: [REDACTED] },
     });
+  });
+});
+
+describe("platform/log — S3b: a failing scrub never reaches the caller", () => {
+  it("reports on stderr and writes a placeholder line instead of throwing", () => {
+    const stderr = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const { lines, sink } = capture();
+    const logger = createLogger({
+      sink,
+      clock: () => FIXED,
+      base: {
+        get boom(): string {
+          throw new Error("field getter exploded");
+        },
+      },
+    });
+    expect(() => logger.info("still fine")).not.toThrow();
+    expect(lines[0]?.msg).toBe("[log line could not be built]");
+    expect(stderr).toHaveBeenCalled();
+    stderr.mockRestore();
   });
 });
 
@@ -453,6 +481,23 @@ describe("platform/log — S3b HIGH-1: `msg` is scrubbed before any sink or trac
     logger.info("y".repeat(5000));
     expect(String(lines[1]?.msg).length).toBeLessThan(2100);
     expect(lines[1]?.msg).toMatch(/…\[truncated\]$/);
+  });
+
+  it("pins the documented fail-closed trade-off: a 9–15-digit run in prose is redacted in place", () => {
+    // Deliberate (README): `msg` is prose, ids belong in `fields`. The run goes, the message survives.
+    const { lines, sink } = capture();
+    const logger = createLogger({ sink, clock });
+    logger.info("order 4471234567 refunded");
+    expect(lines[0]?.msg).toBe("order [redacted] refunded");
+    logger.info("run started at 2026-09-15 08:00 London");
+    expect(lines[1]?.msg).toBe("run started at [redacted]:00 London");
+    // Shorter and longer digit runs are not phone-shaped and survive untouched.
+    logger.info("cron processed 12345678 rows in 1234 ms");
+    expect(lines[2]?.msg).toBe("cron processed 12345678 rows in 1234 ms");
+    logger.info("user 00000000-0000-4000-8000-000000000000 advanced");
+    expect(lines[3]?.msg).toBe(
+      "user 00000000-0000-4000-8000-000000000000 advanced",
+    );
   });
 
   it("the error tracker receives the scrubbed message, not the raw one", () => {
