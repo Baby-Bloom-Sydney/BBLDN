@@ -23,7 +23,8 @@ const HEADER = `// eslint.boundaries.js — GENERATED FILE, DO NOT EDIT.
 //   rule 2  no deep imports — a module is entered through its connector only. \`@/modules/config/server\` is
 //           \`config\`'s second entry point (01 §3.3). Sub-module connectors (\`comms/sms\`, \`admin/*\` …) are
 //           reachable only through the parent's re-exports. \`bb/no-relative-module-escape\` closes the same
-//           hole for relative paths, which \`no-restricted-imports\` cannot see.
+//           hole for relative paths and \`bb/no-dynamic-module-import\` the one for \`import()\` expressions
+//           and type-position imports — neither of which ESLint 8's core rule reads.
 //   rule 3  no cycles at module level — asserted over the declared table when this file is generated, which
 //           is exhaustive once rules 1–2 hold (there is no other way for one module to reach another).
 //   rule 4  \`bb/one-export-per-file\` — L1; the exemptions live in the rule, not in the files.
@@ -59,10 +60,14 @@ const LINTER_OPTIONS = { reportUnusedDisableDirectives: false };
 `;
 
 const FOOTER = `
-const messageFor = (name, group) =>
-  \`\${name} may import \${group
+// The connectors a row allows, read back off its own pattern group so there is one source, not two.
+const allowedOf = (group) =>
+  group
     .filter((pattern) => pattern.startsWith("!") && !pattern.endsWith("/**"))
-    .map((pattern) => pattern.slice(1))
+    .map((pattern) => pattern.slice(1));
+
+const messageFor = (name, group) =>
+  \`\${name} may import \${allowedOf(group)
     .join(" · ")} — nothing else (01 §2.3, §2.4). A module is entered through its connector: no deep import \` +
   \`into another module's inside, and no sub-module connector from outside its parent (05 §7 rules 1–2).\`;
 
@@ -92,6 +97,10 @@ module.exports = [
       "no-restricted-imports": [
         "error",
         { patterns: [{ group, message: messageFor(name, group) }] },
+      ],
+      "bb/no-dynamic-module-import": [
+        "error",
+        { module: name, allowed: allowedOf(group) },
       ],
     },
   })),
