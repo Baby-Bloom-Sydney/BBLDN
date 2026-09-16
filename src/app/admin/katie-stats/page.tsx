@@ -4,9 +4,11 @@
  * Read-only. Pulls aggregates from chat_cost_daily, chat_messages.metadata,
  * and chat_draft_locks. Server component — no client interactivity in v1.
  *
- * Admin role is already enforced by `src/lib/supabase/middleware.ts`
- * (`/admin` paths require role 'admin' or 'super_admin'), so we don't
- * re-check here.
+ * Admin role is enforced by the gate in `src/middleware.ts` (01 §4d step 2 —
+ * `/admin` requires role 'admin', and 07 §5.4 row 2's aal2 with it), so we
+ * don't re-check here. NOTE: the gate is the coarse check; 07 §5.4 row 1 wants
+ * `is_admin()` re-checked in every admin action too — F-c's route shells.
+ * (Reference updated by S4, which replaced the Sydney gate this named.)
  *
  * What this dashboard answers:
  *   - Total cost in the last 7 / 30 days

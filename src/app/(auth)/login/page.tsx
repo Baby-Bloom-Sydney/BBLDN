@@ -34,7 +34,9 @@ type LoginFormData = z.infer<typeof loginSchema>;
 function LoginForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const redirectTo = searchParams.get("redirect");
+  // 01 §4d step 2: the gate sends people here as `?next=<attempted path>`. Sydney's own links still use
+  // `?redirect=`, so both are read and the same `isSafeInternalPath` guard applies to either (S4).
+  const redirectTo = searchParams.get("next") ?? searchParams.get("redirect");
   const inviteToken = searchParams.get("invite");
   const [isLoading, setIsLoading] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
