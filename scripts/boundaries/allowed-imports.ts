@@ -8,9 +8,7 @@
 // Each row is the §2.3 "May import (connectors only)" cell verbatim, service modules included where the row
 // names them. The service modules are allowed for every row regardless (01 §2.4) — that union is applied by
 // `lib/allowed-specifiers.ts`, not baked in here, so this file stays a faithful copy of the document.
-import type { MODULE_NAMES } from "../../src/modules/shared-types/module-names.ts";
-
-type ModuleName = (typeof MODULE_NAMES)[number];
+import type { ModuleName } from "./module-name.ts";
 
 export const ALLOWED_IMPORTS: Readonly<
   Record<ModuleName, readonly ModuleName[]>

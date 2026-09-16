@@ -7,29 +7,11 @@
 // specifier against the importing file and refuses any that leaves the module it started in. Cross-module
 // traffic is `@/modules/<x>` — the connector — and is judged by the generated patterns.
 //
-// Test files get a **narrow** exemption, not a blanket one (silent-failure-hunter, S6 review): a test may
-// reach outside `src/modules` entirely — `src/modules/config/__tests__/config.repo.test.ts` reads
-// `scripts/env/lib/…` on purpose, to prove the committed `.env.example` is what the generator writes — but a
-// test reaching into *another module's* inside is the same architecture erosion as production code doing it,
-// and is reported.
+// The where-am-I and where-does-this-go questions, and the narrow test-file exemption, live in
+// `lib/module-context.js`, shared with `bb/no-dynamic-module-import` so the static and dynamic halves of the
+// same rule cannot drift apart (typescript-reviewer, S6 review).
 
-const MODULE_ROOT = /^(?<root>.*\/src\/modules\/[^/]+\/)/u;
-const MODULES_ROOT = "/src/modules/";
-
-const isTestPath = (posixPath) =>
-  posixPath.includes("/__tests__/") ||
-  /\.(test|spec)\.[cm]?[jt]sx?$/u.test(posixPath);
-
-/** Joins a relative specifier onto a directory, resolving `.` and `..`, without touching the filesystem. */
-function resolvePosix(fromDirectory, specifier) {
-  const segments = [];
-  for (const segment of `${fromDirectory}/${specifier}`.split("/")) {
-    if (segment === "" || segment === ".") continue;
-    if (segment === "..") segments.pop();
-    else segments.push(segment);
-  }
-  return `/${segments.join("/")}`;
-}
+const moduleContextOf = require("./lib/module-context");
 
 /** @type {import("eslint").Rule.RuleModule} */
 module.exports = {
@@ -47,32 +29,22 @@ module.exports = {
   },
 
   create(context) {
-    const filename = (context.filename ?? context.getFilename() ?? "").replace(
-      /\\/gu,
-      "/",
-    );
-    const root = MODULE_ROOT.exec(filename)?.groups?.root;
-    if (root === undefined) return {};
-    const isTest = isTestPath(filename);
-
-    const directory = filename.slice(0, filename.lastIndexOf("/"));
-    const segments = root.split("/").filter(Boolean);
-    const moduleName = segments[segments.length - 1];
+    const here = moduleContextOf(context.filename ?? context.getFilename());
+    if (here === null) return {};
 
     const check = (node) => {
       const source = node.source?.value;
       if (typeof source !== "string" || !source.startsWith(".")) return;
-      const resolved = resolvePosix(directory, source);
-      if (resolved.startsWith(root)) return;
-      if (isTest && !resolved.includes(MODULES_ROOT)) return;
-      const inside = resolved.indexOf("/src/");
+      const resolved = here.resolve(source);
+      if (here.staysInside(resolved)) return;
+      if (here.isTest && here.leavesModuleTree(resolved)) return;
       context.report({
         node: node.source,
         messageId: "escape",
         data: {
           source,
-          module: moduleName,
-          resolved: inside === -1 ? resolved : resolved.slice(inside + 1),
+          module: here.moduleName,
+          resolved: here.display(resolved),
         },
       });
     };

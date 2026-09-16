@@ -49,6 +49,12 @@ ruleTester.run("bb/no-dynamic-module-import", rule, {
       filename: inMatching,
       options,
     },
+    // A test may reach the repo's own tooling outside `src/modules`, exactly as the static rule allows.
+    {
+      code: 'await import("../../../../scripts/env/lib/render-env-example");',
+      filename: "/repo/src/modules/matching/__tests__/matching.test.ts",
+      options,
+    },
     // Outside `src/modules` there is no module to hold anything inside.
     {
       code: 'await import("@/modules/connections");',
@@ -98,6 +104,13 @@ ruleTester.run("bb/no-dynamic-module-import", rule, {
       filename: inMatching,
       options,
       errors: [{ messageId: "restricted" }],
+    },
+    // …but not into another module's inside.
+    {
+      code: 'await import("../../positions/lib/pick");',
+      filename: "/repo/src/modules/matching/__tests__/matching.test.ts",
+      options,
+      errors: [{ messageId: "escape" }],
     },
   ],
 });

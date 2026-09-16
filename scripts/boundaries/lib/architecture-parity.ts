@@ -18,22 +18,25 @@ export function architectureParity(markdown: string | null): {
     };
 
   const fromDocument = parseArchitectureTable(markdown);
-  const drift = [
-    ...new Set([...Object.keys(ALLOWED_IMPORTS), ...Object.keys(fromDocument)]),
-  ]
+  const rowsOf = (
+    entries: ReadonlyArray<readonly [string, readonly string[]]>,
+  ): ReadonlyMap<string, string> =>
+    new Map(entries.map(([name, row]) => [name, row.join(" · ")]));
+
+  const copy = rowsOf(Object.entries(ALLOWED_IMPORTS));
+  const document = rowsOf(Object.entries(fromDocument));
+  const drift = [...new Set([...copy.keys(), ...document.keys()])]
     .map((module) => ({
       module,
-      copy: (
-        ALLOWED_IMPORTS[module as keyof typeof ALLOWED_IMPORTS] ?? ["<missing>"]
-      ).join(" · "),
-      document: (fromDocument[module] ?? ["<missing>"]).join(" · "),
+      copy: copy.get(module) ?? "<missing>",
+      document: document.get(module) ?? "<missing>",
     }))
     .filter((row) => row.copy !== row.document);
 
   if (drift.length === 0)
     return {
       ok: true,
-      message: `check:allowed-imports: OK — allowed-imports.ts matches 01-architecture.md §2.3 (${Object.keys(ALLOWED_IMPORTS).length} rows)`,
+      message: `check:allowed-imports: OK — allowed-imports.ts matches 01-architecture.md §2.3 (${copy.size} rows)`,
     };
 
   return {

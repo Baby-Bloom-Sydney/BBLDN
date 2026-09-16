@@ -19,6 +19,11 @@ ruleTester.run("bb/one-export-per-file", rule, {
     { code: "export function a() {}", filename: helper },
     { code: "export default function a() {}", filename: helper },
     { code: "export const { a } = actions;", filename: helper },
+    // Ambient declarations are a declaration group, like a type group.
+    {
+      code: "export declare const a: number;\nexport declare function b(): void;",
+      filename: helper,
+    },
     // A value plus the types that describe it is one thing, not two (L1's "one type group").
     {
       code: "export type A = { a: 1 };\nexport interface B { b: 2 }\nexport const a: A = { a: 1 };",

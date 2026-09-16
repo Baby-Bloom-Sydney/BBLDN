@@ -415,6 +415,26 @@ const messageFor = (name, group) =>
 module.exports = [
   { ignores: [...legacyPaths] },
 
+  // The rules that enforce everything below get no static analysis otherwise: `tsc` skips them (`allowJs`
+  // without `checkJs`) and `next lint` does not scan `scripts/` (typescript-reviewer, S6 review).
+  {
+    files: ["scripts/boundaries/rules/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "commonjs",
+      globals: { require: "readonly", module: "writable", console: "readonly" },
+    },
+    linterOptions: LINTER_OPTIONS,
+    rules: {
+      "no-undef": "error",
+      "no-unused-vars": "error",
+      "no-var": "error",
+      "prefer-const": "error",
+      eqeqeq: "error",
+      "no-empty": "error",
+    },
+  },
+
   // L1 (05 §7 rule 4) and the relative half of rule 2 — every module file, one rule set.
   {
     files: ["src/modules/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],

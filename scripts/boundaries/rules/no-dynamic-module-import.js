@@ -1,6 +1,6 @@
 "use strict";
 
-// bb/no-dynamic-module-import — the third blind spot of `no-restricted-imports`.
+// bb/no-dynamic-module-import — the blind spot of `no-restricted-imports`.
 //
 // ESLint 8's core rule reads `import` / `export … from` declarations only. Measured on this repo: a module
 // file containing `await import("@/modules/connections")` passes the generated patterns with no report, and
@@ -8,24 +8,15 @@
 // boundary crossings — at run time and at type level — so this rule applies the module's own row to them.
 //
 // It takes the row as an option (`{ module, allowed }`), written into `eslint.boundaries.js` by the
-// generator, so there is still exactly one source for the table.
+// generator, so there is still exactly one source for the table. Path questions and the narrow test-file
+// exemption come from `lib/module-context.js`, shared with `bb/no-relative-module-escape`.
 //
 // A specifier that is not a plain string is reported rather than skipped: a gate that cannot see what it is
 // being asked to allow must say so, not wave it through.
 
-const MODULE_ROOT = /^(?<root>.*\/src\/modules\/[^/]+\/)/u;
-const MODULE_SPECIFIER = "@/modules/";
+const moduleContextOf = require("./lib/module-context");
 
-/** Joins a relative specifier onto a directory, resolving `.` and `..`, without touching the filesystem. */
-function resolvePosix(fromDirectory, specifier) {
-  const segments = [];
-  for (const segment of `${fromDirectory}/${specifier}`.split("/")) {
-    if (segment === "" || segment === ".") continue;
-    if (segment === "..") segments.pop();
-    else segments.push(segment);
-  }
-  return `/${segments.join("/")}`;
-}
+const MODULE_SPECIFIER = "@/modules/";
 
 /** @type {import("eslint").Rule.RuleModule} */
 module.exports = {
@@ -33,7 +24,7 @@ module.exports = {
     type: "problem",
     docs: {
       description:
-        "a dynamic or type-position `import()` obeys the same allowed-imports row as a static one (01 §2.3)",
+        "a dynamic, type-position or `require` import obeys the same allowed-imports row as a static one (01 §2.3)",
     },
     schema: [
       {
@@ -48,11 +39,11 @@ module.exports = {
     ],
     messages: {
       restricted:
-        '`import("{{source}}")` crosses a boundary the row does not allow. `{{module}}` may import {{allowed}} — nothing else (01 §2.3, §2.4), and a dynamic or type-position import is an import.',
+        '`{{kind}}("{{source}}")` crosses a boundary the row does not allow. `{{module}}` may import {{allowed}} — nothing else (01 §2.3, §2.4), and a dynamic, type-position or `require` import is an import.',
       escape:
-        '`import("{{source}}")` leaves `{{module}}`. Cross-module traffic goes through the other module\'s connector (`@/modules/<module>`), never a relative path into its inside (01 §2.3; 05 §7 rule 2).',
+        '`{{kind}}("{{source}}")` leaves `{{module}}` and reaches `{{resolved}}`. Cross-module traffic goes through the other module\'s connector (`@/modules/<module>`), never a relative path into its inside (01 §2.3; 05 §7 rule 2).',
       computed:
-        "`import()` here is given a computed specifier, so the boundary lint cannot check it. Write the module path as a literal (01 §2.3; 05 §7 rules 1–2).",
+        "`{{kind}}()` here is given a computed specifier, so the boundary lint cannot check it. Write the module path as a literal (01 §2.3; 05 §7 rules 1–2).",
     },
   },
 
@@ -63,35 +54,37 @@ module.exports = {
         "bb/no-dynamic-module-import needs { module, allowed } — it is written by scripts/gen-boundary-rules.ts",
       );
 
-    const filename = (context.filename ?? context.getFilename() ?? "").replace(
-      /\\/gu,
-      "/",
-    );
-    const root = MODULE_ROOT.exec(filename)?.groups?.root;
-    if (root === undefined) return {};
+    const here = moduleContextOf(context.filename ?? context.getFilename());
+    if (here === null) return {};
 
-    const directory = filename.slice(0, filename.lastIndexOf("/"));
     const allowedSet = new Set(allowed);
     const own = `${MODULE_SPECIFIER}${moduleName}`;
     const allowedList = allowed.join(" · ");
 
-    const check = (node, sourceNode) => {
+    const check = (node, sourceNode, kind) => {
       if (
         sourceNode === null ||
         sourceNode === undefined ||
         sourceNode.type !== "Literal" ||
         typeof sourceNode.value !== "string"
       ) {
-        context.report({ node, messageId: "computed" });
+        context.report({ node, messageId: "computed", data: { kind } });
         return;
       }
       const source = sourceNode.value;
       if (source.startsWith(".")) {
-        if (resolvePosix(directory, source).startsWith(root)) return;
+        const resolved = here.resolve(source);
+        if (here.staysInside(resolved)) return;
+        if (here.isTest && here.leavesModuleTree(resolved)) return;
         context.report({
           node: sourceNode,
           messageId: "escape",
-          data: { source, module: moduleName },
+          data: {
+            kind,
+            source,
+            module: moduleName,
+            resolved: here.display(resolved),
+          },
         });
         return;
       }
@@ -105,7 +98,7 @@ module.exports = {
       context.report({
         node: sourceNode,
         messageId: "restricted",
-        data: { source, module: moduleName, allowed: allowedList },
+        data: { kind, source, module: moduleName, allowed: allowedList },
       });
     };
 
@@ -127,10 +120,10 @@ module.exports = {
         callee.property.name === "resolve");
 
     return {
-      ImportExpression: (node) => check(node, node.source),
-      TSImportType: (node) => check(node, specifierOfType(node)),
+      ImportExpression: (node) => check(node, node.source, "import"),
+      TSImportType: (node) => check(node, specifierOfType(node), "import"),
       CallExpression(node) {
-        if (isRequire(node.callee)) check(node, node.arguments[0]);
+        if (isRequire(node.callee)) check(node, node.arguments[0], "require");
       },
     };
   },

@@ -95,7 +95,10 @@ function valueExportsOf(node) {
       .filter((specifier) => specifier.exportKind !== "type")
       .map((specifier) => ({ node: specifier, name: specifier.exported.name }));
 
-  if (TYPE_DECLARATIONS.has(declaration.type)) return [];
+  // `export declare const x` / `declare function` publish an ambient *type* surface, not a value this file
+  // owns — a hand-written `.d.ts` is a declaration group, the type-group case (typescript-reviewer, S6).
+  if (TYPE_DECLARATIONS.has(declaration.type) || declaration.declare === true)
+    return [];
   if (declaration.type === "VariableDeclaration")
     return declaration.declarations.flatMap((declarator) =>
       boundNamesOf(declarator.id).map((name) => ({ node: declarator, name })),
