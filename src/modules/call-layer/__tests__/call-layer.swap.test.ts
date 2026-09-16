@@ -87,6 +87,21 @@ describe("call-layer through the connector binding", () => {
     );
   });
 
+  // 05 §3 rule 6: a stub whose success is indistinguishable from real work is acceptable only where a swap test
+  // asserts that behaviour deliberately. `stubCallLayer` holds no calendar, so `listSlots` answers an empty
+  // list — unlike `openNannyCall`, which refuses, because "no slots free" is a real answer and "booked" is not.
+  // Pinned here (REVIEW-1) so the emptiness is a decision on the record rather than an unexamined quiet
+  // success, and so wiring `listSlots` through to `scheduling` later has to change this test on purpose.
+  it("answers an empty slot list rather than refusing — the stub holds no calendar", async () => {
+    const result = await callLayer.listSlots("matchmaking", {
+      from: "2026-01-01T00:00:00+00:00" as never,
+      to: "2026-01-08T00:00:00+00:00" as never,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value).toEqual([]);
+  });
+
   it("reads a position call from its mirror, keyed by positionId", async () => {
     const result = await callLayer.getCallState({
       kind: "call",
