@@ -126,14 +126,15 @@ export const PUBLIC_ENV_ENTRIES = {
     preview: "○",
     prod: "○",
   },
-  // Monitoring (06 §7; ADR-106)
+  // Monitoring (06 §7; ADR-106). Optional in every column until the SDK lands (ADR-128; see env-schema.ts).
   NEXT_PUBLIC_SENTRY_DSN: {
     group: "Monitoring",
     scope: "public",
     kind: "url",
-    purpose: "Sentry DSN, client (ADR-106)",
-    dev: "—",
-    preview: "●",
-    prod: "●",
+    purpose:
+      "Sentry DSN, client (ADR-106; optional until the SDK lands — ADR-128)",
+    dev: "○",
+    preview: "○",
+    prod: "○",
   },
 } as const satisfies Readonly<Record<string, EnvEntry>>;

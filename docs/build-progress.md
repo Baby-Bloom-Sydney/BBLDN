@@ -18,6 +18,7 @@
 
 ## Known bugs / gaps (recorded, not hidden)
 
+- **P1-FIX (L-007, 2026-09-17) closed ADR-119 / ADR-121 / ADR-128:** `TransitionHandler` · `SliceRegistration` · `RegisterSlice` now live in `shared-types/stage-model.ts` (the `connections` / `placements` local copies deleted; `positions` keeps the one `registerSlice` implementation); `/api/health` answers `{ data: { sha, env, db }, requestId }` + `x-request-id` with `db` a real fail-closed read through the data port (E1's item 3 below and its `test.fail()` are closed — the smoke asserts `db: "failed"` because it boots with Supabase unreachable by design; `route.test.ts` pins `db: "ok"` against `stub-auth`); the three monitoring names are `○` everywhere and `VERCEL_GIT_COMMIT_SHA` joined the registry (51 names). Still owed: the rate limit 06 §7.3 names on `/api/health` (no shared limiter store yet); 06 §2.5's Monitoring row still reads `● preview · ● prod` and wants the ADR-128 amendment.
 - **★ 1a: the `Query` port cannot read a view, so S-X-10 / S-X-11 (browse, profile) are not rebuilt.** 07 §5.1 rule 4 / S5's hand-over make `nanny_public` a parent's only road to a nanny, and `0016` grants `anon` SELECT on it — but `shared-types/platform.ts` types `Query.from()` over `keyof DB["Tables"]`, so `Database["public"]["Views"]` is unreachable through `auth.data.run`. Widening it is a 03 §1.4 amendment first (`shared-types` + `auth`, always sequential). Blocks `1b`'s result cards and the OG route too. Options in the L-007 PROGRESS entry; planner's call.
 - **1a: `next.config.mjs` still redirects `/signup/nanny → /apply/nanny` and `/nanny/register → /nanny/profile`**, both contradicting 04 §2.1 (S-X-07, S-N-18). Phase 2 nanny surfaces; recorded, not pinned (a Next redirect is not unit-testable without a server).
 - **1a: the 05 §5.2 static matcher flags Tailwind `tracking-*` classes as _tracking_** (hyphen = word boundary); `public-site` uses `[letter-spacing:…]` instead. Every legacy `tracking-tight` is a false positive in `check:banned-words`.
@@ -304,8 +305,9 @@ Superseded note — the S1 "next unit" text: **S2 — `shared-types` (types only
 <!-- audit
 Last edited: 2026-09-17T12:20+10:00 — BB-LDN-Planner-070926/P1-WIRE
 Notes: P1-WIRE — the ★ instrumentation gap moved from open to CLOSED with what each of the eight ports was bound to and the three corners deliberately left closed (rate limiter undeclared — no rate_limit_buckets spec; event-log reads and the cookie half of consent — no keyed read on the Query surface; comms store + renderer fail-closed); the platform fail-closed entry re-pointed at the new negative test; E1 finding 4 closed; a P1-WIRE files section with gates measured; the Next-unit "still owed" paragraph retired in place. Trunk row not refreshed (1a / P1-FIX are in flight; textual merges).
-Prior: 2026-09-17T11:30+10:00 — BB-LDN-Planner-070926/1a
 Notes: 1a — the public site. Current state: phase flipped to Phase 1, open branches = p1a + P1-FIX. Known bugs gains five 1a entries led by the ★ Query-port-has-no-views gap (blocks S-X-10 / S-X-11 and 1b's cards). New 1a files section (the public-site inside, the thin routes, the deletions, the gates). Next unit gains the "1b must know" block.
+Prior:  2026-09-17T11:55+10:00 — BB-LDN-Planner-070926/P1-FIX — P1-FIX
+Prior: 2026-09-17T11:30+10:00 — BB-LDN-Planner-070926/1a
 Prior: 2026-09-16T17:20+10:00 — BB-LDN-Planner-070926/E1
 Notes: E1 — the shell smoke. Current state corrected (trunk was stale at c4ac6f4 since S4; measured 1ec71e1
 with git merge-base --is-ancestor), one open branch, phase restated. Known bugs gains the ★ E1 block: the

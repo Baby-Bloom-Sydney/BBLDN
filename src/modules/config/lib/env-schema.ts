@@ -22,6 +22,16 @@ const SERVER_ENV_ENTRIES = {
     preview: "●",
     prod: "●",
   },
+  VERCEL_GIT_COMMIT_SHA: {
+    group: "App",
+    scope: "server",
+    kind: "string",
+    purpose:
+      "set by Vercel: the deployed commit sha — /api/health reports it as `sha` (06 §7.3) for the promote verify (06 §4.5; ADR-121)",
+    dev: "○",
+    preview: "○",
+    prod: "○",
+  },
   CRON_SECRET: {
     group: "App",
     scope: "server",
@@ -363,24 +373,28 @@ const SERVER_ENV_ENTRIES = {
     preview: "○",
     prod: "○",
   },
-  // Monitoring (06 §7; ADR-106)
+  // Monitoring (06 §7; ADR-106). Optional in every column until the Sentry project + Slack webhook exist and
+  // the SDK lands as its own unit (ADR-128) — nothing reads these today, so requiring them was a lie the boot
+  // guard had to enforce. That unit may make them ● for production again.
   SENTRY_DSN: {
     group: "Monitoring",
     scope: "server",
     kind: "url",
-    purpose: "Sentry DSN, server (ADR-106)",
-    dev: "—",
-    preview: "●",
-    prod: "●",
+    purpose:
+      "Sentry DSN, server (ADR-106; optional until the SDK lands — ADR-128)",
+    dev: "○",
+    preview: "○",
+    prod: "○",
   },
   ALERT_WEBHOOK_URL: {
     group: "Monitoring",
     scope: "server",
     kind: "url",
-    purpose: "Slack alert-channel webhook (06 §7.2; ADR-106)",
-    dev: "—",
-    preview: "●",
-    prod: "●",
+    purpose:
+      "Slack alert-channel webhook (06 §7.2; ADR-106; optional until the channel exists — ADR-128)",
+    dev: "○",
+    preview: "○",
+    prod: "○",
     secret: true,
   },
 } as const satisfies Readonly<Record<string, EnvEntry>>;

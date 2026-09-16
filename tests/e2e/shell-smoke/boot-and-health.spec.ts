@@ -19,33 +19,35 @@ test("GET /api/health answers 200 with JSON", async ({ request }) => {
 // after one trivial Supabase read"; 06 §4.5's promote step verifies "`/api/health` 200 **with the new sha**", and
 // HANDOFF §11 G2 says the same. 01 §4c makes `requestId` part of every envelope.
 //
-// The shipped route returns a bare `{ status: "ok" }` with no envelope, no sha, no env, no db read and no
-// `x-request-id` — a deliberate F-c choice ("the least informative route in the app") that no ADR records.
-// **The document wins**, so the assertion is written to the document and marked as currently failing rather than
-// rewritten to bless the code. Remove the `test.fail()` with the route fix — or with the ADR that exempts
-// `/api/health` from 01 §4c, in which case 06 §7.3 and §4.5 are the sections to amend first. Until one of those
-// happens, 06 §4.5's promote verify step cannot be performed as written.
+// E1 pinned this as a `test.fail()` against F-c's bare `{ status: "ok" }`; ADR-121 ruled the document right and
+// P1-FIX fixed the route, so it is a real expectation now. **What this server can and cannot show:** the smoke
+// boots with Supabase deliberately unreachable (`scripts/ci/lib/smoke-env.sh` — 01 §4d step 2 wants a session
+// the app cannot read *refused*), so the one real read `db` performs cannot succeed here. The honest, fail-closed
+// answer is therefore `db: "failed"` — and that is what is asserted, because a probe that said `"ok"` with no
+// database behind it is exactly the lie the field exists to prevent. The `db: "ok"` half of the contract is
+// pinned by `src/app/api/health/route.test.ts` against a reachable (in-memory) port.
 //
 // The shape is spelled out inline here rather than read through `envelope.ts`: `SuccessEnvelope<T>`'s `T` is
 // whatever the route returns, and what 06 §7.3 says that `T` is — `{ sha, env, db }` — is exactly the claim
-// under test.
+// under test. `env` is `"preview"` because this project runs against the preview server only (the production
+// server has its own `production/` specs).
 test("GET /api/health answers in the 01 §4c envelope with the deploy sha (06 §7.3)", async ({
   request,
 }) => {
-  test.fail(
-    true,
-    "recorded disagreement: 06 §7.3 vs the shipped route — docs/build-progress.md",
-  );
-
   const response = await request.get("/api/health");
   const body = (await response.json()) as {
     data?: { sha?: string; env?: string; db?: string };
+    error?: unknown;
     requestId?: string;
   };
 
+  expect(response.status()).toBe(STATUS.ok);
   expect(isRequestId(body.requestId)).toBe(true);
-  expect(body.data).toEqual(expect.objectContaining({ db: "ok" }));
+  expect(response.headers()["x-request-id"]).toBe(body.requestId);
+  expect(body.error).toBeUndefined();
   expect(typeof body.data?.sha).toBe("string");
+  expect(body.data?.env).toBe("preview");
+  expect(body.data?.db).toBe("failed");
 });
 
 // 01 §4c rule: `x-request-id` on every response of the envelope, carrying the same value as the body's
