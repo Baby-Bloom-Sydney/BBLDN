@@ -1,11 +1,10 @@
 // auth — the module's type surface (01 §2.5). Copied from `03-interface-contracts.md` §1.4 with the names that
-// contract spells, plus the driver seam the inside is built on. Values live in index.ts. **Types only** — this file
-// is client-safe (`index.ts` is `server-only`), so a `"use client"` page may `import type` from the connector.
+// contract spells, plus the driver seam the inside is built on. Values live in index.ts. **Types only**, so a client
+// component may `import type` from the connector without dragging the Supabase SDK into its bundle.
 import type { NextRequest, NextResponse } from "next/server";
 import type { BucketKey } from "@/modules/config";
 import type {
   Actor,
-  CustomerRole,
   DatabaseShape,
   Email,
   EnumValue,
@@ -22,6 +21,12 @@ import type {
 
 /** `parent` · `nanny` · `admin` — "any admin login", no `super_admin` (ADR-030; 02 §3 `user_role`, §5 row 7). */
 export type Role = EnumValue<"user_role">;
+
+/**
+ * The two customer roles. `shared-types/actor.ts` declares the same type but the barrel does not re-export it
+ * (the S2 gap `platform` hit for `ConsentParty`), so it is derived here from the same enum rather than widened.
+ */
+export type CustomerRole = Exclude<Role, "admin">;
 
 /** 03 §1.4 verbatim. `mfaVerified` = Supabase `aal2`, required for `admin` (07 §5.4 row 2). */
 export type Session = {

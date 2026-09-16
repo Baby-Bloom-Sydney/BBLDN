@@ -26,3 +26,4 @@ export { roleDashboardPath } from "./lib/role-dashboard-path";
 export { requiredRoleForPath } from "./lib/required-role-for-path";
 export { isAuthGroupPath } from "./lib/is-auth-group-path";
 export { loginRedirectUrl } from "./lib/login-redirect-url";
+export { gateDecision } from "./lib/gate-decision";

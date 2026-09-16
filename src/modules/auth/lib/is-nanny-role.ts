@@ -1,0 +1,4 @@
+// 03 §1.4 — pure role predicate.
+import type { Role } from "../types";
+
+export const isNannyRole = (role: Role): boolean => role === "nanny";

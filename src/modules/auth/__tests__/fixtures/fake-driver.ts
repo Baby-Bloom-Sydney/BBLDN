@@ -93,6 +93,8 @@ export function fakeDriver(over: Partial<FakeDriverState> = {}): FakeDriver {
     },
     updatePassword: async () => {
       boom("updatePassword");
+      if (state.user !== null)
+        state.user = { ...state.user, hasPassword: true };
     },
     exchangeCodeForSession: async () => {
       boom("exchangeCodeForSession");
