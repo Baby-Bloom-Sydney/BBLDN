@@ -132,6 +132,10 @@ Branch `boundary-lint-160926-1`, pushed, **PR [#6](https://github.com/babyblooms
 
 **71 files, all new, all under `src/modules/{comms,scheduling,verification,vetting-providers,admin-verification,onboarding-parent,onboarding-nanny,public-site}/`** — connectors, types, READMEs, stubs and tests; no file outside those eight folders was touched. `comms` is the service module of 01 §2.4 (`config` + `shared-types` + `platform` only); `scheduling` ships `scheduling.stub.ts` over the three shared pure rules of 03 §3.6; `verification` and `vetting-providers` are **ADR-117 Tier A** and shipped connector + types only (no evidence handling, no storage path, no provider call); the remaining four carry the folder shape plus only the types the foundations state. Every module-level binding **fails closed** until boot configures it. Gates green locally: typecheck · lint · prettier · vitest 2 314 / 2 314 (154 files) · lint:boundaries · check:allowed-imports · check:config-literals · check:claude-md. Review deferred to the ADR-117 Tier B overnight sweep. Gaps are in each module README and in the L-005 F-b entry.
 
+## Files created / modified in the current unit (F-a — marketplace module connectors + stubs)
+
+Branch `modules-marketplace-160926-1`, **PR open into `main`, not merged** — **ADR-117 Tier B** (fast gates + PR; the review-agent battery is the overnight sweep, its findings return as a separate fix unit). **Created (84):** everything under `src/modules/{areas,scoring,matching,positions,call-layer,connections,placements,hire-docs,admin-on-behalf}/**` — nine `index.ts` + `types.ts` + `README.md`, nine `*.stub.ts` (`stub-areas` · `stubScoring` + `stubDistanceProvider` + `haversineProvider` · `stubMatching` · `stubPositions` · `stubCallLayer` · `stubConnections` + `stubConnectionsSlice` · `stubPlacements` + `stubPlacementsSlice` · `stubHireDocs` · `stubAdminOnBehalf`), the `positions` slice seam (`registerSlice` + `advance` dispatch), and nine `__tests__/*.swap.test.ts` (83 tests). **No file outside those nine folders** except this ledger — no `config`, `shared-types`, `platform`, `auth`, `supabase/**`, script, workflow or eslint change, so F-a is disjoint from S5. Fast gates all green (typecheck · lint · prettier · vitest 2 253 / 152 files · lint:boundaries · allowed-imports · config-literals · check:claude-md); gaps and the one Tier A item are in the L-005 F-a PROGRESS entry.
+
 ## Next unit
 
 **S6 — boundary lint** is already in flight on `boundary-lint-160926-1`, in parallel with this unit and with a disjoint touch surface (`BRANCHES.md`). After both merge, the sequential spine is **S5 — migrations `0000` → `0016`, one PR each** (HANDOFF §11), and the **F-a / F-b / F-c fan-out** opens once S2–S4 and `0000`–`0002` are on `main`.
@@ -153,9 +157,15 @@ Superseded note — the S1 "next unit" text: **S2 — `shared-types` (types only
 ---
 
 <!-- audit
-Last edited: 2026-09-16T14:05+10:00 — BB-LDN-Planner-070926/F-b
-Notes: F-b — one section added for the eight connector modules (71 new files, gates green, ADR-117 Tier B review deferred); the open-branches row now names `modules-onboarding-160926-1` alongside F-a's and S5's. No other line touched: S5's and F-a's state is theirs to write.
-Prior: 2026-09-16T12:45+10:00 — BB-LDN-Planner-070926/S4
+Last edited: 2026-09-16T14:45+10:00 — BB-LDN-Planner-070926/F-a
+Notes: F-a — the marketplace module connectors + stubs (ADR-117 Tier B). One new files section; nothing else in
+this ledger touched, because F-a changed nothing outside its nine module folders. Foundations gaps found while
+building (the `TransitionHandler` home vs the `connections` / `placements` import rows, `public-site`'s K-1 reach,
+the synchronous `scoring` signature, `RoleType`, the provisional `getForMatching` / `recordPrecheck` /
+`activeForPosition` / `liveNannyIdsForParent` / `renderHireSummary` shapes) are recorded in the L-005 F-a PROGRESS
+entry, not here.
+Prior:  2026-09-16T14:05+10:00 — BB-LDN-Planner-070926/F-b — F-b — one section added for the eight connector modules (71 new files, gates green, ADR-117 Tier B review deferred); the
+Prior:  2026-09-16T12:45+10:00 — BB-LDN-Planner-070926/S4
 Notes: S4 — current state restated against the merged trunk 04569f8 (S0–S3b, PRs #1–#5) with two branches open in parallel (auth + boundary lint); tree size re-measured from the whole index (the 1 018 figure had been counting without docs/reference); eight new gap entries, led by the ★ "no src/instrumentation.ts and why" one; CI table re-measured after S4; registry gains the auth module; an S4 files section; next unit rewritten for S5 / F-c / the fan-out with what each must know.
 Notes (merge-down): `main` moved while S4 was in review — S6's boundary lint merged as `0e8a75e`. Merged down per 06 §3.2 safeguard 3; the two ledger conflicts resolved by keeping both units' sections, and `allowed-imports` re-measured green on this branch with no change to S6's files.
 Prior: 2026-09-16T10:35+10:00 — BB-LDN-Planner-070926/S6
