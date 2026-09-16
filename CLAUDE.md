@@ -4,7 +4,7 @@
 
 This repository is the application whose brand, domain, senders, URLs, currency, locale, timezone, areas, prices and flags are all read from the `config` module (`01-architecture.md` §3) — none of them are literals in code, and none are stated in this file. The **foundations** — the nine numbered documents plus `DECISIONS.md` — are the single source of truth for what this app is and does. **Amend the doc first:** if the code needs something a foundation does not say, the foundation is edited (new section or ADR) *before* the code is written; code that contradicts a foundation is wrong until the foundation changes (`README.md` §4 rule 2).
 
-**Where the foundations are.** Throughout this file `FOUNDATIONS` means `../LDN/SPECS/00-foundations/` — i.e. the `LDN` planning tree checked out as a **sibling** of this repo. At bootstrap (`08-launch-and-cutover.md` §2.1 step 0) one of two shapes is chosen and **recorded as an ADR in `DECISIONS.md`**: **(a) linked — the default** — the repo sits beside `LDN/` and every relative path resolves as written; **(b) vendored** — the numbered docs + `DECISIONS.md` are copied read-only into `<ldn-repo>/docs/foundations/` and re-synced at every task boundary, with the originals in `LDN/` remaining canonical. **That ADR governs every `../LDN/` path in this file** — `../LDN/SPECS/00-foundations/` *and* `../LDN/OPERATIONS/` (INDEX, PROGRESS, PROTOCOLS, BRANCHES) alike: if vendored, the ADR also states how each `../LDN/OPERATIONS/…` path resolves (sibling checkout of the workspace repo, or a recorded alias); no path in this file may be left unresolved. Either way: edits go to the `LDN/` originals, never to a vendored copy.
+**Where the foundations are.** Throughout this file `FOUNDATIONS` means `../SPECS/00-foundations/` — i.e. the `LDN` planning tree checked out as a **sibling** of this repo. At bootstrap (`08-launch-and-cutover.md` §2.1 step 0) one of two shapes is chosen and **recorded as an ADR in `DECISIONS.md`**: **(a) linked — the default** — the repo sits beside `LDN/` and every relative path resolves as written; **(b) vendored** — the numbered docs + `DECISIONS.md` are copied read-only into `<ldn-repo>/docs/foundations/` and re-synced at every task boundary, with the originals in `LDN/` remaining canonical. **That ADR governs every `../` path in this file** — `../SPECS/00-foundations/` *and* `../OPERATIONS/` (INDEX, PROGRESS, PROTOCOLS, BRANCHES) alike: if vendored, the ADR also states how each `../OPERATIONS/…` path resolves (sibling checkout of the workspace repo, or a recorded alias); no path in this file may be left unresolved. Either way: edits go to the `LDN/` originals, never to a vendored copy.
 
 ---
 
@@ -15,11 +15,11 @@ You may be one of several Claude sessions, sub-agents and BAI himself active on 
 1. **This file** — the process rules.
 2. **`FOUNDATIONS/README.md`** — the file index and the **ownership matrix** (§2): which doc § owns each topic.
 3. **`FOUNDATIONS/DECISIONS.md`** — the ADR register; read the header rules and the **newest rows** (bottom of §1) plus the open decisions (§2). A decision that binds your work is cited by ADR id in your PR body.
-4. **The OPERATIONS task you were pointed at** — `../LDN/OPERATIONS/INDEX.md` lists active tasks (`L-NNN` ids); the task's `PROGRESS.md` is the soft lock: claim before work, sign every edit, update on every status change (`../LDN/OPERATIONS/PROTOCOLS/MULTI-AGENT-ETIQUETTE.md`, `SIGN-OFF-FORMAT.md`).
-5. **Your handle** = the renameable Claude Code session name BAI has set (`../LDN/OPERATIONS/PROTOCOLS/HANDLE-CONVENTION.md`). Ask BAI if you don't know it; use it on every commit, footer and log line.
+4. **The OPERATIONS task you were pointed at** — `../OPERATIONS/INDEX.md` lists active tasks (`L-NNN` ids); the task's `PROGRESS.md` is the soft lock: claim before work, sign every edit, update on every status change (`../OPERATIONS/PROTOCOLS/MULTI-AGENT-ETIQUETTE.md`, `SIGN-OFF-FORMAT.md`).
+5. **Your handle** = the renameable Claude Code session name BAI has set (`../OPERATIONS/PROTOCOLS/HANDLE-CONVENTION.md`). Ask BAI if you don't know it; use it on every commit, footer and log line.
 6. **`docs/build-progress.md`** in this repo (§9 below) — current code state, known bugs, exact next unit.
 
-Then: confirm you are a **coding agent** working from a handoff doc (`../LDN/OPERATIONS/PROTOCOLS/PLANNING-VS-IMPLEMENTATION.md`). Planning sessions do not write code in this repo.
+Then: confirm you are a **coding agent** working from a handoff doc (`../OPERATIONS/PROTOCOLS/PLANNING-VS-IMPLEMENTATION.md`). Planning sessions do not write code in this repo.
 
 ---
 
@@ -49,7 +49,7 @@ Copied Sydney code is split to one-function-per-file and swept for literals **as
 
 ## 3. ECC hard rules — never skip
 
-ECC = Everything Claude Code: `~/.claude/rules/` (rules), `~/.claude/skills/` (skills), `~/.claude/agents/` (agents). These apply to every change in this repo (`../LDN/CLAUDE.md` § ECC discipline; build-standard L5):
+ECC = Everything Claude Code: `~/.claude/rules/` (rules), `~/.claude/skills/` (skills), `~/.claude/agents/` (agents). These apply to every change in this repo (`../CLAUDE.md` § ECC discipline; build-standard L5):
 
 - **Files ≤ 800 lines, functions ≤ 50 lines** (`common/coding-style.md`). Split before, never after.
 - **No `any` in TypeScript application code.** Use `unknown` + narrow (`typescript/coding-style.md`).
@@ -61,7 +61,7 @@ ECC = Everything Claude Code: `~/.claude/rules/` (rules), `~/.claude/skills/` (s
 - **No hardcoded secrets.** `config/env.ts` reads `process.env` once; `process.env` anywhere else fails review (`07-security-and-data-protection.md` §7).
 - **Run independent agents in parallel** — one tool-call batch (`common/agents.md`).
 - **Update the task's `PROGRESS.md` whenever your work changes status** (LDN OPERATIONS).
-- **Commit at every task boundary** (`../LDN/OPERATIONS/PROTOCOLS/COMMIT-DISCIPLINE.md`); commit shape in `06-runbook.md` §4.3.
+- **Commit at every task boundary** (`../OPERATIONS/PROTOCOLS/COMMIT-DISCIPLINE.md`); commit shape in `06-runbook.md` §4.3.
 - **Never push, deploy, merge to `main`, or promote without BAI's explicit OK for *that* action.** Prior approvals do not roll forward (`06-runbook.md` §3.2; memory `feedback_never_deploy_without_approval`).
 
 Before any non-trivial task: re-read the relevant ECC rules (`common/coding-style.md` · `common/testing.md` · `common/code-review.md` · `common/development-workflow.md` · `common/security.md`; `typescript/*`; for UI `web/design-quality.md` · `web/performance.md` · `web/coding-style.md`) and pick the matching agent rather than defaulting to general-purpose coding. Research before writing (`common/development-workflow.md` §0): GitHub code search → library docs → registries → adapt a proven implementation.
@@ -143,7 +143,7 @@ One topic → one owning `doc §` (`FOUNDATIONS/README.md` §2). Cite these; nev
 | Decisions (ADRs) + open decisions | `DECISIONS.md` §1 · §2 |
 | Build laws, module map origin, acceptance test | `TARGET/build-standard/README.md` §2 · §3 · §5 |
 
-If a topic is not in this table, look it up in `FOUNDATIONS/README.md` §2 (the ownership matrix is the authority; this table mirrors it and is re-synced whenever the matrix changes). If it is in neither, it is undecided: raise it in the task's `PROGRESS.md` and, if KEY, in `../LDN/OPERATIONS/INDEX.md` "Open KEY decisions".
+If a topic is not in this table, look it up in `FOUNDATIONS/README.md` §2 (the ownership matrix is the authority; this table mirrors it and is re-synced whenever the matrix changes). If it is in neither, it is undecided: raise it in the task's `PROGRESS.md` and, if KEY, in `../OPERATIONS/INDEX.md` "Open KEY decisions".
 
 ---
 
@@ -172,7 +172,7 @@ Where one of these sections marks an item as open (e.g. slice-registration shape
 Governed by `06-runbook.md` §3 (five invariants §3.1 · three human safeguards §3.2 · lifecycle §3.3 · branch protection §3.4) and §4 (deploy runbook). Origin: Sydney's `website/system/OPERATIONS/PROTOCOLS/BRANCH-AND-DEPLOY.md`, written after the 2026-06-01 non-fast-forward promote silently reverted 252 files. London makes it mechanical from day one. In one screen:
 
 1. **One trunk: `main`** = what is live = the base every branch starts from.
-2. **Own branch, own worktree, off the *current* `main`**; branch name `<purpose>-DDMMYY-N`. Register it in `../LDN/OPERATIONS/BRANCHES.md` before building; read that file first for overlap. That file is created at bootstrap (`08-launch-and-cutover.md` §2.1 step 0); **if it is absent, stop and create it from the Sydney pattern** (`website/system/OPERATIONS/BRANCHES.md`) before branching.
+2. **Own branch, own worktree, off the *current* `main`**; branch name `<purpose>-DDMMYY-N`. Register it in `../OPERATIONS/BRANCHES.md` before building; read that file first for overlap. That file is created at bootstrap (`08-launch-and-cutover.md` §2.1 step 0); **if it is absent, stop and create it from the Sydney pattern** (`website/system/OPERATIONS/BRANCHES.md`) before branching.
 3. **Push continuously.** Unpushed work does not exist.
 4. **Merge `main` DOWN before merging UP;** then `git merge-base --is-ancestor origin/main HEAD && echo CURRENT || echo STALE` — STALE means go back to step 4.
 5. **Promote only `main`, fast-forward-only**, via `tools/promote-guard.sh <live-sha> <candidate-sha> <repo>` (exit 0 or STOP). Branch protection on `main` is **on from day one** (required checks, up-to-date rule, no force-push — `06-runbook.md` §3.4).
@@ -192,7 +192,7 @@ Gates before every push: `npm run typecheck && npm run lint && npm test` (+ `npm
 - **Auth / middleware:** `auth`'s connector (`01-architecture.md` §4d, §6.3) + the middleware gate. Nothing else.
 - **Schema:** `02-data-model.md` + `07-security-and-data-protection.md` §5. Nothing else from the foundations.
 - **Contract change:** the owning section of `03-interface-contracts.md` — amend the doc first (preamble of this file; `README.md` §4 rule 2).
-- **Do not read** `../LDN/STOCKTAKE/`, `../LDN/TRIAGE/`, `../LDN/TARGET/` (except build-standard) or Sydney's `website/` unless the handoff points you there. They are history and reference, not spec.
+- **Do not read** `../STOCKTAKE/`, `../TRIAGE/`, `../TARGET/` (except build-standard) or Sydney's `website/` unless the handoff points you there. They are history and reference, not spec.
 
 **Response style.** Don't narrate; do it. Don't echo file contents after editing — path + what changed. Minimal change for a bug fix; no drive-by refactors.
 
@@ -207,8 +207,8 @@ Gates before every push: `npm run typecheck && npm run lint && npm test` (+ `npm
 Compact only at a logical breakpoint, never mid-task. Before every compaction:
 
 1. `docs/build-progress.md` — files created / modified (full paths + what changed), current bugs, registry, **exact next unit to pick up**.
-2. The task's `PROGRESS.md` in `../LDN/OPERATIONS/` — a "compacting context now; resume here" log entry, signed with your handle.
-3. Audit footers bumped on every file you edited (`../LDN/OPERATIONS/PROTOCOLS/SIGN-OFF-FORMAT.md`).
+2. The task's `PROGRESS.md` in `../OPERATIONS/` — a "compacting context now; resume here" log entry, signed with your handle.
+3. Audit footers bumped on every file you edited (`../OPERATIONS/PROTOCOLS/SIGN-OFF-FORMAT.md`).
 4. **Commit everything** (`COMMIT-DISCIPLINE.md`) — `ops(L-NNN): pre-compaction snapshot` is fine.
 5. After compaction: re-read §1–§3 of this file, then `build-progress.md`.
 
@@ -222,7 +222,7 @@ Three ledgers, each updated whenever code state changes; a task is not done unti
 |---|---|---|
 | `docs/build-progress.md` | this repo | files created / modified, component + action registry, known bugs, next unit. Must always reflect the true current state so any fresh context resumes perfectly. |
 | `CHANGELOG.md` | this repo | one line per merged unit, newest at top, `type(<module>): …` + PR + ADRs cited. |
-| `PROGRESS.md` | `../LDN/OPERATIONS/ACTIVE/L-NNN-…/` | claim, status, log entries with handle + offset timestamp; mirrored in `INDEX.md`; closed tasks roll into `../LDN/OPERATIONS/CHANGELOG.md`. |
+| `PROGRESS.md` | `../OPERATIONS/ACTIVE/L-NNN-…/` | claim, status, log entries with handle + offset timestamp; mirrored in `INDEX.md`; closed tasks roll into `../OPERATIONS/CHANGELOG.md`. |
 
 Both in-repo ledgers are seeded at bootstrap (`08-launch-and-cutover.md` §2.1 step 0). **If `docs/build-progress.md` or `CHANGELOG.md` is absent, create it from the `_project-template` shape** (`projects/_project-template/`; Sydney's `BB/nanny-platform/docs/04-technical/build-progress.md` is the reference for the build ledger) **before the first commit** — a commit with no ledger entry is a process violation.
 
@@ -248,15 +248,15 @@ If a fact is needed here to make a rule readable, the rule is written as a point
 1. `~/.claude/rules/` — base ECC rules. Always apply.
 2. **This file** — code-repo process rules.
 3. `FOUNDATIONS/*` — what the app is (facts); they win over any code comment or README in this repo.
-4. `../LDN/OPERATIONS/PROTOCOLS/*` — team protocols referenced from here.
+4. `../OPERATIONS/PROTOCOLS/*` — team protocols referenced from here.
 5. Per-task handoff docs — task-specific notes.
 
-Sydney's `website/` CLAUDE.md chain is reference only; it does not govern this repo. Conflicts go to `../LDN/OPERATIONS/INDEX.md` "Open KEY decisions" for BAI.
+Sydney's `website/` CLAUDE.md chain is reference only; it does not govern this repo. Conflicts go to `../OPERATIONS/INDEX.md` "Open KEY decisions" for BAI.
 
 ---
 
 <!-- audit
-Last edited: 2026-09-15T18:59+10:00 — BB-LDN-Planner-070926
-Notes (F9, review fix pass): preamble bootstrap moment → 08 §2.1 step 0 / gate A0; linked-vs-vendored ADR governs ALL ../LDN/ paths (foundations + OPERATIONS), default linked; §5 reduced to pointers only (01 §2.3–2.5 / §4a / §6.3; 03 §1.4 / §2.1 / §3; 05 §7), restated rules + unratified slice-registration default removed; §6 BRANCHES.md created at bootstrap, else stop + create from Sydney pattern; §9 seed build-progress / CHANGELOG from _project-template shape before first commit; §4 fallback keeps README §2 as authority.
+Last edited: 2026-09-16T11:05+10:00 — BB-LDN-Planner-070926
+Notes (F9, review fix pass): preamble bootstrap moment → 08 §2.1 step 0 / gate A0; linked-vs-vendored ADR governs ALL ../ paths (foundations + OPERATIONS), default linked; §5 reduced to pointers only (01 §2.3–2.5 / §4a / §6.3; 03 §1.4 / §2.1 / §3; 05 §7), restated rules + unratified slice-registration default removed; §6 BRANCHES.md created at bootstrap, else stop + create from Sydney pattern; §9 seed build-progress / CHANGELOG from _project-template shape before first commit; §4 fallback keeps README §2 as authority.
 Previous: Notes: initial authoring (L-004 wave 4) — code-repo CLAUDE.md seed: pointers + process only; five laws as merge blocks + five-question test; ECC hard rules; pointer table mirroring README §2 with real section numbers from 00–08 + DECISIONS + build-standard; module rules (folder shape, boundary lint, service leaves, auth no-client, UnitOfWork token, slice registration default pending 03 §12 item 35 / 01 §10 O-12, scheduling importers); branch/deploy/promote condensed from 06 §3–§4 with Sydney origin; efficiency + compaction (portable half of Sydney's nanny-platform CLAUDE.md); three build ledgers; never-list; precedence. Bootstrap decisions flagged: linked vs vendored foundations; slice-registration shape.
 -->

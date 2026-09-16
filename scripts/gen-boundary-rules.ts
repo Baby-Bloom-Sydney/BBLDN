@@ -19,7 +19,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const TARGET = resolve(REPO_ROOT, "eslint.boundaries.js");
 const ARCHITECTURE = resolve(
   REPO_ROOT,
-  "../LDN/SPECS/00-foundations/01-architecture.md",
+  "../SPECS/00-foundations/01-architecture.md",
 );
 
 /** The file's text, or `null` when it is genuinely absent; any other read failure is an error, not a skip. */

@@ -110,7 +110,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm run format:check
       - name: CLAUDE.md = CODE-CLAUDE.md — LOCAL GATE (HANDOFF §3.3 (ii))
-        # CODE-CLAUDE.md lives in ../LDN/SPECS/00-foundations/ (workspace repo), not in this checkout, so the byte
+        # CODE-CLAUDE.md lives in ../SPECS/00-foundations/ (workspace repo), not in this checkout, so the byte
         # diff cannot run here. The script passes with a notice when CI=true and the source is absent; locally
         # (`npm run check:claude-md`, part of `npm run gates`) it is mandatory and a missing source is an error.
         if: ${{ !cancelled() }}

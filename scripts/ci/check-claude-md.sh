@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-claude-md.sh — CLAUDE.md must equal ../LDN/SPECS/00-foundations/CODE-CLAUDE.md
+# check-claude-md.sh — CLAUDE.md must equal ../SPECS/00-foundations/CODE-CLAUDE.md
 # byte-for-byte (HANDOFF §3.3 (ii); 08 §2.1 step 0 gate: "diff … is empty").
 #
 # LOCAL GATE. The source file lives in the LDN planning tree (workspace repo),
@@ -10,7 +10,7 @@
 set -euo pipefail
 
 readonly REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-readonly DEFAULT_SOURCE="${REPO_ROOT}/../LDN/SPECS/00-foundations/CODE-CLAUDE.md"
+readonly DEFAULT_SOURCE="${REPO_ROOT}/../SPECS/00-foundations/CODE-CLAUDE.md"
 readonly SOURCE="${CLAUDE_MD_SOURCE:-$DEFAULT_SOURCE}"
 readonly TARGET="${REPO_ROOT}/CLAUDE.md"
 

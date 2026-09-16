@@ -56,7 +56,7 @@ describe("parseArchitectureTable", () => {
 
 const ARCHITECTURE = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  "../../../../LDN/SPECS/00-foundations/01-architecture.md",
+  "../../../../SPECS/00-foundations/01-architecture.md",
 );
 
 // Skipped where the foundations are not checked out beside the repo (CI — ADR-107 "linked" shape), exactly as

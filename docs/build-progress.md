@@ -1,6 +1,6 @@
 # build-progress — BabyBloom London (code repo ledger)
 
-> **The repo's own build ledger** (`CLAUDE.md` §9; `08-launch-and-cutover.md` §2.1 step 0 (v); SEQUENCE `14.33`). Must always reflect the true current state so any fresh context resumes perfectly. Updated whenever code state changes; bumped before every compaction (`CLAUDE.md` §8). Task-level tracking lives in `../LDN/OPERATIONS/ACTIVE/L-NNN-…/PROGRESS.md`; merged units are one line each in `CHANGELOG.md`.
+> **The repo's own build ledger** (`CLAUDE.md` §9; `08-launch-and-cutover.md` §2.1 step 0 (v); SEQUENCE `14.33`). Must always reflect the true current state so any fresh context resumes perfectly. Updated whenever code state changes; bumped before every compaction (`CLAUDE.md` §8). Task-level tracking lives in `../OPERATIONS/ACTIVE/L-NNN-…/PROGRESS.md`; merged units are one line each in `CHANGELOG.md`.
 
 ---
 

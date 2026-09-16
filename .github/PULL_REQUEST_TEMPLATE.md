@@ -3,7 +3,7 @@
 ## Unit
 
 - **Unit / task:** <!-- e.g. S1 — L-005 -->
-- **Branch:** <!-- <purpose>-DDMMYY-N; registered in ../LDN/OPERATIONS/BRANCHES.md -->
+- **Branch:** <!-- <purpose>-DDMMYY-N; registered in ../OPERATIONS/BRANCHES.md -->
 - **ADRs cited:** <!-- ADR-… (DECISIONS.md) -->
 - **Foundations cited:** <!-- doc §section, never restated -->
 
@@ -31,4 +31,4 @@
 
 - [ ] `npm run typecheck && npm run lint && npm test` (+ `npm run build` if structural)
 - [ ] `git merge-base --is-ancestor origin/main HEAD` → CURRENT (merged `main` down first)
-- [ ] `../LDN/OPERATIONS/BRANCHES.md` row current; `docs/build-progress.md` + `CHANGELOG.md` updated
+- [ ] `../OPERATIONS/BRANCHES.md` row current; `docs/build-progress.md` + `CHANGELOG.md` updated
