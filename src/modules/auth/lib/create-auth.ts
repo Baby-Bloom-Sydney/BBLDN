@@ -25,7 +25,7 @@ export function createAuth(deps: AuthDeps<AppDatabase>): Auth<AppDatabase> {
     getSession,
     requireRole: requireRoleWith(getSession),
     getCurrentUserId: getCurrentUserIdWith(driver),
-    data: createDataAccessPort(driver),
+    data: createDataAccessPort(driver, deps.unitOfWork),
     refreshSession: refreshSessionWith(driver),
     needsPasswordSetup: needsPasswordSetupWith(driver),
     signUp: signUpWith(driver),

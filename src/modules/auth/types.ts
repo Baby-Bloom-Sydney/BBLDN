@@ -2,7 +2,7 @@
 // contract spells, plus the driver seam the inside is built on. Values live in index.ts. **Types only**, so a client
 // component may `import type` from the connector without dragging the Supabase SDK into its bundle.
 import type { NextRequest, NextResponse } from "next/server";
-import type { ClientResult } from "@/modules/platform";
+import type { ClientResult, UnitOfWorkJoin } from "@/modules/platform";
 import type { BucketKey } from "@/modules/config";
 import type {
   Actor,
@@ -182,9 +182,14 @@ export interface AuthDriver<DB extends DatabaseShape = AppDatabase> {
   createSignedUrl(ref: StorageRef, ttlSeconds: number): Promise<string>;
 }
 
-/** What `createAuth` needs beyond the driver. */
+/**
+ * What `createAuth` needs beyond the driver. `unitOfWork` is the join the data port honours `{ uow }` through
+ * (ADR-127 — one RPC is one transaction); absent, the port defaults to `platform`'s module-level join, which
+ * follows whatever binding `configureUnitOfWork` installed and refuses every token until boot installs one.
+ */
 export type AuthDeps<DB extends DatabaseShape = AppDatabase> = {
   readonly driver: AuthDriver<DB>;
+  readonly unitOfWork?: UnitOfWorkJoin;
 };
 
 // ── stub-auth (05 §3 rule 1: production code inside the module it stubs) ──
@@ -204,6 +209,8 @@ export type StubAuthOptions = {
   readonly signedInUserId?: string;
   /** Rows a `NamedOperation` sees; the stub's "test schema" behind the same port (03 §11 row 9). */
   readonly tables?: Readonly<Record<string, ReadonlyArray<unknown>>>;
+  /** The unit-of-work join (`AuthDeps.unitOfWork`); the stub honours `{ uow }` exactly as the real inside does. */
+  readonly unitOfWork?: UnitOfWorkJoin;
 };
 
 // ── The gate (01 §4d) and the one `(auth)` surface this unit owns ──
