@@ -88,10 +88,10 @@ describe("currentUser", () => {
     expect(user?.hasPassword).toBe(false);
   });
 
-  it("is null when the provider reports an error rather than guessing a session", async () => {
+  it("is null when the provider says the session is not valid (a 4xx)", async () => {
     serverClient.auth.getUser.mockResolvedValue({
       data: { user: null },
-      error: { message: "jwt expired" },
+      error: { name: "AuthApiError", status: 401, message: "jwt expired" },
     });
     expect(await supabaseAuthDriver().currentUser()).toBeNull();
   });

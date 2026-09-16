@@ -6,7 +6,9 @@ import type { AuthErrorDetails } from "../types";
 
 const MESSAGE = "Please sign in to continue.";
 
-export const unauthenticated = (): {
+export const unauthenticated = (
+  cause?: unknown,
+): {
   readonly ok: false;
   readonly error: AppError<AuthErrorDetails>;
-} => err<AuthErrorDetails>("UNAUTHENTICATED", MESSAGE);
+} => err<AuthErrorDetails>("UNAUTHENTICATED", MESSAGE, undefined, cause);

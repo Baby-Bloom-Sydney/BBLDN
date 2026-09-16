@@ -97,8 +97,13 @@ export function memoryAuthDriver(
     updatePassword: async (newPassword: string) => {
       upsert({ ...signedIn(), password: newPassword });
     },
-    exchangeCodeForSession: async (code: string) =>
-      enter(find(code) ?? signedIn()),
+    // No "fall back to whoever is signed in": the real driver throws on a code it cannot exchange, and a stub that
+    // succeeds where production fails is a connector defect, not a stub convenience (05 §3 rule 2).
+    exchangeCodeForSession: async (code: string) => {
+      const user = find(code);
+      if (user === null) throw new Error("no account for that code");
+      return enter(user);
+    },
     writeRole: async (userId: string, role: Role) => {
       const user = find(userId);
       if (user === null) throw new Error("no such account");

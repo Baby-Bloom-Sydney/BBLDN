@@ -24,6 +24,12 @@ import { supabaseQuery } from "./supabase-query";
 const URL_NAME = publicEnv.NEXT_PUBLIC_SUPABASE_URL;
 const ANON_KEY = publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+/** Next refuses a cookie write inside a Server Component; that one case is expected, anything else is not. */
+const READ_ONLY_COOKIE_STORE = "read-only-cookie-store";
+const isReadOnlyRefusal = (thrown: unknown): boolean =>
+  thrown instanceof Error &&
+  /can only be modified|read-?only/i.test(thrown.message);
+
 /** The RSC cookie jar: writes are refused inside a Server Component, where middleware has already refreshed. */
 const serverClient = async (): Promise<SupabaseClient> => {
   const { cookies } = await import("next/headers");
@@ -35,11 +41,15 @@ const serverClient = async (): Promise<SupabaseClient> => {
         try {
           for (const { name, value, options } of list)
             store.set(name, value, options);
-        } catch {
-          log.debug("session cookie write skipped", {
+        } catch (thrown) {
+          // `debug` is dropped in production, so a genuine rotation bug would leave no trace at all: warn, and
+          // only claim the benign reason when the error actually is Next's read-only refusal.
+          log.warn("session cookie write failed", {
             module: "auth",
             action: "serverClient",
-            reason: "read-only-cookie-store",
+            ...(isReadOnlyRefusal(thrown)
+              ? { reason: READ_ONLY_COOKIE_STORE, expected: true }
+              : { cause: thrown }),
           });
         }
       },

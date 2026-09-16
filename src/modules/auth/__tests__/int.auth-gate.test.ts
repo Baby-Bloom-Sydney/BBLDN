@@ -176,6 +176,42 @@ describe("missing Supabase env fails the boot, it does not bypass the gate (01 Â
   });
 });
 
+describe("a session read that failed is refused, not waved through", () => {
+  it("fails closed on a protected route and says so in the log (Sydney skipped the gate instead)", async () => {
+    const warned: string[] = [];
+    vi.resetModules();
+    vi.doMock("@/modules/platform", async (importOriginal) => {
+      const actual = await importOriginal<Record<string, unknown>>();
+      return {
+        ...actual,
+        log: {
+          debug: () => undefined,
+          info: () => undefined,
+          warn: (msg: string) => warned.push(msg),
+          error: () => undefined,
+        },
+      };
+    });
+    const { middleware: m } = await import("@/middleware");
+    const { configureAuth: c, stubAuth: st } = await import("@/modules/auth");
+    const broken = st({ users: Object.values(seededUsers) });
+    c({
+      ...broken,
+      refreshSession: async () => ({
+        ok: false as const,
+        error: { code: "INTERNAL" as const, message: "identity provider down" },
+      }),
+    });
+    const res = await m(request("/parent"));
+    expect(res.status).toBe(307);
+    expect(locationOf(res)).toContain("/login");
+    expect(warned).toContain(
+      "session refresh failed; treating the request as signed out",
+    );
+    vi.doUnmock("@/modules/platform");
+  });
+});
+
 describe("the matcher never gates the app's own static assets", () => {
   it("skips _next and file requests", async () => {
     const { config } = await import("@/middleware");

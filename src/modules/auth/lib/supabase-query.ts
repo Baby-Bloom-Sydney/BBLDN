@@ -6,13 +6,27 @@ import type { Query } from "@/modules/shared-types";
 import type { AppDatabase } from "../types";
 
 type Rows = ReadonlyArray<Readonly<Record<string, unknown>>>;
+type DriverResult = { data: unknown; error: { message: string } | null };
 
-const unwrap = <T>(result: {
-  data: unknown;
-  error: { message: string } | null;
-}): T => {
+/** An RPC may legitimately return `null`, so this one only refuses a reported error. */
+const unwrap = <T>(result: DriverResult): T => {
   if (result.error !== null) throw new Error(result.error.message);
   return result.data as T;
+};
+
+/** A successful `select` is a list. Anything else is a shape we cannot honour — fail at the seam, not downstream. */
+const unwrapRows = (result: DriverResult): Rows => {
+  const data = unwrap<unknown>(result);
+  if (!Array.isArray(data)) throw new Error("select returned no rows");
+  return data as Rows;
+};
+
+/** A successful `insert` / `update` returns the row it wrote; `null` there is a driver anomaly, not an empty answer. */
+const unwrapRow = <T>(result: DriverResult): T => {
+  const data = unwrap<unknown>(result);
+  if (data === null || data === undefined)
+    throw new Error("write returned no row");
+  return data as T;
 };
 
 export function supabaseQuery(
@@ -21,13 +35,13 @@ export function supabaseQuery(
   return {
     from: (table) => ({
       select: async (columns) =>
-        unwrap<Rows>(
+        unwrapRows(
           await (await client())
             .from(table)
             .select(columns === undefined ? "*" : columns.join(",")),
         ) as never,
       insert: async (row) =>
-        unwrap(
+        unwrapRow(
           await (
             await client()
           )
@@ -37,7 +51,7 @@ export function supabaseQuery(
             .single(),
         ),
       update: async (id, patch) =>
-        unwrap(
+        unwrapRow(
           await (
             await client()
           )
