@@ -128,6 +128,10 @@ Branch `boundary-lint-160926-1`, pushed, **PR [#6](https://github.com/babyblooms
 
 **Design decisions recorded in the L-005 S6 entry:** flat config (the only way to register a rule under the exact id 05 §7 rule 4 names); the machine-readable copy + the two parity gates; type-only exports counted as L1's "one type group"; `__tests__/**` read as the folder form of the spec's `*.test.ts` exemption for the one-export rule; `import/no-cycle` **not** used because it silently no-ops under flat config on this ESLint version (measured), acyclicity asserted at generation instead.
 
+## Files created / modified in the current unit (F-b — comms · scheduling · verification · onboarding connectors)
+
+**71 files, all new, all under `src/modules/{comms,scheduling,verification,vetting-providers,admin-verification,onboarding-parent,onboarding-nanny,public-site}/`** — connectors, types, READMEs, stubs and tests; no file outside those eight folders was touched. `comms` is the service module of 01 §2.4 (`config` + `shared-types` + `platform` only); `scheduling` ships `scheduling.stub.ts` over the three shared pure rules of 03 §3.6; `verification` and `vetting-providers` are **ADR-117 Tier A** and shipped connector + types only (no evidence handling, no storage path, no provider call); the remaining four carry the folder shape plus only the types the foundations state. Every module-level binding **fails closed** until boot configures it. Gates green locally: typecheck · lint · prettier · vitest 2 314 / 2 314 (154 files) · lint:boundaries · check:allowed-imports · check:config-literals · check:claude-md. Review deferred to the ADR-117 Tier B overnight sweep. Gaps are in each module README and in the L-005 F-b entry.
+
 ## Next unit
 
 **S6 — boundary lint** is already in flight on `boundary-lint-160926-1`, in parallel with this unit and with a disjoint touch surface (`BRANCHES.md`). After both merge, the sequential spine is **S5 — migrations `0000` → `0016`, one PR each** (HANDOFF §11), and the **F-a / F-b / F-c fan-out** opens once S2–S4 and `0000`–`0002` are on `main`.
@@ -149,7 +153,9 @@ Superseded note — the S1 "next unit" text: **S2 — `shared-types` (types only
 ---
 
 <!-- audit
-Last edited: 2026-09-16T12:45+10:00 — BB-LDN-Planner-070926/S4
+Last edited: 2026-09-16T14:05+10:00 — BB-LDN-Planner-070926/F-b
+Notes: F-b — one section added for the eight connector modules (71 new files, gates green, ADR-117 Tier B review deferred); the open-branches row now names `modules-onboarding-160926-1` alongside F-a's and S5's. No other line touched: S5's and F-a's state is theirs to write.
+Prior: 2026-09-16T12:45+10:00 — BB-LDN-Planner-070926/S4
 Notes: S4 — current state restated against the merged trunk 04569f8 (S0–S3b, PRs #1–#5) with two branches open in parallel (auth + boundary lint); tree size re-measured from the whole index (the 1 018 figure had been counting without docs/reference); eight new gap entries, led by the ★ "no src/instrumentation.ts and why" one; CI table re-measured after S4; registry gains the auth module; an S4 files section; next unit rewritten for S5 / F-c / the fan-out with what each must know.
 Notes (merge-down): `main` moved while S4 was in review — S6's boundary lint merged as `0e8a75e`. Merged down per 06 §3.2 safeguard 3; the two ledger conflicts resolved by keeping both units' sections, and `allowed-imports` re-measured green on this branch with no change to S6's files.
 Prior: 2026-09-16T10:35+10:00 — BB-LDN-Planner-070926/S6
