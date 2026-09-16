@@ -1,28 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { processDfyWaves } from "@/lib/actions/matching";
+// Cron shell for `/api/cron/dfy-waves` (01 §4e / §4f). Thin by rule: it delegates to `runCron`, which is the one place the
+// Bearer `CRON_SECRET` check lives — fail closed, constant-time, an unset secret rejecting every caller.
+import { runCron } from "@/app/api/_lib/run-cron";
 
-/**
- * Cron endpoint: processes pending DFY email waves.
- *
- * Wave schedule:
- * - Wave 1 (Day 0): Sent immediately by triggerDfyMatchmaking()
- * - Wave 2 (Day 2): Next 20 nannies, if <10 interested responses
- * - Wave 3 (Day 5): Next 20 nannies, if <10 interested responses
- *
- * Called by Vercel Cron daily at 9:00 AM UTC (7:00 PM AEST).
- * Also triggered lazily by getDfyStatus() on parent page visit.
- */
-export async function GET(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+export const dynamic = "force-dynamic";
 
-  const { processed } = await processDfyWaves();
+const PATH = "/api/cron/dfy-waves";
 
-  console.log(`[DFY-Waves] Processed: ${processed} waves`);
-  return NextResponse.json({ processed });
+export async function GET(request: Request): Promise<Response> {
+  return runCron(request, PATH);
 }
