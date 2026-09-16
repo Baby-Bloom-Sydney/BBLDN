@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { isPublicSitePath } from "@/modules/public-site";
 
 const HIDDEN_PATHS = [
   "/parent/request",
@@ -26,6 +27,9 @@ function MiniFooterInner() {
   if (funnelSrc === "std" || funnelSrc === "adv") return null;
 
   if (HIDDEN_PATHS.some((p) => pathname.startsWith(p))) return null;
+
+  // The `(public)` group renders its own footer (public-site, 01.03).
+  if (isPublicSitePath(pathname)) return null;
 
   return (
     <div className="flex justify-center gap-3 text-[10px] text-slate-400 py-3">
