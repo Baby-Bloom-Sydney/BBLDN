@@ -1,28 +1,7 @@
+// 05 §8.3 — generated from the route register, never hand-written.
 import type { MetadataRoute } from "next";
+import { buildRobots } from "@/modules/public-site";
 
 export default function robots(): MetadataRoute.Robots {
-  return {
-    rules: [
-      {
-        userAgent: "*",
-        allow: "/",
-        disallow: [
-          "/api/",
-          "/nanny/",
-          "/parent/",
-          "/admin/",
-          "/login",
-          "/signup",
-          "/forgot-password",
-          "/reset-password",
-          "/test",
-        ],
-      },
-      {
-        userAgent: "GPTBot",
-        disallow: "/",
-      },
-    ],
-    sitemap: "https://babybloomsydney.com.au/sitemap.xml",
-  };
+  return buildRobots();
 }

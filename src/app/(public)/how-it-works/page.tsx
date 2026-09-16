@@ -1,16 +1,13 @@
+// S-X-21 — heading-only stub, route kept (04 §6.1). Thin by rule (05 §7 rule 5).
 import type { Metadata } from "next";
+import { HowItWorksStub, publicPageMetadata } from "@/modules/public-site";
 
-export const metadata: Metadata = {
-  title: "How Baby Bloom Works — Find a Nanny in 3 Steps",
-  description:
-    "See how Baby Bloom matches Sydney families with WWCC-verified nannies. Browse profiles, get matched, and arrange a meet and greet — it's simple.",
-  alternates: { canonical: "/how-it-works" },
-};
+export const metadata: Metadata = publicPageMetadata("/how-it-works");
 
 export default function HowItWorksPage() {
   return (
-    <div className="container mx-auto py-10">
-      <h1 className="text-3xl font-bold">How It Works</h1>
-    </div>
+    <main>
+      <HowItWorksStub />
+    </main>
   );
 }

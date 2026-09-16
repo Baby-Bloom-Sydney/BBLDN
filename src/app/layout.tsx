@@ -1,124 +1,39 @@
+// 01.01 — the root layout and global providers. Brand, base URL and locale come from `config` (L4); the
+// Sydney Sentry CDN loader (hardcoded DSN) is gone — ADR-106's error capture is injected at boot (03 §4b), not here.
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import { LOCALE, PUBLIC_FLAGS } from "@/modules/config";
+import { AREAS_SOURCE } from "@/modules/config/server";
+import {
+  JsonLd,
+  organizationJsonLd,
+  rootMetadata,
+} from "@/modules/public-site";
+import { fontClassNames } from "./fonts";
 import { SessionProvider } from "@/components/providers/SessionProvider";
-import { VisitorTracker } from "@/components/providers/VisitorTracker";
 import { DevToolbar } from "@/components/dev/DevToolbar";
 import { DevSidebar } from "@/components/dev/DevSidebar";
 import { KatieShell } from "@/components/katie/KatieShell";
-import { Analytics } from "@vercel/analytics/next";
 import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
 import { MiniFooter } from "@/components/layout/MiniFooter";
-import Script from "next/script";
 
-const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
-const isProd = process.env.NODE_ENV === "production";
-
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
-});
-
-export const metadata: Metadata = {
-  metadataBase: new URL("https://babybloomsydney.com.au"),
-  title: {
-    template: "%s | Baby Bloom Sydney",
-    default: "Baby Bloom Sydney — Verified Nannies for Sydney Families",
-  },
-  description:
-    "Find trusted, WWCC-verified nannies in Sydney. Baby Bloom matches families with background-checked, education-focused childcare professionals.",
-  // Declares the icon links explicitly so Safari stops probing
-  // /apple-touch-icon.png + /apple-touch-icon-precomposed.png on
-  // every page load (those 404s were cosmetic but cluttered the
-  // dev console — Bailey 2026-05-14). Points at the existing
-  // favicon + logo so no new assets are required.
-  icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/logo.svg",
-  },
-  openGraph: {
-    siteName: "Baby Bloom Sydney",
-    locale: "en_AU",
-    type: "website",
-  },
-};
+export const metadata: Metadata = rootMetadata;
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  const organizationJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: "Baby Bloom Sydney",
-    alternateName: "Baby Bloom",
-    url: "https://babybloomsydney.com.au",
-    logo: "https://babybloomsydney.com.au/logo.png",
-    description:
-      "Sydney's trusted platform for connecting families with verified, WWCC-checked nannies and babysitters.",
-    foundingDate: "2020",
-    areaServed: {
-      "@type": "City",
-      name: "Sydney",
-      addressRegion: "NSW",
-      addressCountry: "AU",
-    },
-    sameAs: [],
-  };
-
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="overflow-x-hidden">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}
-      >
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify(organizationJsonLd).replace(/</g, "\\u003c"),
-          }}
-        />
+    <html lang={LOCALE.locale} className="overflow-x-hidden">
+      <body className={`${fontClassNames} overflow-x-hidden antialiased`}>
+        <JsonLd data={organizationJsonLd(AREAS_SOURCE.serviceAreaName)} />
         <SessionProvider>
-          <VisitorTracker />
-          {isDevMode && <DevSidebar />}
-          {/* MiniFooter passed as a separate slot so the shell can
-              wrap the page content in a flex-grow div above it.
-              Result: footer sticks to viewport bottom when the page
-              is shorter than the viewport, and sits at the end of
-              scrolled content when the page is taller. (Sticky-
-              footer pattern, applied globally per user feedback
-              2026-05-07.) */}
+          {PUBLIC_FLAGS.DEV_MODE && <DevSidebar />}
           <KatieShell footer={<MiniFooter />}>{children}</KatieShell>
           <Analytics />
           <CookieConsentBanner />
-          {isDevMode && <DevToolbar />}
+          {PUBLIC_FLAGS.DEV_MODE && <DevToolbar />}
         </SessionProvider>
-        {isProd && (
-          <>
-            <Script
-              src="https://browser.sentry-cdn.com/8.46.0/bundle.min.js"
-              crossOrigin="anonymous"
-              strategy="afterInteractive"
-            />
-            <Script id="sentry-init" strategy="afterInteractive">
-              {`
-                if (typeof Sentry !== 'undefined') {
-                  Sentry.init({
-                    dsn: "https://0a45d54c5424e8f1ee27c7143617571f@o4511097907904512.ingest.us.sentry.io/4511097920225280",
-                    tracesSampleRate: 0.1,
-                  });
-                }
-              `}
-            </Script>
-          </>
-        )}
       </body>
     </html>
   );
