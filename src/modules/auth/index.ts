@@ -27,3 +27,9 @@ export { requiredRoleForPath } from "./lib/required-role-for-path";
 export { isAuthGroupPath } from "./lib/is-auth-group-path";
 export { loginRedirectUrl } from "./lib/login-redirect-url";
 export { gateDecision } from "./lib/gate-decision";
+
+// S-X-09's set-password variant (ADR-042) — the one `(auth)` surface this unit owns. A route file imports the
+// connector and renders; the action is passed to the client component as a prop so the client bundle never
+// reaches the connector barrel (01 §2.5 "route files are thin").
+export { setPasswordAction } from "./actions/set-password-action";
+export { SetPasswordForm } from "./components/SetPasswordForm";
