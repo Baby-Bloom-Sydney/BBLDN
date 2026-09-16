@@ -20,6 +20,14 @@ ruleTester.run("bb/no-interpolated-log-message", rule, {
     "reporter.info(`${count} rows`);",
     // Not a level the logger has.
     "log.send(`${count} rows`);",
+    // A computed member cannot be read as a level.
+    "log[level](`${count} rows`);",
+    // The receiver chain roots somewhere that is not a logger.
+    "this.log.info(`${count} rows`);",
+    "context.log.info(`${count} rows`);",
+    // No message at all.
+    "log.info();",
+    'log.info("plain", { count });',
   ],
   invalid: [
     {
