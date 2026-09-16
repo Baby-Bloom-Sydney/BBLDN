@@ -1,10 +1,9 @@
 // positions — the module's type surface (01 §2.5). `positions` is the aggregate root of the stage model
 // (03 §2.1): it owns `advance` · `amend` · the read models, and the slices (`connections` · `placements` ·
 // `call-layer`) register their handlers with it at boot. The stage-model vocabulary itself lives in
-// `shared-types/stage-model.ts` (03 §2.5) and is re-exported by `index.ts`; this file adds only what the
-// registration seam and the `positions` connector need.
+// `shared-types/stage-model.ts` (03 §2.5) — the slice-registration types included (ADR-119) — and is re-exported
+// by `index.ts`; this file adds only what the `positions` connector needs.
 import type {
-  AdvanceInput,
   AmendInput,
   Actor,
   EntityRef,
@@ -18,26 +17,10 @@ import type {
   StageRead,
   StateAfter,
   TransitionId,
-  UnitOfWork,
 } from "@/modules/shared-types";
 
-/**
- * 03 §2.5. One `TransitionId`, one handler. The slice runs **inside** the caller's unit of work — it is handed
- * the token, never a driver (R4), which is what lets a stub slice honour the same signature.
- */
-export type TransitionHandler = {
-  readonly id: TransitionId;
-  readonly run: (
-    input: AdvanceInput<TransitionId>,
-    uow: UnitOfWork,
-  ) => Promise<Result<StateAfter>>;
-};
-
-/** 03 §2.5 `registerSlice` — boot only (`src/instrumentation.ts`, §2.1). All three slices register (§12 item 35). */
-export type SliceRegistration = {
-  readonly entity: EntityRef["kind"];
-  readonly handlers: ReadonlyArray<TransitionHandler>;
-};
+// `TransitionHandler` · `SliceRegistration` · `RegisterSlice` are `shared-types`' (03 §2.5; ADR-119) and are
+// re-exported by `index.ts` beside the rest of the stage-model vocabulary.
 
 /** 03 §2.5 errors, as the closed `details.reason` union 03 §1 rule 4 asks for. */
 export type StageErrorDetails = {

@@ -3,36 +3,19 @@
 // model at boot and it is never called directly (03 §2.1). The stage vocabulary itself is `shared-types`' and is
 // re-exported by `index.ts`.
 import type {
-  AdvanceInput,
   NannyId,
   ParentId,
   PositionId,
   Result,
-  StateAfter,
-  TransitionId,
-  UnitOfWork,
+  TransitionHandler,
 } from "@/modules/shared-types";
 
 /**
- * Structurally the `TransitionHandler` of 03 §2.5 — declared here rather than imported.
- *
- * GAP — recorded in the L-005 F-a PROGRESS entry. 03 §2.5 puts `TransitionHandler` / `registerSlice` in
- * `shared-types/stage-model.ts`, but they are not there yet; the only other home is `positions`, and 01 §2.3
- * gives `connections` **no** arrow to `positions` (that direction would be the cycle R2 closed). So the type is
- * declared locally, structurally identical, and the handlers reach `positions.registerSlice` from the boot file,
- * which may import both. The fix is to move the two types into `shared-types/stage-model.ts` where 03 §2.5 says
- * they live — not this unit's surface.
+ * The K-row handlers the boot file registers with the stage model (03 §2.1). `TransitionHandler` is
+ * `shared-types`' (03 §2.5; ADR-119) — `connections` has no arrow to `positions` (01 §2.3) and needs none: the
+ * boot file, which may import both, hands these to `positions.registerSlice`.
  */
-export type StageTransitionHandler = {
-  readonly id: TransitionId;
-  readonly run: (
-    input: AdvanceInput<TransitionId>,
-    uow: UnitOfWork,
-  ) => Promise<Result<StateAfter>>;
-};
-
-/** The K-row handlers the boot file registers with the stage model (03 §2.1). */
-export type ConnectionsSlice = ReadonlyArray<StageTransitionHandler>;
+export type ConnectionsSlice = ReadonlyArray<TransitionHandler>;
 
 export type ConnectionsErrorDetails = {
   readonly reason:

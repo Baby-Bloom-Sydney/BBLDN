@@ -5,6 +5,7 @@ import type { ENUMS } from "./enums";
 import type { EventName } from "./events";
 import type { ConnectionId, ParentId, PlacementId, PositionId } from "./ids";
 import type { UnitOfWork } from "./platform";
+import type { Result } from "./result";
 import type { Instant } from "./scalars";
 import type { SYSTEM_JOB_NAMES } from "./system-job-names";
 import type { TRANSITION_IDS } from "./transition-ids";
@@ -91,6 +92,33 @@ export type AmendInput = {
   readonly fields: AmendableFields;
   readonly idempotencyKey: string;
 };
+
+/**
+ * 03 §2.5. One `TransitionId`, one handler. The slice runs **inside** the caller's unit of work — it is handed the
+ * token, never a driver (R4), which is what lets a stub slice honour the same signature. Declared here (ADR-119)
+ * so `connections` and `placements` implement it by importing `shared-types`, which every module may, and never
+ * need an arrow to `positions` (01 §2.3 — that direction would invert the dispatch).
+ */
+export type TransitionHandler = {
+  readonly id: TransitionId;
+  readonly run: (
+    input: AdvanceInput<TransitionId>,
+    uow: UnitOfWork,
+  ) => Promise<Result<StateAfter>>;
+};
+
+/** The argument of `registerSlice` (03 §2.5): one entity kind, its handlers. */
+export type SliceRegistration = {
+  readonly entity: EntityRef["kind"];
+  readonly handlers: ReadonlyArray<TransitionHandler>;
+};
+
+/**
+ * 03 §2.5 `declare function registerSlice(slice): void` — boot only (`src/instrumentation.ts`, §2.1);
+ * `connections` · `placements` · `call-layer` all register through it (§12 item 35). This module carries no
+ * behaviour, so the **signature** lives here and `positions` exports the one implementation.
+ */
+export type RegisterSlice = (slice: SliceRegistration) => void;
 
 export type JourneyStep = {
   readonly row: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;

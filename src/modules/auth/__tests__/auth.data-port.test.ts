@@ -1,11 +1,19 @@
 // The data-access port (01 §6.3 amended; 03 §1.4): `run` over the narrow `Query` surface with a named operation,
-// the two scopes, the `uow` join, and `signUrl` — the one signed-URL minter (07 §5.3 rule 1). Plus the module
-// binding: a faithful pass-through to whatever `configureAuth` installed.
+// the two scopes, the unit-of-work join (ADR-127 — one RPC is one transaction), and `signUrl` — the one
+// signed-URL minter (07 §5.3 rule 1). Plus the module binding: a faithful pass-through to whatever
+// `configureAuth` installed.
 import { describe, expect, it, vi } from "vitest";
-import { auth, configureAuth, createAuth } from "@/modules/auth";
+import { auth, configureAuth, createAuth, stubAuth } from "@/modules/auth";
 import type { NamedOperation, StorageRef } from "../types";
 import type { UnitOfWork } from "@/modules/shared-types";
 import { SECURITY } from "@/modules/config";
+import {
+  configureUnitOfWork,
+  createUnitOfWork,
+  memoryTransactionOpener,
+  rpcTransactionOpener,
+  withUnitOfWork,
+} from "@/modules/platform";
 import { fakeDriver } from "./fixtures/fake-driver";
 
 const anOperation = (
@@ -82,17 +90,180 @@ describe("DataAccessPort.run", () => {
     });
   });
 
-  it("refuses an unknown unit-of-work handle instead of silently running outside it", async () => {
-    // The transaction opener behind `platform.withUnitOfWork` is not decided (03 §1.4; a KEY decision for S4 /
-    // planner). Until it is, a `uow` a caller somehow holds must fail closed, never be ignored.
-    const { driver } = fakeDriver();
+  it("refuses a unit-of-work token no binding holds open, instead of silently running outside it", async () => {
+    // ADR-127: the join is what makes `{ uow }` real. Before boot installs a binding (or for a token some other
+    // binding minted) the port refuses, never runs the operation as if no unit of work had been asked for.
+    const { driver, state } = fakeDriver();
     const result = await createAuth({ driver }).data.run(anOperation(), {
       uow: {} as UnitOfWork,
     });
     expect(result.ok === false && result.error.code).toBe("INTERNAL");
     expect(result.ok === false && result.error.details?.reason).toBe(
-      "unit-of-work-not-supported",
+      "unit-of-work-unknown",
     );
+    expect(state.scopes).toEqual([]);
+  });
+});
+
+describe("DataAccessPort.run under a unit of work — one RPC is one transaction (ADR-127)", () => {
+  /** A query double that counts RPCs and writes, so the test proves what reached the driver — not what was refused. */
+  const countingDriver = (rpcThrows = false) => {
+    const { driver } = fakeDriver();
+    const calls = { rpc: 0, insert: 0, select: 0 };
+    const query = {
+      from: () => ({
+        select: async () => {
+          calls.select += 1;
+          return [];
+        },
+        insert: async (row: unknown) => {
+          calls.insert += 1;
+          return row;
+        },
+        update: async (_id: unknown, patch: unknown) => {
+          calls.insert += 1;
+          return patch;
+        },
+      }),
+      rpc: async () => {
+        calls.rpc += 1;
+        if (rpcThrows) throw new Error("function book_slot raised");
+        return { booked: true };
+      },
+    } as never;
+    return { driver: { ...driver, query: () => query }, calls };
+  };
+
+  const bookSlot = (): NamedOperation<unknown> => ({
+    name: "call-layer.bookSlot",
+    // The function writes `bookings` AND the `events` row — two writes, one RPC (03 §2.5; ADR-127).
+    exec: (q) => q.rpc("book_slot", {} as never),
+  });
+
+  it("runs two writes inside one unit of work as exactly one RPC, and commits", async () => {
+    const opener = rpcTransactionOpener();
+    const binding = createUnitOfWork(opener);
+    const { driver, calls } = countingDriver();
+    const port = createAuth({ driver, unitOfWork: binding.join }).data;
+
+    const result = await binding.withUnitOfWork(async (uow) => {
+      const booked = await port.run(bookSlot(), { uow });
+      expect(binding.transactionOf(uow)?.rpcCount).toBe(1);
+      return booked;
+    });
+
+    expect(result).toEqual({ ok: true, value: { booked: true } });
+    expect(calls).toEqual({ rpc: 1, insert: 0, select: 0 });
+    expect(opener.settled).toEqual({ committed: 1, rolledBack: 0 });
+    expect(opener.open).toEqual([]);
+  });
+
+  it("refuses a second RPC in the same unit of work — it would be a second transaction", async () => {
+    const binding = createUnitOfWork(rpcTransactionOpener());
+    const { driver, calls } = countingDriver();
+    const port = createAuth({ driver, unitOfWork: binding.join }).data;
+
+    const result = await binding.withUnitOfWork(async (uow) => {
+      const first = await port.run(bookSlot(), { uow });
+      expect(first.ok).toBe(true);
+      return port.run(bookSlot(), { uow });
+    });
+
+    expect(result.ok === false && result.error.details?.reason).toBe(
+      "second-rpc-in-unit-of-work",
+    );
+    expect(calls.rpc).toBe(1);
+  });
+
+  it("refuses a table write inside a unit of work — under PostgREST it could never be atomic with the RPC", async () => {
+    const binding = createUnitOfWork(rpcTransactionOpener());
+    const { driver, calls } = countingDriver();
+    const port = createAuth({ driver, unitOfWork: binding.join }).data;
+
+    const result = await binding.withUnitOfWork(async (uow) =>
+      port.run(
+        {
+          name: "auth.writeRole",
+          exec: (q) =>
+            q
+              .from("user_roles")
+              .insert({ user_id: "u" as never, role: "parent" }),
+        },
+        { uow },
+      ),
+    );
+
+    expect(result.ok === false && result.error.details?.reason).toBe(
+      "write-outside-rpc",
+    );
+    expect(calls.insert).toBe(0);
+  });
+
+  it("lets a read through inside a unit of work", async () => {
+    const binding = createUnitOfWork(rpcTransactionOpener());
+    const { driver, calls } = countingDriver();
+    const port = createAuth({ driver, unitOfWork: binding.join }).data;
+
+    const result = await binding.withUnitOfWork(async (uow) =>
+      port.run(
+        { name: "auth.readRoles", exec: (q) => q.from("user_roles").select() },
+        { uow },
+      ),
+    );
+
+    expect(result).toEqual({ ok: true, value: [] });
+    expect(calls.select).toBe(1);
+  });
+
+  it("turns a failing RPC into a Result error and rolls the unit of work back — never a throw across the connector", async () => {
+    const opener = rpcTransactionOpener();
+    const binding = createUnitOfWork(opener);
+    const { driver } = countingDriver(true);
+    const port = createAuth({ driver, unitOfWork: binding.join }).data;
+
+    const result = await binding.withUnitOfWork(async (uow) =>
+      port.run(bookSlot(), { uow }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("INTERNAL");
+      expect(result.error.message).not.toContain("book_slot");
+      expect(result.error.details).toMatchObject({
+        module: "auth",
+        action: "call-layer.bookSlot",
+      });
+    }
+    expect(opener.settled).toEqual({ committed: 0, rolledBack: 1 });
+  });
+
+  it("defaults to platform's module-level join, so a boot-installed binding reaches a port built without one", async () => {
+    const opener = rpcTransactionOpener();
+    configureUnitOfWork(createUnitOfWork(opener));
+    const { driver, calls } = countingDriver();
+    const port = createAuth({ driver }).data;
+
+    const result = await withUnitOfWork(async (uow) =>
+      port.run(bookSlot(), { uow }),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(calls.rpc).toBe(1);
+    expect(opener.settled.committed).toBe(1);
+  });
+
+  it("stub-auth honours a unit of work through the same join (03 §11 row 9)", async () => {
+    const binding = createUnitOfWork(memoryTransactionOpener());
+    const a = stubAuth({ unitOfWork: binding.join });
+
+    const result = await binding.withUnitOfWork(async (uow) =>
+      a.data.run(
+        { name: "auth.readRoles", exec: (q) => q.from("user_roles").select() },
+        { uow },
+      ),
+    );
+
+    expect(result).toEqual({ ok: true, value: [] });
   });
 });
 
