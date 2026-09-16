@@ -24,7 +24,10 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "umkqevipzmoovyrnynrf.supabase.co",
+        // The one Supabase project (01 §3.2 rule 2 — per-environment values come from env), never a literal.
+        hostname: new URL(
+          process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://localhost",
+        ).hostname,
         pathname: "/storage/v1/object/public/**",
       },
       {
