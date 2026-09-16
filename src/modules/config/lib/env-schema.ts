@@ -22,6 +22,16 @@ const SERVER_ENV_ENTRIES = {
     preview: "●",
     prod: "●",
   },
+  VERCEL_GIT_COMMIT_SHA: {
+    group: "App",
+    scope: "server",
+    kind: "string",
+    purpose:
+      "set by Vercel: the deployed commit sha — /api/health reports it as `sha` (06 §7.3) for the promote verify (06 §4.5; ADR-121)",
+    dev: "○",
+    preview: "○",
+    prod: "○",
+  },
   CRON_SECRET: {
     group: "App",
     scope: "server",

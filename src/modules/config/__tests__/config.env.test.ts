@@ -15,8 +15,10 @@ import {
 } from "./env-fixtures";
 
 // HANDOFF §5.4 / 06 §13 O-8 say 51 but enumerate 52 (both the BUNDLE and the SELF_SERVE_APP price-id pairs) —
-// 03 §5.2 owns the price ids, so the BUNDLE pair is not defined and the schema (the count's source) has 50.
-const NAME_COUNT = 50;
+// 03 §5.2 owns the price ids, so the BUNDLE pair is not defined and the S2 schema (the count's source) had 50.
+// P1-FIX (ADR-121) added `VERCEL_GIT_COMMIT_SHA` — Vercel's own system variable, optional everywhere, read for
+// `/api/health`'s `sha` because the environment is read only by this module (01 §1.3 rule 1) — so the schema has 51.
+const NAME_COUNT = 51;
 const dotEnvTest = loadDotEnvTest();
 const production = productionEnvFrom(dotEnvTest);
 
@@ -39,7 +41,7 @@ function failure(fn: () => unknown): EnvInvalidError {
 }
 
 describe("config.env — the name list (HANDOFF §5.4)", () => {
-  it("declares exactly 50 names, each in one scope, with a purpose and D / P / Pr marks", () => {
+  it("declares exactly 51 names, each in one scope, with a purpose and D / P / Pr marks", () => {
     const names = Object.keys(ENV_SCHEMA.entries);
     expect(names).toHaveLength(NAME_COUNT);
     for (const name of names) {
