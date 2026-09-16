@@ -22,13 +22,24 @@ describe("allowedSpecifiers", () => {
     ]);
   });
 
-  it("gives a service module the universals and its own inside only (01 §2.4 — leaves)", () => {
+  it("gives a tier-1 service the universals, the platform kernel and its own inside (01 §2.4; ADR-116)", () => {
     expect(allowedSpecifiers("comms")).toEqual([
       "@/modules/config",
       "@/modules/config/server",
       "@/modules/shared-types",
+      "@/modules/platform",
       "@/modules/comms",
       "@/modules/comms/**",
+    ]);
+  });
+
+  it("keeps the platform kernel itself a true leaf (ADR-116)", () => {
+    expect(allowedSpecifiers("platform")).toEqual([
+      "@/modules/config",
+      "@/modules/config/server",
+      "@/modules/shared-types",
+      "@/modules/platform",
+      "@/modules/platform/**",
     ]);
   });
 

@@ -22,7 +22,7 @@ export const ALLOWED_IMPORTS: Readonly<
     "auth",
     "comms",
   ] as const),
-  areas: Object.freeze([] as const),
+  areas: Object.freeze(["platform"] as const),
   matching: Object.freeze([
     "positions",
     "scoring",
@@ -71,7 +71,7 @@ export const ALLOWED_IMPORTS: Readonly<
     "platform",
   ] as const),
   scheduling: Object.freeze(["platform", "auth"] as const),
-  auth: Object.freeze([] as const),
+  auth: Object.freeze(["platform"] as const),
   "onboarding-parent": Object.freeze([
     "call-layer",
     "positions",
@@ -103,7 +103,7 @@ export const ALLOWED_IMPORTS: Readonly<
     "auth",
     "platform",
   ] as const),
-  comms: Object.freeze([] as const),
+  comms: Object.freeze(["platform"] as const),
   platform: Object.freeze([] as const),
   payments: Object.freeze([
     "purchase-paths",

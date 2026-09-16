@@ -31,9 +31,20 @@ describe("ALLOWED_IMPORTS", () => {
     expect(selfImports).toEqual([]);
   });
 
-  it("keeps the four service modules and the two universal modules as leaves (01 §2.4; ADR-069)", () => {
-    for (const leaf of [...SERVICE_MODULES, ...UNIVERSAL_MODULES]) {
+  it("keeps the universal modules and the platform kernel as true leaves (01 §2.4; ADR-069, ADR-116)", () => {
+    for (const leaf of [...UNIVERSAL_MODULES, "platform"] as const) {
       expect(ALLOWED_IMPORTS[leaf]).toEqual([]);
+    }
+  });
+
+  it("lets the tier-1 services import the platform kernel and nothing else (ADR-116)", () => {
+    // `Result` helpers and `log` live only in `platform`, while 03 §1 rule 4
+    // obliges every connector to return a `Result` and 01 §4b obliges logging —
+    // so the earlier all-services-are-leaves reading was unsatisfiable. The
+    // kernel imports nothing, so no cycle is reachable through it.
+    for (const service of SERVICE_MODULES) {
+      if (service === "platform") continue;
+      expect(ALLOWED_IMPORTS[service]).toEqual(["platform"]);
     }
   });
 
