@@ -74,6 +74,7 @@ describe("call-layer through the connector binding", () => {
       openNannyCall: async () => notConfigured,
       recordOutcome: async () => notConfigured,
       getCallState: async () => notConfigured,
+      findOpenCall: async () => notConfigured,
     });
 
     const result = await callLayer.getCallState({
