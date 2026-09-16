@@ -47,6 +47,7 @@ describe("platform — one export per file (L1; 05 §7 rule 4)", () => {
       "consent",
       "rate-limit",
       "upload-scan",
+      "unit-of-work",
     ]) {
       expect(files.map(rel)).toContain(`${sub}/index.ts`);
       expect(files.map(rel)).toContain(`${sub}/types.ts`);

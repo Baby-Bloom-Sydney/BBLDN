@@ -1,19 +1,15 @@
 // platform — the module's type surface (01 §2.5). The sub-modules named in the map (01 §2.5: `platform/log` ·
-// `platform/events` · `platform/consent`) keep their own `types.ts`; this file re-exports them plus the Result /
-// envelope / unit-of-work types that live at the module root. Values live in index.ts.
-import type {
-  AppErrorDetails,
-  ClientAppError,
-  Result,
-  UnitOfWork,
-  WithUnitOfWork,
-} from "@/modules/shared-types";
+// `platform/events` · `platform/consent`) and the three that grew beside them (`rate-limit` · `upload-scan` ·
+// `unit-of-work`, ADR-127) keep their own `types.ts`; this file re-exports them plus the Result / envelope types
+// and the `Registry` slot that live at the module root. Values live in index.ts.
+import type { AppErrorDetails, ClientAppError } from "@/modules/shared-types";
 
 export type * from "./log/types";
 export type * from "./events/types";
 export type * from "./consent/types";
 export type * from "./rate-limit/types";
 export type * from "./upload-scan/types";
+export type * from "./unit-of-work/types";
 
 // ── Result helpers (01 §4a) ──
 
@@ -72,45 +68,10 @@ export type EnvelopePayload<T, D extends AppErrorDetails = AppErrorDetails> = {
   readonly headers: Readonly<Record<string, string>>;
 };
 
-// ── Unit of work (01 §6.3; 03 §1.4) ──
-
-/**
- * The port `auth` (S4) implements over its data client: begin / commit / rollback on an opaque handle `H`.
- * `platform` never sees a driver type — it only carries `H` from `begin` to `commit` / `rollback` and hands it
- * back to the owner through `transactionOf` (see `UnitOfWorkBinding`).
- */
-export type TransactionOpener<H> = {
-  begin(): Promise<Result<H>>;
-  commit(handle: H): Promise<Result<void>>;
-  rollback(handle: H): Promise<Result<void>>;
-};
-
-/**
- * What `createUnitOfWork(opener)` returns: the `withUnitOfWork` of 03 §1.4 (commit on ok, roll back on error /
- * throw; nested calls join the outer) and `transactionOf`, the one way the opener's owner gets its handle back for
- * a token a caller passed as `{ uow }` — typed by the same `H` it minted, so no cast crosses a connector.
- * `UnitOfWork` is one opaque type for every binding: a token another binding minted resolves to `undefined` at
- * run time (a WeakMap miss), not at compile time — the port must handle `undefined`.
- */
-export type UnitOfWorkBinding<H> = {
-  readonly withUnitOfWork: WithUnitOfWork;
-  readonly transactionOf: (uow: UnitOfWork) => H | undefined;
-  /** The token of the unit of work the current async context is inside, if any (nested-call join). */
-  readonly current: () => UnitOfWork | undefined;
-};
+// ── Unit of work (01 §6.3; 03 §1.4; ADR-127) — the sub-module's own `types.ts`, re-exported above ──
 
 /** A boot-time registration slot (see `lib/create-registry.ts`). */
 export type Registry<T> = {
   readonly get: () => T;
   readonly set: (next: T) => void;
-};
-
-/** How a memory opener reports what happened — the stub's observable state for the swap tests. */
-export type MemoryTransactionState = "open" | "committed" | "rolled-back";
-export type MemoryTransaction = {
-  readonly id: number;
-  readonly state: MemoryTransactionState;
-};
-export type MemoryTransactionOpener = TransactionOpener<MemoryTransaction> & {
-  readonly transactions: ReadonlyArray<MemoryTransaction>;
 };

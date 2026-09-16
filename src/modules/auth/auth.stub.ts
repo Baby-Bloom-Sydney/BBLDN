@@ -7,5 +7,8 @@ import { createAuth } from "./lib/create-auth";
 import { memoryAuthDriver } from "./lib/memory-auth-driver";
 
 export function stubAuth(options: StubAuthOptions = {}): Auth<AppDatabase> {
-  return createAuth({ driver: memoryAuthDriver(options) });
+  return createAuth({
+    driver: memoryAuthDriver(options),
+    unitOfWork: options.unitOfWork,
+  });
 }
