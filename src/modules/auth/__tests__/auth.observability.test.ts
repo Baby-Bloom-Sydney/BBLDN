@@ -251,7 +251,7 @@ describe("the unconfigured binding is the real inside, as documented", () => {
     // ports have no implementation yet; `auth`'s does, and with no `src/instrumentation.ts` a fail-closed default
     // would leave the app with no gate at all. If this ever becomes a poison pill, this test must change with it.
     const { createServerClient } = await import("@supabase/ssr");
-    const { auth } = await import("..");
+    const { auth } = await import("@/modules/auth");
     serverClient.auth.getUser.mockResolvedValue({
       data: { user: null },
       error: { name: "AuthSessionMissingError", status: 400, message: "none" },

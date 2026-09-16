@@ -10,7 +10,7 @@ import {
   loginRedirectUrl,
   requiredRoleForPath,
   roleDashboardPath,
-} from "..";
+} from "@/modules/auth";
 import { ENUMS } from "@/modules/shared-types";
 
 describe("ROUTE_MAP (01 §4d)", () => {

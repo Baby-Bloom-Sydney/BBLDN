@@ -2,7 +2,7 @@
 // the two scopes, the `uow` join, and `signUrl` — the one signed-URL minter (07 §5.3 rule 1). Plus the module
 // binding: a faithful pass-through to whatever `configureAuth` installed.
 import { describe, expect, it, vi } from "vitest";
-import { auth, configureAuth, createAuth } from "..";
+import { auth, configureAuth, createAuth } from "@/modules/auth";
 import type { NamedOperation, StorageRef } from "../types";
 import type { UnitOfWork } from "@/modules/shared-types";
 import { SECURITY } from "@/modules/config";

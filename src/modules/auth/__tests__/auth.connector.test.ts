@@ -1,7 +1,7 @@
 // The `auth` contract (03 §1.4), written once and run twice — against the real inside (`createAuth` over a driver
 // double) and against `stub-auth` (05 §3 rule 2). A behaviour the stub cannot honour is a connector defect.
 import { describe, expect, it } from "vitest";
-import { createAuth, stubAuth } from "..";
+import { createAuth, stubAuth } from "@/modules/auth";
 import type { Auth, Role, Session } from "../types";
 import type { Actor, Email, UserId } from "@/modules/shared-types";
 import { aDriverUser, fakeDriver } from "./fixtures/fake-driver";

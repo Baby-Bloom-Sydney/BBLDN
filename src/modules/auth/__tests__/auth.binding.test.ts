@@ -2,7 +2,7 @@
 // the installed inside with the caller's arguments. A binding that quietly drops one is how a gate check goes
 // missing without a single test failing.
 import { describe, expect, it, vi } from "vitest";
-import { auth, configureAuth, stubAuth } from "..";
+import { auth, configureAuth, stubAuth } from "@/modules/auth";
 import type { AppDatabase, Auth, NamedOperation } from "../types";
 import type { Actor, UserId } from "@/modules/shared-types";
 
