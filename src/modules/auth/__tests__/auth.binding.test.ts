@@ -146,13 +146,19 @@ describe("stub-auth's in-memory store (03 §11 row 9)", () => {
     const a = stubAuth();
     await a.data.run({
       name: "auth.writeRole",
-      exec: async (q) => q.from("user_roles").insert({ role: "nanny" }),
+      // A user_roles row is (user_id, role) — the generated types say so, and before S5
+      // landed them this fixture wrote a row that could never exist (02 §4.1 row 2).
+      exec: async (q) =>
+        q.from("user_roles").insert({ user_id: USER, role: "nanny" }),
     });
     const after = await a.data.run({
       name: "auth.readRoles",
       exec: async (q) => q.from("user_roles").select(),
     });
-    expect(after).toEqual({ ok: true, value: [{ role: "nanny" }] });
+    expect(after).toEqual({
+      ok: true,
+      value: [{ user_id: USER, role: "nanny" }],
+    });
   });
 
   it("refuses a role grant for an account it does not know", async () => {
