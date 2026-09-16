@@ -41,7 +41,7 @@ describe("eslint.boundaries.js", () => {
     const blocks = config.flatMap((block) => block.files ?? []);
     for (const name of MODULE_NAMES) {
       expect(blocks, `no block for ${name}`).toContain(
-        `src/modules/${name}/**/*.{ts,tsx,mts,cts}`,
+        `src/modules/${name}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}`,
       );
     }
   });

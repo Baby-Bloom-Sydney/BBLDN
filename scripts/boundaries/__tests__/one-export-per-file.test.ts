@@ -18,6 +18,7 @@ ruleTester.run("bb/one-export-per-file", rule, {
     { code: "export const a = 1;", filename: helper },
     { code: "export function a() {}", filename: helper },
     { code: "export default function a() {}", filename: helper },
+    { code: "export const { a } = actions;", filename: helper },
     // A value plus the types that describe it is one thing, not two (L1's "one type group").
     {
       code: "export type A = { a: 1 };\nexport interface B { b: 2 }\nexport const a: A = { a: 1 };",
@@ -68,6 +69,22 @@ ruleTester.run("bb/one-export-per-file", rule, {
     },
     {
       code: "export const a = 1, b = 2;",
+      filename: helper,
+      errors: [{ messageId: "tooMany" }],
+    },
+    // A destructured export publishes one name per binding, not one per declarator.
+    {
+      code: "export const { a, b } = actions;",
+      filename: helper,
+      errors: [{ messageId: "tooMany" }],
+    },
+    {
+      code: "export const [a, b] = pair;",
+      filename: helper,
+      errors: [{ messageId: "tooMany" }],
+    },
+    {
+      code: "export const { a, ...rest } = actions;",
       filename: helper,
       errors: [{ messageId: "tooMany" }],
     },

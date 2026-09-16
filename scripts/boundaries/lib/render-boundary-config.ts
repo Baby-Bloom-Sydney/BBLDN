@@ -35,6 +35,9 @@ const HEADER = `// eslint.boundaries.js — GENERATED FILE, DO NOT EDIT.
 // Reading a block: the group bans the whole \`@/modules\` namespace and then negates what the row allows —
 // \`no-restricted-imports\` matches gitignore-style, last match wins.
 //
+// The globs cover every module source extension, not only the TypeScript ones \`src/modules/**\` holds
+// today: a \`.js\` file appearing there later must not be a blind spot (code-reviewer, S6 review).
+//
 // Run: \`npm run lint:boundaries\` (CI: the \`allowed-imports\` job).
 "use strict";
 
@@ -72,11 +75,11 @@ const messageFor = (name, group) =>
   \`into another module's inside, and no sub-module connector from outside its parent (05 §7 rules 1–2).\`;
 
 module.exports = [
-  { ignores: [...legacyPaths, "**/*.d.ts"] },
+  { ignores: [...legacyPaths] },
 
   // L1 (05 §7 rule 4) and the relative half of rule 2 — every module file, one rule set.
   {
-    files: ["src/modules/**/*.{ts,tsx,mts,cts}"],
+    files: ["src/modules/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
     languageOptions: LANGUAGE_OPTIONS,
     plugins: PLUGINS,
     linterOptions: LINTER_OPTIONS,
@@ -89,7 +92,7 @@ module.exports = [
 
   // 01 §2.3 — one block per module, in the document's row order.
   ...Object.entries(GROUPS).map(([name, group]) => ({
-    files: [\`src/modules/\${name}/**/*.{ts,tsx,mts,cts}\`],
+    files: [\`src/modules/\${name}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}\`],
     languageOptions: LANGUAGE_OPTIONS,
     plugins: PLUGINS,
     linterOptions: LINTER_OPTIONS,

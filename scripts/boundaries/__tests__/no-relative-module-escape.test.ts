@@ -26,10 +26,15 @@ ruleTester.run("bb/no-relative-module-escape", rule, {
       code: "import { a } from '../../../scripts/ci/lib/a';",
       filename: "/repo/src/app/api/thing/route.ts",
     },
-    // Test files reach the repo's own tooling on purpose (`config.repo.test.ts` reads the generators).
+    // Test files reach the repo's own tooling on purpose (`config.repo.test.ts` reads the generators) —
+    // a narrow exemption: outside `src/modules` entirely, not "any escape from a test file".
     {
       code: "import { a } from '../../../../scripts/env/lib/render-env-example';",
       filename: "/repo/src/modules/config/__tests__/config.repo.test.ts",
+    },
+    {
+      code: "import { a } from '../lib/parse-env';",
+      filename: "/repo/src/modules/config/__tests__/config.env.test.ts",
     },
   ],
   invalid: [
@@ -46,6 +51,12 @@ ruleTester.run("bb/no-relative-module-escape", rule, {
     {
       code: "export * from '../../../lib/legacy-helper';",
       filename: inMatching,
+      errors: [{ messageId: "escape" }],
+    },
+    // A test reaching into another module's inside erodes the boundary exactly as production code does.
+    {
+      code: "import { pick } from '../../positions/lib/pick';",
+      filename: "/repo/src/modules/matching/__tests__/matching.test.ts",
       errors: [{ messageId: "escape" }],
     },
   ],

@@ -20,7 +20,7 @@
     "check:claude-md": "bash scripts/ci/check-claude-md.sh",
     "gen:boundary-rules": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/gen-boundary-rules.ts",
     "check:allowed-imports": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/gen-boundary-rules.ts --check",
-    "lint:boundaries": "ESLINT_USE_FLAT_CONFIG=true eslint --config eslint.boundaries.js --max-warnings 0 \"src/modules/**/*.{ts,tsx}\"",
+    "lint:boundaries": "ESLINT_USE_FLAT_CONFIG=true eslint --config eslint.boundaries.js --max-warnings 0 \"src/modules/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}\"",
     "check:config-literals": "node scripts/ci/check-config-literals.mjs",
     "check:banned-words": "node scripts/ci/banned-words-static.mjs",
     "check:env-example": "npm run env:check",

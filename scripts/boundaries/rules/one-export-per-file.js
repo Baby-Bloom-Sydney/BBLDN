@@ -53,6 +53,33 @@ const isTestPath = (posixPath) =>
   posixPath.includes("/__tests__/") ||
   /\.(test|spec)\.[cm]?[jt]sx?$/u.test(posixPath);
 
+/**
+ * Every binding a declarator's target introduces. `export const { a, b } = actions;` publishes two names from
+ * one declarator, and collapsing that to a single placeholder was the `utils` grab-bag L1 forbids wearing a
+ * destructuring hat (code-reviewer, S6 review).
+ */
+function boundNamesOf(target) {
+  if (target === null || target === undefined) return [];
+  switch (target.type) {
+    case "Identifier":
+      return [target.name];
+    case "ObjectPattern":
+      return target.properties.flatMap((property) =>
+        boundNamesOf(
+          property.type === "RestElement" ? property.argument : property.value,
+        ),
+      );
+    case "ArrayPattern":
+      return target.elements.flatMap(boundNamesOf);
+    case "AssignmentPattern":
+      return boundNamesOf(target.left);
+    case "RestElement":
+      return boundNamesOf(target.argument);
+    default:
+      return ["(pattern)"];
+  }
+}
+
 /** Every value export a top-level node declares, as `{ node, name }` (types are not value exports). */
 function valueExportsOf(node) {
   if (node.type === "ExportDefaultDeclaration")
@@ -70,10 +97,9 @@ function valueExportsOf(node) {
 
   if (TYPE_DECLARATIONS.has(declaration.type)) return [];
   if (declaration.type === "VariableDeclaration")
-    return declaration.declarations.map((declarator) => ({
-      node: declarator,
-      name: declarator.id.name ?? "(pattern)",
-    }));
+    return declaration.declarations.flatMap((declarator) =>
+      boundNamesOf(declarator.id).map((name) => ({ node: declarator, name })),
+    );
   return [{ node: declaration, name: declaration.id?.name ?? "default" }];
 }
 

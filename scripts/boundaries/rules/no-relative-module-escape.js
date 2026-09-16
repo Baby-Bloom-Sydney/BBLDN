@@ -7,10 +7,14 @@
 // specifier against the importing file and refuses any that leaves the module it started in. Cross-module
 // traffic is `@/modules/<x>` — the connector — and is judged by the generated patterns.
 //
-// Test files are exempt: `src/modules/config/__tests__/config.repo.test.ts` reaches `scripts/env/lib/…` on
-// purpose, to prove the committed `.env.example` is what the generator writes.
+// Test files get a **narrow** exemption, not a blanket one (silent-failure-hunter, S6 review): a test may
+// reach outside `src/modules` entirely — `src/modules/config/__tests__/config.repo.test.ts` reads
+// `scripts/env/lib/…` on purpose, to prove the committed `.env.example` is what the generator writes — but a
+// test reaching into *another module's* inside is the same architecture erosion as production code doing it,
+// and is reported.
 
 const MODULE_ROOT = /^(?<root>.*\/src\/modules\/[^/]+\/)/u;
+const MODULES_ROOT = "/src/modules/";
 
 const isTestPath = (posixPath) =>
   posixPath.includes("/__tests__/") ||
@@ -48,7 +52,8 @@ module.exports = {
       "/",
     );
     const root = MODULE_ROOT.exec(filename)?.groups?.root;
-    if (root === undefined || isTestPath(filename)) return {};
+    if (root === undefined) return {};
+    const isTest = isTestPath(filename);
 
     const directory = filename.slice(0, filename.lastIndexOf("/"));
     const segments = root.split("/").filter(Boolean);
@@ -59,6 +64,7 @@ module.exports = {
       if (typeof source !== "string" || !source.startsWith(".")) return;
       const resolved = resolvePosix(directory, source);
       if (resolved.startsWith(root)) return;
+      if (isTest && !resolved.includes(MODULES_ROOT)) return;
       const inside = resolved.indexOf("/src/");
       context.report({
         node: node.source,

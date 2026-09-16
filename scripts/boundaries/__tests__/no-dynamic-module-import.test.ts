@@ -42,6 +42,8 @@ ruleTester.run("bb/no-dynamic-module-import", rule, {
     },
     { code: 'await import("../lib/score");', filename: inMatching, options },
     { code: 'await import("zod");', filename: inMatching, options },
+    { code: 'require("node:path");', filename: inMatching, options },
+    { code: 'require("@/modules/positions");', filename: inMatching, options },
     {
       code: 'type A = typeof import("@/modules/shared-types");',
       filename: inMatching,
@@ -84,6 +86,18 @@ ruleTester.run("bb/no-dynamic-module-import", rule, {
       filename: inMatching,
       options,
       errors: [{ messageId: "computed" }],
+    },
+    {
+      code: 'require("@/modules/connections");',
+      filename: inMatching,
+      options,
+      errors: [{ messageId: "restricted" }],
+    },
+    {
+      code: 'require.resolve("@/modules/connections");',
+      filename: inMatching,
+      options,
+      errors: [{ messageId: "restricted" }],
     },
   ],
 });

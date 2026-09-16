@@ -4,8 +4,8 @@
 //
 // ESLint 8's core rule reads `import` / `export … from` declarations only. Measured on this repo: a module
 // file containing `await import("@/modules/connections")` passes the generated patterns with no report, and
-// so does `type X = import("@/modules/connections").Foo`. Both are boundary crossings — one at run time, one
-// at type level — so this rule applies the module's own row to them.
+// so do `type X = import("@/modules/connections").Foo` and `require("@/modules/connections")`. All three are
+// boundary crossings — at run time and at type level — so this rule applies the module's own row to them.
 //
 // It takes the row as an option (`{ module, allowed }`), written into `eslint.boundaries.js` by the
 // generator, so there is still exactly one source for the table.
@@ -109,16 +109,29 @@ module.exports = {
       });
     };
 
-    // In a type position the specifier is wrapped: `TSImportType.argument` is a `TSLiteralType` whose
-    // `literal` is the string (older parsers called the field `parameter`).
+    // In a type position the specifier is wrapped: the field is a `TSLiteralType` whose `literal` is the
+    // string. `source` is the current name; `argument` / `parameter` are the two earlier ones.
     const specifierOfType = (node) => {
-      const argument = node.argument ?? node.parameter;
-      return argument?.type === "TSLiteralType" ? argument.literal : argument;
+      const field = node.source ?? node.argument ?? node.parameter;
+      return field?.type === "TSLiteralType" ? field.literal : field;
     };
+
+    // `require("@/modules/x")` / `require.resolve(…)` reach the same places and are read by no core rule
+    // either (silent-failure-hunter, S6 review).
+    const isRequire = (callee) =>
+      (callee.type === "Identifier" && callee.name === "require") ||
+      (callee.type === "MemberExpression" &&
+        !callee.computed &&
+        callee.object.type === "Identifier" &&
+        callee.object.name === "require" &&
+        callee.property.name === "resolve");
 
     return {
       ImportExpression: (node) => check(node, node.source),
       TSImportType: (node) => check(node, specifierOfType(node)),
+      CallExpression(node) {
+        if (isRequire(node.callee)) check(node, node.arguments[0]);
+      },
     };
   },
 };
