@@ -198,12 +198,18 @@ jobs:
           supabase start
           supabase db reset
           npx vitest run --project integration
-      - name: e2e (05 §9 stage 6) — shell smoke + responsive + a11y from E1; single shard at S0
+      - name: e2e (05 §9 stage 6) — E1 shell smoke — green
         if: ${{ !cancelled() }}
         run: |
           npx playwright install --with-deps chromium
           npm run build
-          npx playwright test
+          npm run check:boot-guard
+          npm run test:shell-smoke
+      - name: e2e (05 §9 stage 6) — legacy Sydney journeys — red until F-d / Phase 1 rewrites them
+        if: ${{ !cancelled() }}
+        # They need a seeded database and real credentials (`.env.local`), neither of which exists here. Not
+        # disabled (HANDOFF §11 S0): it runs and goes red, and the unit that turns it green is named above.
+        run: npx playwright test
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -233,7 +239,9 @@ jobs:
       - name: bundle string scan — server-only names + stub-stripe absent from client chunks (AC-X-35 / 36)
         if: ${{ !cancelled() }}
         run: npm run check:bundle-secrets
-      - name: prod-guard — production boot with PURCHASE_PROVIDER=stub-stripe must exit non-zero (07 §5.5) — red until F-c
+      # Green from F-c; E1 fixed the script's environment so the non-zero exit is the stub guard rather than
+      # four missing prod-column names (see scripts/ci/prod-guard-boot.sh).
+      - name: prod-guard — production boot with PURCHASE_PROVIDER=stub-stripe must exit non-zero (07 §5.5)
         if: ${{ !cancelled() }}
         run: npm run check:prod-guard
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
