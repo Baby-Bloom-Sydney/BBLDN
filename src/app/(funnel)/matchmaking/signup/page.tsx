@@ -1,33 +1,42 @@
+// S-X-05 — one-go signup beside the matches (04 §3.1 step 5). Thin (05 §7 rule 5): `?lead=` from the wizard, else
+// back to S-X-03 (04 §6.1 "missing lead"); `?count=` from S-X-04 when `1b` hands it over.
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { runPreAuthMatching } from "@/lib/matching/pre-auth";
-import { MatchmakingSignupClient } from "./MatchmakingSignupClient";
+import { BRAND, SECURITY, URLS } from "@/modules/config";
+import {
+  AuthShell,
+  ParentSignupForm,
+  signUpParentAction,
+  signupContextFromQuery,
+} from "@/modules/onboarding-parent";
 
-interface Props {
-  searchParams: Promise<{ lead?: string }>;
-}
+export const metadata: Metadata = { title: "Create your account" };
 
-export default async function MatchmakingSignupPage({ searchParams }: Props) {
-  const { lead } = await searchParams;
+type Props = {
+  searchParams: Record<string, string | string[] | undefined>;
+};
 
-  if (!lead) {
-    redirect("/matchmaking/onboarding");
-  }
-
-  // Fetch match data for context banner
-  const { matches, totalEligible } = await runPreAuthMatching(lead);
-  const topMatch = matches[0] ?? null;
-
-  const topPhotos = matches.slice(0, 3).map((m) => ({
-    url: m.profile.profile_picture_url,
-    initial: m.profile.first_name?.[0]?.toUpperCase() ?? "?",
-  }));
-
-  const matchSummary = topMatch
-    ? {
-        totalEligible,
-        topPhotos,
-      }
-    : null;
-
-  return <MatchmakingSignupClient leadId={lead} matchSummary={matchSummary} />;
+export default function MatchmakingSignupPage({ searchParams }: Props) {
+  const context = signupContextFromQuery(searchParams);
+  if (context.leadId === undefined) redirect("/matchmaking/onboarding");
+  const count = Number(searchParams.count);
+  return (
+    <AuthShell
+      brandName={BRAND.name}
+      homeHref="/"
+      clientTermsHref={URLS.paths.legal.clientTerms}
+      privacyHref={URLS.paths.legal.privacy}
+    >
+      <ParentSignupForm
+        action={signUpParentAction}
+        variant="beside-matches"
+        context={context}
+        minPasswordLength={SECURITY.password.minLength}
+        signInHref="/login"
+        clientTermsHref={URLS.paths.legal.clientTerms}
+        privacyHref={URLS.paths.legal.privacy}
+        {...(Number.isInteger(count) && count > 0 ? { matchCount: count } : {})}
+      />
+    </AuthShell>
+  );
 }
