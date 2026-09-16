@@ -5,16 +5,7 @@
 // `useFormState` is the React 18 / Next 14 pairing (`useActionState` is React 19 — ADR-104 pins the current
 // major, and the upgrade is its own unit).
 import { useFormState, useFormStatus } from "react-dom";
-import type { ClientResult } from "@/modules/platform";
-
-export type SetPasswordFormProps = {
-  readonly action: (
-    previous: unknown,
-    formData: FormData,
-  ) => Promise<ClientResult<void>>;
-  readonly minLength: number;
-  readonly signInHref: string;
-};
+import type { SetPasswordFormProps } from "../types";
 
 export function SetPasswordForm(props: SetPasswordFormProps) {
   const [state, formAction] = useFormState(props.action, null);

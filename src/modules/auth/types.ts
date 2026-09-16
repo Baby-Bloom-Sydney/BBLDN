@@ -2,6 +2,7 @@
 // contract spells, plus the driver seam the inside is built on. Values live in index.ts. **Types only**, so a client
 // component may `import type` from the connector without dragging the Supabase SDK into its bundle.
 import type { NextRequest, NextResponse } from "next/server";
+import type { ClientResult } from "@/modules/platform";
 import type { BucketKey } from "@/modules/config";
 import type {
   Actor,
@@ -201,4 +202,28 @@ export type StubAuthOptions = {
   readonly signedInUserId?: string;
   /** Rows a `NamedOperation` sees; the stub's "test schema" behind the same port (03 §11 row 9). */
   readonly tables?: Readonly<Record<string, ReadonlyArray<unknown>>>;
+};
+
+// ── The gate (01 §4d) and the one `(auth)` surface this unit owns ──
+
+export type GateInput = {
+  readonly pathname: string;
+  readonly search?: string;
+  readonly session: GateSession | null;
+};
+
+export type GateDecision =
+  | { readonly kind: "allow" }
+  | { readonly kind: "redirect"; readonly to: string };
+
+/** The set-password action's shape, so the client component never imports the connector barrel. */
+export type SetPasswordAction = (
+  previous: unknown,
+  formData: FormData,
+) => Promise<ClientResult<void>>;
+
+export type SetPasswordFormProps = {
+  readonly action: SetPasswordAction;
+  readonly minLength: number;
+  readonly signInHref: string;
 };

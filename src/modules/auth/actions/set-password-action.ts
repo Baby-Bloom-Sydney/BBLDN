@@ -4,16 +4,16 @@
 // itself lives in `auth.setPassword` so the rule cannot differ between callers.
 import { z } from "zod";
 import { err, toActionResult } from "@/modules/platform";
-import type { ClientResult } from "@/modules/platform";
+import type { SetPasswordAction } from "../types";
 import { auth } from "../lib/default-auth";
 
 const FIELD = "password";
 const schema = z.object({ [FIELD]: z.string() });
 
-export async function setPasswordAction(
+export const setPasswordAction: SetPasswordAction = async (
   _previous: unknown,
   formData: FormData,
-): Promise<ClientResult<void>> {
+) => {
   const parsed = schema.safeParse({ [FIELD]: formData.get(FIELD) });
   if (!parsed.success)
     return toActionResult(
@@ -22,4 +22,4 @@ export async function setPasswordAction(
       }),
     );
   return toActionResult(await auth.setPassword(parsed.data[FIELD]));
-}
+};

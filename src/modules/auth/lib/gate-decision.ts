@@ -1,22 +1,12 @@
 // 01 §4d, the whole gate as one pure function so it is readable, testable and cannot drift between the middleware
 // and any server-side re-check. Input: the path and the session the cookie rotation produced. Output: allow, or
 // the one place to send the person.
-import type { GateSession } from "../types";
+import type { GateDecision, GateInput } from "../types";
 import { ROUTE_MAP } from "./route-map";
 import { isAuthGroupPath } from "./is-auth-group-path";
 import { loginRedirectUrl } from "./login-redirect-url";
 import { requiredRoleForPath } from "./required-role-for-path";
 import { roleDashboardPath } from "./role-dashboard-path";
-
-export type GateInput = {
-  readonly pathname: string;
-  readonly search?: string;
-  readonly session: GateSession | null;
-};
-
-export type GateDecision =
-  | { readonly kind: "allow" }
-  | { readonly kind: "redirect"; readonly to: string };
 
 const allow: GateDecision = Object.freeze({ kind: "allow" });
 const go = (to: string): GateDecision =>
