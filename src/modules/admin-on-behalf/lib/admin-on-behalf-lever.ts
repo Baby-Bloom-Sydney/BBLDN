@@ -1,50 +1,31 @@
-// The delegating lever set: refuse anything that is not an admin actor, otherwise pass the call to the module
-// that owns the move (01 §2.2's reading of the admin edges; R2). `stubAdminOnBehalf` is this, and the real inside
-// will be this **plus** the `auth.requireRole('admin')` + `mfaVerified` gate (07 §5.4 row 2) that ADR-117 Tier A
-// puts behind a security review — which is why the gate is absent here rather than approximated.
+// The delegating lever set: pass each call to the module that owns the move (01 §2.2's reading of the admin
+// edges; R2) and return its result unchanged. That forwarding *is* the module — P-1 (ADR-001): an on-behalf
+// move is the same move, so a lever that invented its own answer would be a second stage model.
+//
+// **There is no role check in this file, deliberately** (FIX-1; REVIEW-1 C-1). It used to hold
+// `actor.kind === 'admin'` — a test on a field the caller handed in, with no `mfaVerified` — which read like a
+// gate and was not one. Authority now has exactly one home: `gated-admin-actor.ts`, over
+// `auth.requireRole('admin')` (07 §5.4 rows 1–2), applied to every lever by `gateAdminOnBehalf` at the
+// `configureAdminOnBehalf` seam. By the time a call reaches the functions below its actor is session-derived
+// and carries the required `onBehalfOf`, so re-testing it here would add a second, weaker answer to a question
+// already settled.
 import { advance as stageAdvance, positions } from "@/modules/positions";
 import { callLayer } from "@/modules/call-layer";
 import { matching } from "@/modules/matching";
-import { err } from "@/modules/platform";
-import type { Actor } from "@/modules/shared-types";
 import type { AdminOnBehalf } from "../types";
-
-const FORBIDDEN = err("FORBIDDEN", "Not an admin actor", {
-  reason: "E_ACTOR_FORBIDDEN" as const,
-  which: "mover",
-});
-
-const isAdmin = (actor: Actor): boolean => actor.kind === "admin";
 
 export function adminOnBehalfLever(): AdminOnBehalf {
   return Object.freeze({
-    advance: async (input) =>
-      isAdmin(input.actor) ? stageAdvance(input) : FORBIDDEN,
-    listAllowed: async (entity, actor) =>
-      isAdmin(actor) ? positions.listAllowed(entity, actor) : Object.freeze([]),
-    chooseSlot: async (positionId, slotId, holdId, actor, idempotencyKey) =>
-      isAdmin(actor)
-        ? callLayer.chooseSlot(
-            positionId,
-            slotId,
-            holdId,
-            actor,
-            idempotencyKey,
-          )
-        : FORBIDDEN,
-    moveSlot: async (ref, slotId, actor) =>
-      isAdmin(actor) ? callLayer.moveSlot(ref, slotId, actor) : FORBIDDEN,
-    clearSlot: async (positionId, actor, reason) =>
-      isAdmin(actor)
-        ? callLayer.clearSlot(positionId, actor, reason)
-        : FORBIDDEN,
-    recordOutcome: async (ref, outcome, notes, actor) =>
-      isAdmin(actor)
-        ? callLayer.recordOutcome(ref, outcome, notes, actor)
-        : FORBIDDEN,
-    bookNannyCall: async (input) =>
-      isAdmin(input.actor) ? callLayer.openNannyCall(input) : FORBIDDEN,
-    autofire: async (positionId, actor) =>
-      isAdmin(actor) ? matching.autofire(positionId, actor) : FORBIDDEN,
+    advance: (input) => stageAdvance(input),
+    listAllowed: (entity, actor) => positions.listAllowed(entity, actor),
+    chooseSlot: (positionId, slotId, holdId, actor, idempotencyKey) =>
+      callLayer.chooseSlot(positionId, slotId, holdId, actor, idempotencyKey),
+    moveSlot: (ref, slotId, actor) => callLayer.moveSlot(ref, slotId, actor),
+    clearSlot: (positionId, actor, reason) =>
+      callLayer.clearSlot(positionId, actor, reason),
+    recordOutcome: (ref, outcome, notes, actor) =>
+      callLayer.recordOutcome(ref, outcome, notes, actor),
+    bookNannyCall: (input) => callLayer.openNannyCall(input),
+    autofire: (positionId, actor) => matching.autofire(positionId, actor),
   });
 }
