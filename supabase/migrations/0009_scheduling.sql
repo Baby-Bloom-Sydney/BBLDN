@@ -19,12 +19,13 @@
 -- 02 §5 row 9 — there is no `slot_holds` table and no stored `slots`: a hold **is** a bookings row
 --   at status `held` with `hold_expires_at`, and slots are computed (rules ∪ open − blocked − active).
 --
--- === Two foundations conflicts this file had to resolve. Both are in PROGRESS for the planner. ===
+-- === Two foundations conflicts this file had to resolve. ===
 --  (1) `availability_rules.weekday`: 02 §4.4 says "0-6, **Mon = 0**"; config/scheduling.ts says
 --      `weekdays: [1,2,3,4,5] // Mon-Fri (0 = Sunday)` — the JS convention. Both mean Mon-Fri but
 --      with different integers, so seeding straight from the config array under 02's convention
---      would silently produce **Tue-Sat**. This file follows 02 (its own DDL spec): Mon = 0, so
---      Mon-Fri is 0,1,2,3,4. Whoever writes the slot generator must read the same convention.
+--      would silently produce **Tue-Sat**. **Ruled by the coordinator 2026-09-16: 02 §4.4 is
+--      authoritative, Mon = 0**, and `config/scheduling.ts` is the side that gets corrected in a
+--      later unit. So Mon-Fri is 0,1,2,3,4 here, and the slot generator must read it that way.
 --  (2) `calendars.id`: 02 C-2 says every entity table has a uuid PK; 03 §3.2 types
 --      `CalendarId = 'default'`. The column is a uuid (C-2 is the DDL rule) and the connector maps
 --      its single literal to the single row — I-5 ("calendarId <> 'default' -> CALENDAR_UNKNOWN")

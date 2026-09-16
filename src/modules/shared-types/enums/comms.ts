@@ -8,6 +8,12 @@ export const COMMS_ENUMS = Object.freeze({
     "bounced",
     "cancelled",
     "dry_run",
+    // Appended by the coordinator's ruling of 2026-09-16, with 02 §3 amended to match: a message
+    // suppressed as a duplicate is a real outcome, and without its own value it is indistinguishable
+    // from `cancelled`. Added now rather than later because an enum value is add-only (C-1) but
+    // still costs a migration. `dry_run` stays snake_case — 02 owns the enums; 03 §8.1's `dry-run`
+    // is the side being corrected.
+    "deduped",
   ] as const),
   admin_notification_kind: Object.freeze([
     "call_due",

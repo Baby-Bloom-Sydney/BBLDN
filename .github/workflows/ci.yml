@@ -192,7 +192,7 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           version: 2.117.0
-      - name: integration (05 §9 stage 5) — green from S5: db.constraints, enum-ordinals, int.rls
+      - name: integration (05 §9 stage 5) — green from S5 — db.constraints, enum-ordinals, int.rls
         if: ${{ !cancelled() }}
         run: |
           supabase start

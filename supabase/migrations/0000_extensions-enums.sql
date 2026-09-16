@@ -118,7 +118,7 @@ begin
 
   -- comms
   if to_regtype('public.message_channel') is null then create type public.message_channel as enum ('email', 'sms'); end if;
-  if to_regtype('public.message_status') is null then create type public.message_status as enum ('queued', 'sent', 'failed', 'bounced', 'cancelled', 'dry_run'); end if;
+  if to_regtype('public.message_status') is null then create type public.message_status as enum ('queued', 'sent', 'failed', 'bounced', 'cancelled', 'dry_run', 'deduped'); end if;
   if to_regtype('public.admin_notification_kind') is null then create type public.admin_notification_kind as enum ('call_due', 'call_overdue', 'commission_call_booked', 'onboarding_call_due', 'nanny_barred', 'contact_message', 'cron_failed', 'lead_replied', 'booking_blocked_over', 'booking_displacement_failed', 'payment_due', 'usage_check_low'); end if;
 
   -- leads

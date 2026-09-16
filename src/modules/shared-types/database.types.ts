@@ -4451,6 +4451,7 @@ export type Database = {
         | "bounced"
         | "cancelled"
         | "dry_run"
+        | "deduped"
       mover: "user" | "admin" | "system"
       nanny_lead_status:
         | "applied"
@@ -4871,6 +4872,7 @@ export const Constants = {
         "bounced",
         "cancelled",
         "dry_run",
+        "deduped",
       ],
       mover: ["user", "admin", "system"],
       nanny_lead_status: [
