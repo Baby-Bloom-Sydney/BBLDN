@@ -1,8 +1,14 @@
 // auth connector (01 §2.4; ADR-069) — the service module every module may import for the session read, the role
 // gate and the **data-access port**: the only road to Postgres / Storage. It never exports a Supabase client or any
-// driver type (01 §6.3 amended; 03 §1.4) and never imports a business module. The real inside is installed once at
-// boot through `configureAuth`; until then every method fails closed (`INTERNAL { reason: 'auth-not-configured' }`),
-// so a stub can never be mistaken for a configured system.
+// driver type (01 §6.3 amended; 03 §1.4) and never imports a business module.
+//
+// **The module-level `auth` binding defaults to the REAL Supabase-backed inside, not to a fail-closed stub.** That
+// is the opposite of `platform`'s registries, and deliberately so: `platform`'s ports have no implementation until
+// a database exists, whereas `auth`'s does — it needs only env, and `config` throws at import if that env is
+// missing (01 §4d step 5). There is no `src/instrumentation.ts` in this repo yet (see the module README), so a
+// fail-closed default would mean the app has no gate at all. `configureAuth` replaces the default — that is how
+// test wiring and `stub-auth` are selected (05 §3 rule 3) — and every method re-reads the registry, so a later
+// call wins.
 export type * from "./types";
 
 // The connector (03 §1.4) — module-level bindings over the registry.

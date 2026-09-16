@@ -2,8 +2,8 @@
 // a **server** value into `user_roles` — never read back from `raw_user_meta_data` — and it can only ever be a
 // customer role, so no path a visitor can reach produces an `admin`. A failed role write is INTERNAL, not a
 // half-made account that would sign in with no role at all.
-import { fromThrown, ok } from "@/modules/platform";
-import type { Result } from "@/modules/shared-types";
+import { fromThrown, log, ok } from "@/modules/platform";
+import type { Result, Uuid } from "@/modules/shared-types";
 import type {
   AppDatabase,
   AuthDriver,
@@ -24,7 +24,15 @@ export const signUpWith =
     if (policy !== null) return policy;
     try {
       const user = await driver.signUpWithPassword(input);
+      // The other named service-role use (module README); logged for the same audit reason as `grantRole`
+      // (07 §9.2(f) — a role write is exactly the event anomaly detection wants to see).
       await driver.writeRole(user.id, input.role);
+      log.info("role written at signup", {
+        module: "auth",
+        action: "signUp",
+        userId: user.id as Uuid,
+        grantedRole: input.role,
+      });
       const session = toSession(user, input.role);
       return session === null ? unauthenticated() : ok(session);
     } catch (thrown) {

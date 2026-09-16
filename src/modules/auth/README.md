@@ -19,9 +19,17 @@ Supabase SDK internally and **never exports a client or any driver type**, so a 
 **Errors** (03 §1.4): `UNAUTHENTICATED` · `FORBIDDEN { reason: 'role' | 'mfa' | 'scope' }` · `INTERNAL`
 (connection / commit). Every method returns `Result`; nothing throws to a caller (03 §1 rule 4).
 
-**Boot wiring.** `auth` follows `platform`'s registry pattern: the module-level `auth` binding **fails closed**
-with `INTERNAL { reason: 'auth-not-configured' }` until boot calls
-`configureAuth(createAuth({ driver: supabaseAuthDriver() }))`. There is no silent success against a stub.
+**Boot wiring — and where it deliberately differs from `platform`.** `auth` uses the same registry shape, but the
+**default is the real inside, not a fail-closed stub**: the first call to the module-level `auth` binding resolves
+to `createAuth({ driver: supabaseAuthDriver() })` and caches it in the registry. `configureAuth` replaces it, and
+every method re-reads the registry so a later call wins.
+
+That is on purpose, and it is the opposite of `platform`'s ports. `platform` fails closed because its ports have
+**no** implementation until the S5 schema exists, so anything that "worked" would be a stub succeeding silently.
+`auth`'s implementation exists today and needs only env — and `config` throws at import when that env is missing
+(01 §4d step 5), so the default cannot quietly run against nothing. With no `src/instrumentation.ts` in this repo
+(below), a fail-closed default would simply mean the app has no gate. **There is still no silent success against a
+stub:** `stub-auth` is reached only by an explicit `configureAuth(stubAuth(...))`.
 
 **What this module does _not_ do yet (S4 boundaries — see `docs/build-progress.md`).**
 

@@ -1,8 +1,7 @@
 // 01 §6.3 amended / 03 §1.4 — the data-access port. A caller hands over a **named** operation and gets a `Result`;
 // it never sees a client, a driver type or a raw error. Two scopes: `session` (RLS as the caller) and `service`
 // (named jobs and definers only — every use listed in the module README).
-import { err, fromThrown, ok } from "@/modules/platform";
-import { SECURITY } from "@/modules/config";
+import { err, fromThrown, log, ok } from "@/modules/platform";
 import type { Result, Url } from "@/modules/shared-types";
 import type {
   AppDatabase,
@@ -13,11 +12,8 @@ import type {
   StorageRef,
 } from "../types";
 import { isSafeObjectPath } from "./is-safe-object-path";
+import { SIGNED_URL_TTL_CEILING } from "./signed-url-ttl-ceiling";
 
-/** The longest TTL any surface is allowed (07 §5.3 rule 1 — browse / profile at 24 h is the ceiling). */
-const MAX_TTL_SECONDS = Math.max(
-  ...Object.values(SECURITY.signedUrlTtlSeconds),
-);
 const UOW_MESSAGE = "This operation could not be completed.";
 
 export function createDataAccessPort(
@@ -34,8 +30,17 @@ export function createDataAccessPort(
       return err("INTERNAL", UOW_MESSAGE, {
         reason: "unit-of-work-not-supported",
       });
+    const scope = opts?.scope ?? "session";
+    // 01 §6.3: every RLS-bypassing use must be named and reviewed. The technical enforcement is a review, so the
+    // least this choke point owes is an audit line naming the operation that asked for it.
+    if (scope === "service")
+      log.info("service-scope data access", {
+        module: "auth",
+        action: op.name,
+        scope,
+      });
     try {
-      return ok(await op.exec(driver.query(opts?.scope ?? "session")));
+      return ok(await op.exec(driver.query(scope)));
     } catch (thrown) {
       return fromThrown(thrown, { module: "auth", action: op.name });
     }
@@ -52,7 +57,7 @@ export function createDataAccessPort(
     if (
       !Number.isInteger(ttlSeconds) ||
       ttlSeconds <= 0 ||
-      ttlSeconds > MAX_TTL_SECONDS
+      ttlSeconds > SIGNED_URL_TTL_CEILING[ref.bucket]
     )
       return err("VALIDATION", "That link could not be created.", {
         reason: "invalid-ttl",

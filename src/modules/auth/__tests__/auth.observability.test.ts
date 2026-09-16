@@ -244,3 +244,19 @@ describe("the query surface refuses a shape it cannot honour", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("the unconfigured binding is the real inside, as documented", () => {
+  it("resolves to the Supabase-backed driver with no configureAuth call anywhere in this file", async () => {
+    // Pins the documented default (index.ts header, README "Boot wiring"). `platform` fails closed because its
+    // ports have no implementation yet; `auth`'s does, and with no `src/instrumentation.ts` a fail-closed default
+    // would leave the app with no gate at all. If this ever becomes a poison pill, this test must change with it.
+    const { createServerClient } = await import("@supabase/ssr");
+    const { auth } = await import("..");
+    serverClient.auth.getUser.mockResolvedValue({
+      data: { user: null },
+      error: { name: "AuthSessionMissingError", status: 400, message: "none" },
+    });
+    expect(await auth.getSession()).toEqual({ ok: true, value: null });
+    expect(vi.mocked(createServerClient)).toHaveBeenCalled();
+  });
+});

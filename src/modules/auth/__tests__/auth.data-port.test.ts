@@ -1,7 +1,7 @@
 // The data-access port (01 §6.3 amended; 03 §1.4): `run` over the narrow `Query` surface with a named operation,
-// the two scopes, the `uow` join, and `signUrl` — the one signed-URL minter (07 §5.3 rule 1). Plus the fail-closed
-// module binding: nothing succeeds against an unconfigured `auth`.
-import { describe, expect, it } from "vitest";
+// the two scopes, the `uow` join, and `signUrl` — the one signed-URL minter (07 §5.3 rule 1). Plus the module
+// binding: a faithful pass-through to whatever `configureAuth` installed.
+import { describe, expect, it, vi } from "vitest";
 import { auth, configureAuth, createAuth } from "..";
 import type { NamedOperation, StorageRef } from "../types";
 import type { UnitOfWork } from "@/modules/shared-types";
@@ -29,6 +29,40 @@ describe("DataAccessPort.run", () => {
     const { driver, state } = fakeDriver();
     await createAuth({ driver }).data.run(anOperation(), { scope: "service" });
     expect(state.scopes).toEqual(["service"]);
+  });
+
+  it("leaves an audit line naming the operation whenever RLS is bypassed", async () => {
+    const lines: Array<{ msg: string; fields: unknown }> = [];
+    vi.resetModules();
+    vi.doMock("@/modules/platform", async (importOriginal) => {
+      const actual = await importOriginal<Record<string, unknown>>();
+      return {
+        ...actual,
+        log: {
+          debug: () => undefined,
+          info: (msg: string, fields?: unknown) => lines.push({ msg, fields }),
+          warn: () => undefined,
+          error: () => undefined,
+        },
+      };
+    });
+    const { createAuth: build } = await import("../lib/create-auth");
+    const { fakeDriver: fake } = await import("./fixtures/fake-driver");
+    const port = build({ driver: fake().driver }).data;
+    await port.run(anOperation());
+    expect(lines).toEqual([]);
+    await port.run(anOperation(), { scope: "service" });
+    expect(lines).toEqual([
+      {
+        msg: "service-scope data access",
+        fields: {
+          module: "auth",
+          action: "auth.readSomething",
+          scope: "service",
+        },
+      },
+    ]);
+    vi.doUnmock("@/modules/platform");
   });
 
   it("maps a thrown driver error to INTERNAL with the operation name, never the throw text", async () => {
@@ -94,6 +128,38 @@ describe("DataAccessPort.signUrl (07 §5.3 rule 1)", () => {
     const { driver } = fakeDriver();
     const result = await createAuth({ driver }).data.signUrl(A_REF, ttl);
     expect(result.ok === false && result.error.code).toBe("VALIDATION");
+  });
+
+  it("holds each bucket to its OWN ceiling, not the loosest one (07 §5.3 rule 1)", async () => {
+    // Browse / profile reads get 24 h; DBS, right-to-work and ID evidence get 1 h. A flat global ceiling would
+    // hand out a 24-hour link to a passport scan — 07 §10.1's `auth` row names "signed URL TTL 1 h" for exactly
+    // this bucket.
+    const { driver, state } = fakeDriver();
+    const port = createAuth({ driver }).data;
+    const day = SECURITY.signedUrlTtlSeconds.browse;
+
+    const profile = await port.signUrl(
+      { bucket: "profile-pictures", path: "parent/u/a.png" },
+      day,
+    );
+    expect(profile.ok).toBe(true);
+
+    const evidence = await port.signUrl(A_REF, day);
+    expect(evidence.ok === false && evidence.error.code).toBe("VALIDATION");
+    expect(evidence.ok === false && evidence.error.details?.reason).toBe(
+      "invalid-ttl",
+    );
+
+    const appImage = await port.signUrl(
+      { bucket: "development-images", path: "children/c-1/a.png" },
+      day,
+    );
+    expect(appImage.ok).toBe(false);
+
+    // Only the one that was within its own bucket's ceiling reached the driver.
+    expect(state.signedUrls.map((s) => s.ref.bucket)).toEqual([
+      "profile-pictures",
+    ]);
   });
 
   it("maps a storage failure to INTERNAL", async () => {
