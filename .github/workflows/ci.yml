@@ -5,7 +5,8 @@
 #
 # Stage → job → what runs (05 §9 numbering):
 #   1 lint            → lint            eslint · prettier --check · CLAUDE.md = CODE-CLAUDE.md (local gate, see below)
-#   1 lint            → allowed-imports scripts/gen-boundary-rules.ts --check + eslint.boundaries.js   [red until S6]
+#   1 lint            → allowed-imports scripts/gen-boundary-rules.ts --check + eslint.boundaries.js (S6 — green;
+#                                        joins the required-check list per ADR-109 when this PR merges)
 #   1 lint            → banned-literals scripts/ci/check-config-literals.mjs · banned-words static pre-check ·
 #                                        env:check (.env.example) · crons:check (vercel.json) · process.env grep outside config
 #   2 typecheck       → typecheck       tsc --noEmit --pretty false
@@ -125,11 +126,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: gen-boundary-rules --check (05 §7 rule 1, §10) — red until S6 lands the generator + eslint.boundaries.js
+      - name: gen-boundary-rules --check (05 §7 rule 1, §10) — eslint.boundaries.js = a fresh generation
         run: npm run check:allowed-imports
-      - name: eslint boundaries over src/modules (05 §7 rules 1–5) — red until S6
+      - name: eslint boundaries over src/modules (05 §7 rules 1–4) — S6; flat config, so ESLINT_USE_FLAT_CONFIG
         if: ${{ !cancelled() }}
-        run: npx eslint --config eslint.boundaries.js "src/modules/**/*.{ts,tsx}"
+        run: npm run lint:boundaries
 
   banned-literals:
     name: banned-literals
