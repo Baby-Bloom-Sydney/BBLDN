@@ -7,7 +7,10 @@ import type { ChildLink, ChildLinkingReads } from "./child-linking";
 
 export type StubAppSeed = Readonly<Record<string, ReadonlyArray<ChildLink>>>;
 
-const earliest = (children: ReadonlyArray<ChildLink>): ISODate | null =>
+/** The **youngest** child — the latest date of birth, which is what bounds access (ADR-083 / 084). */
+const youngestDateOfBirth = (
+  children: ReadonlyArray<ChildLink>,
+): ISODate | null =>
   children.length === 0
     ? null
     : children.reduce((youngest, child) =>
@@ -20,6 +23,6 @@ export function stubApp(seed: StubAppSeed = {}): ChildLinkingReads {
   return Object.freeze({
     linkedChildren: async (familyId: FamilyId) => ok(childrenOf(familyId)),
     youngestChildDateOfBirth: async (familyId: FamilyId) =>
-      ok(earliest(childrenOf(familyId))),
+      ok(youngestDateOfBirth(childrenOf(familyId))),
   });
 }

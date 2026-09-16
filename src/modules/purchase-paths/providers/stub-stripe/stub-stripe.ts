@@ -45,6 +45,17 @@ function withRef(base: string, path: string, ref: LinkRef): Url {
   return url.toString() as Url;
 }
 
+/**
+ * The same rule `src/app/api/_lib/authorise-bearer.ts` applies, restated here so layer 3 of 07 §5.5 is
+ * **sufficient alone** rather than sufficient given a careful caller: an empty or blank secret is not a secret,
+ * and `constantTimeEquals("", "")` is `true`. Today both callers already guarantee a non-empty value reaches
+ * this point; that is exactly the kind of guarantee that quietly stops holding.
+ */
+function verified(signature: string, secret: string): boolean {
+  if (secret.trim() === "" || signature === "") return false;
+  return constantTimeEquals(signature, secret);
+}
+
 function parseBody(rawBody: string): PurchaseResult<PurchaseEvent> {
   const json: unknown = (() => {
     try {
@@ -56,7 +67,7 @@ function parseBody(rawBody: string): PurchaseResult<PurchaseEvent> {
   if (json === undefined) return unverified();
   const parsed = STUB_EVENT_SCHEMA.safeParse(json);
   if (!parsed.success) return unverified();
-  return ok(parsed.data as unknown as PurchaseEvent);
+  return ok(parsed.data);
 }
 
 export function stubStripe(options: StubStripeOptions): PurchaseProvider {
@@ -75,7 +86,7 @@ export function stubStripe(options: StubStripeOptions): PurchaseProvider {
     createCheckout: async (_customer, _preset, _plan, ref) =>
       ok({ url: withRef(appUrl, CHECKOUT_PATH, ref) }),
     parseEvent: (raw) =>
-      constantTimeEquals(raw.signature, eventSecret)
+      verified(raw.signature, eventSecret)
         ? parseBody(raw.rawBody)
         : unverified(),
     portal: async () => ok({ url: `${appUrl}${CHECKOUT_PATH}` as Url }),

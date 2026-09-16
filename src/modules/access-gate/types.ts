@@ -1,7 +1,7 @@
 // access-gate — the one read every app surface asks before rendering the product: "is the app open for this
 // family?" (01 §2.3; 03 §10.1). It derives the answer from `payments.getAccess` and re-exports `setAccess` for
 // S-A-10; it sends nothing and emits nothing — `payments` owns the events and `app-ready` (fix: A-3).
-import type { AccessState } from "@/modules/payments";
+import type { AccessState, PaymentsErrorReason } from "@/modules/payments";
 import type { Instant, Result } from "@/modules/shared-types";
 
 /**
@@ -30,6 +30,11 @@ export type AccessDecision = {
   readonly state: AccessState;
 };
 
-export type AccessGateErrorDetails = { readonly reason: string };
+/**
+ * `hasAccess` forwards `payments.getAccess`'s error unchanged, so its reasons are `payments`' reasons. Typed as
+ * the closed union rather than `string` so a caller matching on `details.reason` keeps narrowing and typo
+ * protection at this layer too — every sibling error-details type in the tree is closed the same way.
+ */
+export type AccessGateErrorDetails = { readonly reason: PaymentsErrorReason };
 
 export type AccessGateResult<T> = Result<T, AccessGateErrorDetails>;

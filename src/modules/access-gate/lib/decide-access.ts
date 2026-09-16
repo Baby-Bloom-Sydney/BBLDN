@@ -35,9 +35,20 @@ const decide = (state: AccessState): Grant => {
       return { open: false, reason: "deposit-paid" };
     case "lapsed":
       return { open: false, reason: "lapsed" };
-    default:
+    case "none":
       return { open: false, reason: "none" };
+    default:
+      // Exhaustive by construction: a new `AccessState` variant fails the compile here rather than falling
+      // through to a default. The runtime arm still closes the gate, because an unrecognised standing is not
+      // evidence of a paid family — but no one should ever reach it.
+      return assertNever(state);
   }
+};
+
+/** A new standing must be decided deliberately; until it is, the gate is closed. */
+const assertNever = (state: never): Grant => {
+  void state;
+  return { open: false, reason: "none" };
 };
 
 const boundOf = (state: AccessState): Instant | null => {

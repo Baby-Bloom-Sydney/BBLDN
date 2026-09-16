@@ -145,6 +145,20 @@ describe("accessUntil — the youngest child's third birthday (ADR-083 / 084)", 
     expect(decision.reason).toBe("access-ended");
   });
 
+  it("closes at the exact instant it expires, not one tick later", () => {
+    // `until <= now` is inclusive on purpose; this pins which side of the boundary the gate falls on.
+    const decision = decideAccess({ ...placed, accessUntil: NOW }, NOW);
+
+    expect(decision.open).toBe(false);
+    expect(decision.reason).toBe("access-ended");
+  });
+
+  it("is still open one instant before it expires", () => {
+    const decision = decideAccess({ ...placed, accessUntil: FUTURE }, NOW);
+
+    expect(decision.open).toBe(true);
+  });
+
   it("leaves the gate open while nothing bounds it — no child linked yet", () => {
     const decision = decideAccess({ ...placed, accessUntil: null }, NOW);
 

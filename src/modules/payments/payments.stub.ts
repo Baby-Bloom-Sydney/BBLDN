@@ -13,11 +13,11 @@ import type { PurchaseProvider } from "@/modules/purchase-paths";
 import type { Money, PlanShape, Price } from "@/modules/purchase-paths";
 import type {
   Actor,
+  CustomerRef,
   FamilyId,
   Instant,
   LinkRef,
-  PlacementId,
-  RawProviderEvent,
+  Url,
 } from "@/modules/shared-types";
 import type {
   AccessChange,
@@ -37,6 +37,11 @@ export type StubPaymentsSeed = {
 
 const MS_PER_DAY = 86_400_000;
 const NONE: AccessState = Object.freeze({ state: "none" });
+const EPOCH = new Date(0).toISOString() as Instant;
+/** The `ignored` webhook outcome has no family; see the GAP note on `handleWebhook`. */
+const UNRESOLVED_FAMILY = "" as FamilyId;
+/** The stub takes no money, so a hosted return URL is never followed; the in-app panel is the whole flow. */
+const RETURN_TO = "" as Url;
 
 const fail = (reason: PaymentsErrorReason, message: string) =>
   err(
@@ -49,11 +54,12 @@ const fail = (reason: PaymentsErrorReason, message: string) =>
     { reason },
   );
 
-// The currency is read from `config`, never written here (L4 — 01 §3.2 rule 1); the cast is to 03 §5.2's
-// literal type, which is the contract's, not a second source of truth.
+// The currency is read from `config`, never written here (L4 — 01 §3.2 rule 1). No cast: `LOCALE.currency`
+// already infers as the literal 03 §5.2 types `Money["currency"]` as, so a drift between the two is a compile
+// error rather than something a cast would absorb.
 const pence = (amount: number): Money => ({
   pence: amount,
-  currency: LOCALE.currency as Money["currency"],
+  currency: LOCALE.currency,
 });
 
 function addDays(from: Instant, days: number): Instant {
@@ -103,15 +109,17 @@ function toggledChange(
   at: Instant,
   until?: Instant,
 ): AccessChange {
-  const after: AccessState = {
-    state: "toggled",
+  // Frozen before it is aliased: the same reference is stored in the stub's mutable map and returned to the
+  // caller, and `readonly` on the type is a compile-time promise only.
+  const after: AccessState = Object.freeze({
+    state: "toggled" as const,
     on,
     accessUntil: null,
     reason,
     toggledBy: actor.id,
     at,
     ...(until === undefined ? {} : { until }),
-  };
+  });
   return Object.freeze({
     familyId,
     before,
@@ -125,62 +133,78 @@ function toggledChange(
   });
 }
 
-export function stubPayments(seed: StubPaymentsSeed = {}): PurchasePath {
-  const now = seed.now ?? (new Date(0).toISOString() as Instant);
-  const dfy = new Set<string>(seed.dfyFamilies ?? []);
-  const states = new Map<string, AccessState>(
-    Object.entries(seed.access ?? {}),
-  );
-  const provider = seed.provider;
-  const noProvider = () =>
-    err("INTERNAL", "Stub payments has no provider", {
-      reason: "E_PROVIDER" as const,
-      provider: "none",
-    });
-  const readAccess = (familyId: FamilyId): AccessState =>
-    states.get(familyId) ?? NONE;
+/** Everything the stub's method groups share; split out so no single function exceeds the 50-line rule. */
+type StubContext = {
+  readonly now: Instant;
+  readonly dfy: ReadonlySet<string>;
+  readonly states: Map<string, AccessState>;
+  readonly provider?: PurchaseProvider;
+};
 
-  const linkDue = (familyId: FamilyId): boolean => {
-    const state = readAccess(familyId);
-    return state.state === "placed" && state.paymentDueAt <= now;
-  };
+const readAccess = (ctx: StubContext, familyId: FamilyId): AccessState =>
+  ctx.states.get(familyId) ?? NONE;
 
-  // Declared, then frozen: the annotation is what contextually types every arrow below; an outer `as`
-  // cast would infer them away and silently widen the parameters.
-  const path: PurchasePath = {
-    prices: presetPrices,
+const noProvider = () =>
+  err("INTERNAL", "Stub payments has no provider", {
+    reason: "E_PROVIDER" as const,
+    provider: "none",
+  });
 
-    getAccess: async (familyId) => ok(readAccess(familyId)),
+/** The bill falls due `PRICES.paymentAfterStartDays` after the nanny's start; before that, `E_PAYMENT_NOT_DUE`. */
+const linkDue = (ctx: StubContext, familyId: FamilyId): boolean => {
+  const state = readAccess(ctx, familyId);
+  return state.state === "placed" && state.paymentDueAt <= ctx.now;
+};
+
+const customerOf = (familyId: FamilyId) => `stub:${familyId}` as CustomerRef;
+
+function accessMethods(
+  ctx: StubContext,
+): Pick<PurchasePath, "getAccess" | "setAccess" | "startTrial"> {
+  return {
+    getAccess: async (familyId) => ok(readAccess(ctx, familyId)),
 
     setAccess: async (familyId, on, reason, actor, until) => {
       if (actor.kind !== "admin")
         return fail("E_ACTOR_FORBIDDEN", "Only an admin may toggle access");
-      const before = readAccess(familyId);
+      const before = readAccess(ctx, familyId);
       const change = toggledChange(
         familyId,
         before,
         on,
         reason,
         actor,
-        now,
+        ctx.now,
         until,
       );
-      states.set(familyId, change.after);
+      ctx.states.set(familyId, change.after);
       return ok(change);
     },
 
     startTrial: async (familyId) => {
-      if (dfy.has(familyId))
+      if (ctx.dfy.has(familyId))
         return fail("E_DFY_FAMILY", "A done-for-you family has no trial");
-      const before = readAccess(familyId);
-      if (before.state !== "none") return ok({ alreadyUsed: true as const });
-      const trialEndsAt = addDays(now, PRICES.trialDays);
-      states.set(familyId, { state: "trial", accessUntil: null, trialEndsAt });
+      if (readAccess(ctx, familyId).state !== "none")
+        return ok({ alreadyUsed: true as const });
+      const trialEndsAt = addDays(ctx.now, PRICES.trialDays);
+      ctx.states.set(
+        familyId,
+        Object.freeze({
+          state: "trial" as const,
+          accessUntil: null,
+          trialEndsAt,
+        }),
+      );
       return ok({ trialEndsAt });
     },
+  };
+}
 
-    openDfyAccess: async (familyId, _placementId: PlacementId) => {
-      const before = readAccess(familyId);
+/** L-1b: the app on the nanny's first day, the bill a week later, the satisfaction window set (ADR-093 / 094). */
+function dfyMethods(ctx: StubContext): Pick<PurchasePath, "openDfyAccess"> {
+  return {
+    openDfyAccess: async (familyId) => {
+      const before = readAccess(ctx, familyId);
       if (before.state === "placed")
         return ok(
           Object.freeze({
@@ -191,16 +215,21 @@ export function stubPayments(seed: StubPaymentsSeed = {}): PurchasePath {
             handled: "skipped-duplicate" as const,
           }),
         );
-      const after: AccessState = {
-        state: "placed",
+      const after: AccessState = Object.freeze({
+        state: "placed" as const,
         accessUntil: null,
-        startedAt: now,
-        paymentDueAt: addDays(now, PRICES.paymentAfterStartDays),
+        startedAt: ctx.now,
+        paymentDueAt: addDays(ctx.now, PRICES.paymentAfterStartDays),
         balance: pence(PRICES.feePence),
+        // The real first-week discount is snapshotted from the placement's contracted hours and rate
+        // (ADR-100); a stub has no placement to read, so it credits nothing rather than inventing a figure.
         firstWeekWages: pence(0),
-        satisfactionWindowEndsAt: addDays(now, PRICES.satisfactionWindowDays),
-      };
-      states.set(familyId, after);
+        satisfactionWindowEndsAt: addDays(
+          ctx.now,
+          PRICES.satisfactionWindowDays,
+        ),
+      });
+      ctx.states.set(familyId, after);
       return ok(
         Object.freeze({
           familyId,
@@ -211,19 +240,24 @@ export function stubPayments(seed: StubPaymentsSeed = {}): PurchasePath {
         }),
       );
     },
+  };
+}
 
+function linkMethods(
+  ctx: StubContext,
+): Pick<PurchasePath, "createPaymentLink" | "createCheckout"> {
+  return {
     createPaymentLink: async (familyId, kind, plan, actor, custom) => {
       if (actor.kind !== "admin")
         return fail("E_ACTOR_FORBIDDEN", "Only an admin may send a link");
-      if (kind === "balance-after-week-1" && !linkDue(familyId))
+      if (kind === "balance-after-week-1" && !linkDue(ctx, familyId))
         return fail("E_PAYMENT_NOT_DUE", "The bill is not due yet");
-      if (provider === undefined) return noProvider();
+      if (ctx.provider === undefined) return noProvider();
       const reference = `stub-ref:${familyId}:${kind}` as LinkRef;
-      const expiresAt = addDays(now, PRICES.linkTtlDays);
-      const amount = custom ?? pence(PRICES.depositPence);
-      const link = await provider.createPaymentLink(
-        `stub:${familyId}` as never,
-        amount,
+      const expiresAt = addDays(ctx.now, PRICES.linkTtlDays);
+      const link = await ctx.provider.createPaymentLink(
+        customerOf(familyId),
+        custom ?? pence(PRICES.depositPence),
         kind,
         plan,
         reference,
@@ -234,30 +268,39 @@ export function stubPayments(seed: StubPaymentsSeed = {}): PurchasePath {
     },
 
     createCheckout: async (familyId, preset, plan) => {
-      if (provider === undefined) return noProvider();
+      if (ctx.provider === undefined) return noProvider();
       const reference = `stub-ref:${familyId}:${preset}` as LinkRef;
-      const checkout = await provider.createCheckout(
-        `stub:${familyId}` as never,
+      const checkout = await ctx.provider.createCheckout(
+        customerOf(familyId),
         preset,
         plan,
         reference,
-        { success: "" as never, cancel: "" as never },
+        { success: RETURN_TO, cancel: RETURN_TO },
       );
       if (!checkout.ok)
         return fail("E_PROVIDER", "The provider refused the checkout");
       return ok({ url: checkout.value.url });
     },
+  };
+}
 
-    handleWebhook: async (event: RawProviderEvent) => {
-      if (provider === undefined) return noProvider();
-      const parsed = provider.parseEvent(event);
-      if (!parsed.ok)
+function spineMethods(
+  ctx: StubContext,
+): Pick<PurchasePath, "handleWebhook" | "portal"> {
+  return {
+    handleWebhook: async (event) => {
+      if (ctx.provider === undefined) return noProvider();
+      if (!ctx.provider.parseEvent(event).ok)
         return fail("E_EVENT_UNVERIFIED", "The event is not verified");
-      // The §5.4.3 dispatch table is Phase 1; a verified event the stub cannot place is `ignored`, never a
-      // guessed money transition.
+      // The §5.4.3 dispatch table is Phase 1. A **verified** event the stub cannot place is `ignored` with no
+      // state change — never a guessed money transition.
+      //
+      // GAP (L-005 F-c PROGRESS entry): 03 §5.2 makes `AccessChange.familyId` non-optional, but the `ignored`
+      // outcome of §5.4.3 has no family by definition (no `LinkRef` we minted). `UNRESOLVED_FAMILY` is the
+      // documented sentinel until the contract says which it is.
       return ok(
         Object.freeze({
-          familyId: "" as FamilyId,
+          familyId: UNRESOLVED_FAMILY,
           before: NONE,
           after: NONE,
           events: Object.freeze([]),
@@ -267,14 +310,29 @@ export function stubPayments(seed: StubPaymentsSeed = {}): PurchasePath {
     },
 
     portal: async (familyId) => {
-      if (provider === undefined) return noProvider();
-      const result = await provider.portal(
-        `stub:${familyId}` as never,
-        "" as never,
-      );
+      if (ctx.provider === undefined) return noProvider();
+      const result = await ctx.provider.portal(customerOf(familyId), RETURN_TO);
       if (!result.ok) return fail("E_PROVIDER", "The provider refused");
       return ok(result.value);
     },
+  };
+}
+
+export function stubPayments(seed: StubPaymentsSeed = {}): PurchasePath {
+  const ctx: StubContext = {
+    now: seed.now ?? EPOCH,
+    dfy: new Set<string>(seed.dfyFamilies ?? []),
+    states: new Map<string, AccessState>(Object.entries(seed.access ?? {})),
+    ...(seed.provider === undefined ? {} : { provider: seed.provider }),
+  };
+  // Declared, then frozen: the annotation is what contextually types every arrow in the groups above; an outer
+  // `as` cast would infer them away and silently widen the parameters.
+  const path: PurchasePath = {
+    prices: presetPrices,
+    ...accessMethods(ctx),
+    ...dfyMethods(ctx),
+    ...linkMethods(ctx),
+    ...spineMethods(ctx),
   };
   return Object.freeze(path);
 }

@@ -17,6 +17,18 @@
 //     runtime-split, the purchase registry stays unconfigured and every payment call fails closed — which is the
 //     honest state while `payments` has no inside.
 // Each is recorded in the L-005 F-c PROGRESS entry rather than guessed at.
+/**
+ * `EnvInvalidError` carries a frozen `names` array and **never a value** — that is the whole point of its shape
+ * (`config/lib/env-invalid-error.ts`). It is read structurally rather than by importing the class, because the
+ * `config` connector does not export it and a boot file should not deep-import another module's `lib/`.
+ */
+function invalidEnvNames(error: unknown): ReadonlyArray<string> | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const names = (error as { readonly names?: unknown }).names;
+  if (!Array.isArray(names)) return undefined;
+  return names.filter((name): name is string => typeof name === "string");
+}
+
 export async function register(): Promise<void> {
   const { log } = await import("@/modules/platform");
   try {
@@ -32,9 +44,11 @@ export async function register(): Promise<void> {
       environment: env.environment,
     });
   } catch (error) {
+    // Names only. Without them an on-call engineer sees the alert fire and has no idea which variable failed.
     log.error("boot: environment is invalid", {
       action: "boot",
       alert: "ALERT_ENV_INVALID",
+      envNames: invalidEnvNames(error),
     });
     // **The boot must fail, not degrade.** Next 14 catches a throwing `register()`, keeps the process alive and
     // serves 500s from every route — a server that is up but cannot answer, which reads to an orchestrator as

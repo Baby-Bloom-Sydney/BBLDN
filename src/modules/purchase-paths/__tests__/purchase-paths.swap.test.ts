@@ -13,6 +13,7 @@ import type {
   Instant,
   LinkRef,
   RawProviderEvent,
+  Url,
 } from "@/modules/shared-types";
 
 const SECRET = "stub-event-secret-for-tests";
@@ -96,7 +97,7 @@ describe("stub-stripe, once the binding points at it", () => {
       "self-serve-app",
       { kind: "upfront" },
       REF,
-      { success: `${APP_URL}/ok` as never, cancel: `${APP_URL}/no` as never },
+      { success: `${APP_URL}/ok` as Url, cancel: `${APP_URL}/no` as Url },
     );
 
     expect(link.ok && link.value.url).toBe(
@@ -131,6 +132,32 @@ describe("parseEvent fails closed (07 §5.5 layer 3)", () => {
 
   it("refuses an empty secret — an unset secret must never read as authorised", () => {
     expect(purchaseProvider.parseEvent(raw(completed, "")).ok).toBe(false);
+  });
+
+  it("refuses when the provider itself was built with a blank secret and the caller presents a blank one", () => {
+    // `constantTimeEquals("", "")` is `true`. Layer 3 of 07 §5.5 must be sufficient **alone**, not sufficient
+    // given a careful caller — so the guard lives in `parseEvent`, not only in the routes above it.
+    configurePurchaseProvider(
+      stubStripe({
+        eventSecret: "   ",
+        environment: "development",
+        appUrl: APP_URL,
+      }),
+    );
+
+    expect(purchaseProvider.parseEvent(raw(completed, "   ")).ok).toBe(false);
+    expect(purchaseProvider.parseEvent(raw(completed, "")).ok).toBe(false);
+  });
+
+  it("refuses an instalment count the schema will not bound", () => {
+    const result = purchaseProvider.parseEvent(
+      raw(
+        { ...completed, shape: { kind: "instalments", count: 1_000_000 } },
+        SECRET,
+      ),
+    );
+
+    expect(result.ok).toBe(false);
   });
 
   it("refuses a body that is not valid JSON", () => {

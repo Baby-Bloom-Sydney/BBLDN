@@ -9,9 +9,11 @@ import type { PurchaseProvider } from "@/modules/purchase-paths";
 import type {
   Actor,
   AdminId,
+  CustomerRef,
   FamilyId,
   Instant,
   PlacementId,
+  Url,
   UserId,
 } from "@/modules/shared-types";
 
@@ -32,11 +34,11 @@ const PARENT: Actor = Object.freeze({
 const SIGNATURE = "signed";
 const fakeProvider = (): PurchaseProvider => ({
   name: "stub-stripe",
-  ensureCustomer: async () => ok("customer-1" as never),
+  ensureCustomer: async () => ok("customer-1" as CustomerRef),
   createPaymentLink: async (_customer, _amount, _kind, _plan, ref) =>
-    ok({ url: `https://example.test/parent/bundle?ref=${ref}` as never }),
+    ok({ url: `https://example.test/parent/bundle?ref=${ref}` as Url }),
   createCheckout: async (_customer, _preset, _plan, ref) =>
-    ok({ url: `https://example.test/parent/subscribe?ref=${ref}` as never }),
+    ok({ url: `https://example.test/parent/subscribe?ref=${ref}` as Url }),
   parseEvent: (raw) =>
     raw.signature === SIGNATURE
       ? ok({ kind: "ignored", eventId: "e1", providerType: "x" })
@@ -49,7 +51,7 @@ const fakeProvider = (): PurchaseProvider => ({
           },
         },
   portal: async () =>
-    ok({ url: "https://example.test/parent/subscribe" as never }),
+    ok({ url: "https://example.test/parent/subscribe" as Url }),
 });
 const provider = fakeProvider;
 
@@ -229,6 +231,25 @@ describe("prices() renders config, never a literal (L4)", () => {
 });
 
 describe("the webhook spine", () => {
+  it("never fabricates a money transition for a verified event it cannot place", async () => {
+    // The §5.4.3 dispatch table is Phase 1. A **verified** event the stub cannot resolve to a family must come
+    // back `ignored` with no state change — the failure this pins is a stub that quietly reported `handled` and
+    // moved a family's access. Without this case, that regression would pass every other test in the file.
+    const result = await payments.handleWebhook({
+      rawBody: "{}",
+      signature: SIGNATURE,
+      receivedAt: NOW,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.handled).toBe("ignored");
+    expect(result.ok && result.value.events).toEqual([]);
+    expect(result.ok && result.value.after).toEqual(
+      result.ok && result.value.before,
+    );
+    expect(result.ok && result.value.after.state).toBe("none");
+  });
+
   it("refuses an unverified event with E_EVENT_UNVERIFIED before any dispatch", async () => {
     const result = await payments.handleWebhook({
       rawBody: "{}",
