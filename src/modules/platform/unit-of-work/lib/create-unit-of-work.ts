@@ -1,11 +1,19 @@
 // 03 §1.4 `withUnitOfWork`: begin → run → commit on ok, roll back on error / throw; nested calls join the outer
 // (AsyncLocalStorage carries the token down the async call tree); the token is opaque — the opener's handle is
 // reachable only through the binding that minted it (`transactionOf`), so no driver type crosses a connector (R4).
+// The `join` is the seam a data port is handed at boot (ADR-127): it resolves a token to "mine and open" and books
+// the unit of work's one RPC through the opener's `claim`, keeping the handle current as it does.
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Result, UnitOfWork } from "@/modules/shared-types";
-import type { TransactionOpener, UnitOfWorkBinding } from "../types";
-import { err } from "./err";
-import { fromThrown } from "./from-thrown";
+import type {
+  TransactionOpener,
+  UnitOfWorkBinding,
+  UnitOfWorkClaimDetails,
+  UnitOfWorkJoin,
+} from "../types";
+import { err } from "../../lib/err";
+import { fromThrown } from "../../lib/from-thrown";
+import { ok } from "../../lib/ok";
 
 type Body<T> = (uow: UnitOfWork) => Promise<Result<T>>;
 
@@ -47,6 +55,25 @@ async function settle<H, T>(
   );
 }
 
+function joinOver<H>(
+  opener: TransactionOpener<H>,
+  handles: WeakMap<UnitOfWork, H>,
+): UnitOfWorkJoin {
+  const claimRpc = (uow: UnitOfWork): Result<void, UnitOfWorkClaimDetails> => {
+    const handle = handles.get(uow);
+    if (handle === undefined)
+      return err("INTERNAL", "Unit of work is not open", {
+        reason: "unit-of-work-unknown",
+      });
+    if (opener.claim === undefined) return ok(undefined);
+    const claimed = opener.claim(handle);
+    if (!claimed.ok) return claimed;
+    handles.set(uow, claimed.value);
+    return ok(undefined);
+  };
+  return Object.freeze({ isOpen: (uow) => handles.has(uow), claimRpc });
+}
+
 export function createUnitOfWork<H>(
   opener: TransactionOpener<H>,
 ): UnitOfWorkBinding<H> {
@@ -61,9 +88,9 @@ export function createUnitOfWork<H>(
     const token = mintToken();
     handles.set(token, begun.value);
     try {
-      return await storage.run(token, async () =>
-        settle(opener, begun.value, await runBody(fn, token)),
-      );
+      const outcome = await storage.run(token, () => runBody(fn, token));
+      // `claim` may have replaced the handle since `begin`; settle the one the ledger holds now.
+      return await settle(opener, handles.get(token) ?? begun.value, outcome);
     } finally {
       handles.delete(token);
     }
@@ -73,5 +100,6 @@ export function createUnitOfWork<H>(
     withUnitOfWork,
     transactionOf: (uow: UnitOfWork) => handles.get(uow),
     current: () => storage.getStore(),
+    join: joinOver(opener, handles),
   });
 }

@@ -1,8 +1,8 @@
 // platform connector (01 §2.4; ADR-069) — the service module every module may import: `log` (§4b), `Events`
 // + `ConsentReader` (§7), `Result` helpers + `ErrorCode` → HTTP mapping (§4a), the envelope helpers (§4c / §4e),
-// `withUnitOfWork` + the opaque `UnitOfWork` token (§6.3; 03 §1.4), `platform/consent` (02 R-4), the rate-limit
-// (07 §8) and upload-scan (07 §5.3 rule 3, ADR-106) interfaces. Client-safe: nothing here reads server env; the
-// boot code (`src/instrumentation.ts`, S4 / F-c) injects the real ports through the `configure*` calls.
+// `withUnitOfWork` + the opaque `UnitOfWork` token (§6.3; 03 §1.4; ADR-127), `platform/consent` (02 R-4), the
+// rate-limit (07 §8) and upload-scan (07 §5.3 rule 3, ADR-106) interfaces. Client-safe: nothing here reads server
+// env; the boot code (`src/instrumentation.ts`, P1-WIRE) injects the real ports through the `configure*` calls.
 export type * from "./types";
 
 // Result (01 §4a)
@@ -17,13 +17,6 @@ export { envelopeOf } from "./lib/envelope-of";
 export { toResponse } from "./lib/to-response";
 export { toActionResult } from "./lib/to-action-result";
 
-// Unit of work (01 §6.3; 03 §1.4)
-export { createUnitOfWork } from "./lib/create-unit-of-work";
-export { withUnitOfWork } from "./lib/with-unit-of-work";
-export { currentUnitOfWork } from "./lib/current-unit-of-work";
-export { configureUnitOfWork } from "./lib/configure-unit-of-work";
-export { memoryTransactionOpener } from "./lib/memory-transaction-opener";
-
 // Clock + id minting (the one place a branded id is minted)
 export { nowInstant } from "./lib/now-instant";
 export { newId } from "./lib/new-id";
@@ -34,3 +27,4 @@ export * from "./events";
 export * from "./consent";
 export * from "./rate-limit";
 export * from "./upload-scan";
+export * from "./unit-of-work";
