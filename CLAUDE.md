@@ -66,36 +66,23 @@ ECC = Everything Claude Code: `~/.claude/rules/` (rules), `~/.claude/skills/` (s
 
 Before any non-trivial task: re-read the relevant ECC rules (`common/coding-style.md` · `common/testing.md` · `common/code-review.md` · `common/development-workflow.md` · `common/security.md`; `typescript/*`; for UI `web/design-quality.md` · `web/performance.md` · `web/coding-style.md`) and pick the matching agent rather than defaulting to general-purpose coding. Research before writing (`common/development-workflow.md` §0): GitHub code search → library docs → registries → adapt a proven implementation.
 
-### Skills — load before the unit, not after (BAI, 2026-09-15: "use all ECC skills and principles")
+### How much process a unit carries (ADR-123 — read this before anything else in §3)
 
-Read the matching `~/.claude/skills/<name>/SKILL.md` **before** writing, summarise its constraints in the unit's PROGRESS entry, then build. Minimum set per unit type (add others when the unit touches their domain):
+ECC is a **project** standard applied at **checkpoints**, not a battery rerun on every task. Running all of it per task is what made units take one to three hours on 2026-09-16, and it still let tautological tests, a wrongly-green prod guard and a privileged module labelled as scaffolding through — all three were caught by the batch sweep afterwards, not by per-task review.
 
-| Unit type | Skills (always) | Agents (always) |
-|---|---|---|
-| Repo / CI / tooling (S0, S1, S6) | `coding-standards` · `deployment-patterns` · `github-ops` · `verification-loop` | `[code-reviewer + security-reviewer]` on workflows, scripts, env handling |
-| Config / types / platform (S2, S3) | `coding-standards` · `tdd-workflow` · `backend-patterns` · `api-design` · `security-review` | `[code-reviewer + typescript-reviewer + silent-failure-hunter]`; `type-design-analyzer` on `shared-types` |
-| Auth / API routes / webhooks (S4, F-c shells) | `security-review` · `backend-patterns` · `api-design` · `tdd-workflow` | `[code-reviewer + typescript-reviewer + security-reviewer + silent-failure-hunter]` |
-| Migrations / RLS / RPC (S5) | `database-migrations` · `postgres-patterns` · `security-review` | `[database-reviewer + code-reviewer]`; `code-architect` first |
-| Module connectors + insides (F-a, F-b, F-c) | `coding-standards` · `tdd-workflow` · `backend-patterns` (+ `frontend-patterns` · `frontend-design` for UI) | `code-architect` → `tdd-guide` → `[code-reviewer + typescript-reviewer + silent-failure-hunter]`; `a11y-architect` on UI |
-| Journeys / e2e (E1, Phase 1+) | `e2e-testing` · `verification-loop` | `e2e-runner` · `pr-test-analyzer` |
-| Any breakage | — | `build-error-resolver` (minimal diff) |
-
-Skipping a listed skill or agent is a process violation to call out in review, not a shortcut.
-
-### Model marking — `[Fable]` units (BAI, 2026-09-15)
-
-Most of this build is execution against a spec that already answers the hard questions, and the gates above are what hold quality. A unit tagged **`[Fable]`** in `HANDOFF.md` §11 or the L-005 `RESUME.md` is the exception: **do not start it on a lesser model — wait for the strongest available.** The tag marks work where the specification cannot carry the judgement:
-
-| Tag it when the unit | Why |
+| | What a unit does |
 |---|---|
-| Rewrites or decomposes a large existing file across module boundaries (build-standard §6) | subtle behaviour is easy to lose and hard to test back |
-| Sweeps a cross-cutting change over the legacy tree (F-d locale + literal sweep) | one wrong replacement is silent until production |
-| Turns BAI's intent into screens or copy rather than following a written contract (Phase 1+ journeys) | the foundations are thin here by design; the judgement is the work |
-| Hits a contradiction the foundations do not resolve | the answer becomes an ADR, and a wrong ADR compounds |
+| **Build task** | **No review agents.** Build it, pass the fast gates, merge. At most **one** skill, named in your brief. Cite `doc §x.y`, don't read whole documents. Target 20–30 minutes. |
+| **Fast gates** | `typecheck` · `lint` · `prettier --check .` · `vitest run` · `lint:boundaries` · `check:allowed-imports` · `check:config-literals` · `check:claude-md`. CI runs the slow ones. Never chase a red that exists on `main` by construction. |
+| **Checkpoint** | Once a day, overnight: the **full battery over the whole diff since the last checkpoint**. Findings come back as one fix unit, not seven interruptions. |
+| **Model split** | Fable builds while BAI is present; Opus runs the checkpoint and its fixes. |
 
-Anything else — a named bug fix, a connector against a written contract, a migration the data model already specifies, a lint generator — is not `[Fable]`. Tagging everything defeats the point.
+**Two rules survive unconditionally, because they are cheap and they are what actually failed:**
 
-An untagged unit that turns out to need this judgement mid-flight **stops**, logs why in `PROGRESS.md`, and waits. It does not guess.
+1. **Any claim your merge rests on ships as an executable test in the same PR.** "It fails closed until boot configures it" is not a merge argument unless a test proves it, run RED first. Ten of thirteen modules made that claim with no test that could have caught a regression.
+2. **A test that asserts whatever the code happens to do is worse than no test.** If the code and the document disagree, the document wins: pin the documented behaviour as a failing test and record it. Never bend the assertion to match the code.
+
+**The trigger that ends all of this:** the first moment a real person can reach the site or real data exists. Then inline review returns for auth, money, personal data and schema, permanently. Until then nothing is deployed and the database is empty, so a fault found tomorrow costs what it costs today. **If you are the unit that makes the site reachable, say so loudly — that is the day the rule flips.**
 
 ### Workflow recipes (portable from Sydney's `BB/nanny-platform/CLAUDE.md`)
 
@@ -256,7 +243,7 @@ Sydney's `website/` CLAUDE.md chain is reference only; it does not govern this r
 ---
 
 <!-- audit
-Last edited: 2026-09-16T11:05+10:00 — BB-LDN-Planner-070926
+Last edited: 2026-09-16T18:37+10:00 — BB-LDN-Planner-070926
 Notes (F9, review fix pass): preamble bootstrap moment → 08 §2.1 step 0 / gate A0; linked-vs-vendored ADR governs ALL ../ paths (foundations + OPERATIONS), default linked; §5 reduced to pointers only (01 §2.3–2.5 / §4a / §6.3; 03 §1.4 / §2.1 / §3; 05 §7), restated rules + unratified slice-registration default removed; §6 BRANCHES.md created at bootstrap, else stop + create from Sydney pattern; §9 seed build-progress / CHANGELOG from _project-template shape before first commit; §4 fallback keeps README §2 as authority.
 Previous: Notes: initial authoring (L-004 wave 4) — code-repo CLAUDE.md seed: pointers + process only; five laws as merge blocks + five-question test; ECC hard rules; pointer table mirroring README §2 with real section numbers from 00–08 + DECISIONS + build-standard; module rules (folder shape, boundary lint, service leaves, auth no-client, UnitOfWork token, slice registration default pending 03 §12 item 35 / 01 §10 O-12, scheduling importers); branch/deploy/promote condensed from 06 §3–§4 with Sydney origin; efficiency + compaction (portable half of Sydney's nanny-platform CLAUDE.md); three build ledgers; never-list; precedence. Bootstrap decisions flagged: linked vs vendored foundations; slice-registration shape.
 -->
