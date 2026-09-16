@@ -18,6 +18,7 @@
 
 ## Known bugs / gaps (recorded, not hidden)
 
+- **P1-FIX (L-007, 2026-09-17) closed ADR-119 / ADR-121 / ADR-128:** `TransitionHandler` · `SliceRegistration` · `RegisterSlice` now live in `shared-types/stage-model.ts` (the `connections` / `placements` local copies deleted; `positions` keeps the one `registerSlice` implementation); `/api/health` answers `{ data: { sha, env, db }, requestId }` + `x-request-id` with `db` a real fail-closed read through the data port (E1's item 3 below and its `test.fail()` are closed — the smoke asserts `db: "failed"` because it boots with Supabase unreachable by design; `route.test.ts` pins `db: "ok"` against `stub-auth`); the three monitoring names are `○` everywhere and `VERCEL_GIT_COMMIT_SHA` joined the registry (51 names). Still owed: the rate limit 06 §7.3 names on `/api/health` (no shared limiter store yet); 06 §2.5's Monitoring row still reads `● preview · ● prod` and wants the ADR-128 amendment.
 - **★ E1: five things the assembled app measurably does that the foundations do not say — the document wins in each, none bent to match the code.**
   1. **`check:prod-guard` was green for the wrong reason, and E1 fixed it.** `prod-guard-boot.sh` started `next start` with `NODE_ENV=production` and an inherited environment in which `VERCEL_ENV` is unset. `resolveEnvironment` then reads **production**, whose column requires four names CI never sets (`VERCEL_ENV` · `NEXT_PUBLIC_META_PIXEL_ID` · `META_CAPI_ACCESS_TOKEN` · `META_DATASET_ID`), and `parseEnv` throws on those **before** `refineEnv` — where the `stub-stripe` rule actually lives — is reached. The boot exited non-zero, the required `build` check reported OK, and **07 §5.5 item 2 was never exercised**. Measured by running `parseEnv` under each shape: `VERCEL_ENV` unset → `[NEXT_PUBLIC_META_PIXEL_ID, VERCEL_ENV, META_CAPI_ACCESS_TOKEN, META_DATASET_ID]`; `VERCEL_ENV=production` + `stub-stripe` → `[PURCHASE_PROVIDER, STUB_EVENT_SECRET]`, which is the guard. The script now takes its environment from `scripts/ci/lib/smoke-env.sh` in production mode, so the only fault left is the provider; **mutation-checked** — removing the stub provider and its secret makes the guard report FAIL (the server boots and serves).
   2. **An off-Vercel production runtime cannot boot at all, and two documents disagree about whether it should.** 07 §5.5 item 2 and ADR-108 name "off-Vercel `NODE_ENV = production` at runtime" as a production resolution; 06 §2.5 marks `VERCEL_ENV` **required** in the prod column. Together they make that runtime unbootable — `resolveEnvironment` only returns production off-Vercel when `VERCEL_ENV` is absent, and the prod column then rejects its absence. Pinned as measured behaviour in `boot-guard.sh` case 6 so the shape change is visible the day someone resolves it. **Decision owed:** either mark `VERCEL_ENV` optional in the prod column, or amend 07 §5.5 to say production is Vercel-only.
@@ -266,7 +267,11 @@ Superseded note — the S1 "next unit" text: **S2 — `shared-types` (types only
 ---
 
 <!-- audit
-Last edited: 2026-09-16T17:20+10:00 — BB-LDN-Planner-070926/E1
+Last edited: 2026-09-17T10:40+10:00 — BB-LDN-Planner-070926/P1-FIX
+Notes: P1-FIX — one line under Known bugs marking ADR-119 / 121 / 128 closed (slice types home, /api/health
+shape + fail-closed probe, monitoring names optional; VERCEL_GIT_COMMIT_SHA added, 51 names) with the two things
+still owed named (health rate limit; 06 §2.5 Monitoring row). Nothing else in this ledger touched.
+Prior: 2026-09-16T17:20+10:00 — BB-LDN-Planner-070926/E1
 Notes: E1 — the shell smoke. Current state corrected (trunk was stale at c4ac6f4 since S4; measured 1ec71e1
 with git merge-base --is-ancestor), one open branch, phase restated. Known bugs gains the ★ E1 block: the
 check:prod-guard false green and its fix, the off-Vercel-production contradiction between 07 §5.5 / ADR-108 and
