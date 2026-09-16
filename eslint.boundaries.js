@@ -18,6 +18,9 @@
 //           is exhaustive once rules 1–2 hold (there is no other way for one module to reach another).
 //   rule 4  `bb/one-export-per-file` — L1; the exemptions live in the rule, not in the files.
 //
+// Plus `bb/no-interpolated-log-message`: the S3 security review's second line of defence behind the runtime
+// scrubber (01 §4b — identifiers go in `fields`, never in the message).
+//
 // Reading a block: the group bans the whole `@/modules` namespace and then negates what the row allows —
 // `no-restricted-imports` matches gitignore-style, last match wins.
 //
@@ -413,6 +416,7 @@ module.exports = [
     rules: {
       "bb/one-export-per-file": "error",
       "bb/no-relative-module-escape": "error",
+      "bb/no-interpolated-log-message": "error",
     },
   },
 
