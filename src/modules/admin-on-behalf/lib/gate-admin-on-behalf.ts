@@ -27,7 +27,9 @@ export function gateAdminOnBehalf(inside: AdminOnBehalf): AdminOnBehalf {
     // the closed answer, which is what every other unconfigured / forbidden path here returns too.
     listAllowed: async (entity, supplied) => {
       const actor = await gatedAdminActor(supplied);
-      return actor.ok ? inside.listAllowed(entity, actor.value) : [];
+      return actor.ok
+        ? inside.listAllowed(entity, actor.value)
+        : Object.freeze([]);
     },
     chooseSlot: (positionId, slotId, holdId, supplied, idempotencyKey) =>
       gatedCall(supplied, (actor) =>

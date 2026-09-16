@@ -42,6 +42,8 @@ read, not two. Refusals are `UNAUTHENTICATED` when there is no session and `FORB
 `{ reason: 'E_ACTOR_FORBIDDEN', which: 'session' | 'role' | 'mfa' | 'scope' }`; `listAllowed`, which 03 §2.5
 gives no `Result`, refuses by offering no levers.
 
+**★ The one thing that must be closed before this module is wired to a route or to the event sink** (security-reviewer, FIX-1 inline review, MEDIUM). `onBehalfOf` is **present and always the connector's own value** — but its _contents_ are the caller's and are not validated: nothing checks that the id is a real user, that its `role` matches that user's actual role, or that the subject is a party to the entity being moved. Inert today (nothing reads the field), and the gate is where the check belongs once it exists, because 01 §2.2 makes `admin-on-behalf` the only importer of the modules it moves. Until it is written, the record 07 §5.4 row 6 exists to produce can be misattributed by an authenticated admin. **Do not persist `events.on_behalf_of_id` and do not put a route in front of these levers without it.**
+
 **Audit gap — recorded, not fixable here.** `onBehalfOf` now always reaches the module that owns the move,
 `EventActor` carries it, and `events.on_behalf_of_id` exists (migration 0011). What does not exist is a
 **writer**: no event sink persists an emitted actor's `onBehalfOf` into that column, because the stage slices
@@ -67,6 +69,11 @@ Notes: the gate section rewritten — it is no longer absent. FIX-1 closes REVIE
 `configureAdminOnBehalf`, with the actor rebuilt from the session and `onBehalfOf` required. The caller-supplied
 `actor.kind === 'admin'` test is deleted. The `onBehalfOf` audit gap is narrowed to its real owner: the event
 sink, which does not write `events.on_behalf_of_id` yet. Suites list gains the gate suite.
+Amended same session after the three inline ADR-117 Tier A reviews (security 0 CRITICAL / 0 HIGH; code 1 HIGH;
+typescript 2 HIGH — all closed in-unit): a failed session read is no longer relabelled as an access refusal, the
+UserId→AdminId re-brand is one named helper, the gated actor is frozen, `which` is a closed union, and the
+security reviewer's MEDIUM — `onBehalfOf`'s CONTENTS are unvalidated — is recorded here as the ★ blocker on any
+route or event sink in front of these levers.
 Prior: 2026-09-16T14:35+10:00 — BB-LDN-Planner-070926/F-a
 Notes: initial authoring — the F-a connector, the delegating lever set, `stubAdminOnBehalf` and the swap test.
 The admin gate (`auth.requireRole` + `mfaVerified`, 07 §5.4 row 2) is ADR-117 Tier A and is deliberately absent;

@@ -7,9 +7,14 @@
 // per file, so every call below runs against the real factory default.
 //
 // This is the most important fail-closed default in the fan-out and it was the least tested: every lever here
-// moves a real family's or nanny's stage, and the real admin gate (`auth.requireRole('admin')` + `mfaVerified`,
-// 07 §5.4 row 2) is ADR-117 Tier A and deliberately absent. Until that gate exists, the unconfigured default is
-// the only thing standing between these levers and a caller — so it is asserted here rather than assumed.
+// moves a real family's or nanny's stage.
+//
+// **Updated by FIX-1.** When REVIEW-1 wrote this file the admin gate did not exist, and this default was the
+// only thing standing between the levers and a caller. The gate exists now — `auth.requireRole('admin')` with
+// `mfaVerified` (07 §5.4 rows 1–2), applied to every lever by `configureAdminOnBehalf` and pinned by
+// `admin-on-behalf.gate.test.ts`. The two are **independent layers and both still matter**: the gate answers
+// "is this caller an admin", the default below answers "is there an inside at all". This file owns the second
+// question, which is why it still never calls `configureAdminOnBehalf` — and why its assertions are unchanged.
 import { describe, expect, it } from "vitest";
 import { adminOnBehalf } from "@/modules/admin-on-behalf";
 import type { Actor, PositionId } from "@/modules/shared-types";

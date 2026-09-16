@@ -40,8 +40,11 @@ import type {
   Email,
   Instant,
   PositionId,
+  SlotId,
+  StateAfter,
   UserId,
 } from "@/modules/shared-types";
+import type { AdminOnBehalf } from "@/modules/admin-on-behalf";
 
 const SESSION_ADMIN_ID = "22222222-2222-4222-8222-222222222222";
 const POSITION_ID = "position-1" as PositionId;
@@ -111,12 +114,14 @@ beforeEach(() => {
     }),
   );
   // `admin-on-behalf` may not import `scoring` (01 §2.3), so the matching double is hand-written rather than
-  // built from `stubMatching`, which would pull `scoring` in through this file's own imports.
+  // built from `stubMatching`, which would pull `scoring` in through this file's own imports. Every method
+  // answers a typed refusal: no case here reaches `matching` — the gate refuses first, which is the point — so
+  // a fabricated success would be a shape nothing asserts (typescript-reviewer, MEDIUM: no `as never`).
   configureMatching({
-    autofire: async () => ok({ fired: 0 } as never),
-    quickMatch: async () => ok([] as never),
-    preAuthMatch: async () => ok([] as never),
-    resultsFor: async () => ok([] as never),
+    autofire: async () => MATCHING_UNAVAILABLE,
+    quickMatch: async () => MATCHING_UNAVAILABLE,
+    preAuthMatch: async () => MATCHING_UNAVAILABLE,
+    resultsFor: async () => MATCHING_UNAVAILABLE,
   });
   registerSlice({
     entity: "position",
@@ -192,6 +197,51 @@ describe("authority comes from the session, never from the Actor the caller shap
   });
 });
 
+describe("a failed session read is not a verdict about the caller", () => {
+  // `auth` keeps "no session" and "we could not tell" apart on purpose (`get-session.ts`). The gate must keep
+  // them apart too: relabelling a provider outage as a routine access refusal would bury the outage in exactly
+  // the logs an incident is diagnosed from. Raised by `code-reviewer` at the FIX-1 inline review (HIGH).
+  const PROVIDER_DOWN = "Could not read the session.";
+
+  const sessionReadFails = (): void =>
+    configureAuth({
+      ...stubAuth(),
+      requireRole: async () => ({
+        ok: false as const,
+        error: {
+          code: "INTERNAL" as const,
+          message: PROVIDER_DOWN,
+          cause: new Error("identity provider unavailable"),
+        },
+      }),
+    });
+
+  it("forwards the read failure with its own message and cause, and still runs nothing", async () => {
+    sessionReadFails();
+
+    const result = await advanceAs(CALLER_ADMIN);
+
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.error.code).toBe("INTERNAL");
+    expect(!result.ok && result.error.message).toBe(PROVIDER_DOWN);
+    expect(!result.ok && result.error.cause).toBeInstanceOf(Error);
+    // Not relabelled as an access refusal — that is the whole point of the case.
+    expect(!result.ok && result.error.details?.reason).toBeUndefined();
+    expect(seenActor).toBeNull();
+  });
+
+  it("offers no levers when the session cannot be read", async () => {
+    sessionReadFails();
+
+    await expect(
+      adminOnBehalf.listAllowed(
+        { kind: "position", id: POSITION_ID },
+        CALLER_ADMIN,
+      ),
+    ).resolves.toEqual([]);
+  });
+});
+
 describe("onBehalfOf is required on every on-behalf move (07 §5.4 row 6)", () => {
   it("refuses an admin move that names no subject", async () => {
     signedInAs("admin", true);
@@ -226,14 +276,14 @@ describe("every lever is gated, not only advance", () => {
     const results = await Promise.all([
       adminOnBehalf.chooseSlot(
         POSITION_ID,
-        "slot-1" as never,
+        "slot-1" as SlotId,
         undefined,
         CALLER_ADMIN,
         "key-2",
       ),
       adminOnBehalf.moveSlot(
         { kind: "call", positionId: POSITION_ID },
-        "slot-1" as never,
+        "slot-1" as SlotId,
         CALLER_ADMIN,
       ),
       adminOnBehalf.clearSlot(POSITION_ID, CALLER_ADMIN, "position-closed"),
@@ -244,8 +294,8 @@ describe("every lever is gated, not only advance", () => {
         CALLER_ADMIN,
       ),
       adminOnBehalf.bookNannyCall({
-        nannyId: "nanny-1" as never,
-        slotId: "slot-1" as never,
+        nannyId: "nanny-1" as UserId,
+        slotId: "slot-1" as SlotId,
         actor: CALLER_ADMIN,
         idempotencyKey: "key-3",
       }),
@@ -286,15 +336,28 @@ describe("the seam carries the gate — an ungated inside cannot be configured (
   // The exact line REVIEW-1 said would grant full on-behalf power to anyone who can shape an `Actor`: a
   // hand-written `AdminOnBehalf` that answers `ok` for everything, installed through the public boot hook.
   // After the fix the hook wraps whatever it is handed, so the open inside is unreachable without a session.
-  const openInside = {
-    advance: async () => ok({ stage: "CLOSED" } as never),
-    listAllowed: async () => ["P-7"] as never,
-    chooseSlot: async () => ok({ stage: "CLOSED" } as never),
-    moveSlot: async () => ok({ kind: "call" } as never),
-    clearSlot: async () => ok({ stage: "CLOSED" } as never),
-    recordOutcome: async () => ok({ kind: "call" } as never),
-    bookNannyCall: async () => ok({ id: "booking-1" } as never),
-    autofire: async () => ok({ fired: 1 } as never),
+  // Typed as `AdminOnBehalf` and built from the real domain shapes, so a field added to `StateAfter` or
+  // `CallResult` breaks this fixture instead of sliding past it (typescript-reviewer, MEDIUM). `bookNannyCall`
+  // answers a typed refusal rather than a fabricated 14-field `Booking`: no case below calls it, and inventing
+  // a booking would assert nothing.
+  const CLOSED: StateAfter = Object.freeze({
+    entity: { kind: "position" as const, id: POSITION_ID },
+    stage: "CLOSED",
+    version: 2,
+    changedAt: AT,
+    cascaded: [],
+    events: [],
+  });
+
+  const openInside: AdminOnBehalf = {
+    advance: async () => ok(CLOSED),
+    listAllowed: async () => ["P-7"],
+    chooseSlot: async () => ok(CLOSED),
+    moveSlot: async () => ok({ kind: "call", state: CLOSED }),
+    clearSlot: async () => ok(CLOSED),
+    recordOutcome: async () => ok({ kind: "call", state: CLOSED }),
+    bookNannyCall: async () => MATCHING_UNAVAILABLE,
+    autofire: async () => MATCHING_UNAVAILABLE,
   };
 
   it("gates an inside that gates nothing itself", async () => {
@@ -336,3 +399,13 @@ describe("the seam carries the gate — an ungated inside cannot be configured (
     expect(result.ok).toBe(true);
   });
 });
+
+/** One typed refusal for every double in this file — nothing here is meant to succeed. */
+const MATCHING_UNAVAILABLE = {
+  ok: false as const,
+  error: {
+    code: "INTERNAL" as const,
+    message: "Not available in this test",
+    details: { reason: "test-double-unavailable" as const },
+  },
+};

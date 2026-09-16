@@ -14,6 +14,7 @@ import type {
   TransitionId,
   UserId,
 } from "@/modules/shared-types";
+import type { AuthFailureReason } from "@/modules/auth";
 import type { AdvanceInput } from "@/modules/positions";
 import type { CallRef, CallResult } from "@/modules/call-layer";
 import type { AutofireOutcome } from "@/modules/matching";
@@ -25,8 +26,11 @@ export type AdminOnBehalfErrorDetails = {
     | "E_ENTITY_NOT_FOUND"
     | "E_PRECONDITION_FAILED"
     | "admin-on-behalf-not-configured";
-  /** Why the gate refused: `session` (nobody signed in) · `role` · `mfa` (07 §5.4 row 2) · `scope`. */
-  readonly which?: string;
+  /**
+   * Why the gate refused — a closed set, not a free string: `session` (the read found nobody signed in) plus
+   * `auth`'s own `role` · `mfa` (07 §5.4 row 2) · `scope`, which is where the other three come from.
+   */
+  readonly which?: AuthFailureReason | "session";
 };
 
 /**
@@ -49,9 +53,25 @@ export type GatedAdminActor = Extract<Actor, { readonly kind: "admin" }> & {
 };
 
 /**
- * Methods return a plain `Result`: every lever **forwards** the result of the module that owns the move
- * (`positions.advance`, `callLayer.*`, `matching.autofire`) unchanged, which is what makes an on-behalf move the
- * same move (P-1, ADR-001). `AdminOnBehalfErrorDetails` is what this module itself produces — chiefly the refusal.
+ * Methods return a plain `Result`, **not** `Result<T, AdminOnBehalfErrorDetails>` — and the distinction is worth
+ * stating exactly, because the loose reading is wrong in a way that matters (typescript-reviewer, FIX-1 inline
+ * review, HIGH).
+ *
+ * A lever's failure is one of two different things. Either **the gate refused** — in which case the details are
+ * this module's own `AdminOnBehalfErrorDetails`, which `gatedAdminActor` returns under that exact type — or
+ * **the module that owns the move refused**, in which case the result is forwarded verbatim, because that is
+ * what makes an on-behalf move the same move (P-1, ADR-001). A lever that re-wrapped the second kind would be a
+ * second stage model.
+ *
+ * So this alias cannot be narrowed **in this module**: `positions.advance` and `matching.autofire` both return
+ * the wide `Result<T>` already, `callLayer` returns `Result<T, CallErrorDetails>`, and a union of the three
+ * would not accept the first two without a cast. `matching/types.ts` records the identical decision for the
+ * identical reason. The consequence a consumer must know: `error.details?.reason` off a lever is `unknown`, and
+ * only a refusal produced *here* is guaranteed to be in the union above.
+ *
+ * **Recorded, not closed:** giving forwarding connectors a narrowable failure type is a contract question across
+ * `positions` · `call-layer` · `matching` (03 §1 rule 4 vs the forwarding law), not a change this module can
+ * make to its own file. Logged in the L-005 FIX-1 PROGRESS entry.
  */
 export type AdminOnBehalfResult<T> = Result<T>;
 

@@ -33,6 +33,7 @@ import {
 } from "@/modules/platform";
 import type {
   Actor,
+  AdminId,
   Email,
   Instant,
   PositionId,
@@ -46,7 +47,7 @@ const SIGNED_IN_ID = "22222222-2222-4222-8222-222222222222";
 /** The caller's actor carries only the subject of the move; the admin id downstream is the session's. */
 const ADMIN: Actor = Object.freeze({
   kind: "admin",
-  id: "admin-1" as never,
+  id: "admin-1" as AdminId,
   onBehalfOf: {
     role: "parent" as const,
     id: "99999999-9999-4999-8999-999999999999" as UserId,
@@ -54,7 +55,7 @@ const ADMIN: Actor = Object.freeze({
 });
 const PARENT: Actor = Object.freeze({
   kind: "user",
-  id: "user-1" as never,
+  id: "user-1" as UserId,
   role: "parent",
 });
 
