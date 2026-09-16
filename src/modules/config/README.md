@@ -19,7 +19,7 @@ Why two: `env.ts` must carry `import "server-only"` (01 §3.3) and the server na
 component that imported `BRAND`. The boundary lint (S6) allows `@/modules/config/server` as the module's second entry
 point — recorded in the L-005 S2 PROGRESS entry as a `[decision]`.
 
-**The two `process.env` readers.** `env.ts` is the one reader for server code (all 50 names, parsed once, missing or
+**The two `process.env` readers.** `env.ts` is the one reader for server code (all 51 names, parsed once, missing or
 malformed → `EnvInvalidError` naming names only, `ALERT_ENV_INVALID`). `public-env.ts` reads only the
 `NEXT_PUBLIC_*` names + `NODE_ENV`, each as a literal property access so Next.js inlines them at build time — the only
 way a client bundle can hold a public value. The config.env suite asserts that `public-env.ts` reads nothing else and

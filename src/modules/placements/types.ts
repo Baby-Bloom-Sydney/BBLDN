@@ -3,7 +3,6 @@
 // directly (03 §2.1). On `placement.started` (L-1b) it opens done-for-you app access through
 // `payments.openDfyAccess` (ADR-093) and renders the hire summary through `hire-docs`.
 import type {
-  AdvanceInput,
   ConnectionId,
   Instant,
   ISODate,
@@ -11,28 +10,15 @@ import type {
   PlacementState,
   PositionId,
   Result,
-  StateAfter,
-  TransitionId,
-  UnitOfWork,
+  TransitionHandler,
 } from "@/modules/shared-types";
 
 /**
- * Structurally the `TransitionHandler` of 03 §2.5 — declared here rather than imported.
- *
- * GAP — recorded in the L-005 F-a PROGRESS entry, same one `connections/types.ts` records: 03 §2.5 puts
- * `TransitionHandler` / `registerSlice` in `shared-types/stage-model.ts`, they are not there yet, and 01 §2.3
- * gives `placements` no arrow to `positions`. The boot file, which may import both, does the registering.
+ * The L-row handlers the boot file registers with the stage model (03 §2.1). `TransitionHandler` is
+ * `shared-types`' (03 §2.5; ADR-119) — `placements` has no arrow to `positions` (01 §2.3) and needs none: the
+ * boot file, which may import both, hands these to `positions.registerSlice`.
  */
-export type StageTransitionHandler = {
-  readonly id: TransitionId;
-  readonly run: (
-    input: AdvanceInput<TransitionId>,
-    uow: UnitOfWork,
-  ) => Promise<Result<StateAfter>>;
-};
-
-/** The L-row handlers the boot file registers with the stage model (03 §2.1). */
-export type PlacementsSlice = ReadonlyArray<StageTransitionHandler>;
+export type PlacementsSlice = ReadonlyArray<TransitionHandler>;
 
 export type PlacementsErrorDetails = {
   readonly reason:

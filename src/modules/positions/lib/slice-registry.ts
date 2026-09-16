@@ -4,8 +4,11 @@
 // One handler per `TransitionId`. Registration is boot-time and last-wins, so a test (or a second boot in the
 // same process) can replace a slice with a stub without tearing the registry down — which is exactly what swap
 // test 1 does. The entity kind a slice declares is kept so `advance` can say which slice is missing.
-import type { TransitionId } from "@/modules/shared-types";
-import type { SliceRegistration, TransitionHandler } from "../types";
+import type {
+  SliceRegistration,
+  TransitionHandler,
+  TransitionId,
+} from "@/modules/shared-types";
 
 type Registered = {
   readonly entity: SliceRegistration["entity"];
