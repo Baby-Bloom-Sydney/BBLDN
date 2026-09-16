@@ -105,7 +105,7 @@ describe("S-X-02 — QuickMatchResults", () => {
     );
     const heading = screen.getByRole("heading", { level: 1 });
     expect(heading).toHaveTextContent(
-      "We cover Greater London — nannies near you are being added",
+      "We cover Somewhere — nannies near you are being added",
     );
     expect(heading).toHaveFocus();
     expect(
