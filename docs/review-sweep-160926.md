@@ -10,12 +10,12 @@
 
 ## 1. Counts
 
-| Severity | Found | Fixed in this sweep | Recorded for another unit |
-| -------- | ----- | ------------------- | ------------------------- |
-| CRITICAL | 1     | 0                   | 1                         |
-| HIGH     | 4     | 2                   | 2                         |
-| MEDIUM   | 9     | 0                   | 9                         |
-| LOW      | 7     | 0                   | 7                         |
+| Severity | Found | Fixed in this sweep | Recorded for another unit           |
+| -------- | ----- | ------------------- | ----------------------------------- |
+| CRITICAL | 1     | 0                   | 1 — **now CLOSED by FIX-1**, see §2 |
+| HIGH     | 4     | 2                   | 2                                   |
+| MEDIUM   | 9     | 0                   | 9                                   |
+| LOW      | 7     | 0                   | 7                                   |
 
 **Bottom line.** The two units are materially clean against the five laws: one export per file (machine-checked by `bb/one-export-per-file`, green), connectors written first, every allowed-imports row honoured, zero `any`, zero silent catches, zero config literals, no file over 800 lines. The findings are not about what the code does — they are about **what the code's safety claims were allowed to assert without evidence**, and about two seams that will bite the unit that wires the boot file.
 
@@ -23,7 +23,7 @@
 
 ## 2. CRITICAL
 
-### C-1 — `admin-on-behalf`'s levers are real, and the only gate is a value the caller supplies
+### C-1 — ✅ **CLOSED by FIX-1 (2026-09-16)** — `admin-on-behalf`'s levers are real, and the only gate is a value the caller supplies
 
 |              |                                                                                                                                                                     |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -44,6 +44,27 @@ Two further gaps compound it: `onBehalfOf` (the audit field 03 §2.5 and ADR-001
 **Checked, not assumed:** the boot file landed while this sweep was running (F-c, PR #11). `src/instrumentation.ts` on `modules-payments-160926-1` calls **`configureLog` and nothing else** — it deliberately wires no registry, for the same reason this finding gives, and says so in its own header. So the trap has not sprung. But note what actually held the line: two units independently choosing not to wire a seam, not a gate that would have stopped them.
 
 The sweep did not fix this: the fix is an auth surface, which ADR-117 puts behind a security review, and it needs the Tier A ruling rather than a review agent's patch. What the sweep did add is `admin-on-behalf.fail-closed.test.ts`, which pins the unconfigured default that is currently the only thing holding the line.
+
+---
+
+**✅ CLOSED by unit FIX-1 — 2026-09-16, branch `fix-admin-authority-160926-1` (ADR-117 Tier A, reviews run inline).**
+
+What the fix actually changed, against each half of the finding:
+
+| The finding                                                                    | What now holds                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| the only gate is `actor.kind === 'admin'`, a caller-supplied field             | **Deleted.** `lib/admin-on-behalf-lever.ts` holds no role check at all. Authority lives in one file, `lib/gated-admin-actor.ts`, over `auth.requireRole('admin')` — the gate 01 §4d already puts in `auth`, not a re-implementation.                                                                                                                                                                                                 |
+| no `mfaVerified` / `aal2` check (07 §5.4 row 2)                                | Enforced, and **not by this module**: `requireRole` refuses `session.role === 'admin' && !session.mfaVerified`. Pinned by a case that signs in an `aal1` admin and asserts `FORBIDDEN { which: 'mfa' }`.                                                                                                                                                                                                                             |
+| a caller could name themselves any admin                                       | The actor a lever runs with is **rebuilt from the session** — `{ kind: 'admin', id: <session user>, onBehalfOf }`. A case passes a caller-written admin id and asserts the id that reaches the stage handler is the session's.                                                                                                                                                                                                       |
+| `onBehalfOf` optional and populated nowhere (row 6; 03 §2.5)                   | **Required.** A move that names no subject is refused with `VALIDATION { E_ON_BEHALF_OF_REQUIRED }` before anything moves; the subject then travels on the actor to the module that owns the move.                                                                                                                                                                                                                                   |
+| `configureAdminOnBehalf(stubAdminOnBehalf())` in a boot file grants full power | **Safe by construction.** `configureAdminOnBehalf` wraps _whatever_ inside it is handed in the gate (`lib/gate-admin-on-behalf.ts`), so there is no argument a boot file can pass that reaches a lever ungated. The standing merge rule this finding proposed is therefore structural rather than a reviewer's vigilance. Gating is idempotent (a `WeakSet`), so the stub gating itself and boot gating again cost one session read. |
+| `listAllowed` answers `[]` where siblings answer `FORBIDDEN`                   | Unchanged, and now deliberate: 03 §2.5 gives `listAllowed` no `Result`, so its refusal is the closed value. Pinned in both directions — `[]` for a non-admin session, the real lever list for an `aal2` admin.                                                                                                                                                                                                                       |
+
+**Evidence, not assertion (ADR-120).** `src/modules/admin-on-behalf/__tests__/admin-on-behalf.gate.test.ts`, 12 cases, **written first and verified RED against the shipped code: 10 failed, 2 passed** — the two that passed are the positive paths, which passed precisely because the caller-shaped admin was trusted. Includes three cases under _"the seam carries the gate"_ that configure a hand-written inside answering `ok` to everything and assert it is unreachable without an MFA-verified admin session.
+
+**Not closed here, and narrowed to its real owner.** `onBehalfOf` now always reaches the module that owns the move, `EventActor` carries it, and `events.on_behalf_of_id` exists (migration `0011`) — but **no event sink writes that column**, because the emitting stage slices (Phase 1e–1g) and the Postgres event sink are both unwritten. So 07 §5.4 row 6 is satisfied at the connector and still owed at the sink. It cannot be closed from inside `admin-on-behalf`.
+
+The swap test's refusal cases became session-driven in the same diff (a case that used to refuse "a non-admin actor" now signs a non-admin _session_ in); `admin-on-behalf.fail-closed.test.ts`, which this sweep added, is untouched and still green — the unconfigured default refuses before any `configure*` call, gate or no gate.
 
 ---
 
@@ -183,7 +204,14 @@ Tests only. No source file in either unit was edited.
 ---
 
 <!-- audit
-Last edited: 2026-09-16T22:10+10:00 — BB-LDN-Planner-070926/REVIEW-1
+Last edited: 2026-09-16T16:30+10:00 — BB-LDN-Planner-070926/FIX-1
+Notes: C-1 marked CLOSED with a per-half close-out table and the RED-first evidence (the gate suite failed 10 of
+12 against the shipped code). The gate is auth.requireRole('admin') in one file with MFA enforced by auth, the
+actor rebuilt from the session, onBehalfOf required, and configureAdminOnBehalf wrapping whatever it is handed
+so the boot-file trap is structural rather than a merge rule. The residual onBehalfOf audit gap is narrowed to
+its real owner: no event sink writes events.on_behalf_of_id. Nothing else in this register changed — the four
+HIGH, nine MEDIUM and seven LOW stand exactly as REVIEW-1 wrote them.
+Prior: 2026-09-16T22:10+10:00 — BB-LDN-Planner-070926/REVIEW-1
 Notes: created — the ADR-117 Tier B overnight sweep's finding register for units F-a and F-b. 1 CRITICAL
 (admin-on-behalf's levers are real and gated only by a caller-supplied actor.kind — latent until something calls
 configureAdminOnBehalf, which is why it is flagged to the boot-file unit rather than patched), 4 HIGH (2 fixed
