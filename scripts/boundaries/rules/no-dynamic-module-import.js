@@ -18,6 +18,70 @@ const moduleContextOf = require("./lib/module-context");
 
 const MODULE_SPECIFIER = "@/modules/";
 
+// In a type position the specifier is wrapped: the field is a `TSLiteralType` whose `literal` is the string.
+// `source` is the current name; `argument` / `parameter` are the two earlier ones.
+function specifierOfType(node) {
+  const field = node.source ?? node.argument ?? node.parameter;
+  return field?.type === "TSLiteralType" ? field.literal : field;
+}
+
+// `require("@/modules/x")` / `require.resolve(…)` reach the same places, and no core rule reads them either
+// (silent-failure-hunter, S6 review).
+function isRequire(callee) {
+  if (callee.type === "Identifier") return callee.name === "require";
+  return (
+    callee.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.object.type === "Identifier" &&
+    callee.object.name === "require" &&
+    callee.property.name === "resolve"
+  );
+}
+
+/** Judges one specifier against the module's row: unreadable, escaping, restricted, or fine. */
+function checkerFor(context, here, moduleName, allowed) {
+  const allowedSet = new Set(allowed);
+  const own = `${MODULE_SPECIFIER}${moduleName}`;
+  const allowedList = allowed.join(" · ");
+
+  return (node, sourceNode, kind) => {
+    if (
+      sourceNode?.type !== "Literal" ||
+      typeof sourceNode.value !== "string"
+    ) {
+      context.report({ node, messageId: "computed", data: { kind } });
+      return;
+    }
+    const source = sourceNode.value;
+    const data = { kind, source, module: moduleName };
+
+    if (source.startsWith(".")) {
+      const resolved = here.resolve(source);
+      if (here.staysInside(resolved)) return;
+      if (here.isTest && here.leavesModuleTree(resolved)) return;
+      context.report({
+        node: sourceNode,
+        messageId: "escape",
+        data: { ...data, resolved: here.display(resolved) },
+      });
+      return;
+    }
+
+    if (!source.startsWith(MODULE_SPECIFIER)) return;
+    if (
+      allowedSet.has(source) ||
+      source === own ||
+      source.startsWith(`${own}/`)
+    )
+      return;
+    context.report({
+      node: sourceNode,
+      messageId: "restricted",
+      data: { ...data, allowed: allowedList },
+    });
+  };
+}
+
 /** @type {import("eslint").Rule.RuleModule} */
 module.exports = {
   meta: {
@@ -57,68 +121,7 @@ module.exports = {
     const here = moduleContextOf(context.filename ?? context.getFilename());
     if (here === null) return {};
 
-    const allowedSet = new Set(allowed);
-    const own = `${MODULE_SPECIFIER}${moduleName}`;
-    const allowedList = allowed.join(" · ");
-
-    const check = (node, sourceNode, kind) => {
-      if (
-        sourceNode === null ||
-        sourceNode === undefined ||
-        sourceNode.type !== "Literal" ||
-        typeof sourceNode.value !== "string"
-      ) {
-        context.report({ node, messageId: "computed", data: { kind } });
-        return;
-      }
-      const source = sourceNode.value;
-      if (source.startsWith(".")) {
-        const resolved = here.resolve(source);
-        if (here.staysInside(resolved)) return;
-        if (here.isTest && here.leavesModuleTree(resolved)) return;
-        context.report({
-          node: sourceNode,
-          messageId: "escape",
-          data: {
-            kind,
-            source,
-            module: moduleName,
-            resolved: here.display(resolved),
-          },
-        });
-        return;
-      }
-      if (!source.startsWith(MODULE_SPECIFIER)) return;
-      if (
-        allowedSet.has(source) ||
-        source === own ||
-        source.startsWith(`${own}/`)
-      )
-        return;
-      context.report({
-        node: sourceNode,
-        messageId: "restricted",
-        data: { kind, source, module: moduleName, allowed: allowedList },
-      });
-    };
-
-    // In a type position the specifier is wrapped: the field is a `TSLiteralType` whose `literal` is the
-    // string. `source` is the current name; `argument` / `parameter` are the two earlier ones.
-    const specifierOfType = (node) => {
-      const field = node.source ?? node.argument ?? node.parameter;
-      return field?.type === "TSLiteralType" ? field.literal : field;
-    };
-
-    // `require("@/modules/x")` / `require.resolve(…)` reach the same places and are read by no core rule
-    // either (silent-failure-hunter, S6 review).
-    const isRequire = (callee) =>
-      (callee.type === "Identifier" && callee.name === "require") ||
-      (callee.type === "MemberExpression" &&
-        !callee.computed &&
-        callee.object.type === "Identifier" &&
-        callee.object.name === "require" &&
-        callee.property.name === "resolve");
-
+    const check = checkerFor(context, here, moduleName, allowed);
     return {
       ImportExpression: (node) => check(node, node.source, "import"),
       TSImportType: (node) => check(node, specifierOfType(node), "import"),
