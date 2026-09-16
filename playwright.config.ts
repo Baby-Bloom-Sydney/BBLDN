@@ -14,6 +14,9 @@ dotenv.config({ path: path.resolve(__dirname, ".env.local") });
  */
 export default defineConfig({
   testDir: "./tests/e2e",
+  // The E1 shell smoke has its own config (`playwright.shell-smoke.config.ts`) because it starts two servers of
+  // its own; without this it would also be collected here and run against no server at all.
+  testIgnore: "**/shell-smoke/**",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
