@@ -53,13 +53,33 @@ export function memoryAuthDriver(
     return user;
   };
 
+  // A real test schema: a write through the port is readable back through it, or a test could "succeed" against a
+  // stub that records nothing (05 §3 rule 2 — a behaviour the stub cannot honour is a connector defect).
+  const tables = new Map<
+    string,
+    ReadonlyArray<Readonly<Record<string, unknown>>>
+  >(
+    Object.entries(options.tables ?? {}).map(([name, rows]) => [
+      name,
+      rows as ReadonlyArray<Readonly<Record<string, unknown>>>,
+    ]),
+  );
+
+  const append = (
+    table: string,
+    row: Readonly<Record<string, unknown>>,
+  ): Readonly<Record<string, unknown>> => {
+    tables.set(table, [...(tables.get(table) ?? []), row]);
+    return row;
+  };
+
   const query = (): Query<AppDatabase> => ({
     from: (table) => ({
-      select: async () => (options.tables?.[table] ?? []) as never,
-      insert: async (row) => row as never,
-      update: async (_id, patch) => patch as never,
+      select: async () => tables.get(table) ?? [],
+      insert: async (row) => append(table, row),
+      update: async (_id, patch) => append(table, patch),
     }),
-    rpc: async () => undefined as never,
+    rpc: async () => undefined,
   });
 
   return Object.freeze({

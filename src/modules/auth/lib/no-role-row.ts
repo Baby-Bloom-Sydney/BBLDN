@@ -3,14 +3,14 @@
 // gets the same generic refusal (telling them apart would enumerate accounts, 07 §4); the difference is recorded
 // where an operator can find the pattern.
 import { log } from "@/modules/platform";
-import type { Uuid } from "@/modules/shared-types";
+import { asLogUuid } from "./as-log-uuid";
 import { unauthenticated } from "./unauthenticated";
 
 export function noRoleRow(action: string, userId: string) {
   log.warn("authenticated account has no role row", {
     module: "auth",
     action,
-    userId: userId as Uuid,
+    userId: asLogUuid(userId),
   });
   return unauthenticated();
 }

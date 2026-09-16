@@ -13,7 +13,20 @@ export const requireRoleWith =
   ): Promise<Result<Session, AuthErrorDetails>> => {
     const allowed: ReadonlyArray<Role> = Array.isArray(role) ? role : [role];
     const result = await getSession();
-    if (!result.ok) return result as Result<Session, AuthErrorDetails>;
+    // `getSession`'s failure is an `INTERNAL` carrying `{ module, action }`, not an `AuthErrorDetails` — casting
+    // the whole result through would promise callers a `details.reason` that is `undefined` at runtime. The code,
+    // message and cause are what matter; the mistyped `details` is dropped (it is optional on `AppError`).
+    if (!result.ok)
+      return {
+        ok: false,
+        error: {
+          code: result.error.code,
+          message: result.error.message,
+          ...(result.error.cause === undefined
+            ? {}
+            : { cause: result.error.cause }),
+        },
+      };
     const session = result.value;
     if (session === null) return unauthenticated();
     if (!allowed.includes(session.role)) return forbidden("role");

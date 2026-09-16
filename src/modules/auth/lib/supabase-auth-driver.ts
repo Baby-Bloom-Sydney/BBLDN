@@ -19,6 +19,7 @@ import type {
   StorageRef,
 } from "../types";
 import { readDriverUser } from "./read-driver-user";
+import { toRole } from "./to-role";
 import { supabaseQuery } from "./supabase-query";
 
 const URL_NAME = publicEnv.NEXT_PUBLIC_SUPABASE_URL;
@@ -71,6 +72,12 @@ const requestClient = (req: NextRequest, res: NextResponse): SupabaseClient =>
 const elevated = async (): Promise<SupabaseClient> =>
   (await import("./elevated-client")).elevatedClient();
 
+/**
+ * The credential calls report `aal1`: Supabase has no MFA-challenge-during-sign-in path wired here, so a session
+ * that has just been created has not passed a second factor. It is never the value the gate reads — `requireRole`
+ * and `gateDecision` always re-derive from `getSession` / `refreshSession`, which read the real assurance level.
+ * **If MFA at sign-in is ever added, this hardcode must go**, or an `aal2` session would under-report as `aal1`.
+ */
 const unwrapUser = (
   user: { id: string; email?: string } | null,
   session: { expires_at?: number } | null,
@@ -97,7 +104,7 @@ export function supabaseAuthDriver(): AuthDriver<AppDatabase> {
       .eq("user_id", userId)
       .maybeSingle();
     if (error !== null) throw new Error(error.message);
-    return (data?.role as Role | undefined) ?? null;
+    return toRole(data?.role);
   };
 
   return Object.freeze({

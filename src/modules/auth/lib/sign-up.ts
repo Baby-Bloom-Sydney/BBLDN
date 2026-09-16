@@ -3,17 +3,18 @@
 // customer role, so no path a visitor can reach produces an `admin`. A failed role write is INTERNAL, not a
 // half-made account that would sign in with no role at all.
 import { fromThrown, log, ok } from "@/modules/platform";
-import type { Result, Uuid } from "@/modules/shared-types";
+import type { Result } from "@/modules/shared-types";
 import type {
   AppDatabase,
   AuthDriver,
   GateSession,
   SignUpInput,
 } from "../types";
+import { asLogUuid } from "./as-log-uuid";
 import { forbidden } from "./forbidden";
+import { noRoleRow } from "./no-role-row";
 import { passwordPolicyError } from "./password-policy-error";
 import { toSession } from "./to-session";
-import { unauthenticated } from "./unauthenticated";
 
 export const signUpWith =
   (driver: AuthDriver<AppDatabase>) =>
@@ -30,11 +31,11 @@ export const signUpWith =
       log.info("role written at signup", {
         module: "auth",
         action: "signUp",
-        userId: user.id as Uuid,
+        userId: asLogUuid(user.id),
         grantedRole: input.role,
       });
       const session = toSession(user, input.role);
-      return session === null ? unauthenticated() : ok(session);
+      return session === null ? noRoleRow("signUp", user.id) : ok(session);
     } catch (thrown) {
       return fromThrown(thrown, { module: "auth", action: "signUp" });
     }

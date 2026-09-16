@@ -39,14 +39,14 @@ export function supabaseQuery(
           await (await client())
             .from(table)
             .select(columns === undefined ? "*" : columns.join(",")),
-        ) as never,
+        ),
       insert: async (row) =>
         unwrapRow(
           await (
             await client()
           )
             .from(table)
-            .insert(row as never)
+            .insert(row as Record<string, unknown>)
             .select()
             .single(),
         ),
@@ -56,13 +56,13 @@ export function supabaseQuery(
             await client()
           )
             .from(table)
-            .update(patch as never)
+            .update(patch as Record<string, unknown>)
             .eq("id", id)
             .select()
             .single(),
         ),
     }),
     rpc: async (name, args) =>
-      unwrap(await (await client()).rpc(name, args as never)),
+      unwrap(await (await client()).rpc(name, args as Record<string, unknown>)),
   };
 }

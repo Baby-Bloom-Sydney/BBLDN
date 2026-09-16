@@ -137,9 +137,22 @@ describe("stub-auth's in-memory store (03 §11 row 9)", () => {
     const a = stubAuth({ tables: { user_roles: [{ role: "parent" }] } });
     const result = await a.data.run({
       name: "auth.readRoles",
-      exec: async (q) => q.from("user_roles" as never).select(),
+      exec: async (q) => q.from("user_roles").select(),
     });
     expect(result).toEqual({ ok: true, value: [{ role: "parent" }] });
+  });
+
+  it("reads back a write made through the same port — the stub is a schema, not an echo", async () => {
+    const a = stubAuth();
+    await a.data.run({
+      name: "auth.writeRole",
+      exec: async (q) => q.from("user_roles").insert({ role: "nanny" }),
+    });
+    const after = await a.data.run({
+      name: "auth.readRoles",
+      exec: async (q) => q.from("user_roles").select(),
+    });
+    expect(after).toEqual({ ok: true, value: [{ role: "nanny" }] });
   });
 
   it("refuses a role grant for an account it does not know", async () => {

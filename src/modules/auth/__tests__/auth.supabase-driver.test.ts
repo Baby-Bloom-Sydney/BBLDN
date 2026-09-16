@@ -106,6 +106,15 @@ describe("currentUser", () => {
 });
 
 describe("roleOf", () => {
+  it("refuses a role the register does not contain rather than trusting the row", async () => {
+    // Migration drift or a hand-edited row must fail closed: a `Role` the gate's own tables have no entry for
+    // would redirect someone to `/undefined`.
+    serverClient.from.mockReturnValue(
+      chain({ data: { role: "super_admin" }, error: null }),
+    );
+    expect(await supabaseAuthDriver().roleOf("u-1")).toBeNull();
+  });
+
   it("reads user_roles through the session-scoped client (RLS: own row)", async () => {
     serverClient.from.mockReturnValue(
       chain({ data: { role: "nanny" }, error: null }),
