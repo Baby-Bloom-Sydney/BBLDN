@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-09-15T04:44:30.118Z",
+  "generated_at": "2026-09-16T00:09:40.171Z",
   "summary": {
     "route_count": 48,
-    "page_count": 84,
-    "cron_count": 13,
+    "page_count": 85,
+    "cron_count": 23,
     "migration_count": 0,
     "server_action_file_count": 41
   },
@@ -362,6 +362,10 @@
       "file": "src/app/(auth)/reset-password/page.tsx"
     },
     {
+      "path": "/set-password",
+      "file": "src/app/(auth)/set-password/page.tsx"
+    },
+    {
       "path": "/signup/nanny",
       "file": "src/app/(auth)/signup/nanny/page.tsx"
     },
@@ -696,6 +700,38 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/meeting-complete-sweep",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/trial-complete-sweep",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/placement-start-sweep",
+      "schedule": "15 0 * * *"
+    },
+    {
+      "path": "/api/cron/close-no-candidates",
+      "schedule": "15 4 * * *"
+    },
+    {
+      "path": "/api/cron/vetting-expiry",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/expire-subscribe-invites",
+      "schedule": "45 4 * * *"
+    },
+    {
+      "path": "/api/cron/retention-sweep",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/delete-account",
+      "schedule": "30 2 * * *"
+    },
+    {
       "path": "/api/cron/proactive",
       "schedule": "*/15 * * * *"
     },
@@ -708,16 +744,24 @@
       "schedule": "0 3 * * *"
     },
     {
+      "path": "/api/cron/soft-lock-stale-children",
+      "schedule": "15 3 * * *"
+    },
+    {
       "path": "/api/cron/dfy-waves",
       "schedule": "0 9 * * *"
     },
     {
       "path": "/api/cron/snapshot-pipeline",
-      "schedule": "0 14 * * *"
+      "schedule": "5 0 * * *"
     },
     {
       "path": "/api/cron/expire-trials",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/trial-reminders",
+      "schedule": "0 8 * * *"
     },
     {
       "path": "/api/cron/expire-past-due",
@@ -728,16 +772,16 @@
       "schedule": "45 3 * * *"
     },
     {
-      "path": "/api/cron/soft-lock-stale-children",
-      "schedule": "15 3 * * *"
-    },
-    {
-      "path": "/api/cron/trial-reminders",
-      "schedule": "0 2 * * *"
-    },
-    {
       "path": "/api/cron/audit-consent-expiry",
       "schedule": "5 21 * * *"
+    },
+    {
+      "path": "/api/cron/usage-weekly-check",
+      "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/cron/payment-due-sweep",
+      "schedule": "0 7 * * *"
     }
   ],
   "migrations": [],

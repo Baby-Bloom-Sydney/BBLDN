@@ -20,7 +20,7 @@ export const seededUsers: Readonly<Record<string, StubUser>> = Object.freeze({
   }),
   admin: Object.freeze({
     id: "33333333-3333-4333-8333-333333333333",
-    email: "admin@example.test" as Email,
+    email: "operator@example.test" as Email,
     password: PASSWORD,
     role: "admin",
     mfaVerified: true,
@@ -28,7 +28,7 @@ export const seededUsers: Readonly<Record<string, StubUser>> = Object.freeze({
   /** An admin session at `aal1` — 07 §5.4 row 2: it must not reach `/admin/*`. */
   adminNoMfa: Object.freeze({
     id: "44444444-4444-4444-8444-444444444444",
-    email: "admin2@example.test" as Email,
+    email: "operator-two@example.test" as Email,
     password: PASSWORD,
     role: "admin",
     mfaVerified: false,

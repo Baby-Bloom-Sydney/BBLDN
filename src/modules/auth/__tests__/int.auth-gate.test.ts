@@ -141,7 +141,7 @@ describe("(auth) routes for a signed-in user (01 §4d step 3)", () => {
 describe("DEV_MODE (01 §4d step 4)", () => {
   it("is ignored in production: the gate still redirects", async () => {
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("NEXT_PUBLIC_DEV_MODE", "true");
+    vi.stubEnv("NEXT_PUBLIC_DEV_MODE", "true"); // config-literal-ok: 01 §4d step 4 is about this exact env name
     // The production column of the public schema requires the tracker DSN (06 §2.5); supplying it keeps this
     // spec about `DEV_MODE`, not about env validation — which the last describe covers on its own.
     vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://key@o1.ingest.test/1");
@@ -156,7 +156,7 @@ describe("DEV_MODE (01 §4d step 4)", () => {
   });
 
   it("bypasses the gate outside production", async () => {
-    vi.stubEnv("NEXT_PUBLIC_DEV_MODE", "true");
+    vi.stubEnv("NEXT_PUBLIC_DEV_MODE", "true"); // config-literal-ok: 01 §4d step 4 is about this exact env name
     vi.resetModules();
     const { middleware: devMiddleware } = await import("@/middleware");
     const { configureAuth: configureDev, stubAuth: stubDev } =
