@@ -1,8 +1,9 @@
 // 01.09 / 01.10 — S-X-01's hero and the quick-match front door (04 §3.1 step 1: days × time, London area +
 // postcode district). A plain GET form, no script: it lands on S-X-02 (`/results`) with the query
-// `parseQuickMatchQuery` reads back (`1b` builds the results). The area combobox over the areas table (04 §6.1
-// S-X-05 shape) arrives with `/api/areas` in `1b`; until then two labelled inputs.
+// `parseQuickMatchQuery` reads back. The area is the ARIA combobox over the areas table (04 §6.1 S-X-05 shape;
+// `1b`), which writes `area` + `district` as hidden fields so the GET contract is unchanged.
 import { BRAND } from "@/modules/config";
+import { AreaCombobox } from "@/modules/matching";
 import type { ServiceAreaProps } from "../types";
 import { PUBLIC_ROUTES } from "../lib/public-routes";
 import { QUICK_MATCH_DAYS } from "../lib/quick-match-days";
@@ -120,48 +121,8 @@ export function HomeHero({ serviceAreaName }: ServiceAreaProps) {
             </div>
           </fieldset>
 
-          <div className="mt-5 grid gap-4 sm:grid-cols-[1.4fr_1fr]">
-            <div>
-              <label
-                htmlFor="area"
-                className="text-sm font-medium text-slate-900"
-              >
-                Your area
-              </label>
-              <input
-                id="area"
-                name="area"
-                type="text"
-                autoComplete="address-level2"
-                maxLength={60}
-                placeholder="e.g. Clapham"
-                className="mt-2 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="district"
-                className="text-sm font-medium text-slate-900"
-              >
-                Postcode district
-              </label>
-              <input
-                id="district"
-                name="district"
-                type="text"
-                required
-                inputMode="text"
-                autoComplete="postal-code"
-                pattern="[A-Za-z]{1,2}[0-9][A-Za-z0-9]?"
-                maxLength={4}
-                placeholder="e.g. SW4"
-                aria-describedby="district-hint"
-                className="mt-2 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm uppercase text-slate-900 placeholder:normal-case placeholder:text-slate-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-              />
-              <p id="district-hint" className="mt-1 text-xs text-slate-400">
-                The first part of your postcode.
-              </p>
-            </div>
+          <div className="mt-5">
+            <AreaCombobox label="Your area" required />
           </div>
 
           <button

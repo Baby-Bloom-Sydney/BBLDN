@@ -10,20 +10,24 @@ import type {
   Candidate,
   DistanceProvider,
   PositionInput,
+  Requirements,
   Schedule,
+  ScheduleBlock,
 } from "@/modules/scoring";
 import type { NannyId } from "@/modules/shared-types";
 
 const nanny = (value: string): NannyId => value as NannyId;
 
+const AVAILABILITY: ReadonlyArray<ScheduleBlock> = Object.freeze([
+  { day: 0, part: "morning" },
+  { day: 0, part: "midday" },
+  { day: 1, part: "morning" },
+]);
+
 const CANDIDATE: Candidate = Object.freeze({
   nannyId: nanny("nanny-aaa"),
   area: { area: "Clapham", district: "SW4" },
-  availability: [
-    { day: 0, part: "morning" },
-    { day: 0, part: "midday" },
-    { day: 1, part: "morning" },
-  ],
+  availability: AVAILABILITY,
   experienceYears: 3,
   qualificationRung: 3,
   certifications: [],
@@ -55,7 +59,11 @@ const POSITION: PositionInput = Object.freeze({
   },
 });
 
-const positionWith = (patch: Partial<PositionInput>): PositionInput =>
+type PositionPatch = Omit<Partial<PositionInput>, "requirements"> & {
+  readonly requirements?: Partial<Requirements>;
+};
+
+const positionWith = (patch: PositionPatch): PositionInput =>
   Object.freeze({
     ...POSITION,
     ...patch,
@@ -176,7 +184,7 @@ describe("scoring engine — the three layers (03 §7.1)", () => {
     const wanting = positionWith({
       minExperienceYears: 1,
       minQualificationRung: 2,
-      requirements: { languages: ["French"], nannyAge: { min: 25 } },
+      requirements: { languages: ["French"], nannyAge: { min: 26 } },
     });
     const result = await engine.scorePosition(wanting, [overqualified]);
     const ranked = result.ok ? result.value.ranked[0] : undefined;

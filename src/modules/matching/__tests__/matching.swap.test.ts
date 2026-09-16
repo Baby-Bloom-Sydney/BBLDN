@@ -59,7 +59,7 @@ beforeEach(() => {
   );
   configureMatching(
     stubMatching({
-      candidates: [candidate("nanny-a"), candidate("nanny-b")],
+      pool: [candidate("nanny-a"), candidate("nanny-b")],
       positions: { [POSITION_ID]: POSITION },
     }),
   );
@@ -75,6 +75,12 @@ describe("matching through the connector binding", () => {
       quickMatch: async () => notConfigured,
       preAuthMatch: async () => notConfigured,
       resultsFor: async () => notConfigured,
+
+      listPublicNannies: async () => notConfigured,
+      getPublicNanny: async () => notConfigured,
+      saveLead: async () => notConfigured,
+      getLead: async () => notConfigured,
+      connect: async () => notConfigured,
     });
 
     const result = await matching.quickMatch(null, {
@@ -133,10 +139,7 @@ describe("matching through the connector binding", () => {
   it("counts the exclusions by reason instead of dropping them", async () => {
     configureMatching(
       stubMatching({
-        candidates: [
-          candidate("nanny-a"),
-          candidate("nanny-c", { isolated: true }),
-        ],
+        pool: [candidate("nanny-a"), candidate("nanny-c", { isolated: true })],
         positions: { [POSITION_ID]: POSITION },
       }),
     );

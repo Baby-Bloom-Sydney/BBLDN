@@ -122,6 +122,12 @@ beforeEach(() => {
     quickMatch: async () => MATCHING_UNAVAILABLE,
     preAuthMatch: async () => MATCHING_UNAVAILABLE,
     resultsFor: async () => MATCHING_UNAVAILABLE,
+
+    listPublicNannies: async () => MATCHING_UNAVAILABLE,
+    getPublicNanny: async () => MATCHING_UNAVAILABLE,
+    saveLead: async () => MATCHING_UNAVAILABLE,
+    getLead: async () => MATCHING_UNAVAILABLE,
+    connect: async () => MATCHING_UNAVAILABLE,
   });
   registerSlice({
     entity: "position",

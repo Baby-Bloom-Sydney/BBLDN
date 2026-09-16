@@ -1,9 +1,19 @@
 // matching — the module's type surface (01 §2.5). Quick match, advanced match, results and the pre-auth wizard,
-// plus the `autofire` job (03 §7.4). Candidate loading lives **here**, not in `scoring`: the loader pre-filters
+// plus the `autofire` task (03 §7.4). Candidate loading lives **here**, not in `scoring`: the loader pre-filters
 // (verified ≥ min, not isolated, not on hold) and `scoring` re-checks, so the rule lives in one place.
+//
+// Phase 1 `1b` added the surfaces the 04 §3 journey needs on top of the 03 §10.1 methods: the marketplace-safe
+// nanny read over `nanny_public` (07 §5.2 — the only road from a visitor to a nanny), the advanced-wizard lead
+// (02 §4.7 `parent_leads`, owner `matching`), and the one Connect entry point of ADR-126. Each is a **connector
+// extension** recorded in the L-007 `1b` PROGRESS entry for ratification (amend-first, as S4 did for
+// `needsPasswordSetup`).
+import type { Session } from "@/modules/auth";
 import type {
   Actor,
+  EnumValue,
   Instant,
+  LeadId,
+  NannyId,
   PositionId,
   Result,
 } from "@/modules/shared-types";
@@ -13,6 +23,7 @@ import type {
   QuickMatchResult,
   Ranked,
   Schedule,
+  ScheduleBlock,
 } from "@/modules/scoring";
 
 export type MatchingErrorDetails = {
@@ -21,14 +32,15 @@ export type MatchingErrorDetails = {
     | "E_PRECONDITION_FAILED"
     | "distance-failed"
     | "invalid-input"
-    | "matching-not-configured";
+    | "matching-not-configured"
+    | "not-built";
   readonly which?: string;
 };
 
 /**
  * Methods return a plain `Result`, not `Result<T, MatchingErrorDetails>`: `matching` **forwards** the failures of
  * `scoring` and `positions` unchanged (03 §7.3 — a distance failure fails the whole call), so closing the union
- * here would mean either re-wrapping another module's error or listing its reasons in this module's type. The
+ * here would mean either re-wrapping another module's error or naming its reasons in this module's type. The
  * reasons `matching` itself produces are `MatchingErrorDetails`; the ones it passes on stay their owner's.
  */
 export type MatchingResult<T> = Result<T>;
@@ -44,16 +56,157 @@ export type AutofireOutcome = {
   readonly wave: number;
 };
 
+// ── The marketplace-safe nanny (07 §5.2 `nanny_public`; 02 §4.2 read models) ──
+
+/** 02 §3 `verification_level` — the view admits `L3_PROVISIONALLY_VERIFIED` and above only. */
+export type VerificationLevel = EnumValue<"verification_level">;
+
+/**
+ * One row of `nanny_public`, shaped for a screen: first name only, the area as an `AreaRef` (rendered through
+ * `formatAreaLabel`, 03 §6.3 rule 6), the photo already signed by the read model (07 §5.3 rule 1 — never by a
+ * component), availability as `scoring` blocks. No rate (the amount never appears pre-call — 04 §8, D2), no
+ * `is_vaccinated` (ADR-103), no surname, no pointer.
+ */
+export type PublicNanny = {
+  readonly nannyId: NannyId;
+  readonly firstName: string;
+  readonly area: AreaRef;
+  readonly photoUrl: string | null;
+  readonly bio: string | null;
+  readonly yearsExperience: number | null;
+  readonly qualification: string | null;
+  readonly certificates: ReadonlyArray<string>;
+  readonly languages: ReadonlyArray<string>;
+  readonly hasCar: boolean;
+  readonly hasDrivingLicence: boolean;
+  readonly isNonSmoker: boolean | null;
+  readonly comfortableWithPets: boolean | null;
+  readonly availability: ReadonlyArray<ScheduleBlock>;
+  readonly availableFrom: Instant | null;
+  readonly verificationLevel: VerificationLevel;
+};
+
+/** A ranked result joined to what a card shows (S-X-02 / S-X-04 / S-P-06). */
+export type MatchCard = {
+  readonly nanny: PublicNanny;
+  readonly ranked: Ranked;
+};
+
+// ── The quick match (S-X-01 → S-X-02; 04 §3.1 steps 1–2) ──
+
+export type QuickMatchDay = ScheduleBlock["day"];
+export type QuickMatchPart = ScheduleBlock["part"];
+
+/** What S-X-02 receives from the front door's query (parsed by `public-site`; the district decides the area). */
+export type QuickMatchInput = {
+  readonly days: ReadonlyArray<QuickMatchDay>;
+  readonly parts: ReadonlyArray<QuickMatchPart>;
+  readonly district: string;
+};
+
+/** S-X-02's states (04 §6.1): matches · no-match (a stop state) · error; loading is the route's. */
+export type QuickMatchPage =
+  | {
+      readonly kind: "matches";
+      readonly area: AreaRef;
+      readonly total: number;
+      readonly cards: ReadonlyArray<MatchCard>;
+    }
+  | { readonly kind: "no-match"; readonly area: AreaRef | null }
+  | { readonly kind: "error" };
+
+// ── The advanced wizard (S-X-03; 02 §4.7 `parent_leads`) ──
+
+export type WizardChild = {
+  readonly ageLabel: string;
+};
+
+/**
+ * The advanced wizard's answers (04 §3.1 step 3: children, ages, area + district, hours, days, length, focus …),
+ * the `form_data` shape `parent_leads` stores and S-P-04 shares (02 §4.7). Every field optional: the wizard
+ * saves progressively (04 §6.1 S-X-03 "progressive save"), so a partial record is the normal case.
+ */
+export type WizardAnswers = {
+  readonly children?: ReadonlyArray<WizardChild>;
+  readonly area?: AreaRef;
+  readonly days?: ReadonlyArray<QuickMatchDay>;
+  readonly parts?: ReadonlyArray<QuickMatchPart>;
+  readonly scheduleType?: "Fixed" | "Flexible";
+  readonly hoursPerWeek?: string;
+  readonly placementLength?: string;
+  readonly startWhen?: string;
+  readonly focus?: string;
+  readonly support?: string;
+  readonly minExperienceYears?: number;
+  readonly drivingLicence?: boolean;
+  readonly car?: boolean;
+  readonly nonSmoker?: boolean;
+  readonly petsAtHome?: boolean;
+  readonly languages?: ReadonlyArray<string>;
+  /** T-1.8d: the nanny a guest Connect remembered on the way in (04 §3.2 path D). */
+  readonly connectNannyId?: string;
+};
+
+/** The saved lead (02 §4.7): client-minted id, the answers, the resolved area, the funnel source. */
+export type ParentLead = {
+  readonly id: LeadId;
+  readonly answers: WizardAnswers;
+  readonly area: AreaRef | null;
+  readonly source: string | null;
+  readonly completed: boolean;
+};
+
+export type SaveLeadInput = {
+  readonly id: LeadId;
+  readonly answers: WizardAnswers;
+  readonly source: string | null;
+  /** `true` once the last question is answered — emits `wizard.completed` (03 §9.3). */
+  readonly completed: boolean;
+};
+
+/** S-X-04's states (04 §6.1): matches · missing lead → S-X-03 · error. */
+export type PreAuthPage =
+  | {
+      readonly kind: "matches";
+      readonly lead: ParentLead;
+      readonly total: number;
+      readonly cards: ReadonlyArray<MatchCard>;
+    }
+  | { readonly kind: "missing-lead" }
+  | { readonly kind: "error" };
+
+// ── The Connect entry point (ADR-126: `public-site → matching → positions.advance`) ──
+
+/** 03 §9.3 `results.viewed.surface` — where the Connect was pressed. */
+export type ConnectSurface = "results" | "matches" | "browse";
+
+export type ConnectInput = {
+  readonly nannyId: NannyId;
+  readonly surface: ConnectSurface;
+  readonly session: Session | null;
+  readonly leadId: LeadId | null;
+};
+
+/**
+ * What the entry point decides. Today every road is a redirect (04 §3.3 (d): a guest → S-X-03's first question
+ * with the nanny remembered; a signed-in parent → S-P-07 where the in-app Connect lives — 04 §6.1 S-X-11).
+ * The `positions.advance(K-1)` branch lands with `1g` (`04.12`) behind this same entry point.
+ */
+export type ConnectDecision = {
+  readonly kind: "redirect";
+  readonly to: string;
+};
+
 /**
  * The connector `public-site`, `onboarding-parent` and `admin-on-behalf` call (03 §10.1 — matching's legal
  * callers). The three read methods take no candidate list: unlike `scoring`, `matching` loads its own.
  *
  * GAP — recorded in the L-005 F-a PROGRESS entry. `autofire` is spelled in 03 §7.4; the three read methods are
  * named in 03 §10.1 as the calls `matching` makes **on `scoring`**, and their `matching`-side signatures are
- * derived here (the same arguments, minus the candidates). The owning section should confirm them.
+ * derived here (the same arguments, minus the candidate list). The owning section should confirm them.
  */
 export type Matching = {
-  /** T-1.4 level 2 pre-check blast — called after the P-2 commit and swept by `dfy-waves` (03 §7.4). */
+  /** T-1.4 level 2 pre-check blast — called after the P-2 commit and swept by the waves cron (03 §7.4). */
   readonly autofire: (
     positionId: PositionId,
     actor: Actor,
@@ -72,4 +225,22 @@ export type Matching = {
     positionId: PositionId,
     actor: Actor,
   ) => Promise<MatchingResult<ReadonlyArray<Ranked>>>;
+  /** `1b` — every marketplace-safe nanny (browse S-X-10; the cards' display half). */
+  readonly listPublicNannies: () => Promise<
+    MatchingResult<ReadonlyArray<PublicNanny>>
+  >;
+  /** `1b` — one marketplace-safe nanny (S-X-11); `null` = not found / not visible. */
+  readonly getPublicNanny: (
+    nannyId: NannyId,
+  ) => Promise<MatchingResult<PublicNanny | null>>;
+  /** `1b` — the advanced wizard's progressive save (02 §4.7 `saveParentLead`; named service-role use). */
+  readonly saveLead: (input: SaveLeadInput) => Promise<MatchingResult<void>>;
+  /** `1b` — the lead S-X-04 / S-X-05 read back; `null` = unknown id. */
+  readonly getLead: (
+    leadId: LeadId,
+  ) => Promise<MatchingResult<ParentLead | null>>;
+  /** `1b` / ADR-126 — the one Connect entry point `public-site` calls. */
+  readonly connect: (
+    input: ConnectInput,
+  ) => Promise<MatchingResult<ConnectDecision>>;
 };
