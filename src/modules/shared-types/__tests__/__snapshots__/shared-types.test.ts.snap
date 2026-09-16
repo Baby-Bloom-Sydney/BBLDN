@@ -311,6 +311,7 @@ exports[`shared-types enum register (02 §3) > pins every enum's exact order —
     "bounced",
     "cancelled",
     "dry_run",
+    "deduped",
   ],
   "mover": [
     "user",

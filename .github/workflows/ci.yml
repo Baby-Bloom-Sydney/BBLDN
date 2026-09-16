@@ -173,7 +173,10 @@ jobs:
           python-version: "3.12"
       - run: npm ci
       - name: unit + coverage (05 §9 stage 3)
-        run: npx vitest run --coverage --coverage.reporter=lcov
+        # `--project unit` because S5 added a second vitest project: stage 3 is the unit suites with
+        # no database, and stage 5 below is the integration ones against the applied migrations.
+        # Without it this step sweeps both and fails on a database that has not been started yet.
+        run: npx vitest run --project unit --coverage --coverage.reporter=lcov
       - name: changed-line coverage ≥ 80 % (05 §9 stage 3; 07 §10.2)
         # Follow-up (security-reviewer, S0): move to `pip install --require-hashes -r requirements-ci.txt` once S2
         # stabilises the test job — version-pinned today, hash-pinned then.
@@ -189,7 +192,7 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           version: 2.117.0
-      - name: integration (05 §9 stage 5) — red until S5 lands supabase/ + migrations + the `integration` project
+      - name: integration (05 §9 stage 5) — green from S5 — db.constraints, enum-ordinals, int.rls
         if: ${{ !cancelled() }}
         run: |
           supabase start

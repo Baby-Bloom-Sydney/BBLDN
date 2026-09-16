@@ -2,7 +2,12 @@
 // schema, all in a closure. It is the **driver** that swaps, not the contract behaviour: the gate, the `Result`
 // mapping and the password policy stay the module's own, so a stub can never quietly behave differently from the
 // real thing (05 §3 rule 2 — a behaviour the stub cannot honour is a connector defect, not a stub exception).
-import type { Query } from "@/modules/shared-types";
+import type {
+  Query,
+  TableName,
+  TableQuery,
+  TableRow,
+} from "@/modules/shared-types";
 import type {
   AppDatabase,
   AuthDriver,
@@ -73,11 +78,23 @@ export function memoryAuthDriver(
     return row;
   };
 
+  // The stub's rows are whatever a test put in the map, so they become the generated row type at
+  // the same single seam the real driver uses (`supabase-query.ts`) and for the same reason: a
+  // per-table validator here would be `database.types.ts` written twice. Table and column **names**
+  // are still checked at compile time - `T` is constrained to `TableName<AppDatabase>`, which is why
+  // the S5 swap found a fixture in `auth.binding` that was writing a `user_roles` row with no
+  // `user_id`.
+  const asRow = <T extends TableName<AppDatabase>>(
+    row: Readonly<Record<string, unknown>>,
+  ): TableRow<AppDatabase, T> => row as TableRow<AppDatabase, T>;
+
   const query = (): Query<AppDatabase> => ({
-    from: (table) => ({
-      select: async () => tables.get(table) ?? [],
-      insert: async (row) => append(table, row),
-      update: async (_id, patch) => append(table, patch),
+    from: <T extends TableName<AppDatabase>>(
+      table: T,
+    ): TableQuery<AppDatabase, T> => ({
+      select: async () => (tables.get(table) ?? []).map(asRow<T>),
+      insert: async (row) => asRow<T>(append(table, row)),
+      update: async (_id, patch) => asRow<T>(append(table, patch)),
     }),
     rpc: async () => undefined,
   });
