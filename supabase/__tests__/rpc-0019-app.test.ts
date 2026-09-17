@@ -152,6 +152,22 @@ describe("int.rpc-0019 — the creator column and user_has_child_access's fourth
     expect(await seesChild(fx.parentA, childId)).toBe(true);
   });
 
+  // fix: database-reviewer M-1. 0019 replaces this predicate whole, and the first version of that
+  // replacement silently dropped 0012's `p_child_id is not null` guard — which changed the answer for an
+  // admin caller with a null argument from false to true. Nothing passes a null today; this is here so
+  // that the next policy over a nullable child column cannot find out the hard way.
+  it("still answers false for a null child id, for an admin as much as anyone", async () => {
+    for (const actor of [fx.admin, fx.parentA, fx.nannyVisible]) {
+      const rows = await asRole<{ seen: boolean | null }>(
+        db,
+        actor,
+        "select public.user_has_child_access(null) as seen",
+      );
+      await db.query("reset role");
+      expect(rows[0].seen, actor).toBe(false);
+    }
+  });
+
   it("leaves 0012's first three arms exactly as they were", async () => {
     expect(await seesChild(fx.parentA, fx.childA)).toBe(true);
     expect(await seesChild(fx.parentB, fx.childA)).toBe(false);
@@ -219,6 +235,8 @@ describe("int.rpc-0019 — create_child_invite / revoke_child_invite (07 §5.2)"
 
   it("minting twice returns the invite that is already pending, never a second token", async () => {
     // The link is already with a family; a second token would silently invalidate the one they hold.
+    // Since database-reviewer M-3 this goes through `ON CONFLICT … DO NOTHING` rather than a
+    // select-then-insert, so the second mint exercises the conflict path rather than the fast path.
     const first = await mint(fx.parentA, fx.childA, "parent_to_nanny", TOKEN_A);
     const again = await mint(fx.parentA, fx.childA, "parent_to_nanny", TOKEN_B);
     expect(again).toBe(first);

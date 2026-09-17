@@ -52,7 +52,10 @@ drop function if exists public.apply_payment_event(
 drop function if exists public.create_child_invite(uuid, public.invite_direction, text);
 drop function if exists public.revoke_child_invite(uuid, public.invite_revoked_reason);
 
--- `0012`'s body, restored verbatim. Replaced rather than dropped: `children`, `child_client`,
+-- `0012`'s body, behaviour for behaviour — including its `p_child_id is not null` guard, which
+-- database-reviewer M-1 caught 0019 having quietly dropped. Re-indented and written with the
+-- `(select …)` form 0016 uses everywhere else, so it is not character-identical to 0012's text; it
+-- answers identically for every argument, null included. Replaced rather than dropped: `children`, `child_client`,
 -- `child_invites`, `development_images`, `feed_posts`, `milestones` and the rest of the app cluster all
 -- read this predicate from their policies, so a `drop` here is an outage, not a rollback.
 create or replace function public.user_has_child_access(p_child_id uuid)
@@ -62,7 +65,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select
+  select p_child_id is not null and (
     (select public.is_admin())
     or exists (
       select 1 from public.children c
@@ -73,7 +76,8 @@ as $$
        where cc.child_id = p_child_id
          and cc.state = 'active'
          and ((select auth.uid()) in (cc.nanny_user_id, cc.parent_user_id))
-    );
+    )
+  );
 $$;
 
 revoke all on function public.user_has_child_access(uuid) from public;

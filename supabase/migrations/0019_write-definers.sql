@@ -28,14 +28,20 @@
 --   she could drive her own position to `ACTIVE` without the stage model ever running. The precedent
 --   is unambiguous in the same direction: `book_slot()` (`0009`) is the one definer 07 §5.1 rule 5
 --   calls a user-session road, and `0009` grants it to `service_role` alone.
---   `auth.uid()` is also the wrong authority test here, and `0000`'s own comment on
---   `is_privileged_writer()` says why: a definer leaves the request's JWT claims alone, and every
---   caller of these three functions — the P/K/L cascade handlers running as `{ kind: 'system' }`, the
---   `matching.autofire` job, the admin-on-behalf road through the same connector — has no session at
---   all, so `auth.uid()` is null for all of them. The honest authority check is `is_privileged_writer()`,
---   which reads `current_user` (established by the connection, forgeable by no argument). It is
---   asserted at the top of all three functions as well as enforced by the grant, so if EXECUTE is ever
---   widened by mistake the functions still refuse rather than silently accepting a client write.
+--   `auth.uid()` is also the wrong authority test here: every caller of these three — the P/K/L cascade
+--   handlers running as `{ kind: 'system' }`, the `matching.autofire` job, the admin-on-behalf road
+--   through the same connector — has no session at all, so `auth.uid()` is null for all of them.
+--   **fix: database-reviewer H-1. There is no in-function authority check, and that is deliberate.**
+--   These functions were first written with `if not public.is_privileged_writer() then raise` at the top,
+--   described as a second layer that would hold "if EXECUTE is ever widened by mistake". That claim was
+--   false and the review proved it: `is_privileged_writer()` reads `current_user`, and inside a
+--   SECURITY DEFINER `current_user` is the function's **owner** — which this file's own verify block
+--   requires to have BYPASSRLS. So the branch could never fire for any caller, from any role. It was the
+--   same bug this migration diagnoses two hundred lines below for `children_stamp_creator`, and the
+--   reasoning simply had not been carried back up. The checks are gone rather than left as false
+--   comfort, which is also `upsert_call_mirror()`'s (`0018`) shape: **the grant IS the defence**, and it
+--   is asserted three times — in this file's verify block, in `db.constraints`, and in `int.rpc-0019`,
+--   which tries each function as a signed-in parent and as an anonymous visitor and expects 42501.
 --
 -- @adr ADR-127 — the transaction opener is the database function boundary. `upsert_position()` writes
 --      `nanny_positions` AND `position_schedule` in one call for exactly this reason: the caller is
@@ -96,10 +102,6 @@ declare
   v_expected integer := coalesce(p_expected_version, 0);
   v_version  integer;
 begin
-  if not public.is_privileged_writer() then
-    raise exception 'NOT_PRIVILEGED_WRITER' using errcode = 'insufficient_privilege';
-  end if;
-
   v_patch := coalesce(p_columns, '{}'::jsonb)
              - 'id' - 'parent_id' - 'source' - 'stage' - 'version'
              - 'created_at' - 'updated_at' - 'details'
@@ -253,20 +255,7 @@ declare
   v_created  timestamptz;
   v_expected integer := coalesce(p_expected_version, 0);
   v_version  integer;
-  -- 02 §4.2 row 7, and the exact predicate of `connection_requests_one_live_per_pair_idx`. Named
-  -- rather than derived from the enum's order, for the reason `0007`'s own CHECK gives: the branch
-  -- values sort after ACTIVE because C-1 is add-only, so any `>=` form would quietly pull the
-  -- terminal stages in.
-  v_dead     public.connection_stage[] := array[
-    'REQUEST_EXPIRED', 'DECLINED', 'REQUEST_CANCELLED', 'SCHEDULE_EXPIRED',
-    'NOT_HIRED', 'NOT_SELECTED', 'FINISHED',
-    'CANCELLED_BY_PARENT', 'CANCELLED_BY_NANNY'
-  ]::public.connection_stage[];
 begin
-  if not public.is_privileged_writer() then
-    raise exception 'NOT_PRIVILEGED_WRITER' using errcode = 'insufficient_privilege';
-  end if;
-
   v_patch := coalesce(p_columns, '{}'::jsonb)
              - 'id' - 'position_id' - 'parent_id' - 'nanny_id'
              - 'stage' - 'origin' - 'version' - 'created_at' - 'updated_at';
@@ -290,13 +279,26 @@ begin
   end if;
 
   -- 02 §4.2 row 7: <= 1 live connection per (position, nanny).
-  if not (p_stage = any (v_dead))
+  --
+  -- The nine terminal stages are written out as a literal list, twice, rather than held in a variable.
+  -- Two reasons. They are named rather than derived from the enum's order for `0007`'s own stated
+  -- reason: the branch values sort after ACTIVE because C-1 is add-only, so any `>=` form would quietly
+  -- pull the terminal stages in. And they are a **literal** (fix: database-reviewer M-4) because a
+  -- PL/pgSQL array variable is opaque to the planner, which then cannot match this predicate to
+  -- `connection_requests_one_live_per_pair_idx`'s static partial-index WHERE clause and falls back to
+  -- `connection_requests_nanny_stage_idx` plus an in-memory filter. The list here is character-for-
+  -- character `0007`'s index predicate; if one ever changes, so must the other.
+  if p_stage not in ('REQUEST_EXPIRED', 'DECLINED', 'REQUEST_CANCELLED', 'SCHEDULE_EXPIRED',
+                     'NOT_HIRED', 'NOT_SELECTED', 'FINISHED',
+                     'CANCELLED_BY_PARENT', 'CANCELLED_BY_NANNY')
      and exists (
        select 1 from public.connection_requests cr
         where cr.position_id = p_position_id
           and cr.nanny_id = p_nanny_id
           and cr.id <> p_id
-          and not (cr.stage = any (v_dead))
+          and cr.stage not in ('REQUEST_EXPIRED', 'DECLINED', 'REQUEST_CANCELLED', 'SCHEDULE_EXPIRED',
+                               'NOT_HIRED', 'NOT_SELECTED', 'FINISHED',
+                               'CANCELLED_BY_PARENT', 'CANCELLED_BY_NANNY')
      ) then
     raise exception 'CONNECTION_ALREADY_LIVE' using errcode = 'unique_violation';
   end if;
@@ -403,10 +405,6 @@ declare
   v_expected integer := coalesce(p_expected_version, 0);
   v_version  integer;
 begin
-  if not public.is_privileged_writer() then
-    raise exception 'NOT_PRIVILEGED_WRITER' using errcode = 'insufficient_privilege';
-  end if;
-
   v_patch := coalesce(p_columns, '{}'::jsonb)
              - 'id' - 'position_id' - 'parent_id' - 'nanny_id' - 'connection_id'
              - 'source' - 'state' - 'version' - 'created_at' - 'updated_at';
@@ -576,7 +574,12 @@ create trigger children_stamp_creator
   for each row execute function public.children_stamp_creator();
 
 -- The fourth arm. Replaced whole rather than patched, because `0012` wrote it as one `select` and a
--- policy that reads it must keep reading one object; the first three arms are `0012`'s, unchanged.
+-- policy that reads it must keep reading one object. **The first three arms are `0012`'s, behaviour for
+-- behaviour, including its `p_child_id is not null` guard** — restored after database-reviewer M-1
+-- measured that dropping it changed the answer for an admin caller with a null argument from `false` to
+-- `true`. Nothing passes a null today (`development_images_access_select`, the one policy over a
+-- nullable `child_id`, guards it itself), which is exactly why the guard has to be kept rather than
+-- reasoned away: the next policy that forgets its own guard is the one that would find out.
 create or replace function public.user_has_child_access(p_child_id uuid)
 returns boolean
 language sql
@@ -584,7 +587,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select
+  select p_child_id is not null and (
     (select public.is_admin())
     or exists (
       select 1 from public.children c
@@ -602,7 +605,8 @@ as $$
        where c.id = p_child_id
          and c.parent_user_id is null
          and c.created_by_user_id = (select auth.uid())
-    );
+    )
+  );
 $$;
 
 comment on function public.user_has_child_access is
@@ -664,14 +668,15 @@ begin
     raise exception 'INVITE_NO_SESSION' using errcode = '42501';
   end if;
 
+  -- fix: database-reviewer L-1. The row is read but a missing one is NOT a refusal of its own: a
+  -- separate `INVITE_CHILD_NOT_FOUND` would let any signed-in caller probe whether an arbitrary uuid is
+  -- a `children.id`, which is the enumeration oracle 07 §4 forbids. "No such child" falls through the
+  -- authorisation below and comes back as `INVITE_NOT_YOURS`, the same line as every other failure.
   select * into v_child from public.children c where c.id = p_child_id;
-  if not found then
-    raise exception 'INVITE_CHILD_NOT_FOUND' using errcode = 'no_data_found';
-  end if;
 
   -- `invite-authorisation.ts` `mayMint`, in SQL. One refusal for every way it can fail, so a caller
-  -- cannot tell "not your child" from "wrong direction for your role" (07 §4).
-  if not (
+  -- cannot tell "not your child" from "wrong direction for your role" from "no such child" (07 §4).
+  if v_child.id is null or not (
     (select public.is_admin())
     or (p_direction = 'parent_to_nanny' and v_child.parent_user_id = v_actor)
     or (
@@ -694,19 +699,31 @@ begin
     raise exception 'INVITE_TOKEN_MALFORMED' using errcode = 'invalid_parameter_value';
   end if;
 
-  -- Idempotent, and it matches `child_invites_one_pending_per_direction_idx` rather than racing it: the
-  -- pending invite for this (child, direction) IS the answer, and a caller that asks twice gets the same
-  -- token rather than a second one that would invalidate the link already passed to a family.
-  select i.id into v_id
-    from public.child_invites i
-   where i.child_id = p_child_id and i.direction = p_direction and i.status = 'pending';
-  if found then
-    return v_id;
-  end if;
-
+  -- Idempotent through `child_invites_one_pending_per_direction_idx` rather than beside it: the pending
+  -- invite for this (child, direction) IS the answer, and a caller that asks twice gets the same token
+  -- rather than a second one that would invalidate the link already passed to a family.
+  --
+  -- fix: database-reviewer M-3. This was a `select`-then-`insert`, which two concurrent mints can both
+  -- pass before either commits — the loser then got a bare 23505 instead of the winner's id, so the
+  -- idempotency the comment promised was true single-threaded and false under load. `ON CONFLICT … DO
+  -- NOTHING` is what closes it: the loser **blocks** on the winner's row until it commits, writes
+  -- nothing, and the read below therefore sees a committed row rather than a snapshot that predates it.
   insert into public.child_invites (child_id, token, direction, created_by_user_id)
   values (p_child_id, p_token, p_direction, v_actor)
+  on conflict (child_id, direction) where status = 'pending' do nothing
   returning id into v_id;
+
+  if v_id is null then
+    select i.id into v_id
+      from public.child_invites i
+     where i.child_id = p_child_id and i.direction = p_direction and i.status = 'pending';
+    if not found then
+      -- The conflict was real and the row is gone again: the pending invite was revoked between the
+      -- insert and this read. Refused rather than retried, because a retry loop here is a lock held
+      -- open on a row somebody else is actively changing.
+      raise exception 'INVITE_MINT_RACE' using errcode = 'serialization_failure';
+    end if;
+  end if;
 
   return v_id;
 end;
@@ -819,10 +836,6 @@ declare
   v_patch        jsonb;
   v_access_until timestamptz;
 begin
-  if not public.is_privileged_writer() then
-    raise exception 'NOT_PRIVILEGED_WRITER' using errcode = 'insufficient_privilege';
-  end if;
-
   insert into public.payment_events
     (provider, provider_event_id, event_type, payload, received_at)
   values
@@ -1092,6 +1105,18 @@ begin
     if (select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
          where n.nspname = 'public' and p.proname = v_fn) !~ 'INVITE_NO_SESSION' then
       raise exception '0019: %() must refuse a call with no session', v_fn;
+    end if;
+
+    -- fix: database-reviewer M-2. These two are the only definers here that reach the FORCE RLS
+    -- `children` and `child_invites` under a real user session, so a non-BYPASSRLS owner would not make
+    -- them refuse loudly - it would make every legitimate caller see "not yours" for her own child.
+    if exists (
+      select 1 from pg_proc p join pg_roles r on r.oid = p.proowner
+      join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = v_fn
+        and not (r.rolbypassrls or r.rolsuper)
+    ) then
+      raise exception '0019: %() is owned by a role without BYPASSRLS; FORCE RLS would make it refuse every legitimate caller', v_fn;
     end if;
   end loop;
 
