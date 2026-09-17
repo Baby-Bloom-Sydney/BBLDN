@@ -22,6 +22,7 @@ import { wireConsent } from "./wire-consent";
 import { wireEvents } from "./wire-events";
 import { wireMatching } from "./wire-matching";
 import { wireParentProfileStore } from "./wire-parent-profile-store";
+import { wireApp } from "./wire-app";
 import { wirePayments } from "./wire-payments";
 import { wirePlacements } from "./wire-placements";
 import { wirePositions } from "./wire-positions";
@@ -61,5 +62,9 @@ export function wirePorts(env: ParsedEnv): BootReport {
       URLS.app,
     ),
     wirePayments(),
+    // `app/child-linking` last: it injects `payments.startTrial` and the spine's `set_access_window`, so the
+    // money port is wired before it. Neither is load-bearing at wire time — both are closures over module-level
+    // bindings, which fail closed at call time — but the reading order is the dependency order.
+    wireApp(),
   ]);
 }
