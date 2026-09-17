@@ -14,7 +14,7 @@ export { CALENDAR_PANEL } from "./calendar";
 
 // S-A-03 / S-A-04 — the call queue and the one live calendar (`1f`; 04 §6.4). The route files are thin
 // (01 §2.5): they gate on the admin role and render these.
-export { loadCallQueue } from "./call-queue";
+export { loadCallQueue, callTimelineRows } from "./call-queue";
 export { CallQueue } from "./call-queue";
 export {
   recordCallOutcomeAction,

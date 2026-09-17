@@ -9,6 +9,7 @@ export { queueGroupOf } from "./lib/queue-group-of";
 export { QUEUE_HEADINGS } from "./lib/queue-headings";
 export { CALL_TYPE_LABEL } from "./lib/call-type-label";
 export { CALL_OUTCOME_LABEL } from "./lib/call-outcome-label";
+export { callTimelineRows } from "./lib/call-timeline-rows";
 
 export { recordCallOutcomeAction } from "./actions/record-call-outcome-action";
 export { moveCallSlotAction } from "./actions/move-call-slot-action";

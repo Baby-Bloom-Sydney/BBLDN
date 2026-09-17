@@ -236,3 +236,44 @@ describe("admin/call-queue — the outcome vocabulary is 03 §2.7's enum (ADR-12
     }
   });
 });
+
+describe("admin/call-queue — S-A-19's call rows (04 §6.4)", () => {
+  it("reads newest first and names how each call ended", async () => {
+    const { callTimelineRows } =
+      await import("../call-queue/lib/call-timeline-rows");
+    const rows = callTimelineRows([
+      booking({
+        id: "bk-old" as BookingId,
+        start: "2026-01-02T10:00:00.000Z" as ISO,
+      }),
+      booking({
+        id: "bk-new" as BookingId,
+        start: "2026-01-09T10:00:00.000Z" as ISO,
+        status: "done",
+        outcome: "proceeding",
+      }),
+    ]);
+    expect(rows.map((each) => each.id)).toEqual(["bk-new", "bk-old"]);
+    expect(rows[0]?.detail).toBe("Call done — Going ahead");
+    expect(rows[1]?.detail).toBe("Time set");
+  });
+
+  it("says when a family booking moved a nanny's call, and when a no-answer left it waiting", async () => {
+    const { callTimelineRows } =
+      await import("../call-queue/lib/call-timeline-rows");
+    const rows = callTimelineRows([
+      booking({
+        id: "bk-d" as BookingId,
+        status: "rescheduled",
+        displacedFrom: "2026-01-09T09:00:00.000Z" as ISO,
+      }),
+      booking({
+        id: "bk-n" as BookingId,
+        start: "2026-01-08T10:00:00.000Z" as ISO,
+        status: "no-answer",
+      }),
+    ]);
+    expect(rows[0]?.detail).toContain("moved by a family booking");
+    expect(rows[1]?.detail).toBe("No answer — waiting for a new time");
+  });
+});
