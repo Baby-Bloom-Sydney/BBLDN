@@ -46,6 +46,13 @@ export type Session = {
  */
 export type GateSession = Session & {
   readonly needsPasswordSetup: boolean;
+  /**
+   * The session was created by a recovery link rather than by signing in (the provider's `amr` says `recovery`).
+   * It is the one signal that distinguishes "here to set a new password" from "already signed in", and the gate
+   * uses it for exactly one path — `/reset-password`, which 01 §4d's signed-out-only `(auth)` rule would
+   * otherwise close against the very session the link exists to create (ADR-132; 04 §6.1 S-X-09).
+   */
+  readonly isRecovery: boolean;
 };
 
 /**
@@ -137,6 +144,17 @@ export interface Auth<DB extends DatabaseShape = AppDatabase> {
   setPassword(newPassword: string): Promise<Result<void>>;
   /** ADR-042 passwordless catch: the caller sends the email; this exchanges the code (03 §1.4). */
   handleAuthCallback(code: string): Promise<Result<Session>>;
+  /**
+   * S-X-09's forgot half and the **anonymous** half of ADR-042's passwordless catch, in one method because under
+   * ADR-132 they cannot be told apart from outside: it answers the **same `Result` for every address**, and the
+   * only difference is what the account itself receives — a recovery link for an address the provider knows,
+   * nothing for one it does not. A provider failure also answers `ok` (logged, never surfaced), because a caller
+   * that could tell "sent" from "not sent" would be an account-enumeration oracle on a public form (07 §4).
+   *
+   * **Connector extension:** 03 §1.4 names `setPassword` and `handleAuthCallback` and says "the caller sends the
+   * email", but no method sends it — the gap `1c` pinned (4). Raised for ratification, amend-first.
+   */
+  requestPasswordReset(email: Email): Promise<Result<void>>;
   /** Admin actor only, logged (03 §1.4; 07 §5.4 row 3). */
   grantRole(userId: UserId, role: Role, actor: Actor): Promise<Result<void>>;
   isParent(s: Session): boolean;
@@ -154,6 +172,8 @@ export type DriverUser = {
   readonly hasPassword: boolean;
   /** Supabase assurance level; `aal2` is `mfaVerified` (07 §5.4 row 2). */
   readonly aal: string | null;
+  /** The provider's `amr` names `recovery` — this session came from a password-recovery link, not a sign-in. */
+  readonly isRecovery: boolean;
   /** Session expiry as an epoch-second stamp, as the provider reports it. */
   readonly expiresAtEpochSeconds: number | null;
 };
@@ -175,6 +195,12 @@ export interface AuthDriver<DB extends DatabaseShape = AppDatabase> {
   signOut(): Promise<void>;
   updatePassword(newPassword: string): Promise<void>;
   exchangeCodeForSession(code: string): Promise<DriverUser>;
+  /**
+   * Asks the identity provider to email a recovery link landing on `redirectTo`. The provider is the one that
+   * knows whether the address exists and it never says (07 §4) — so this resolves either way and the connector
+   * never learns which happened.
+   */
+  sendRecoveryEmail(email: string, redirectTo: string): Promise<void>;
   /** Writes the `user_roles` row from a server-side value (07 §10.1); service scope. */
   writeRole(userId: string, role: Role): Promise<void>;
   /** The narrow typed query surface for the given scope (03 §1.4). */
@@ -194,6 +220,12 @@ export type AuthDeps<DB extends DatabaseShape = AppDatabase> = {
 
 // ── stub-auth (05 §3 rule 1: production code inside the module it stubs) ──
 
+/** One link the stub's provider would have emailed (`StubAuthOptions.onRecoveryEmail`). */
+export type RecoveryEmailSent = {
+  readonly email: Email;
+  readonly redirectTo: string;
+};
+
 /** One in-memory account. No `password` ⇒ ADR-042's passwordless account. */
 export type StubUser = {
   readonly id: string;
@@ -202,6 +234,8 @@ export type StubUser = {
   /** Absent ⇒ authenticated with the provider but not a known actor — the gate treats it as no session. */
   readonly role?: Role;
   readonly mfaVerified?: boolean;
+  /** The seeded session came from a recovery link (the provider's `amr` would say `recovery`). */
+  readonly isRecovery?: boolean;
 };
 
 export type StubAuthOptions = {
@@ -211,6 +245,11 @@ export type StubAuthOptions = {
   readonly tables?: Readonly<Record<string, ReadonlyArray<unknown>>>;
   /** The unit-of-work join (`AuthDeps.unitOfWork`); the stub honours `{ uow }` exactly as the real inside does. */
   readonly unitOfWork?: UnitOfWorkJoin;
+  /**
+   * The stub's outbox. Called once for each recovery link the provider would actually send — for a seeded address
+   * only, never for an unknown one, which is the whole behaviour a no-enumeration test has to be able to see.
+   */
+  readonly onRecoveryEmail?: (sent: RecoveryEmailSent) => void;
 };
 
 // ── The gate (01 §4d) and the one `(auth)` surface this unit owns ──

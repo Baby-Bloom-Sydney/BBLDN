@@ -29,6 +29,7 @@ const toDriverUser = (user: StubUser): DriverUser => ({
   email: user.email,
   hasPassword: user.password !== undefined,
   aal: user.mfaVerified === true ? "aal2" : "aal1",
+  isRecovery: user.isRecovery === true,
   expiresAtEpochSeconds: STUB_EXPIRY_EPOCH_SECONDS,
 });
 
@@ -179,6 +180,14 @@ export function memoryAuthDriver(
       const user = find(code);
       if (user === null) throw new Error("no account for that code");
       return enter(user);
+    },
+    // The provider's own behaviour, not a convenience: a link goes out for a seeded address and nothing happens
+    // for an unknown one, and neither case is reported back — so a test can see what the *account* received
+    // while the connector still cannot (05 §3 rule 2).
+    sendRecoveryEmail: async (email: string, redirectTo: string) => {
+      const user = state.users.find((u) => u.email === email);
+      if (user === undefined) return;
+      options.onRecoveryEmail?.({ email: user.email, redirectTo });
     },
     writeRole: async (userId: string, role: Role) => {
       const user = find(userId);

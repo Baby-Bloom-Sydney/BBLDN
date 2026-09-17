@@ -39,6 +39,16 @@ export function gateDecision(input: GateInput): GateDecision {
       : go(roleDashboardPath(session.role));
   }
 
+  // The recovery exception (ADR-132; 04 §6.1 S-X-09). `/reset-password` is in the `(auth)` group, which the next
+  // rule makes signed-out only — and a recovery link arrives *with* a session, so without this the one screen the
+  // link exists to reach is the one screen it can never reach. Exactly one path, exactly one session class: a
+  // session that did not come from a recovery link falls through and is bounced as before, and a recovery session
+  // anywhere else is judged by the ordinary rules above and below (all of it pinned in
+  // `__tests__/auth.password-recovery.test.ts`). It is placed after step 3, so an account with no password is
+  // still sent to set-password rather than to a screen that would ask it to confirm a password it does not have.
+  if (session.isRecovery && pathname === ROUTE_MAP.resetPasswordPath)
+    return allow;
+
   // Step 3, first half: the `(auth)` group is signed-out only.
   if (isAuthGroupPath(pathname))
     return needsMfa ? allow : go(roleDashboardPath(session.role));

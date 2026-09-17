@@ -13,6 +13,7 @@ useDefault = true
 description = "Recorded false positives — reviewed at S0 bootstrap (BB-LDN-Planner-070926/S0, 2026-09-15)"
 regexTarget = "match"
 regexes = [
+  '''idempotencyKey: "fail-closed-probe-p2"''',  # AUTH-2 test fixture; generic-api-key matched on the word Key
   # Token-alphabet constants for invite tokens (Crockford-like set, no ambiguous
   # characters). Not a credential: a fixed public alphabet, identical in three
   # files. Flagged by `generic-api-key` on entropy alone at the initial copy

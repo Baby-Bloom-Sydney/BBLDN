@@ -8,13 +8,13 @@ Supabase SDK internally and **never exports a client or any driver type**, so a 
 
 **Connector** (`index.ts` + `types.ts`, written and reviewed before the inside — L2):
 
-| Area                     | Values                                                                                             | Types (`types.ts`)                                                                              |
-| ------------------------ | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| The gate (03 §1.4)       | `auth` (module binding) · `configureAuth` · `createAuth`                                           | `Auth` · `Session` · `Role` · `SignInInput` · `SignUpInput` · `AuthErrorDetails`                |
-| Data access              | `auth.data.run(op, { uow?, scope? })` · `auth.data.signUrl(ref, ttl)`                              | `DataAccessPort` · `NamedOperation` · `RunOptions` · `DataScope` · `StorageRef` · `AppDatabase` |
-| Drivers                  | `supabaseAuthDriver` (real) · `stubAuth` (`auth.stub.ts`)                                          | `AuthDriver` · `AuthDeps` (+ `unitOfWork?: UnitOfWorkJoin`) · `DriverUser`                      |
-| Route knowledge (01 §4d) | `ROUTE_MAP` · `roleDashboardPath` · `requiredRoleForPath` · `isAuthGroupPath` · `loginRedirectUrl` | —                                                                                               |
-| Pure predicates          | `isParentRole` · `isNannyRole` · `isAdminRole` (+ `auth.isParent/isNanny/isAdmin` on a `Session`)  | —                                                                                               |
+| Area                     | Values                                                                                                              | Types (`types.ts`)                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| The gate (03 §1.4)       | `auth` (module binding) · `configureAuth` · `createAuth`                                                            | `Auth` · `Session` · `Role` · `SignInInput` · `SignUpInput` · `AuthErrorDetails`                |
+| Data access              | `auth.data.run(op, { uow?, scope? })` · `auth.data.signUrl(ref, ttl)`                                               | `DataAccessPort` · `NamedOperation` · `RunOptions` · `DataScope` · `StorageRef` · `AppDatabase` |
+| Drivers                  | `supabaseAuthDriver` (real) · `stubAuth` (`auth.stub.ts`)                                                           | `AuthDriver` · `AuthDeps` (+ `unitOfWork?: UnitOfWorkJoin`) · `DriverUser`                      |
+| Route knowledge (01 §4d) | `ROUTE_MAP` · `roleDashboardPath` · `requiredRoleForPath` · `isAuthGroupPath` · `loginRedirectUrl` · `gateDecision` | `GateSession` (`needsPasswordSetup` · `isRecovery`)                                             |
+| Pure predicates          | `isParentRole` · `isNannyRole` · `isAdminRole` (+ `auth.isParent/isNanny/isAdmin` on a `Session`)                   | —                                                                                               |
 
 **Errors** (03 §1.4): `UNAUTHENTICATED` · `FORBIDDEN { reason: 'role' | 'mfa' | 'scope' }` · `INTERNAL`
 (connection / commit). Every method returns `Result`; nothing throws to a caller (03 §1 rule 4).
@@ -50,10 +50,32 @@ stub:** `stub-auth` is reached only by an explicit `configureAuth(stubAuth(...))
   production-resolved environment (Vercel preview included) until boot declares a **shared** backend, and the
   shared store is the `rate_limit_buckets` table — which **has no specification** (07 §8 names it; 02 §4 / §6
   never create it), so P1-WIRE left the limiter undeclared on purpose. Supabase Auth's own limits stay on meanwhile.
-- **No anonymous passwordless catch** (AC-X-14). 01 §4d step 3 — a _signed-in_ user with no password → set-password
-  — is implemented (`needsPasswordSetup`). The login-form half, where an anonymous visitor types a known
-  passwordless email, needs a named lookup 02 §7 does not define plus an account-enumeration ruling; raised as a
-  foundations gap in the L-005 S4 entry rather than invented.
+
+**The passwordless catch and the reset request (ADR-042 · ADR-132 · AUTH-2).** `requestPasswordReset(email)` is the
+anonymous half of the catch _and_ S-X-09's forgot half, in one method, because ADR-132 rules that from outside they
+must be indistinguishable. It answers the **same `Result` for every address** — known, unknown, passwordless, or a
+provider outage — and the only difference is what the account receives: a recovery link for an address the provider
+knows, nothing for one it does not. The link lands on `ROUTE_MAP.authCallbackPath` carrying
+`next=/reset-password`; an account that has never set a password is then moved on to set-password by the gate's own
+step 3, so the catch needs no second email and no account lookup. A provider failure is logged with
+`ALERT_PROVIDER_DOWN` and still answers `ok` — surfacing it would restore the enumeration oracle; that reading is
+scoped to `lib/request-password-reset.ts` and must not be copied to a write path.
+
+**The recovery email is Supabase's own template, not `comms`** — three reasons, each measured on the trunk, not a
+preference: `auth` may import `platform` only (01 §2.3, enforced by `lint:boundaries`), so it cannot reach `comms`;
+03 §8.2's 46-id registry names no password-reset or set-password template, and `08.05` already places the auth
+emails in the Supabase dashboard; and ADR-136's `Recipient = { userId }` is not implemented — today's `Recipient`
+still requires an `email`, so "pass the user id, not an address" has nothing to pass it to. Recorded in the L-007
+AUTH-2 entry as a foundations correction.
+
+**The gate's recovery exception (AUTH-2; ADR-132 / 04 §6.1 S-X-09).** `/reset-password` is in
+`ROUTE_MAP.authGroupPaths`, which 01 §4d makes signed-out only — and the recovery link arrives _with_ a session, so
+until now the one screen the link exists to reach was the one screen it could never reach. `gateDecision` now allows
+**one path for one session class**: `session.isRecovery && pathname === ROUTE_MAP.resetPasswordPath`. `isRecovery`
+comes from the provider's own `amr` (`readDriverUser`), never from a query string the visitor controls, and it fails
+closed with the assurance read. The exception sits **after** step 3, so an account with no password still goes to
+set-password. Every other session class is judged exactly as before, and that half is pinned as carefully as the
+exception (`__tests__/auth.password-recovery.test.ts`, `int.auth-gate.test.ts`).
 
 **Security scope** (07 §10.1 `auth`, mandatory `security-reviewer`): signup writes the role from a **server** value
 and can only ever write a `CustomerRole` (`parent` · `nanny`) — no self-signup path produces `admin` (07 §5.4 row 3);
@@ -76,7 +98,8 @@ point, `elevated-client.ts` only) · `@/modules/shared-types` · `@/modules/plat
 No business module, ever (01 §2.3; 05 §7 rule 1).
 
 **Suites.** `src/modules/auth/__tests__/` — `auth.connector.test.ts` (the contract, run twice: real driver double
-and `stub-auth`), `auth.route-map.test.ts` (01 §4d prefix table), `auth.data-port.test.ts` (scopes, the
+and `stub-auth`), `auth.route-map.test.ts` (01 §4d prefix table), `auth.password-recovery.test.ts` (ADR-042 / ADR-132 — the reset
+request, the no-enumeration property and the gate's recovery exception), `auth.data-port.test.ts` (scopes, the
 unit-of-work join — one RPC, a second refused, a write refused, a failing RPC as a `Result` — and `signUrl`), and
 `int.auth-gate.test.ts` (05 §4.2 — the middleware gate end to end).
 

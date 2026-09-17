@@ -12,6 +12,7 @@ import { isNannyRole } from "./is-nanny-role";
 import { isParentRole } from "./is-parent-role";
 import { needsPasswordSetupWith } from "./needs-password-setup";
 import { refreshSessionWith } from "./refresh-session";
+import { requestPasswordResetWith } from "./request-password-reset";
 import { requireRoleWith } from "./require-role";
 import { setPasswordWith } from "./set-password";
 import { signInWith } from "./sign-in";
@@ -33,6 +34,7 @@ export function createAuth(deps: AuthDeps<AppDatabase>): Auth<AppDatabase> {
     signOut: signOutWith(driver),
     setPassword: setPasswordWith(driver, getSession),
     handleAuthCallback: handleAuthCallbackWith(driver),
+    requestPasswordReset: requestPasswordResetWith(driver),
     grantRole: grantRoleWith(driver),
     isParent: (s: Session) => isParentRole(s.role),
     isNanny: (s: Session) => isNannyRole(s.role),

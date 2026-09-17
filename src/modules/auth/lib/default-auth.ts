@@ -2,7 +2,7 @@
 // default is the *real* thing, not a stub, so nothing can succeed against a fake by accident. `configureAuth`
 // replaces it (test wiring, `stub-auth`), and every method re-reads the registry so a later call wins.
 import type { NextRequest, NextResponse } from "next/server";
-import type { Actor, UserId } from "@/modules/shared-types";
+import type { Actor, Email, UserId } from "@/modules/shared-types";
 import type {
   AppDatabase,
   Auth,
@@ -46,6 +46,7 @@ export const auth: Auth<AppDatabase> = Object.freeze({
   refreshSession: (req: NextRequest, res: NextResponse) =>
     resolve().refreshSession(req, res),
   needsPasswordSetup: () => resolve().needsPasswordSetup(),
+  requestPasswordReset: (email: Email) => resolve().requestPasswordReset(email),
   signUp: (input: SignUpInput) => resolve().signUp(input),
   signIn: (input: SignInInput) => resolve().signIn(input),
   signOut: () => resolve().signOut(),
