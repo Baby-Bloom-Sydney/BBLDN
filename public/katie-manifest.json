@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-17T05:35:14.549Z",
+  "generated_at": "2026-09-17T05:53:23.529Z",
   "summary": {
     "route_count": 59,
     "page_count": 88,
@@ -961,8 +961,8 @@
     },
     {
       "filename": "0017_consent-purpose-rate-limits-profile.sql",
-      "bytes": 23351,
-      "modified_at": "2026-09-17T05:07:46.089Z"
+      "bytes": 28374,
+      "modified_at": "2026-09-17T05:45:13.187Z"
     }
   ],
   "server_actions": [
