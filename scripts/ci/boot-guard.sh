@@ -15,6 +15,10 @@
 #                                name dev-only, so a deployment that sets it does not boot at all)
 #   5. valid production env    → must LISTEN (the positive control for `check:prod-guard`)
 #   6. off-Vercel production   → must EXIT NON-ZERO (a measured contradiction, not a guard — see the case)
+#   7. production WRITE road    → the production environment's position / connection / placement writes reach
+#                                the driver instead of being refused by the port (`0019`, ADR-127). Case 5
+#                                proves production can READ (`/api/health` probes `areas`); until `0019` the
+#                                same environment could not WRITE at all, and nothing here said so.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -81,6 +85,25 @@ expect_outcome "a valid production env boots and serves /api/health" listening "
 smoke_env production
 unset VERCEL_ENV
 expect_outcome "an off-Vercel production runtime refuses the boot (missing VERCEL_ENV)" exited-nonzero "$((BASE_PORT + 5))"
+
+# 7 — the write road, in the production environment (S5c). ADR-127 makes one unit of work one RPC and the port
+# refuses every table write under a `{ uow }`; before `0019` no definer existed for `nanny_positions`,
+# `connection_requests` or `nanny_placements`, so the production boot served reads and refused every commit —
+# P1-STORES measured that and pinned it. This case is that pin, run in the environment case 5 boots: the same
+# `smoke_env production` names are exported, so `config/server` resolves the production column and the boot
+# suite's write-road claims are made against it. It needs no database — the claim is that the refusal is the
+# driver's and not `write-outside-rpc`, which is exactly what "the port let it out" means.
+smoke_env production
+write_log="$(mktemp "${TMPDIR:-/tmp}/boot-guard-write.XXXXXX")"
+if npx vitest run --project unit src/boot/__tests__/boot.test.ts \
+  -t "0019" > "$write_log" 2>&1; then
+  echo "boot-guard: OK   — the production env's writes reach the driver, not the unit-of-work refusal"
+else
+  echo "boot-guard: FAIL — the production env still refuses its writes (ADR-127 / 0019)" >&2
+  cat "$write_log" >&2
+  failures=$((failures + 1))
+fi
+rm -f "$write_log"
 
 if ((failures > 0)); then
   echo "boot-guard: ${failures} case(s) failed" >&2

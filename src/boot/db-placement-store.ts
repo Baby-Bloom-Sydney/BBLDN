@@ -5,8 +5,20 @@
 // write is made by an L row running inside a K-20 or a sweep — a cascade actor with no session.
 //
 // `0007`'s deferred constraint trigger `enforce_placement_position_active()` is the reason L-1 can be written
-// in the same transaction as the P-5 that activates the position: it is checked at commit, not at insert.
-import type { DataAccessPort } from "@/modules/auth";
+// in the same transaction as the P-5 that activates the position: it is checked at commit, not at insert — and
+// it still is, because `upsert_placement()` (`0019`) returns before COMMIT and never pre-empts it.
+//
+// **The write is `upsert_placement()` (`0019`), not a table write** — ADR-127, the gap P1-STORES measured under
+// all three of these stores. The two 02 §4.2 row 9 uniques (one non-ENDED placement per position, one per
+// parent) are raised inside the function by name.
+//
+// **Three round-trip repairs, each forced by writing for real.** `recordOf` reads a missing connection, hours,
+// rate and start date back as `""` / `0` / `""`, which was harmless while nothing wrote them and is not now:
+// `""` is not a uuid or a date, and `0` fails `nanny_placements_weekly_hours_step_check` and
+// `nanny_placements_hourly_rate_pence_check`. An `invite_shell` placement (02 §4.6) legitimately has all four
+// absent, so the write maps each placeholder back to the NULL it came from rather than sending the placeholder
+// to a column that cannot hold it.
+import type { AppDatabase, DataAccessPort } from "@/modules/auth";
 import type { PlacementRecord, PlacementStore } from "@/modules/placements";
 import type {
   ConnectionId,
@@ -16,8 +28,11 @@ import type {
   PositionId,
   Result,
   UnitOfWork,
-  Uuid,
 } from "@/modules/shared-types";
+
+/** `0019`'s generated argument shape, so the `jsonb` seam is typed by the migration itself. */
+type PlacementJson =
+  AppDatabase["Functions"]["upsert_placement"]["Args"]["p_columns"];
 
 type Row = {
   readonly id: string;
@@ -64,16 +79,15 @@ const recordOf = (row: Row): PlacementRecord =>
     ...(row.end_notes === null ? {} : { endNotes: row.end_notes }),
   });
 
+/** The read's placeholders, mapped back to the NULLs they stand for — see the header. */
 const patchOf = (record: PlacementRecord) => ({
-  position_id: record.positionId as string,
-  connection_id: record.connectionId as string,
-  parent_id: record.parentId as string,
-  nanny_id: record.nannyId as string,
-  source: record.source,
-  state: record.state,
-  weekly_hours: record.weeklyHours,
-  hourly_rate_pence: record.hourlyRatePence,
-  start_date: record.startDate as string,
+  ...(record.weeklyHours === 0 ? {} : { weekly_hours: record.weeklyHours }),
+  ...(record.hourlyRatePence === 0
+    ? {}
+    : { hourly_rate_pence: record.hourlyRatePence }),
+  ...((record.startDate as string) === ""
+    ? {}
+    : { start_date: record.startDate as string }),
   ...(record.startedAt === undefined
     ? {}
     : { started_at: record.startedAt as string }),
@@ -127,17 +141,22 @@ export function dbPlacementStore(port: DataAccessPort): PlacementStore {
         {
           name: "placements.put",
           exec: async (q) => {
-            // `version: 1` is a create; `0007`'s `bump_version` trigger owns every later number.
-            if (record.version === 1) {
-              await q.from("nanny_placements").insert({
-                id: record.placementId as string,
-                ...patchOf(record),
-              });
-              return;
-            }
-            await q
-              .from("nanny_placements")
-              .update(record.placementId as string as Uuid, patchOf(record));
+            const connectionId = record.connectionId as string;
+            await q.rpc("upsert_placement", {
+              p_id: record.placementId as string,
+              p_position_id: record.positionId as string,
+              p_parent_id: record.parentId as string,
+              p_nanny_id: record.nannyId as string,
+              p_source: record.source,
+              p_state: record.state,
+              p_columns: patchOf(record) as unknown as PlacementJson,
+              // An omitted argument IS the null (`0019` gives it `default null` for exactly this):
+              // an `invite_shell` placement has no connection, and `recordOf` reads that back as `""`.
+              ...(connectionId === "" ? {} : { p_connection_id: connectionId }),
+              // The version this record was derived FROM; a create sends `0`, which `0019` reads as
+              // "insert". `0007`'s `bump_version` trigger still owns every number after the first.
+              p_expected_version: record.version - 1,
+            });
           },
         },
         { scope: "service", ...(uow === undefined ? {} : { uow }) },

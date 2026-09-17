@@ -219,7 +219,46 @@ describe("dbPositionStore — a column is the source of truth for what it holds"
     await store.put(record({ stage: "CONNECTING", version: 2 }));
     expect(fake.rows("nanny_positions")).toHaveLength(1);
     expect(fake.rows("nanny_positions")[0]?.["stage"]).toBe("CONNECTING");
-    expect(fake.rows("nanny_positions")[0]?.["version"]).toBe(1);
+    // **2, not 1** — and the change is the double becoming faithful, not the claim moving. This test always
+    // said the trigger owns the number; while the write was a table `update` the double did not bump, so the
+    // stored value stayed at the one the insert wrote and the assertion recorded that artefact. `0019`'s
+    // stand-in bumps the way `bump_version` does, so the number the store never sends now moves the way the
+    // database moves it. The real claim lives in `int.rpc-0019` against the applied migration.
+    expect(fake.rows("nanny_positions")[0]?.["version"]).toBe(2);
+  });
+
+  // ADR-127, and the claim this unit's merge rests on: the write is **one RPC**, carrying the compare-and-set
+  // the connector already computed. A table statement here would be refused by the port under any real unit of
+  // work (`write-outside-rpc`), which is precisely the seam P1-STORES measured and pinned.
+  it("the write is upsert_position, and it sends the version the record was derived from", async () => {
+    const fake = seeded();
+    const store = dbPositionStore(fake.port);
+    await store.put(record());
+    await store.put(record({ stage: "CONNECTING", version: 2 }));
+
+    expect(fake.rpcs.map((rpc) => rpc.name)).toEqual([
+      "upsert_position",
+      "upsert_position",
+    ]);
+    const args = fake.rpcs.map((rpc) => rpc.args as Record<string, unknown>);
+    // a create sends 0, which `0019` reads as "insert"; the amend sends the version it read
+    expect(args.map((a) => a["p_expected_version"])).toEqual([0, 1]);
+    // the roster travels in the same call, because the guard allows exactly one RPC per unit of work
+    expect(args[0]?.["p_schedule"]).toEqual([{ day: 0, part: "morning" }]);
+    expect(args[0]?.["p_stage"]).toBe("OPEN");
+  });
+
+  // One writer per column: `upsert_call_mirror()` (0018) owns the call's state. `0019` strips the keys, and
+  // this store must not be the thing that puts them back.
+  it("never sends a call_* column of its own", async () => {
+    const fake = seeded();
+    await dbPositionStore(fake.port).put(record());
+    const columns = (fake.rpcs[0]?.args as Record<string, unknown>)[
+      "p_columns"
+    ] as Record<string, unknown>;
+    expect(
+      Object.keys(columns).filter((key) => key.startsWith("call_")),
+    ).toEqual([]);
   });
 });
 

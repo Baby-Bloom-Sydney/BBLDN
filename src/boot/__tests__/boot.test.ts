@@ -346,37 +346,23 @@ describe("after register() in a valid preview environment", () => {
 });
 
 /**
- * ★ `1g`'s pin, flipped — and the one that takes its place, measured on the real wired port.
+ * ★ P1-STORES' ADR-127 pin, flipped by `0019` — and the thing it was pinning kept as a live assertion.
  *
- * `1g` pinned that `positions` and the call mirror disagreed about where a position lives: the mirror,
- * `connections` and `placements` were db stores while `wire-positions.ts` installed `memoryPositionStore` and
- * refused in production. `dbPositionStore` closes that, in every environment, so the first claim below is a
- * plain `it` — the binding is the db store and the two halves now look in the same table.
+ * P1-STORES wired `dbPositionStore` in every environment, which closed `1g`'s "positions and the call mirror
+ * disagree about where a position lives" and left exactly one thing red: the **write**. ADR-127 makes one unit
+ * of work one RPC — `guard-unit-of-work-query.ts` replaces `insert` / `update` with a refusal for every table
+ * reached under a `{ uow }` — and `0006` / `0017` / `0018` defined no `SECURITY DEFINER` function for
+ * `nanny_positions`, `connection_requests` or `nanny_placements`, so there was nothing to call instead. The
+ * pin was written as "a write inside a unit of work is not refused", with the function `0019` owed spelled out
+ * beneath it.
  *
- * What remains is one database object, and it is pinned rather than written down. ADR-127 makes one unit of work
- * one RPC: `guard-unit-of-work-query.ts` replaces `insert` / `update` with a refusal for every table reached
- * under a `{ uow }`, and **every** position write runs inside the caller's unit of work
- * (`create-positions-slice.ts` `commit`; `create-positions.ts` `amend` / `recordPrecheck`). `0006` / `0017` /
- * `0018` define no `SECURITY DEFINER` function for `nanny_positions`, so there is nothing to call instead.
- *
- * **What `0019` owes, exactly:**
- *   `public.upsert_position(p_id uuid, p_parent_id uuid, p_source position_source, p_stage position_stage,
- *    p_columns jsonb, p_details jsonb, p_schedule jsonb, p_expected_version integer) returns integer`
- *   — `SECURITY DEFINER`, `search_path` pinned, `EXECUTE` revoked from `public` and granted to `service_role`
- *   only, the owner-bypasses-RLS assertion S5b's review added, writing `nanny_positions` **and**
- *   `position_schedule` in one transaction with the compare-and-set on `version` that `advance` already sends,
- *   and returning the new version. Modelled on `upsert_call_mirror()` (`0018`) — the same shape, for the same
- *   reason — with the same `int.rpc-00NN` functional suite beside it, because S5b's lesson was that metadata
- *   assertions pass over a function that cannot write.
- *
- * **The same gap sits under `connections` and `placements`.** `db-connection-store.ts` and
- * `db-placement-store.ts` (`1g`) write their tables as table writes and pass the caller's `uow` through too, so
- * `0019` owes `connection_requests` and `nanny_placements` the same treatment. Measured here on the seam they
- * all share rather than claimed, so one test failing is the whole family reported.
- *
- * Red on purpose. The unit that writes `0019` flips it; it is never bent to match the code.
+ * `0019` answers it, and the probe below changes shape for a reason worth stating: the pin asked for a write
+ * that is not refused, **not** for the guard to be widened. A table `insert` under a `{ uow }` is still refused
+ * and always should be — so that half is now a live `it`, not a deletion — and the write the pin was really
+ * about is the RPC ADR-127 always said it would be. Both halves are measured on the real wired port, in the
+ * same place, so neither can be quietly loosened without the other failing.
  */
-describe("boot — the position store, and what 0019 still owes", () => {
+describe("boot — the position store, and the write road 0019 added", () => {
   it("positions and the call mirror agree about where a position lives", async () => {
     const { wirePorts } = await import("@/boot/wire-ports");
     const { env } = await import("@/modules/config/server");
@@ -386,22 +372,89 @@ describe("boot — the position store, and what 0019 still owes", () => {
     expect(positions?.binding).not.toBe("unconfigured");
   });
 
-  it.fails(
-    "PINNED (ADR-127): a write to nanny_positions inside a unit of work is not refused",
-    async () => {
+  it("FLIPPED (ADR-127 / 0019): a position write inside a unit of work is not refused — it is the RPC", async () => {
+    const refused = await m.platform.withUnitOfWork((uow: UnitOfWork) =>
+      m.auth.auth.data.run(
+        {
+          name: "positions.probeWrite",
+          exec: async (q) =>
+            q.rpc("upsert_position", {
+              p_id: POSITION,
+              p_parent_id: PARENT,
+              p_source: "in_app",
+              p_stage: "DRAFT",
+              p_columns: {},
+              p_details: null,
+              p_schedule: null,
+              p_expected_version: 0,
+            } as never),
+        },
+        { scope: "service", uow },
+      ),
+    );
+    // This environment has no database, so the call still fails — as the **driver**, which is the whole point.
+    // `write-outside-rpc` is what "the port refused it before it ever left" says, and that is what is gone.
+    expect(refused.ok).toBe(false);
+    expect(reasonOf(refused)).not.toBe("write-outside-rpc");
+  });
+
+  it("and a table write inside a unit of work is STILL refused, which is what 0019 did not loosen", async () => {
+    const refused = await m.platform.withUnitOfWork((uow: UnitOfWork) =>
+      m.auth.auth.data.run(
+        {
+          name: "positions.probeTableWrite",
+          exec: async (q) =>
+            q
+              .from("nanny_positions")
+              .insert({ id: POSITION, parent_id: PARENT } as never),
+        },
+        { scope: "service", uow },
+      ),
+    );
+    expect(reasonOf(refused)).toBe("write-outside-rpc");
+  });
+
+  // The same seam under the other two stores `1g` shipped. `0019` owes all three or none of them work, so the
+  // family is measured together rather than one test per table.
+  it("the connection and placement writes are RPCs too, not refused table statements", async () => {
+    for (const [name, args] of [
+      [
+        "upsert_connection",
+        {
+          p_id: POSITION,
+          p_position_id: POSITION,
+          p_parent_id: PARENT,
+          p_nanny_id: PARENT,
+          p_stage: "REQUEST_SENT",
+          p_origin: "nanny_application",
+          p_columns: {},
+          p_expected_version: 0,
+        },
+      ],
+      [
+        "upsert_placement",
+        {
+          p_id: POSITION,
+          p_position_id: POSITION,
+          p_parent_id: PARENT,
+          p_nanny_id: PARENT,
+          p_source: "invite_shell",
+          p_state: "CONFIRMED",
+          p_columns: {},
+          p_expected_version: 0,
+        },
+      ],
+    ] as const) {
       const refused = await m.platform.withUnitOfWork((uow: UnitOfWork) =>
         m.auth.auth.data.run(
           {
-            name: "positions.probeWrite",
-            exec: async (q) =>
-              q
-                .from("nanny_positions")
-                .insert({ id: POSITION, parent_id: PARENT } as never),
+            name: "connections.probeWrite",
+            exec: async (q) => q.rpc(name as never, args as never),
           },
           { scope: "service", uow },
         ),
       );
-      expect(reasonOf(refused)).not.toBe("write-outside-rpc");
-    },
-  );
+      expect(reasonOf(refused), name).not.toBe("write-outside-rpc");
+    }
+  });
 });
