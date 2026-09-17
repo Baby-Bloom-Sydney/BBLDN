@@ -145,6 +145,15 @@ export function supabaseAuthDriver(): AuthDriver<AppDatabase> {
       ).auth.updateUser({ password: newPassword });
       if (error !== null) throw new Error(error.message);
     },
+    // ADR-132 / 07 §4: GoTrue answers this the same way for an address it knows and one it does not, so the
+    // no-enumeration property is the provider's, not a rule this module re-implements over a user lookup. The
+    // email itself is Supabase's own Recovery template (`08.05`, dashboard-configured) — see the module README.
+    sendRecoveryEmail: async (email: string, redirectTo: string) => {
+      const { error } = await (
+        await serverClient()
+      ).auth.resetPasswordForEmail(email, { redirectTo });
+      if (error !== null) throw new Error(error.message);
+    },
     exchangeCodeForSession: async (code: string) => {
       const { data, error } = await (
         await serverClient()

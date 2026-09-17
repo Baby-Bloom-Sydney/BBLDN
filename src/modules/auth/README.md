@@ -50,10 +50,23 @@ stub:** `stub-auth` is reached only by an explicit `configureAuth(stubAuth(...))
   production-resolved environment (Vercel preview included) until boot declares a **shared** backend, and the
   shared store is the `rate_limit_buckets` table — which **has no specification** (07 §8 names it; 02 §4 / §6
   never create it), so P1-WIRE left the limiter undeclared on purpose. Supabase Auth's own limits stay on meanwhile.
-- **No anonymous passwordless catch** (AC-X-14). 01 §4d step 3 — a _signed-in_ user with no password → set-password
-  — is implemented (`needsPasswordSetup`). The login-form half, where an anonymous visitor types a known
-  passwordless email, needs a named lookup 02 §7 does not define plus an account-enumeration ruling; raised as a
-  foundations gap in the L-005 S4 entry rather than invented.
+
+**The passwordless catch and the reset request (ADR-042 · ADR-132 · AUTH-2).** `requestPasswordReset(email)` is the
+anonymous half of the catch _and_ S-X-09's forgot half, in one method, because ADR-132 rules that from outside they
+must be indistinguishable. It answers the **same `Result` for every address** — known, unknown, passwordless, or a
+provider outage — and the only difference is what the account receives: a recovery link for an address the provider
+knows, nothing for one it does not. The link lands on `ROUTE_MAP.authCallbackPath` carrying
+`next=/reset-password`; an account that has never set a password is then moved on to set-password by the gate's own
+step 3, so the catch needs no second email and no account lookup. A provider failure is logged with
+`ALERT_PROVIDER_DOWN` and still answers `ok` — surfacing it would restore the enumeration oracle; that reading is
+scoped to `lib/request-password-reset.ts` and must not be copied to a write path.
+
+**The recovery email is Supabase's own template, not `comms`** — three reasons, each measured on the trunk, not a
+preference: `auth` may import `platform` only (01 §2.3, enforced by `lint:boundaries`), so it cannot reach `comms`;
+03 §8.2's 46-id registry names no password-reset or set-password template, and `08.05` already places the auth
+emails in the Supabase dashboard; and ADR-136's `Recipient = { userId }` is not implemented — today's `Recipient`
+still requires an `email`, so "pass the user id, not an address" has nothing to pass it to. Recorded in the L-007
+AUTH-2 entry as a foundations correction.
 
 **Security scope** (07 §10.1 `auth`, mandatory `security-reviewer`): signup writes the role from a **server** value
 and can only ever write a `CustomerRole` (`parent` · `nanny`) — no self-signup path produces `admin` (07 §5.4 row 3);

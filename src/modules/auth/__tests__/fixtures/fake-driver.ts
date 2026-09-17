@@ -19,6 +19,10 @@ export type FakeDriverState = {
   roles: Array<{ readonly userId: string; readonly role: Role }>;
   scopes: DataScope[];
   signedUrls: Array<{ readonly ref: StorageRef; readonly ttlSeconds: number }>;
+  recoveryEmails: Array<{
+    readonly email: string;
+    readonly redirectTo: string;
+  }>;
   queryResult: unknown;
 };
 
@@ -44,6 +48,7 @@ export function fakeDriver(over: Partial<FakeDriverState> = {}): FakeDriver {
     roles: [],
     scopes: [],
     signedUrls: [],
+    recoveryEmails: [],
     queryResult: { ok: true },
     ...over,
   };
@@ -99,6 +104,10 @@ export function fakeDriver(over: Partial<FakeDriverState> = {}): FakeDriver {
     exchangeCodeForSession: async () => {
       boom("exchangeCodeForSession");
       return state.user ?? aDriverUser();
+    },
+    sendRecoveryEmail: async (email: string, redirectTo: string) => {
+      boom("sendRecoveryEmail");
+      state.recoveryEmails = [...state.recoveryEmails, { email, redirectTo }];
     },
     writeRole: async (userId: string, role: Role) => {
       boom("writeRole");
