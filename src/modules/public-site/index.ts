@@ -2,8 +2,12 @@
 // service modules; it never imports `scheduling` (03 §3.6 R3). A Connect from any public surface goes through
 // `matching`'s one entry point (ADR-126: `public-site → matching → positions.advance`), never deeper.
 //
-// Client-safe by construction: no file here imports `@/modules/config/server` except the `"use server"` action,
-// so a client component (the legacy MiniFooter) may import this barrel for `isPublicSitePath`.
+// **This barrel is not client-safe, and cannot be.** `1a` recorded it as "client-safe by construction" on the
+// narrower test of `@/modules/config/server`; `1b` made the claim false by importing `matching`'s connector from
+// the screens (ADR-126, which 01 §2.3 allows), and `matching`'s barrel reaches `auth`'s, whose module-level
+// binding is the real Supabase inside and pulls the `server-only` service-role client behind it. A client
+// component therefore reaches `isPublicSitePath` at its leaf (`./lib/is-public-site-path`), never here —
+// see `src/components/layout/MiniFooter.tsx` and the pin in `src/__tests__/client-server-boundary.test.ts`.
 export type * from "./types";
 
 // The route register (04 §2.1) and what is generated from it (05 §8.3).
