@@ -129,6 +129,12 @@ begin
   -- place it or because the standing does not act on that type. 03 §5.4.3 wants the record either way, so the
   -- ledger row stands - stamped processed, with no processing_error, because nothing is owed on it. The
   -- family id is written when we have one: an ignored delivery we COULD place is still that family's history.
+  --
+  -- fix: database-reviewer L-5. Whatever 06 does with a row it finds on payment_events_unprocessed_idx, it
+  -- cannot be "let the provider resend": the ON CONFLICT replay guard above answers `duplicate` to every
+  -- redelivery of an id already in the ledger, so a row that needs reprocessing is reprocessed by hand or not
+  -- at all. That is 0010's idempotency working as designed, and it is why which rows land on that index - the
+  -- line this branch draws - is the whole subject of this file.
   if p_spine_patch is null then
     update public.payment_events e
        set processed_at = now(), parent_user_id = p_parent_user_id
@@ -214,8 +220,9 @@ comment on function public.apply_payment_event is
 
 do $$
 declare
-  v_sig text;
-  v_col record;
+  v_sig   text;
+  v_col   record;
+  v_count integer;
 begin
   -- 3a. parent_leads.email ---------------------------------------------------
   select data_type, udt_name, is_nullable into v_col
@@ -242,6 +249,18 @@ begin
     raise exception '0020: apply_payment_event() is not at 0019''s signature - create or replace must not have forked it';
   end if;
 
+  -- fix: database-reviewer M-1. `0019` makes this assertion for its three upserts and omitted it here, and it
+  -- matters most here: the checks below name the 8-argument signature as a LITERAL, so a second overload with
+  -- any other argument list would keep PUBLIC's default EXECUTE, be reachable through PostgREST by named
+  -- argument, and pass every one of them. On a function whose only defence is its grant, "exactly one" is part
+  -- of the defence.
+  select count(*) into v_count
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'apply_payment_event';
+  if v_count <> 1 then
+    raise exception '0020: expected exactly 1 apply_payment_event() overload, found % - a leftover overload is a definer nobody granted on purpose', v_count;
+  end if;
+
   if not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'apply_payment_event'
@@ -255,6 +274,12 @@ begin
   if has_function_privilege('anon', v_sig, 'execute')
      or has_function_privilege('authenticated', v_sig, 'execute') then
     raise exception '0020: apply_payment_event() must stay service_role only (I-M2 - no client writes the spine)';
+  end if;
+  -- fix: database-reviewer L-1. The negative was asserted and the positive was not, and this file issues no
+  -- `grant` of its own: the webhook's entire enablement is state inherited from `0019` through `create or
+  -- replace`. It holds today; asserted, it holds provably.
+  if not has_function_privilege('service_role', v_sig, 'execute') then
+    raise exception '0020: apply_payment_event() must stay EXECUTE-able by service_role - create or replace preserves the ACL, and this asserts that it did';
   end if;
 
   if exists (
