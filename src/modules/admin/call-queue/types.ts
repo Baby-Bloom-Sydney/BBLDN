@@ -63,15 +63,39 @@ export type CallQueueGroup = {
 };
 
 /**
- * What S-A-03 renders. `neverBookedUnavailable` is the honest half of the list: 03 §3.6 says awaiting-slot
- * calls "come from `call-layer`" and the admin queue merges both lists, but 03 §2.7's `CallLayer` has no method
- * that enumerates them and the call mirror has no table at all (02 R-1 is `bookings`). A call that has never had
- * a booking is therefore invisible to this screen, and the screen says so rather than reading as empty.
+ * A call the family has **never booked a time for** (03 §3.6: "awaiting-slot calls come from `call-layer`").
+ * It is deliberately not a `CallQueueRow`: a row is a booking decorated, and this call has no booking to
+ * decorate — no `bookingId`, no start, no flags. `1f` shipped S-A-03 with this half missing and said so on the
+ * screen, because the mirror had no table to enumerate; `0018` gave it one.
+ *
+ * What the admin does with it is the whole point of the group: these are the families BabyBloom rings anyway
+ * (03 §2.2 — "`awaiting-slot` = the parent left the call page without picking … BabyBloom calls anyway").
+ */
+export type AwaitingCallRow = {
+  readonly positionId: PositionId;
+  readonly parentId: UserId;
+  readonly type: Exclude<CallType, "nanny-commission">;
+  readonly requestedAt: ISO;
+  /** "Friday 9 January, 10:00am London time" — when the call was asked for, in the one timezone (ADR-074). */
+  readonly requestedWhen: string;
+  /** R5: a call back on the list after a no-answer, and how many times (03 §2.4 C-5). */
+  readonly noAnswerCount: number;
+  /** the position's district and stage — what the connectors can answer today, same as a booked row */
+  readonly about: string;
+  /** trigger (c) / path E: the nanny this call is about (04 §3.3) */
+  readonly aboutNanny?: string;
+};
+
+/**
+ * What S-A-03 renders. `awaiting` is the half 03 §3.6 puts on `call-layer` and `1f` could not build: the queue
+ * "merges both lists", and now it does. A call that has a booking is a `CallQueueRow` in its `due` group; a
+ * call that has never had one is an `AwaitingCallRow` and shows under "Waiting for a time" beside the
+ * no-answer retries, which is where the admin looks for the families still owed a ring.
  */
 export type CallQueueView = {
   readonly groups: ReadonlyArray<CallQueueGroup>;
   readonly total: number;
-  readonly neverBookedUnavailable: true;
+  readonly awaiting: ReadonlyArray<AwaitingCallRow>;
 };
 
 export type CallQueueRead =

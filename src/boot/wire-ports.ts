@@ -34,7 +34,7 @@ export function wirePorts(env: ParsedEnv): BootReport {
     wireScheduling(),
     wireScoring(),
     wireMatching(),
-    wireCallLayer(env.environment),
+    wireCallLayer(),
     wireParentProfileStore(),
   ]);
 }

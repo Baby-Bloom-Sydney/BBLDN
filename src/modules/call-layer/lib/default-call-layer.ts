@@ -22,4 +22,5 @@ export const callLayer: CallLayer = Object.freeze({
     CALL_LAYER_REGISTRY.get().recordOutcome(ref, outcome, notes, actor),
   getCallState: (ref) => CALL_LAYER_REGISTRY.get().getCallState(ref),
   findOpenCall: (parentId) => CALL_LAYER_REGISTRY.get().findOpenCall(parentId),
+  listOpenCalls: () => CALL_LAYER_REGISTRY.get().listOpenCalls(),
 });

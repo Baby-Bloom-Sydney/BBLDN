@@ -6,6 +6,8 @@ import {
   createSchedulingStub,
 } from "@/modules/scheduling";
 import { configurePositions } from "@/modules/positions";
+import { configureCallLayer, stubCallLayer } from "@/modules/call-layer";
+import type { OpenCallSummary } from "@/modules/call-layer";
 import { ok } from "@/modules/platform";
 import type {
   Actor,
@@ -28,6 +30,7 @@ const ADMIN: Actor = { kind: "admin", id: "admin-1" as AdminId };
 const POSITION = "pos-1" as PositionId;
 const PARENT = "parent-1" as UserId;
 const NOW = "2026-01-08T08:00:00.000Z";
+const BOOKING = "bk-1" as BookingId;
 
 const rules: ReadonlyArray<AvailabilityRule> = [0, 1, 2, 3, 4].map(
   (weekday) => ({
@@ -143,6 +146,29 @@ describe("admin/call-queue — the read (03 §3.6: scheduling returns ids, admin
       listSchedule: async () => ok(items),
     } as never);
 
+  /**
+   * 03 §3.6's other half. `call-layer` is the source of the never-booked calls, so the panel is handed one —
+   * the same way `withSchedule` hands it a `Scheduling`. Nothing here reaches a database.
+   */
+  const withOpenCalls = (calls: ReadonlyArray<OpenCallSummary>) =>
+    configureCallLayer({
+      ...stubCallLayer({}),
+      listOpenCalls: async () => ok(calls),
+    });
+
+  const withOpenCallsFailing = () =>
+    configureCallLayer({
+      ...stubCallLayer({}),
+      listOpenCalls: async () => ({
+        ok: false as const,
+        error: {
+          code: "INTERNAL" as const,
+          message: "no",
+          details: { reason: "call-layer-not-configured" as const },
+        },
+      }),
+    });
+
   const refusing = (code: string) =>
     configureScheduling({
       ...createSchedulingStub({ clock: () => NOW as ISO, rules }),
@@ -181,12 +207,62 @@ describe("admin/call-queue — the read (03 §3.6: scheduling returns ids, admin
     expect(row?.state).toBe("slot-chosen");
   });
 
-  it("says out loud that a never-booked call is not on this screen", async () => {
+  // `1f`'s pin, flipped. The claim used to be "the screen says this half is missing"; `0018` gave the mirror a
+  // table, so the claim is now the half itself — 03 §3.6's "awaiting-slot calls come from `call-layer`", merged
+  // into the one queue, decorated the same way a booked row is.
+  it("lists the calls that have never had a time set, from call-layer", async () => {
     withSchedule([]);
+    withOpenCalls([
+      {
+        positionId: POSITION,
+        parentId: PARENT,
+        type: "matchmaking",
+        state: "awaiting-slot",
+        bookingId: null,
+        requestedAt: "2026-01-05T09:00:00+00:00" as ISO,
+        noAnswerCount: 2,
+        aboutNanny: "Amara",
+      },
+    ]);
     const read = await loadCallQueue(ADMIN);
-    expect(read.kind === "queue" && read.view.neverBookedUnavailable).toBe(
-      true,
-    );
+    expect(read.kind === "queue" && read.view.awaiting).toHaveLength(1);
+    const row = read.kind === "queue" ? read.view.awaiting[0] : undefined;
+    expect(row?.noAnswerCount).toBe(2);
+    expect(row?.aboutNanny).toBe("Amara");
+    expect(row?.requestedWhen).toContain("London time");
+    // it counts toward the queue total, or an admin reads "0 calls" with a family waiting
+    expect(read.kind === "queue" && read.view.total).toBe(1);
+  });
+
+  // A family must not appear twice. Once she has picked a time, `scheduling.listSchedule` already returns her.
+  it("drops a call that already points at a booking — listSchedule has it", async () => {
+    withSchedule([]);
+    withOpenCalls([
+      {
+        positionId: POSITION,
+        parentId: PARENT,
+        type: "matchmaking",
+        state: "slot-chosen",
+        bookingId: BOOKING as BookingId,
+        requestedAt: "2026-01-05T09:00:00+00:00" as ISO,
+        noAnswerCount: 0,
+      },
+    ]);
+    const read = await loadCallQueue(ADMIN);
+    expect(read.kind === "queue" && read.view.awaiting).toEqual([]);
+  });
+
+  // A refused enumeration must not take the booked half down with it: the admin still sees the calls that are
+  // actually in the diary, and the waiting group simply reads as empty.
+  it("keeps the booked half when call-layer cannot answer", async () => {
+    withSchedule([item()]);
+    withOpenCallsFailing();
+    const read = await loadCallQueue(ADMIN);
+    expect(read.kind).toBe("queue");
+    expect(read.kind === "queue" && read.view.awaiting).toEqual([]);
+    expect(
+      read.kind === "queue" && read.view.groups.some((g) => g.rows.length > 0),
+    ).toBe(true);
   });
 
   it("answers `forbidden`, not an empty list, when the calendar refuses the session", async () => {
