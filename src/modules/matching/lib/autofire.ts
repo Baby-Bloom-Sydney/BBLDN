@@ -11,15 +11,17 @@
 // provider error is logged by the caller and `precheck.failed` is emitted for the admin chase, and the
 // waves sweep re-fires any `OPEN` position with no `precheck_fired_at`.
 //
-// **GAP, pinned (`matching.autofire.test.ts`, `it.fails`).** §7.4 also has autofire "notify each nanny
-// (`precheck-nanny` batch via `comms.sendMany`)". A `comms` `Recipient` needs an `Email`, and the only nanny
-// read this module has is `nanny_public` — marketplace-safe by design (07 §5.2): first name, no address. There
-// is no ratified service-scope read of nanny contact details and inventing one would put a named use of
-// personal data into the codebase that no document authorises. The blast is therefore **not built**; the lever,
-// the ranking and `precheck.fired` are, so the parent-visible half of row 2 moves. Recorded in the `1e`
-// PROGRESS entry with the shape it wants (a recipient port wired at boot, as the sinks are).
+// **The blast, built at last (ADR-136).** §7.4 also has autofire "notify each nanny (`precheck-nanny` batch via
+// `comms.sendMany`)". `1e` pinned it `it.fails` because a `comms` `Recipient` needed an `Email` and the only
+// nanny read this module has is `nanny_public` — marketplace-safe by design (07 §5.2): first name, no address.
+// ADR-136 removed that requirement rather than the rule: a caller names a person and `comms` resolves the
+// address inside its own send. So this module passes **nanny ids** and still cannot obtain an address.
+//
+// It goes through a port (`PrecheckBlast`), not an import, because 01 §2.3 gives `matching` no arrow to `comms`
+// — the same inversion `connections` uses for its `AdvanceFn`. Boot supplies it; with no port wired the blast
+// is simply `notified: 0`, which is what the module honestly did before.
 import { MATCHING } from "@/modules/config";
-import { Events, nowInstant, ok } from "@/modules/platform";
+import { Events, log, nowInstant, ok } from "@/modules/platform";
 import { positions } from "@/modules/positions";
 import { scoring } from "@/modules/scoring";
 import type { Candidate, DistanceProvider } from "@/modules/scoring";
@@ -29,10 +31,16 @@ import type {
   PositionId,
   Result,
 } from "@/modules/shared-types";
-import type { AutofireOutcome } from "../types";
+import type { AutofireOutcome, PrecheckBlast } from "../types";
 
 export type AutofireDeps = {
   readonly pool: () => Promise<Result<ReadonlyArray<Candidate>>>;
+  /**
+   * 03 §7.4's `precheck-nanny` batch, handed in at boot (see `PrecheckBlast`). Optional: a failure here must
+   * never fail the pre-check, because the lever is already written and the ranking already happened — §7.4's
+   * own rule that "blast failure never fails the position write", read one step later.
+   */
+  readonly blast?: PrecheckBlast;
   /**
    * Which distance provider the boot wired, for `precheck.fired.providerKind` (03 §7.5). `scoring`'s connector
    * does not publish it, so the composer that built the engine names it; day one it is haversine (§7.1).
@@ -97,8 +105,28 @@ export function autofire(deps: AutofireDeps) {
     });
     if (!lever.ok) return lever;
 
+    // The blast runs after the lever, so a provider outage cannot cost the parent her pre-check: the ranking
+    // and `precheck_fired_at` stand either way, and the waves sweep re-fires a position whose blast fell over.
+    const blasted =
+      deps.blast === undefined
+        ? null
+        : await deps.blast({
+            positionId,
+            nannyIds: ranked.value.map((entry) => entry.nannyId),
+            wave: FIRST_WAVE,
+          });
+    if (blasted !== null && !blasted.ok)
+      log.error("precheck blast failed; the lever stands", {
+        module: "matching",
+        action: "autofire.blast",
+        alert: "ALERT_PROVIDER_DOWN",
+        positionId,
+        errorCode: blasted.error.code,
+      });
+
     const outcome: AutofireOutcome = {
       positionId,
+      notified: blasted?.ok === true ? blasted.value.notified : 0,
       candidateCount: pool.value.length,
       rankedCount: ranked.value.length,
       excludedByReason: scored.ok

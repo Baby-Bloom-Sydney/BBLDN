@@ -1,6 +1,6 @@
 // Test doubles for the two ports this unit does not build: the `email_logs` / `inbox_messages` store (02 R-3,
 // a table that is not on `main` yet) and the template renderer (no template file is written by this unit).
-import { newId } from "@/modules/platform";
+import { err, newId } from "@/modules/platform";
 import type { MessageId, Result, Uuid } from "@/modules/shared-types";
 import type {
   CommsErrorDetails,
@@ -10,6 +10,8 @@ import type {
   MessageState,
   MessageStatus,
   RenderedEmail,
+  ResolvedMessage,
+  ResolvedRecipient,
   TemplateId,
   TemplateRenderer,
 } from "../../types";
@@ -24,6 +26,8 @@ export type StoredRow = RenderedEmail &
 export type MemoryCommsStore = CommsStore & {
   readonly rows: ReadonlyArray<StoredRow>;
   readonly inbox: ReadonlyArray<InboxMessage>;
+  /** ADR-136 — the directory this double resolves `{ userId }` against. */
+  readonly directory: Map<string, ResolvedRecipient>;
 };
 
 const okOf = <T>(value: T): Result<T, CommsErrorDetails> => ({
@@ -31,7 +35,9 @@ const okOf = <T>(value: T): Result<T, CommsErrorDetails> => ({
   value,
 });
 
-export function memoryCommsStore(): MemoryCommsStore {
+export function memoryCommsStore(
+  directory: Map<string, ResolvedRecipient> = new Map(),
+): MemoryCommsStore {
   let rows: ReadonlyArray<StoredRow> = [];
   let inbox: ReadonlyArray<InboxMessage> = [];
   const replace = (id: MessageId, next: (row: StoredRow) => StoredRow) => {
@@ -43,6 +49,17 @@ export function memoryCommsStore(): MemoryCommsStore {
     },
     get inbox() {
       return inbox;
+    },
+    directory,
+    resolveRecipient: async (userId) => {
+      const found = directory.get(userId as string);
+      return found === undefined
+        ? err<CommsErrorDetails>(
+            "VALIDATION",
+            "A valid email address is required",
+            { reason: "invalid-recipient" },
+          )
+        : okOf(found);
     },
     findLiveByDedupeKey: async (dedupeKey) =>
       okOf(
@@ -80,7 +97,7 @@ export function memoryCommsStore(): MemoryCommsStore {
 
 /** Stands in for the template files (03 §8.1 "one file per template"), which this unit does not write. */
 export const fakeRenderer: TemplateRenderer = Object.freeze({
-  render: async (message: Message, messageId: MessageId) =>
+  render: async (message: ResolvedMessage, messageId: MessageId) =>
     okOf({
       messageId,
       to: message.to,

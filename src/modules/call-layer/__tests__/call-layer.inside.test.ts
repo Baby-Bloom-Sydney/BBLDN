@@ -206,7 +206,12 @@ describe("chooseSlot — book, then advance(C-1), then the messages (03 §2.7; 0
     await callLayer.chooseSlot(POSITION, slot.id, undefined, parent, "k-1");
 
     expect(comms.sent.map((m) => m.templateId)).toEqual(["call-confirmation"]);
-    expect(comms.sent[0]?.to.email).toBe("parent@example.test");
+    // ADR-136 — a `Recipient` is a union now, and the mirror's parent half is the `{ email }` branch
+    // (the address is on the record, resolved when the mirror was hydrated).
+    const to = comms.sent[0]?.to;
+    expect(to !== undefined && "email" in to && to.email).toBe(
+      "parent@example.test",
+    );
     expect(comms.scheduled.map((m) => m.templateId)).toEqual(
       SCHEDULING.reminderOffsetsMinutes.map(() => "call-reminder"),
     );

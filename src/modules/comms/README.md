@@ -31,6 +31,16 @@ says so (01 §4a rule 2).
 **What it may import.** `@/modules/config` (+ `@/modules/config/server`), `@/modules/shared-types`,
 `@/modules/platform` — nothing else, ever (01 §2.3 row; pinned by `comms.repo.test.ts`).
 
+**ADR-136 — `comms` is the one module that may know an address.** A `Recipient` is `{ userId }` or `{ email }`;
+the `{ userId }` form is resolved inside a send by `CommsStore.resolveRecipient`, over `user_profiles` keyed on
+`user_id` at **service scope**, and the resolved address is written onto the `email_logs` row and **never
+returned to the caller**. `{ email }` exists only for someone who is not a user yet (a lead, a public contact
+form). This replaces "the caller passes fully resolved data" and is stricter than it: `1e` could not send
+`precheck-nanny` and `1g` could not send `connection-requested` because 07 §5.2 keeps a nanny's address out of
+`nanny_public` and no document authorised a business module to read her contact details — under ADR-136 none
+ever will. Every way a recipient fails to resolve answers the same `invalid-recipient`, so a send cannot be used
+to enumerate user ids (07 §4). Pinned in `comms.recipient.test.ts`.
+
 **Gaps (recorded, not hidden).**
 
 1. **03 §8.2 is headed "41 ids" but names 46 distinct id strings** — five numbered rows carry a parent/nanny

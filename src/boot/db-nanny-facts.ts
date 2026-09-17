@@ -10,15 +10,20 @@
 //
 // This is not a widening of what a parent may see: nothing here reaches a route, a screen or a parent-facing
 // message. It is the module that owns `connection_requests` asking two matching flags about a row it is about
-// to reference. **No name and no address**: `NannyFacts.email` is left `undefined`, so no K-row message reaches
-// a nanny — the same gap `1e` pinned on autofire's `precheck-nanny` blast, for the same reason. No document
-// authorises a service-scope read of a nanny's contact details, and inventing one would put an unsanctioned use
-// of personal data in the codebase. It wants a recipient port, ruled and wired; it is pinned, not papered over.
+// to reference.
+//
+// **ADR-136 — and the third column.** `1e` and `1g` both pinned "no K-row message reaches a nanny", because
+// 07 §5.2 keeps her address out of `nanny_public` and no document authorised a service-scope read of her
+// contact details. The ruling moved that read into `comms`, so what this adapter answers is her **`user_id`** —
+// an identifier, not contact data, and the same one `connection_requests` and `auth.users` already key on.
+// `NannyFacts` still carries **no name and no address**; `comms` resolves the address inside the send and never
+// hands it back. The gap is closed by making this module able to do less, not more.
 import type { DataAccessPort } from "@/modules/auth";
 import type { NannyFacts } from "@/modules/connections";
-import type { NannyId, Result } from "@/modules/shared-types";
+import type { NannyId, Result, Uuid } from "@/modules/shared-types";
 
 type NannyRow = {
+  readonly user_id: string;
   readonly verification_level: string | null;
   readonly is_isolated: boolean | null;
 };
@@ -39,6 +44,7 @@ export function dbNannyFacts(
         return Object.freeze({
           verificationLevel: row.verification_level ?? "L0_SIGNED_UP",
           isolated: row.is_isolated ?? false,
+          userId: row.user_id as Uuid,
         });
       },
     },

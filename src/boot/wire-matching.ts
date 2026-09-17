@@ -5,15 +5,16 @@
 // before the first candidate is scored.
 import { auth } from "@/modules/auth";
 import { configureMatching, createMatching } from "@/modules/matching";
+import { precheckBlast } from "./precheck-blast";
 import type { PortWiring } from "./types";
 
 export function wireMatching(): PortWiring {
-  configureMatching(createMatching({ auth }));
+  configureMatching(createMatching({ auth, blast: precheckBlast(auth.data) }));
   return {
     port: "matching",
     binding:
-      "create-matching (nanny_public + parent_leads through auth's data port)",
+      "create-matching (nanny_public + parent_leads through auth's data port) + the 03 §7.4 pre-check blast",
     reason:
-      "autofire and resultsFor answer `not-built` until 1e writes them (03 §10.1) — the rest of the connector is the real inside",
+      "the `precheck-nanny` batch is composed HERE, not imported: 01 §2.3 gives matching no arrow to comms, and under ADR-136 what crosses the port is nanny ids — comms resolves each address inside its own send, so matching still cannot obtain one",
   };
 }
