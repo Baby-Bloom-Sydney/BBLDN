@@ -1,6 +1,7 @@
 // 07 §8 `consume(key, policy)`: every window of the policy is counted, tightest first; the first one over its
 // limit is the hit — `RATE_LIMITED { window, retryAfterSeconds }` (01 §4c rule 5). A key that trips
-// `burstAlertMultiple` times in an hour logs `ALERT_RATE_LIMIT_BURST` once (the key itself is never logged). A
+// `burstAlertMultiple` times in an hour logs `ALERT_RATE_LIMIT_BURST` (at or past the multiple, so a lost
+// increment cannot disarm it — M-14; the key itself is never logged, and a failing burst counter is logged). A
 // store failure denies — fail closed — and is logged `error`.
 import type { Instant, Result } from "@/modules/shared-types";
 import type {
@@ -30,7 +31,21 @@ async function noteBurst(
     BURST_WINDOW_SECONDS,
     now,
   );
-  if (trips.ok && trips.value.count === deps.burstAlertMultiple) {
+  // M-14: the counter that arms the alert can fail like any other bucket, and a swallowed failure means
+  // `ALERT_RATE_LIMIT_BURST` never fires for this key and nobody knows. The refusal itself already stands — this
+  // is only the alert — so the failure is logged rather than raised. The key is never logged (07 §8).
+  if (!trips.ok) {
+    deps.log?.error("rate limit: the burst counter did not answer", {
+      policy: policy.key,
+      reason: "burst-count-failed",
+      errorCode: trips.error.code,
+      windowSeconds: BURST_WINDOW_SECONDS,
+    });
+    return;
+  }
+  // `>=`, never `===`: one increment the store never returned would otherwise step the count past the multiple
+  // and disarm the alert for that key for the rest of the hour (M-14).
+  if (trips.value.count >= deps.burstAlertMultiple) {
     deps.log?.warn("rate limit burst", {
       alert: "ALERT_RATE_LIMIT_BURST",
       policy: policy.key,

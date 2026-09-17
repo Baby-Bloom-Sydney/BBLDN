@@ -104,6 +104,65 @@ describe("platform/rate-limit — consume", () => {
     expect(JSON.stringify(alerts[0])).not.toContain("noisy");
   });
 
+  // M-14 (REVIEW-2 §4): the burst counter used `===`, so a single increment the store never returned disarmed
+  // `ALERT_RATE_LIMIT_BURST` for that key for the rest of the hour — the alert is armed by `>=` instead.
+  it("still alerts when an increment is lost — the burst counter is >=, not ===", async () => {
+    const lines: LogLine[] = [];
+    const inner = memoryRateLimitStore();
+    const skipped = { done: false };
+    const losesOneBurstIncrement: RateLimitStore = {
+      increment: async (bucket, windowSeconds, now) => {
+        const counted = await inner.increment(bucket, windowSeconds, now);
+        if (!bucket.startsWith("burst:") || !counted.ok) return counted;
+        // The store answered, but one increment never landed: the count steps straight past the multiple.
+        if (counted.value.count === 2 && !skipped.done) {
+          skipped.done = true;
+          await inner.increment(bucket, windowSeconds, now);
+          return inner.increment(bucket, windowSeconds, now);
+        }
+        return counted;
+      },
+    };
+    const limiter = createRateLimiter({
+      store: losesOneBurstIncrement,
+      log: createLogger({ sink: (line) => void lines.push(line) }),
+      burstAlertMultiple: 3,
+    });
+    const policy = { key: "ip", perMinute: 1 };
+    await limiter.consume("noisy", policy);
+    for (let i = 0; i < 4; i += 1) await limiter.consume("noisy", policy);
+    expect(
+      lines.filter((line) => line.alert === "ALERT_RATE_LIMIT_BURST").length,
+    ).toBeGreaterThan(0);
+  });
+
+  // M-14, second half: a burst bucket the store cannot write meant the alert silently never fired.
+  it("logs when the burst counter itself fails, and still returns the refusal", async () => {
+    const lines: LogLine[] = [];
+    const inner = memoryRateLimitStore();
+    const brokenBurstBucket: RateLimitStore = {
+      increment: async (bucket, windowSeconds, now) =>
+        bucket.startsWith("burst:")
+          ? { ok: false, error: { code: "INTERNAL", message: "db down" } }
+          : inner.increment(bucket, windowSeconds, now),
+    };
+    const limiter = createRateLimiter({
+      store: brokenBurstBucket,
+      log: createLogger({ sink: (line) => void lines.push(line) }),
+      burstAlertMultiple: 3,
+    });
+    const policy = { key: "ip", perMinute: 1 };
+    await limiter.consume("noisy", policy);
+    const tripped = await limiter.consume("noisy", policy);
+    expect(tripped.ok).toBe(false);
+    if (!tripped.ok) expect(tripped.error.code).toBe("RATE_LIMITED");
+    const failures = lines.filter(
+      (line) => line.level === "error" && line.reason === "burst-count-failed",
+    );
+    expect(failures).toHaveLength(1);
+    expect(JSON.stringify(failures[0])).not.toContain("noisy");
+  });
+
   it("denies (INTERNAL) when the store fails — fail closed, logged", async () => {
     const lines: LogLine[] = [];
     const broken: RateLimitStore = {
