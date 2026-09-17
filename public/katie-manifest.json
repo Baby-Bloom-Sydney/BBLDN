@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-16T05:11:47.803Z",
+  "generated_at": "2026-09-17T05:08:19.497Z",
   "summary": {
-    "route_count": 61,
-    "page_count": 87,
+    "route_count": 59,
+    "page_count": 88,
     "cron_count": 23,
     "migration_count": 17,
     "server_action_file_count": 41
@@ -51,11 +51,11 @@
       "file": "src/app/api/ai/route.ts"
     },
     {
-      "path": "/api/analytics/visit",
+      "path": "/api/areas",
       "methods": [
-        "POST"
+        "GET"
       ],
-      "file": "src/app/api/analytics/visit/route.ts"
+      "file": "src/app/api/areas/route.ts"
     },
     {
       "path": "/api/auth/callback",
@@ -345,13 +345,6 @@
       "file": "src/app/api/og/nanny/[id]/route.tsx"
     },
     {
-      "path": "/api/og/nanny-v2/[id]",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/og/nanny-v2/[id]/route.tsx"
-    },
-    {
       "path": "/api/og/position/[id]",
       "methods": [
         "GET"
@@ -395,13 +388,6 @@
         "POST"
       ],
       "file": "src/app/api/run-verification/route.ts"
-    },
-    {
-      "path": "/api/test-email",
-      "methods": [
-        "GET"
-      ],
-      "file": "src/app/api/test-email/route.ts"
     },
     {
       "path": "/api/upload/development-image",
@@ -473,6 +459,10 @@
       "file": "src/app/(funnel)/apply/page.tsx"
     },
     {
+      "path": "/matchmaking/onboarding",
+      "file": "src/app/(funnel)/matchmaking/onboarding/page.tsx"
+    },
+    {
       "path": "/matchmaking/results",
       "file": "src/app/(funnel)/matchmaking/results/page.tsx"
     },
@@ -531,10 +521,6 @@
     {
       "path": "/legal/professional-terms",
       "file": "src/app/(public)/legal/professional-terms/page.tsx"
-    },
-    {
-      "path": "/matchmaking/onboarding",
-      "file": "src/app/(public)/matchmaking/onboarding/page.tsx"
     },
     {
       "path": "/nannies/[id]",
@@ -721,6 +707,10 @@
       "file": "src/app/parent/browse/page.tsx"
     },
     {
+      "path": "/parent/call",
+      "file": "src/app/parent/call/page.tsx"
+    },
+    {
       "path": "/parent/connections",
       "file": "src/app/parent/connections/page.tsx"
     },
@@ -887,87 +877,87 @@
     {
       "filename": "0000_extensions-enums.sql",
       "bytes": 30735,
-      "modified_at": "2026-09-16T05:09:40.956Z"
+      "modified_at": "2026-09-17T04:55:58.015Z"
     },
     {
       "filename": "0001_areas.sql",
       "bytes": 36557,
-      "modified_at": "2026-09-16T05:09:40.956Z"
+      "modified_at": "2026-09-17T04:55:58.015Z"
     },
     {
       "filename": "0002_identity.sql",
       "bytes": 16144,
-      "modified_at": "2026-09-16T05:09:40.957Z"
+      "modified_at": "2026-09-17T04:55:58.016Z"
     },
     {
       "filename": "0003_legal-documents.sql",
       "bytes": 6933,
-      "modified_at": "2026-09-16T05:09:40.957Z"
+      "modified_at": "2026-09-17T04:55:58.016Z"
     },
     {
       "filename": "0004_consent.sql",
       "bytes": 23647,
-      "modified_at": "2026-09-16T05:09:40.957Z"
+      "modified_at": "2026-09-17T04:55:58.016Z"
     },
     {
       "filename": "0005_marketplace-parties.sql",
       "bytes": 17134,
-      "modified_at": "2026-09-16T05:09:40.957Z"
+      "modified_at": "2026-09-17T04:55:58.016Z"
     },
     {
       "filename": "0006_positions.sql",
       "bytes": 18825,
-      "modified_at": "2026-09-16T05:09:40.958Z"
+      "modified_at": "2026-09-17T04:55:58.017Z"
     },
     {
       "filename": "0007_connections-placements.sql",
       "bytes": 25633,
-      "modified_at": "2026-09-16T05:09:40.958Z"
+      "modified_at": "2026-09-17T04:55:58.017Z"
     },
     {
       "filename": "0008_verification.sql",
       "bytes": 13088,
-      "modified_at": "2026-09-16T05:09:40.958Z"
+      "modified_at": "2026-09-17T04:55:58.017Z"
     },
     {
       "filename": "0009_scheduling.sql",
       "bytes": 34208,
-      "modified_at": "2026-09-16T05:09:40.958Z"
+      "modified_at": "2026-09-17T04:55:58.017Z"
     },
     {
       "filename": "0010_money.sql",
       "bytes": 45746,
-      "modified_at": "2026-09-16T05:09:40.959Z"
+      "modified_at": "2026-09-17T04:55:58.018Z"
     },
     {
       "filename": "0011_events-comms.sql",
       "bytes": 27597,
-      "modified_at": "2026-09-16T05:09:40.959Z"
+      "modified_at": "2026-09-17T04:55:58.018Z"
     },
     {
       "filename": "0012_app.sql",
       "bytes": 60167,
-      "modified_at": "2026-09-16T05:09:40.959Z"
+      "modified_at": "2026-09-17T04:55:58.019Z"
     },
     {
       "filename": "0013_katie.sql",
       "bytes": 25021,
-      "modified_at": "2026-09-16T05:09:40.960Z"
+      "modified_at": "2026-09-17T04:55:58.019Z"
     },
     {
       "filename": "0014_leads.sql",
       "bytes": 13587,
-      "modified_at": "2026-09-16T05:09:40.960Z"
+      "modified_at": "2026-09-17T04:55:58.019Z"
     },
     {
       "filename": "0015_storage.sql",
       "bytes": 11543,
-      "modified_at": "2026-09-16T05:09:40.960Z"
+      "modified_at": "2026-09-17T04:55:58.019Z"
     },
     {
       "filename": "0016_rls.sql",
       "bytes": 26408,
-      "modified_at": "2026-09-16T05:09:40.960Z"
+      "modified_at": "2026-09-17T04:55:58.020Z"
     }
   ],
   "server_actions": [
