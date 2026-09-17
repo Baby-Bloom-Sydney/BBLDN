@@ -1,14 +1,21 @@
-// `positions` (03 §2.5) — the aggregate root of the stage model. `1e` built both halves and wired neither: the
-// reads (`configurePositions`) and the P-row slice (`registerPositionsSlice`) are two calls over **one store
-// instance**, exactly as `wire-call-layer.ts` does for the C rows, because two stores would let `advance` write
-// one position and `getStage` read another.
+// `positions` (03 §2.5) — the aggregate root of the stage model, and now the **real store**, in every
+// environment (`P1-STORES`).
 //
-// The inside is real; the **store** is not. `memoryPositionStore` is per instance and forgets every position on
-// a cold start — on a serverless runtime that is a family whose position silently ceases to exist, not a stub
-// that refuses. So the same rule `wire-scheduling.ts` and `wire-call-layer.ts` apply: installed **outside
-// production only**, chosen by the resolved environment (05 §3 rule 1), and production stays on the fail-closed
-// `positions-not-configured` default with its reason on the report. The store over `nanny_positions`
-// (migration `0006`) is owed — recorded in the `1e` PROGRESS entry and repeated here.
+// What this file used to say, and why it no longer says it: `memoryPositionStore` is per instance and forgets
+// every position on a cold start, so on a serverless runtime a family's open position would silently cease to
+// exist. That is a loss rather than a refusal, which is why `positions` was installed outside production only
+// and why production answered `positions-not-configured`. `dbPositionStore` puts the position where `0006`
+// always kept it — `nanny_positions` with its roster in `position_schedule` — so the reason for the refusal is
+// gone, and with it the refusal. `wire-scheduling.ts` and `wire-call-layer.ts` made the same move for the same
+// reason, one and two units earlier.
+//
+// It also closes the seam `1g` pinned: `call-layer`'s mirror, `connections` and `placements` are db stores, so
+// while `positions` was in memory the two halves disagreed about where a position lives — `advance(P-2)` wrote
+// to memory and the C-row mirror it cascades into looked in `nanny_positions`.
+//
+// The reads (`configurePositions`) and the P-row slice (`registerPositionsSlice`) are two calls over **one**
+// store instance, exactly as `wire-call-layer.ts` does for the C rows: two stores would let `advance` write one
+// position and `getStage` read another.
 //
 // `isInServiceArea` is P-2's own precondition (03 §6): a district that is not in the London table is a refusal,
 // never a guess, because a guessed district matches the wrong nannies and the family finds out on the call. It
@@ -17,18 +24,23 @@
 // left unpassed: `1e` recorded it as open, and a row invented here would be a step on a parent's dashboard that
 // nothing stands behind.
 import { areas, normaliseDistrict } from "@/modules/areas";
-import type { Environment } from "@/modules/config";
+import { auth } from "@/modules/auth";
 import {
   configurePositions,
   createPositions,
   createPositionsSlice,
-  memoryPositionStore,
   registerPositionsSlice,
 } from "@/modules/positions";
+import { dbPositionStore } from "./db-position-store";
 import type { PortWiring } from "./types";
 
-const MEMORY_STORE =
-  "the position store is memoryPositionStore — per instance, and it forgets every position on a cold start; the store over nanny_positions (0006) needs the marketplace tables and the RPC opener (ADR-127), owed since 1e";
+/**
+ * ADR-127: every position write runs inside the caller's unit of work, and a unit of work admits one `rpc()` and
+ * no table write — so until a `0019` definer writes `nanny_positions`, a committed position move is refused at
+ * the port. Measured rather than asserted: `boot.test.ts` "what 0019 owes" pins it with the function's shape.
+ */
+const DEFINER_OWED =
+  "the reads are live; a write inside a unit of work still needs the 0019 definer (ADR-127) — pinned in boot.test.ts, and the same gap sits under connections and placements";
 
 /** 03 §6.3 rule 1: anything that is not an outward code is not a district, so it is not in the table either. */
 const isInServiceArea = async (district: string): Promise<boolean> => {
@@ -36,19 +48,13 @@ const isInServiceArea = async (district: string): Promise<boolean> => {
   return outward === null ? false : areas.isInServiceArea(outward);
 };
 
-export function wirePositions(environment: Environment): PortWiring {
-  if (environment === "production")
-    return {
-      port: "positions",
-      binding: "unconfigured",
-      reason: `${MEMORY_STORE}; refused in production because a cold start would drop a parent's open position silently — scheduling and call-layer are refused there for the same reason`,
-    };
-  const store = memoryPositionStore();
+export function wirePositions(): PortWiring {
+  const store = dbPositionStore(auth.data);
   configurePositions(createPositions({ store }));
   registerPositionsSlice(createPositionsSlice({ store, isInServiceArea }));
   return {
     port: "positions",
-    binding: "create-positions + the P-row slice, over one memory store",
-    reason: `${MEMORY_STORE}; preview and development only. Rail row 3 (JourneyRowSource) is not passed — 1e left it open and an invented row would be a dashboard step nothing stands behind`,
+    binding: "create-positions + the P-row slice, over one db position store",
+    reason: `the position is nanny_positions (0006) with its roster in position_schedule, read back through the keyed read at service scope. No environment gate: a store over a real schema is real wherever a database is. ${DEFINER_OWED}`,
   };
 }
