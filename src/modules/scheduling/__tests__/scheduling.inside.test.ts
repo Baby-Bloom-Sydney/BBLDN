@@ -1,7 +1,13 @@
 // Every claim `1f`'s merge rests on, executable (ADR-120 rule 1). The two the document makes and the code
 // cannot keep are pinned as failing tests, not written down as prose (ADR-120 rule 2).
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { SCHEDULING } from "@/modules/config";
+import {
+  configureEvents,
+  createEvents,
+  log,
+  memoryEventLogStore,
+} from "@/modules/platform";
 import type {
   Actor,
   BlockId,
@@ -594,23 +600,20 @@ describe("scheduling inside — what the document says and the code cannot yet d
   // write that does it. Flipping `kind` to `'open'` was rejected — precedence is blocked > open > rule, so an
   // `open` row ADDS availability and a block laid outside the rules would come back as new open time.
   // Owed: a `delete` on `TableQuery` (the ADR-131 (1) class) or `availability_blocks.revoked_at` in `0018`.
-  it.fails(
-    "the document's `unblock` lifts a block and the slots return",
-    async () => {
-      const block = {
-        id: "blk-1",
-        calendar_id: CALENDAR,
-        kind: "blocked",
-        start_at: `${FRIDAY}T09:00:00.000Z`,
-        end_at: `${FRIDAY}T10:00:00.000Z`,
-        reason: "holiday",
-        created_by: null,
-      };
-      const { calendar } = calendarOf({ blocks: [block] });
-      const lifted = await calendar.unblock("blk-1" as BlockId, admin);
-      expect(lifted.ok).toBe(true);
-    },
-  );
+  it("the document's `unblock` lifts a block and the slots return", async () => {
+    const block = {
+      id: "blk-1",
+      calendar_id: CALENDAR,
+      kind: "blocked",
+      start_at: `${FRIDAY}T09:00:00.000Z`,
+      end_at: `${FRIDAY}T10:00:00.000Z`,
+      reason: "holiday",
+      created_by: null,
+    };
+    const { calendar } = calendarOf({ blocks: [block] });
+    const lifted = await calendar.unblock("blk-1" as BlockId, admin);
+    expect(lifted.ok).toBe(true);
+  });
 
   // ★ 03 §3.2's `Subject` for a position carries `parentId`; `bookings` (02 §4.4 row 4) stores only
   // `subject_type` + `subject_id`. After an admin books on behalf, `booked_by_user_id` is the admin, so the
@@ -633,4 +636,127 @@ describe("scheduling inside — what the document says and the code cannot yet d
       ).toBe(PARENT);
     },
   );
+});
+
+/**
+ * 03 §3.6's five, and who they belong to (`1g`).
+ *
+ * `1f`'s handover read §3.6 as putting these on `call-layer`; the document does not. §3.6 lists them under the
+ * `scheduling` contract and its exception names only the `call.*` family ("Booking creation, reschedule,
+ * cancel, done and no-answer are **call facts** emitted by `call-layer`"). §3.5 sequence 3 settles it by where
+ * it puts the attribution: `booking.displaced` fires, "then `call.slot-chosen` (parent, **from `call-layer`**)".
+ * The contradiction is recorded in the `1g` PROGRESS entry and resolved the document's way.
+ *
+ * The events are emitted **outside** the write and are never allowed to fail it, so the assertion is on what
+ * reached the log — a real `platform` events binding over a memory store, not a spy on the module.
+ */
+describe("scheduling inside — the five events 03 §3.6 names", () => {
+  let store = memoryEventLogStore();
+  beforeEach(() => {
+    store = memoryEventLogStore();
+    configureEvents(createEvents({ store, log }));
+  });
+  const eventNames = (): ReadonlyArray<string> =>
+    store.rows.map((row) => row.name);
+
+  it("emits booking.held when a family takes a slot out of the pool", async () => {
+    const { calendar } = calendarOf();
+    await calendar.hold(slotAt("09:30"), parent, {
+      kind: "matchmaking",
+      subject: parentSubject,
+    });
+    expect(eventNames()).toContain("booking.held");
+  });
+
+  // Half of I-2: without this the displaced nanny is never told. The message is `call-layer`'s (§3.5 seq 3);
+  // this is the record it is chased from.
+  it("emits booking.displaced when book_slot() answers with a moved row", async () => {
+    const { port, calendar } = calendarOf();
+    port.rpcAnswer = () => ({
+      booking: bookingRow({ id: "bk-new" }),
+      displaced: bookingRow({
+        id: "bk-nanny",
+        status: "rescheduled",
+        subject_type: "nanny",
+        subject_id: NANNY,
+        kind: "nanny-commission",
+        priority: 1,
+      }),
+      replayed: false,
+    });
+    await calendar.book({
+      slotId: slotAt("09:30"),
+      kind: "matchmaking",
+      actor: parent,
+      subject: parentSubject,
+      idempotencyKey: "k-displace",
+    });
+    expect(eventNames()).toContain("booking.displaced");
+    expect(eventNames()).not.toContain("booking.displacement-failed");
+  });
+
+  // I-3's fallback: her call could not be moved, so it was cancelled. A different fact and a different name.
+  it("emits booking.displacement-failed when I-3 cancelled her instead", async () => {
+    const { port, calendar } = calendarOf();
+    port.rpcAnswer = () => ({
+      booking: bookingRow({ id: "bk-new" }),
+      displaced: bookingRow({
+        id: "bk-nanny",
+        status: "cancelled",
+        subject_type: "nanny",
+        subject_id: NANNY,
+        kind: "nanny-commission",
+        priority: 1,
+      }),
+      replayed: false,
+    });
+    await calendar.book({
+      slotId: slotAt("09:30"),
+      kind: "matchmaking",
+      actor: parent,
+      subject: parentSubject,
+      idempotencyKey: "k-fail",
+    });
+    expect(eventNames()).toContain("booking.displacement-failed");
+    expect(eventNames()).not.toContain("booking.displaced");
+  });
+
+  it("emits booking.blocked-over per flagged call, and availability.changed for the block", async () => {
+    const { calendar } = calendarOf({
+      bookings: [
+        bookingRow({ id: "bk-1", start_at: `${FRIDAY}T09:30:00.000Z` }),
+      ],
+      admin: true,
+    });
+    await calendar.block(
+      {
+        start: `${FRIDAY}T09:00:00.000Z` as ISO,
+        end: `${FRIDAY}T12:00:00.000Z` as ISO,
+      },
+      "admin away",
+      admin,
+    );
+    expect(eventNames()).toContain("booking.blocked-over");
+    expect(eventNames()).toContain("availability.changed");
+  });
+
+  it("emits availability.changed when a block is lifted (0018's revoked_at)", async () => {
+    const { calendar } = calendarOf({
+      admin: true,
+      blocks: [
+        {
+          id: "blk-1",
+          calendar_id: CALENDAR,
+          kind: "blocked",
+          start_at: `${FRIDAY}T09:00:00.000Z`,
+          end_at: `${FRIDAY}T10:00:00.000Z`,
+          reason: "holiday",
+          created_by: null,
+        },
+      ],
+    });
+    const lifted = await calendar.unblock("blk-1" as BlockId, admin);
+    expect(lifted.ok).toBe(true);
+    expect(eventNames()).toContain("availability.changed");
+  });
 });

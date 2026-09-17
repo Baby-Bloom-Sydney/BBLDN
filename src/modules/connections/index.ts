@@ -23,3 +23,13 @@ export { LIVE_STAGES } from "./lib/live-stages";
 export { connections } from "./lib/default-connections";
 export { configureConnections } from "./lib/configure-connections";
 export { stubConnections } from "./connections.stub";
+
+// `04.12` — S-P-07's in-app Connect (K-1, cascading into C-c) and the dispatcher boot parks for it.
+export { connectToNannyAction } from "./actions/connect-to-nanny-action";
+export { configureConnectionsDispatch } from "./lib/configure-connections-dispatch";
+export { CONNECTIONS_PATHS } from "./lib/connections-paths";
+
+// S-P-08 — the read the route calls and the list it renders (01 §2.5 "thin").
+export { loadParentConnections } from "./lib/load-parent-connections";
+export { connectionCardView } from "./lib/connection-card-view";
+export { ParentConnections } from "./components/ParentConnections";

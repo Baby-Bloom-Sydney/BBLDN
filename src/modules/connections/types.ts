@@ -21,12 +21,15 @@ import type {
   UnitOfWork,
 } from "@/modules/shared-types";
 import type { Comms } from "@/modules/comms";
+import type { ConnectionCard } from "./lib/connection-card-view";
 
 /**
  * The K-row handlers the boot file registers with the stage model (03 §2.1). `TransitionHandler` is
  * `shared-types`' (03 §2.5; ADR-119) — `connections` has no arrow to `positions` (01 §2.3) and needs none: the
  * boot file, which may import both, hands these to `positions.registerSlice`.
  */
+export type { ConnectionCard };
+
 export type ConnectionsSlice = ReadonlyArray<TransitionHandler>;
 
 export type ConnectionsErrorDetails = {
@@ -55,6 +58,30 @@ export type ConnectionsReads = {
   readonly liveCountForPosition: (
     positionId: PositionId,
   ) => Promise<ConnectionsResult<number>>;
+  /**
+   * `1g` — what rows 4 and 5 of the parent rail are derived from (03 §2.3: "any connection ≥ `INTRO_SCHEDULED`"
+   * / "≥ `INTRO_COMPLETE`; outcome stage shown") and what S-P-08 lists. A **summary**, not the row: no parent
+   * id, no expiry, no availability — a screen has no use for them.
+   *
+   * Connector extension, raised for ratification with the two above (03 §7.5 states neither signature either).
+   */
+  readonly forParent: (
+    parentId: ParentId,
+  ) => Promise<ConnectionsResult<ReadonlyArray<ConnectionSummary>>>;
+};
+
+/** One connection as a parent's screens and rail see it (04 §6.2 S-P-08 states; 04 §7.1 rows 4-5). */
+export type ConnectionSummary = {
+  readonly connectionId: ConnectionId;
+  readonly positionId: PositionId;
+  readonly nannyId: NannyId;
+  readonly stage: ConnectionStage;
+  readonly origin: ConnectionOrigin;
+  readonly meetingAt?: Instant;
+  /** 04 §6.2 S-P-08: an admin-set time reads "arranged by your matchmaker", a parent-set one does not. */
+  readonly meetingSetBy?: "parent" | "nanny" | "admin" | "system";
+  readonly meetingOutcome?: MeetingOutcome;
+  readonly trialDate?: ISODate;
 };
 
 // ── The inside (`1g`) ──
@@ -139,6 +166,20 @@ export type ConnectionsDeps = {
   readonly comms: Comms;
   /** the nanny's verification level and isolation — K-1 / K-2 / K-3's preconditions (I-5) */
   readonly nannyFacts: (nannyId: NannyId) => Promise<Result<NannyFacts | null>>;
+  /**
+   * The parent, resolved for comms (03 §8.1: "the caller passes fully resolved data" — `comms` never looks a
+   * person up). K-1's C-c cascade needs it, because a call mirror carries the address its `call-confirmation`
+   * goes to, and so do the parent-side messages of 03 §8.3.
+   *
+   * A **port**, because `connections` may not import `auth` for a person lookup and has no other road to one.
+   * Left optional so the module is usable with none: without it C-c is not fired and the parent's messages are
+   * not sent — recorded, never a guessed address.
+   */
+  readonly recipientOf?: (
+    parentId: ParentId,
+  ) => Promise<
+    Result<{ readonly email: Email; readonly name?: string } | null>
+  >;
   readonly clock?: () => Instant;
 };
 
@@ -148,3 +189,16 @@ export type NannyFacts = {
   readonly firstName?: string;
   readonly email?: Email;
 };
+
+// ── S-P-08 (04 §6.2) ──
+
+export type ParentConnectionsProps = {
+  readonly cards: ReadonlyArray<ConnectionCard>;
+  /** the read failed — the heading still stands, with the error line (04 §6.2 L·E·E) */
+  readonly failed?: boolean;
+};
+
+export type ParentConnectionsLoad =
+  | { readonly kind: "signed-out" }
+  | { readonly kind: "failed" }
+  | { readonly kind: "cards"; readonly cards: ReadonlyArray<ConnectionCard> };

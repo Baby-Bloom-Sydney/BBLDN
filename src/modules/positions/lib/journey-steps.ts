@@ -4,12 +4,17 @@
 //
 // What this unit composes: row 1 from the position's stage, row 2 from the pre-check lever, row 9 from the
 // terminal stages. **Row 3 arrives whole from the `JourneyRowSource` port** — its words are `call-layer`'s
-// `callRailLine` and `positions` may never import that module (fix: A-2 / R2). Rows 4–8 read `pending` here and
-// are `1f` / `1g` / `1h`'s: 4 · 5 need the connection stages, 6 the placement, 7 `payments.getAccess`, 8 the
-// child-linking read model — none of which exists yet, and inventing their states would put a made-up journey on
-// a parent's dashboard.
+// `callRailLine` and `positions` may never import that module (fix: A-2 / R2).
+//
+// `1g`: rows 4, 5 and 6 are now real — `journey-rows-4-to-8.ts` derives them from the connection stages and the
+// placement, both of which `positions` may read (01 §2.3). Rows 7 and 8 still read `pending`: 7 is
+// `payments.getAccess` (`1h`) and 8 the child-linking read model (`1i`), and inventing their states would put a
+// made-up journey on a parent's dashboard.
+import type { ConnectionSummary } from "@/modules/connections";
+import type { PlacementRead } from "@/modules/placements";
 import type { JourneyStep } from "@/modules/shared-types";
 import type { PositionRecord } from "../types";
+import { journeyRows4to8 } from "./journey-rows-4-to-8";
 
 const LABELS = Object.freeze({
   1: "Matches",
@@ -60,18 +65,19 @@ const rowTwo = (record: PositionRecord | null): JourneyStep =>
         "We're checking who's available and keen",
       );
 
-const REMAINING: ReadonlyArray<readonly [JourneyStep["row"], string]> =
-  Object.freeze([
-    [4, LABELS[4]],
-    [5, LABELS[4]],
-    [6, LABELS[6]],
-    [7, LABELS[7]],
-    [8, LABELS[7]],
-  ] as const);
+const RAIL_LABELS = Object.freeze({
+  meetings: LABELS[4],
+  hire: LABELS[6],
+  app: LABELS[7],
+});
 
 export function journeySteps(
   record: PositionRecord | null,
   callRow: JourneyStep | null,
+  rest: {
+    readonly connections: ReadonlyArray<ConnectionSummary>;
+    readonly placement: PlacementRead | null;
+  } = { connections: [], placement: null },
 ): ReadonlyArray<JourneyStep> {
   if (
     record !== null &&
@@ -84,6 +90,6 @@ export function journeySteps(
     rowOne(record),
     rowTwo(record),
     callRow ?? step(3, LABELS[3], "pending"),
-    ...REMAINING.map(([row, label]) => step(row, label, "pending")),
+    ...journeyRows4to8({ ...rest, labels: RAIL_LABELS }),
   ]);
 }

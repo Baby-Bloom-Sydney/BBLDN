@@ -190,6 +190,49 @@ const TERMINATES: ReadonlySet<string> = new Set([
 
 const ACCEPTS: ReadonlySet<string> = new Set(["K-2", "K-4", "K-5"]);
 
+/**
+ * K-1 → **C-c** (03 §2.4): "a parent with a position self-serve Connects", and the call page she lands on is
+ * the whole point of `04.12`. C-c's own row handles the rest of its precondition — "open call → noop; last call
+ * `done` → new call" — which is why `NOT_FOUND` is the only refusal tolerated here, exactly as `1e` tolerates
+ * it on P-7 → C-4.
+ *
+ * The recipient is resolved through the injected port, for the reason `types.ts` gives. With no port there is
+ * no address, and with no address the call mirror would carry a guessed one — so the cascade is **skipped**
+ * and the connection still lands. A family with a connection and no call page is a recorded gap; a family sent
+ * a confirmation to an invented address is not a gap, it is a defect.
+ */
+async function toCall(
+  deps: ConnectionsDeps,
+  fire: Fire,
+  record: ConnectionRecord,
+): Promise<Result<Cascaded>> {
+  if (deps.recipientOf === undefined) return ok([]);
+  const recipient = await deps.recipientOf(record.parentId);
+  if (!recipient.ok) return recipient;
+  if (recipient.value === null) return ok([]);
+  const entity = { kind: "call" as const, id: record.positionId };
+  const moved = await fire.advance({
+    entity,
+    transition: "C-c",
+    actor: CASCADE,
+    payload: {
+      parentId: record.parentId as string,
+      type: "matchmaking",
+      recipient: recipient.value,
+    },
+    expectedFrom: null,
+    idempotencyKey: `${fire.key}:C-c`,
+    uow: fire.uow,
+  });
+  if (!moved.ok)
+    return moved.error.code === "NOT_FOUND" || moved.error.code === "CONFLICT"
+      ? ok([])
+      : moved;
+  return ok([
+    { entity, transition: "C-c" as TransitionId, stage: moved.value.stage },
+  ] as Cascaded);
+}
+
 export async function runCascades(input: {
   readonly deps: ConnectionsDeps;
   readonly id: TransitionId;
@@ -208,6 +251,7 @@ export async function runCascades(input: {
   const siblings = siblingsOf(all.value, record);
   const fire: Fire = { advance: deps.advance, key, uow };
 
+  if (id === "K-1") return toCall(deps, fire, record);
   if (ACCEPTS.has(id))
     return toConnecting(fire, record, siblings, input.positionStage);
   if (TERMINATES.has(id))

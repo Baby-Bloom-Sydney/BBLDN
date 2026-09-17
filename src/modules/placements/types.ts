@@ -65,6 +65,17 @@ export type PlacementsReads = {
   readonly activeForPosition: (
     positionId: PositionId,
   ) => Promise<PlacementsResult<PlacementRead | null>>;
+  /**
+   * `1g` — row 6 of the parent rail ("Hired — placement", 03 §2.3) and S-P-05's placement card. Keyed by the
+   * parent because that is what the rail is keyed by (03 §2.5 `JourneyOwner`), and because a parent holds at
+   * most one live placement (I-3).
+   *
+   * Connector extension, raised for ratification beside `activeForPosition`, whose signature 03 §2.6 also
+   * never states.
+   */
+  readonly liveForParent: (
+    parentId: ParentId,
+  ) => Promise<PlacementsResult<PlacementRead | null>>;
 };
 
 // ── The inside (`1g`) ──

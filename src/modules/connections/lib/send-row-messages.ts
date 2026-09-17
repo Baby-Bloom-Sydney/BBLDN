@@ -22,22 +22,34 @@ export async function sendRowMessages(
   const nanny = await deps.nannyFacts(record.nannyId);
   const nannyEmail = nanny.ok ? nanny.value?.email : undefined;
 
+  // The parent's address comes from the injected recipient port — the same one K-1's C-c cascade uses, so
+  // there is one road to a person in this module and it is the profile's. The **nanny's** has none: 07 §5.2
+  // keeps her address out of `nanny_public` and no document authorises a service-scope read of it, so her
+  // messages are not sent and that is pinned as a failing test rather than papered over (see `1g`'s entry).
+  const parent =
+    deps.recipientOf === undefined
+      ? null
+      : await deps.recipientOf(record.parentId);
+  const parentTo = parent?.ok === true ? parent.value : null;
+
   const messages = rows.flatMap((row): ReadonlyArray<Message> => {
-    // The parent's address has no road from here: `connections` may not import `auth` for a person lookup and
-    // 03 §8.1 forbids `comms` doing it. Whoever wires the recipient port at boot closes this — recorded in the
-    // `1g` PROGRESS entry, and pinned as a failing test rather than papered over with a placeholder.
-    if (row.to === "parent") return [];
-    if (nannyEmail === undefined) return [];
+    const to =
+      row.to === "parent"
+        ? parentTo
+        : nannyEmail === undefined
+          ? null
+          : {
+              email: nannyEmail,
+              ...(nanny.ok && nanny.value?.firstName !== undefined
+                ? { name: nanny.value.firstName }
+                : {}),
+            };
+    if (to === null) return [];
     return [
       {
         channel: "email" as const,
         templateId: row.templateId,
-        to: {
-          email: nannyEmail,
-          ...(nanny.ok && nanny.value?.firstName !== undefined
-            ? { name: nanny.value.firstName }
-            : {}),
-        },
+        to,
         data: {},
         dedupeKey: `${id}:${record.connectionId as string}:${row.templateId}`,
       },

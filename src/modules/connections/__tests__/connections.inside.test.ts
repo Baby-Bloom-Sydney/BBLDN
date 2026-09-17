@@ -33,6 +33,7 @@ import type {
   Actor,
   AdvanceInput,
   ConnectionId,
+  Email,
   Instant,
   NannyId,
   ParentId,
@@ -163,12 +164,44 @@ type World = {
   readonly advance: (
     input: AdvanceInput<TransitionId>,
   ) => ReturnType<TransitionHandler["run"]>;
+  readonly calls: Array<string>;
 };
+
+/**
+ * The fake call slice. K-1 cascades into C-c and `connections` may never import `call-layer` (01 §2.3), so the
+ * seam is proved with a registered fake — the device `1e` used for the P-2 -> C-a cascade, for the same reason.
+ */
+const callSlice = (fired: Array<string>) => ({
+  entity: "call" as const,
+  handlers: [
+    {
+      id: "C-c" as TransitionId,
+      run: async (input: AdvanceInput<TransitionId>) => {
+        fired.push(
+          (
+            input.payload as {
+              readonly recipient?: { readonly email?: string };
+            }
+          ).recipient?.email ?? "",
+        );
+        return ok({
+          entity: input.entity,
+          stage: "awaiting-slot" as const,
+          version: 1,
+          changedAt: NOW,
+          cascaded: [],
+          events: [],
+        });
+      },
+    },
+  ],
+});
 
 function world(
   seed: ReadonlyArray<ConnectionRecord> = [],
   nanny: { level?: string; isolated?: boolean } = {},
   sent: Array<string> = [],
+  calls: Array<string> = [],
 ): World {
   configureUnitOfWork(createUnitOfWork(memoryTransactionOpener()));
   configureEvents(createEvents({ store: memoryEventLogStore(), log }));
@@ -177,6 +210,7 @@ function world(
   const fake = positionSlice(stage);
   const bus = makeDispatcher();
   bus.register(fake.registration);
+  bus.register(callSlice(calls));
 
   const store = memoryConnectionStore(seed);
   const deps: ConnectionsDeps = {
@@ -190,6 +224,8 @@ function world(
         verificationLevel: nanny.level ?? "L3_PROVISIONALLY_VERIFIED",
         isolated: nanny.isolated ?? false,
       }),
+    recipientOf: async () =>
+      ok({ email: "family@example.test" as Email, name: "Rina" }),
   };
   bus.register(connectionsSliceRegistration(createConnectionsSlice(deps)));
   bus.register(
@@ -201,7 +237,7 @@ function world(
       }),
     ),
   );
-  return { deps, fired: fake.fired, stage, advance: bus.dispatch };
+  return { deps, fired: fake.fired, stage, advance: bus.dispatch, calls };
 }
 
 describe("connections — K-1, the Connect a parent makes (04.12)", () => {
@@ -268,6 +304,53 @@ describe("connections — K-1, the Connect a parent makes (04.12)", () => {
     expect(
       !moved.ok && (moved.error.details as { readonly which?: string }).which,
     ).toBe("DUPLICATE_LIVE_CONNECTION");
+  });
+
+  // 04 §3.3 trigger (c) and `04.12`: the Connect is what opens her call, and the call page is where she lands.
+  it("opens the parent's call — K-1 cascades into C-c with her resolved address", async () => {
+    const calls: Array<string> = [];
+    const w = world([], {}, [], calls);
+    const moved = await w.advance({
+      entity: { kind: "connection", id: C1 },
+      transition: "K-1",
+      actor: parentActor,
+      payload: { positionId: POSITION, nannyId: NANNY_A },
+      expectedFrom: null,
+      idempotencyKey: "k1-call",
+    });
+    expect(moved.ok).toBe(true);
+    expect(calls).toEqual(["family@example.test"]);
+    expect(moved.ok && moved.value.cascaded.map((c) => c.transition)).toEqual([
+      "C-c",
+    ]);
+  });
+
+  /**
+   * The create-time half of the actor rule, and a real hole without it: `checkActor` compares a user against
+   * the **record's** party, and a creating row has no record — so a signed-in parent could post K-1 with a
+   * stranger's `positionId`. The position's own parent is the authority. Same class as `1f`'s CRITICAL.
+   */
+  it("refuses a parent who posts another family's position id", async () => {
+    const w = world();
+    const moved = await w.advance({
+      entity: { kind: "connection", id: C1 },
+      transition: "K-1",
+      actor: {
+        kind: "user",
+        id: "00000000-0000-4000-8000-0000000000zz" as UserId,
+        role: "parent",
+      },
+      payload: { positionId: POSITION, nannyId: NANNY_A },
+      expectedFrom: null,
+      idempotencyKey: "k1-idor",
+    });
+    expect(moved.ok).toBe(false);
+    expect(
+      !moved.ok && (moved.error.details as { readonly which?: string }).which,
+    ).toBe("not-party");
+    // and nothing was written: the refusal is before the store, not after it
+    const stored = await w.deps.store.get(C1);
+    expect(stored.ok && stored.value).toBeNull();
   });
 
   it("refuses a nanny's own attempt to file a parent's Connect (the actor rule, not a UI check)", async () => {

@@ -17,6 +17,7 @@ import type {
   ConnectionsReads,
   ConnectionsResult,
   ConnectionStore,
+  ConnectionSummary,
 } from "../types";
 import { LIVE_STAGES } from "./live-stages";
 
@@ -42,6 +43,40 @@ export function createConnections(deps: {
         .map((row) => row.nannyId);
       // one nanny, one entry: a family can hold live rows on more than one position over time
       return ok(Object.freeze([...new Set<NannyId>(ids)]));
+    },
+    // `1g` — rows 4 / 5 of the rail and every state S-P-08 renders. Terminal rows travel too: 04 §6.2 lists
+    // "declined / expired" as states of the screen, so filtering them out here would hide from a family what
+    // happened to a nanny she asked for.
+    forParent: async (
+      parentId: ParentId,
+    ): Promise<ConnectionsResult<ReadonlyArray<ConnectionSummary>>> => {
+      const rows = await deps.store.forParent(parentId);
+      if (!rows.ok) return asConnections(rows);
+      return ok(
+        Object.freeze(
+          rows.value.map((row) =>
+            Object.freeze({
+              connectionId: row.connectionId,
+              positionId: row.positionId,
+              nannyId: row.nannyId,
+              stage: row.stage,
+              origin: row.origin,
+              ...(row.meetingAt === undefined
+                ? {}
+                : { meetingAt: row.meetingAt }),
+              ...(row.meetingSetBy === undefined
+                ? {}
+                : { meetingSetBy: row.meetingSetBy }),
+              ...(row.meetingOutcome === undefined
+                ? {}
+                : { meetingOutcome: row.meetingOutcome }),
+              ...(row.trialDate === undefined
+                ? {}
+                : { trialDate: row.trialDate }),
+            }),
+          ),
+        ),
+      );
     },
     liveCountForPosition: async (
       positionId: PositionId,

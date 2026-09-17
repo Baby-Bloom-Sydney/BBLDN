@@ -11,6 +11,7 @@ const NOT_CONFIGURED = err("INTERNAL", "Placements is not configured", {
 
 const unconfigured: PlacementsReads = Object.freeze({
   activeForPosition: async () => NOT_CONFIGURED,
+  liveForParent: async () => NOT_CONFIGURED,
 });
 
 const slot = { current: unconfigured };

@@ -14,20 +14,43 @@ import { auth } from "@/modules/auth";
 import { comms } from "@/modules/comms";
 import {
   configureConnections,
+  configureConnectionsDispatch,
   connectionsSliceRegistration,
   createConnections,
   createConnectionsSlice,
 } from "@/modules/connections";
+import { parentProfileStore } from "@/modules/onboarding-parent";
 import { ok } from "@/modules/platform";
 import { advance, registerSlice } from "@/modules/positions";
 import { positions } from "@/modules/positions";
-import type { NannyId, PositionId } from "@/modules/shared-types";
+import type {
+  Email,
+  NannyId,
+  ParentId,
+  PositionId,
+} from "@/modules/shared-types";
 import { dbConnectionStore } from "./db-connection-store";
 import { dbNannyFacts } from "./db-nanny-facts";
 import type { PortWiring } from "./types";
 
+/**
+ * The parent, resolved for comms (03 §8.1). Over the same `user_profiles` read `1e` added for S-P-04, so there
+ * is one road to a person's address and it is the one the profile owns — an address copied onto a row at
+ * Connect time would go stale the moment she changed it.
+ */
+async function recipientOf(parentId: ParentId) {
+  const read = await parentProfileStore.get(parentId as string as never);
+  if (!read.ok) return read;
+  if (read.value === null) return ok(null);
+  return ok({
+    email: read.value.email as Email,
+    ...(read.value.firstName === "" ? {} : { name: read.value.firstName }),
+  });
+}
+
 export function wireConnections(): PortWiring {
   const store = dbConnectionStore(auth.data);
+  configureConnectionsDispatch(advance);
   configureConnections(createConnections({ store }));
   registerSlice(
     connectionsSliceRegistration(
@@ -41,6 +64,7 @@ export function wireConnections(): PortWiring {
           return ok({ stage: read.value.stage, parentId: read.value.parentId });
         },
         nannyFacts: (nannyId: NannyId) => dbNannyFacts(auth.data, nannyId),
+        recipientOf,
       }),
     ),
   );

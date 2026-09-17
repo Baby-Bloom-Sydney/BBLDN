@@ -36,6 +36,7 @@ import { bookSlotArgs } from "./book-slot-args";
 import { canMoveStatus } from "./status-lattice";
 import { displaceTo } from "./displace-to";
 import { patchBooking } from "./patch-booking";
+import { schedulingEvents } from "./scheduling-events";
 import { resolveCalendar } from "./resolve-calendar";
 import { schedulingFailure } from "./scheduling-failure";
 import { slotStart } from "./slot-start";
@@ -100,9 +101,10 @@ export function schedulingBookingWrites(
       },
       service,
     );
-    return written.ok
-      ? ok(written.value.id as string as HoldId)
-      : schedulingFailure(written.error);
+    if (!written.ok) return schedulingFailure(written.error);
+    const holdRow = bookingFromRow(written.value);
+    schedulingEvents.held(actor, holdRow); // 03 §3.6
+    return ok(holdRow.id as string as HoldId);
   };
 
   const book = async (
@@ -136,12 +138,27 @@ export function schedulingBookingWrites(
     );
     if (!answer.ok) return schedulingFailure(answer.error);
     const result = answer.value as unknown as BookSlotResult;
+    const booking = bookingFromRow(result.booking);
+    const displaced =
+      result.displaced === null ? undefined : bookingFromRow(result.displaced);
+    // 03 §3.6 / §3.5 seq 3. `book_slot()` answers with the row it moved, and which of the two events this is
+    // depends on what happened to her: I-2 moved her (the row is `rescheduled` at a new time) or I-3 could not
+    // and cancelled it. Without one of these a displaced nanny is never told, which is half of I-2.
+    if (displaced !== undefined) {
+      const from = booking.start;
+      if (displaced.status === "cancelled")
+        schedulingEvents.displacementFailed(
+          input.actor,
+          displaced,
+          booking.id,
+          from,
+        );
+      else schedulingEvents.displaced(input.actor, displaced, booking.id, from);
+    }
     return ok(
       Object.freeze({
-        booking: bookingFromRow(result.booking),
-        ...(result.displaced === null
-          ? {}
-          : { displaced: bookingFromRow(result.displaced) }),
+        booking,
+        ...(displaced === undefined ? {} : { displaced }),
       }),
     );
   };

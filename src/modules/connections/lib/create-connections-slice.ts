@@ -9,7 +9,7 @@
 //
 // Messages go out **after** the write, never inside it: `advance` is atomic and an email that has left cannot
 // be rolled back (see `connection-messages.ts`).
-import { Events, newId, nowInstant, ok } from "@/modules/platform";
+import { Events, err, newId, nowInstant, ok } from "@/modules/platform";
 import type {
   AdvanceInput,
   ConnectionId,
@@ -188,6 +188,26 @@ function handlerFor(deps: ConnectionsDeps, spec: TransitionSpec) {
       if (!facts.ok) return facts;
       if (facts.value === null)
         return CONNECTION_GUARDS.precondition("POSITION_NOT_FOUND");
+
+      /**
+       * The actor rule's create-time half, and it is a real hole without it. `CONNECTION_GUARDS.checkActor`
+       * compares a user against the **record's** party, and a creating row has no record — so a signed-in
+       * parent could otherwise post K-1 with a stranger's `positionId` and file a connection against that
+       * family's position. The position's own parent is the authority (the created row already takes its
+       * `parentId` from there), so the comparison is made against it, before anything is written.
+       *
+       * The same class as `1f`'s CRITICAL on `holdSlotAction`: a client-supplied subject id written onto a row
+       * without checking whose it is.
+       */
+      if (
+        input.actor.kind === "user" &&
+        input.actor.role === "parent" &&
+        (facts.value.parentId as string) !== (input.actor.id as string)
+      )
+        return err("FORBIDDEN", "This actor may not move the connection", {
+          reason: "E_ACTOR_FORBIDDEN" as const,
+          which: "not-party" as const,
+        });
 
       const nannyId = record?.nannyId ?? payload.nannyId;
       const checked = await checkPreconditions({
