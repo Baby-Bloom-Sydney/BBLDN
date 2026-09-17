@@ -65,3 +65,47 @@ describe("normalising (07 §8 row 7 — a typo must never become somebody else's
     }
   });
 });
+
+describe("07 §8 row 7 — the lookup key (the enumeration defence's other half)", () => {
+  it("hashes the address and never carries it in the clear", async () => {
+    const { inviteLookupKey } =
+      await import("../child-linking/lib/invite-lookup-key");
+
+    const key = await inviteLookupKey("203.0.113.7, 10.0.0.1", "invite-lookup");
+
+    expect(key).not.toContain("203.0.113.7");
+    expect(key).toMatch(/^invite-lookup:[0-9a-f]{32}$/);
+  });
+
+  it("takes the FIRST forwarded entry — a client cannot append its way into a fresh bucket", async () => {
+    const { inviteLookupKey } =
+      await import("../child-linking/lib/invite-lookup-key");
+
+    const honest = await inviteLookupKey("203.0.113.7", "invite-lookup");
+    const forged = await inviteLookupKey(
+      "203.0.113.7, 198.51.100.9, 198.51.100.10",
+      "invite-lookup",
+    );
+
+    expect(forged).toBe(honest);
+  });
+
+  it("off Vercel every caller shares one bucket — the strict answer, not the lax one", async () => {
+    const { inviteLookupKey } =
+      await import("../child-linking/lib/invite-lookup-key");
+
+    expect(await inviteLookupKey(null, "invite-lookup")).toBe(
+      "invite-lookup:no-address",
+    );
+  });
+
+  it("the rate bucket and the failed-lookup bucket are different keys for the same caller", async () => {
+    const { inviteLookupKey } =
+      await import("../child-linking/lib/invite-lookup-key");
+
+    const rate = await inviteLookupKey("203.0.113.7", "invite-lookup");
+    const miss = await inviteLookupKey("203.0.113.7", "invite-miss");
+
+    expect(rate).not.toBe(miss);
+  });
+});
