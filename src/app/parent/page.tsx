@@ -13,6 +13,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { ParentHubClient } from "./ParentHubClient";
 import type { ChildClient } from "@/types/bapp";
+// S-P-03 (04 §7.1; `04.30`): the steps in motion sit above the carried Sydney hub until `1e` rebuilds the page.
+import { ParentJourneyRail, loadParentJourney } from "@/modules/call-layer";
 
 const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
@@ -36,6 +38,8 @@ export default async function ParentHubPage({
     data: { user },
   } = await supabase.auth.getUser();
   const admin = createAdminClient();
+
+  const journey = await loadParentJourney();
 
   const [
     placementResult,
@@ -90,6 +94,10 @@ export default async function ParentHubPage({
 
   return (
     <div className="mx-auto max-w-2xl space-y-3">
+      <ParentJourneyRail
+        steps={journey.kind === "steps" ? journey.steps : []}
+        failed={journey.kind !== "steps"}
+      />
       <ParentHubClient
         position={position}
         placement={placement}

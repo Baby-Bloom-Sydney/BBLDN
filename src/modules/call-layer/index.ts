@@ -8,8 +8,32 @@ export type * from "./types";
 export { callLayer } from "./lib/default-call-layer";
 export { configureCallLayer } from "./lib/configure-call-layer";
 
+// The inside (1d): the orchestrator over `scheduling` + `advance`, the C-row slice, the mirror store port.
+export { createCallLayer } from "./lib/create-call-layer";
+export { createCallLayerSlice } from "./lib/create-call-layer-slice";
+export { memoryCallMirrorStore } from "./lib/memory-call-mirror-store";
+export { CALL_TRANSITIONS } from "./lib/call-transitions";
+
 // The stage-model seam (03 §2.1) — the C rows register here, they are never imported by `positions`.
 export { registerCallLayerSlice } from "./lib/register-call-layer-slice";
 
-// The stub the swap tests point at while the inside does not exist.
+// The stub the swap tests point at while boot has not wired the inside.
 export { stubCallLayer } from "./call-layer.stub";
+
+// Words the rail and the page share (04 §7.1 row 3; 04 §8) — `positions.getJourneySteps` composes row 3 with these.
+export { callRailLine } from "./lib/call-rail-line";
+export { callPageView } from "./lib/call-page-view";
+export { londonSlotWords } from "./lib/london-slot-words";
+export { groupSlotsByDay } from "./lib/group-slots-by-day";
+export { RAIL_LABELS } from "./lib/rail-labels";
+
+// S-P-01 · S-P-02 · S-P-03 — the reads the route files call and the screens they render (01 §2.5 "thin").
+export { loadCallPage } from "./lib/load-call-page";
+export { loadParentJourney } from "./lib/load-parent-journey";
+export { holdSlotAction } from "./actions/hold-slot-action";
+export { chooseSlotAction } from "./actions/choose-slot-action";
+export { listSlotsAction } from "./actions/list-slots-action";
+export { CallPage } from "./components/CallPage";
+export { CallUnavailable } from "./components/CallUnavailable";
+export { SlotPicker } from "./components/SlotPicker";
+export { ParentJourneyRail } from "./components/ParentJourneyRail";

@@ -14,31 +14,76 @@ row, retried as a **new** booking (R5).
 
 **Connector** (`index.ts` + `types.ts`, written and reviewed before the inside — L2):
 
-| Area           | Values                                              | Types                                                    |
-| -------------- | --------------------------------------------------- | -------------------------------------------------------- |
-| The call layer | `callLayer` (module binding) · `configureCallLayer` | `CallLayer` · `CallRef` · `CallResult` · `CallStateRead` |
-| The stage seam | `registerCallLayerSlice`                            | `CallLayerSlice`                                         |
-| The stub       | `stubCallLayer` (`call-layer.stub.ts`)              | `CallErrorDetails` · `CallLayerResult`                   |
+| Area           | Values                                                                                                     | Types                                                                      |
+| -------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| The call layer | `callLayer` (module binding) · `configureCallLayer`                                                        | `CallLayer` · `CallRef` · `CallResult` · `CallStateRead` · `OpenCall`      |
+| The inside     | `createCallLayer` · `createCallLayerSlice` · `memoryCallMirrorStore` · `CALL_TRANSITIONS`                  | `CallLayerDeps` · `CallMirror` · `CallMirrorStore` · the C-row payloads    |
+| The stage seam | `registerCallLayerSlice`                                                                                   | `CallLayerSlice`                                                           |
+| The stub       | `stubCallLayer` (`call-layer.stub.ts`)                                                                     | `CallErrorDetails` · `CallLayerResult`                                     |
+| The screens    | `loadCallPage` · `loadParentJourney` · the three actions · `CallPage` · `SlotPicker` · `ParentJourneyRail` | `CallPageView` · `SlotDay` · `SlotActions` · the prop types · the `*Load`s |
+| The words      | `callRailLine` · `londonSlotWords` · `groupSlotsByDay` · `callPageView` · `RAIL_LABELS`                    | `LondonSlotWords` · `CallRailLineInput`                                    |
 
 Methods (03 §2.7): `listSlots` · `chooseSlot` · `moveSlot` · `clearSlot` · `openNannyCall` · `recordOutcome` ·
-`getCallState`. `CallResult` is a **tagged** union, never `StateAfter | Booking` (fix: A-29).
+`getCallState` — plus **`findOpenCall(parentId)`**, a connector extension recorded in the `1d` PROGRESS entry
+(03 §2.7 has no "which call is mine" read; the call page cannot be reached without one). `CallResult` is a
+**tagged** union, never `StateAfter | Booking` (fix: A-29).
+
+**How the inside works (1d).** `createCallLayer(deps)` is the orchestrator 03 §2.7 describes: a `scheduling`
+write, then `positions.advance` on the C row that names it, then the messages. `createCallLayerSlice(deps)` is
+the state machine — the C rows of 03 §2.4 (C-a · C-b · C-c · C-1 · C-2 · C-3 · C-4 · C-5) as `TransitionHandler`s
+over the **mirror store port**: each checks `from` / `expectedFrom`, the actor rule (a parent only on her own
+call; a job only where the row names it), the row's precondition (C-1 / C-2: the booking is active and its
+subject is this position — `BOOKING_NOT_FOR_SUBJECT`), writes the mirror under the caller's `uow`, emits the
+`call.*` event under the same `uow` (a failed event write fails the transition), and answers a `StateAfter`.
+`memoryCallMirrorStore` is the store today; the one over `nanny_positions` (0006's four call columns) arrives
+with the RPC opener (P1-WIRE, ADR-127) and `positions`' inside (1e). The C-row idempotency is honoured as
+written: `noop` rows answer the current state with no event; `key` rows replay the stored `StateAfter`; `reject`
+answers `E_STALE_STATE`.
+
+**The screens.** S-P-01 (`/parent/call`) renders `CallPage` from `loadCallPage()` — heading, the level-2 promise,
+the variant line (after Connect · onboarding · after a no-answer), and S-P-02 `SlotPicker` inline: one
+`radiogroup` per London day in a `fieldset` whose `legend` is the full date, every option named in full with
+"London time" and a `<time datetime>`, tap = `holdSlotAction`, the button = `chooseSlotAction` (C-1, or C-2 while
+a time stands — "Change time"), a taken slot / run-out hold in an alert that takes focus. S-P-03's rail is
+`ParentJourneyRail` from `loadParentJourney()` — an `<ol>` with state as text and `aria-current="step"`; when the
+read fails the six labels still stand (P-2, never an empty room). `positions.getJourneySteps` (1e) composes row
+3's `detail` with `callRailLine` so the rail and the page never disagree about the words.
 
 **What it may import.** `positions` (the stage-model connector only) · `scheduling` · `comms` (S) · `auth` (S) ·
 `platform` (S) (01 §2.3). Because this row _does_ allow `positions`, `registerCallLayerSlice` lives here — unlike
 `connections` and `placements`, whose rows do not.
 
-**What this module does _not_ do yet (F-a boundaries).** No inside: the C rows of 03 §2.4 (C-a…C-d, C-1…C-5), the
-`scheduling` calls behind them, the reminders and the `call.*` events are Phase 1g. `stubCallLayer` holds an
-in-memory mirror so the call surfaces can be built — it honours the shapes and the derived nanny-call state, and
-it refuses `openNannyCall` outright because it has no calendar to book against. `configureCallLayer` and
-`registerCallLayerSlice` are not called anywhere: that is `src/instrumentation.ts`, still absent.
+**Gaps (recorded, not hidden).**
 
-**Suites.** `src/modules/call-layer/__tests__/call-layer.swap.test.ts` — the `call-layer` part of swap tests 1 / 2:
-the mirror read and moved, the tagged `CallResult`, the derived nanny-call state including `no-answer` reading
-back as `awaiting-slot`, the fail-closed seam, and `advance(C-1)` reaching a registered slice.
+1. **`scheduling`'s inside is still the stub** (F-b). 03 §1.4's `Query` has no keyed read or filter
+   (`select` reads a whole table), so `getBooking` / `listForSubject` / holds cannot be built over the data
+   port yet; `book_slot()` exists but P1-WIRE's one-unit-of-work-one-RPC rule refuses the table writes around
+   it. The displacement path (03 §3.3 I-2 / I-3 / I-13; §3.5 seq 3) is **not built** and is pinned as
+   `it.fails` in `call-layer.inside.test.ts` rather than invented.
+2. **`platform`'s `piiSafeString` refuses ~15 % of random uuids** (measured 2 944 / 20 000): a digit run of 9+
+   across hyphens reads as a phone number. Under a `uow` that fails the C row. Pinned as `it.fails` in
+   `call-layer.inside.test.ts`; the suites pin the uuid mint to stay deterministic. Owned by `platform`.
+3. **The nanny's `call-confirmation` + `admin-commission-booking` at `openNannyCall`** (03 §2.7) are not sent:
+   the module has no road to a nanny's email (03 §8.1 "the caller passes fully resolved data"); the parent's
+   recipient rides on the mirror, the nanny's has no home yet. Events are emitted.
+4. **`getJourneySteps` is keyed by `ParentId`; a session carries a `UserId`** (02 §4 gives `parents` its own
+   id). `loadParentJourney` passes the user id through in one place until 1e settles the key.
+5. **The mirror store and the booking are not one transaction** until the store lives inside the RPC opener:
+   `chooseSlot` undoes the booking (`cancel`) when `advance` refuses, so a parent is never told a time is set
+   that the mirror does not hold.
+
+**Suites.** `call-layer.swap.test.ts` (03 §11 tests 1 / 2) · `call-layer.fail-closed.test.ts` (the registry
+default) · `call-layer.inside.test.ts` (the orchestrator + slice over the scheduling stub and the memory store: C-1
+… C-5, C-a / C-c, the actor rule, idempotency, the messages, the two pins) · `call-layer.words.test.ts` (London
+wall clock across DST, the day grouping, the row-3 line, the page variant) · `call-layer.screens.test.tsx` (S-P-01 ·
+S-P-02 · S-P-03 rendered, keyboard + ARIA semantics) · `call-layer.actions.test.ts` (the three actions and the
+page read, signed out and in) · `call-layer.copy.test.ts` (05 §5.2 over every rendered surface, the S-P-01
+allowlist row applied exactly).
 
 <!-- audit
-Last edited: 2026-09-16T14:35+10:00 — BB-LDN-Planner-070926/F-a
-Notes: initial authoring — the F-a connector (03 §2.7 verbatim), the C-row registration seam, `stubCallLayer` and
-the swap test. Recorded boundary: no C-row insides, no `scheduling` calls, no boot wiring.
+Last edited: 2026-09-17T13:40+10:00 — BB-LDN-Planner-070926/1d
+Notes: the inside (orchestrator + C-row slice + memory mirror store), the S-P-01 / S-P-02 / S-P-03 screens, the
+actions, the words; connector extension `findOpenCall` recorded; five gaps recorded (scheduling stub stays, the
+platform uuid defect, the nanny recipient, the journey key, the two-write seam).
+Prior: 2026-09-16T14:35+10:00 — BB-LDN-Planner-070926/F-a — the F-a connector, the seam, the stub, the swap test.
 -->
