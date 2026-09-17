@@ -33,4 +33,9 @@ export {
   createChildInviteAction,
   revokeChildInviteAction,
 } from "./child-linking";
+// The two gate consumers (`07.09`, `07.59`). Both are pure and three-valued — a closed app and an app we
+// could not check are different answers, and neither sub-module flattens them into a boolean.
+export { childAppGate } from "./child-development";
+export { katieAccessGate } from "./katie";
+
 export { stubApp } from "./app.stub";

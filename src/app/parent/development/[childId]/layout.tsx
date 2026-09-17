@@ -4,7 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { BAppLayout } from "@/components/bapp/BAppLayout";
 import { InviteBanner } from "@/components/bapp/InviteBanner";
 import { getInviteForChild } from "@/lib/actions/bapp/child-invites";
-import { requireChildFamilyAccess } from "@/lib/payments/access-gate";
+import { accessGate } from "@/modules/access-gate";
+import { AppGateNotice, appAccessView, childAppGate } from "@/modules/app";
+import type { FamilyId } from "@/modules/shared-types";
 import { hasParentMediaConsent } from "@/lib/legal/media-consent-gate";
 import { ConsentRenewalModal } from "@/components/legal/ConsentRenewalModal";
 import type { ChildClient } from "@/types/bapp";
@@ -47,11 +49,28 @@ export default async function ParentDevelopmentLayout({
   const showBanner = c.nanny_user_id === null;
   const inviteResult = showBanner ? await getInviteForChild(c.id) : null;
 
-  // S4 — paywall gate. When the family lacks access, BAppLayout swaps
-  // the FAB action into the SubscribeModal trigger + renders the
-  // LapsedBanner above page content. Trial state has access; lapsed /
-  // cancelled-after-period do not.
-  const access = await requireChildFamilyAccess(c.id);
+  // `07.09` / `07.59` — the London gate, three-valued. `accessGate.hasAccess` fails closed by carrying
+  // `payments`' error rather than defaulting to `open: false` (`1h`), so `unknown` is a real state here and it
+  // is **not** the paywall: a family that has paid, shown a demand for money because the database blinked,
+  // learns something false about her own account. The Sydney `requireChildFamilyAccess` this replaces could
+  // not express that — it answered a boolean and a lapse reason, so every outage read as a lapse.
+  const familyUserId = c.parent_user_id as string | null;
+  const decision =
+    familyUserId === null
+      ? null
+      : await accessGate.hasAccess(familyUserId as string as FamilyId);
+  const access = decision !== null && decision.ok ? decision.value : null;
+  const gate = childAppGate(access);
+
+  if (gate.kind !== "open") {
+    const view = appAccessView({ access, children: [] });
+    if (view.kind !== "open")
+      return (
+        <main className="mx-auto max-w-2xl px-4 py-10">
+          <AppGateNotice view={view} />
+        </main>
+      );
+  }
 
   // T-015 — check whether the parent's media consent is within the
   // T-7d renewal window or already expired. If so, render the
@@ -83,10 +102,10 @@ export default async function ParentDevelopmentLayout({
     <BAppLayout
       child={c}
       role="parent"
-      familyHasAccess={access.hasAccess}
+      familyHasAccess={gate.kind === "open"}
       nannyFirstName={nannyFirstName}
       lapseReason={
-        access.reason === "trial_expired"
+        gate.kind === "closed" && gate.reason === "lapsed"
           ? "trial_ended"
           : "subscription_lapsed"
       }

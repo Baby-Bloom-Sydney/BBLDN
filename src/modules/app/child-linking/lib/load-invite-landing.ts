@@ -11,9 +11,7 @@ import { inviteLandingView } from "./invite-landing-view";
 import type { InviteLandingView } from "./invite-landing-view";
 import { normaliseInviteToken } from "./normalise-invite-token";
 
-export async function loadInviteLanding(
-  rawToken: string,
-): Promise<{
+export async function loadInviteLanding(rawToken: string): Promise<{
   readonly view: InviteLandingView;
   readonly token: string | null;
 }> {
