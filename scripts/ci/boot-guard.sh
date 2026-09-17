@@ -94,6 +94,18 @@ expect_outcome "an off-Vercel production runtime refuses the boot (missing VERCE
 # suite's write-road claims are made against it. It needs no database — the claim is that the refusal is the
 # driver's and not `write-outside-rpc`, which is exactly what "the port let it out" means.
 smoke_env production
+# **`NODE_ENV` is put back to `test` for this one case, and the reason is a measured vite defect, not a
+# convenience.** The environment `config/server` resolves is `VERCEL_ENV` first (ADR-108), and `smoke_env
+# production` exports `VERCEL_ENV=production` plus the whole production column — so this run resolves the
+# production environment either way. What `NODE_ENV=production` additionally does is put **vite** in production
+# mode, and vite's production transform mangles the specifier of
+# `import(/* webpackIgnore: true */ "node:async_hooks")` in `platform/unit-of-work` down to `"node:"`
+# ("No such built-in module: node:"), so `withUnitOfWork` cannot open at all and all three claims fail for a
+# reason that has nothing to do with the write road. That import is BUILD-FIX's construct in `platform/**`,
+# outside this unit's surface; it is recorded rather than worked around silently. `next start` in cases 1-6 is
+# unaffected — webpack honours the pragma, which is why `npm run build` is green.
+NODE_ENV=test
+export NODE_ENV
 write_log="$(mktemp "${TMPDIR:-/tmp}/boot-guard-write.XXXXXX")"
 if npx vitest run --project unit src/boot/__tests__/boot.test.ts \
   -t "0019" > "$write_log" 2>&1; then
