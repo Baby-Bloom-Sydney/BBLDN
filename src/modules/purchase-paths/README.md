@@ -45,8 +45,17 @@ Dashboard objects. `prices()` (03 §5.2) lives on `payments`, not here, because 
 swap test 4 (03 §11): the fail-closed default, the stub's URLs and customer refs, and every way `parseEvent`
 must refuse.
 
+**Wired at boot since `1h`** (`src/boot/wire-purchase-paths.ts`). F-c could not wire it and said why: `stub-stripe` reached `node:crypto` through its constant-time compare, and `src/instrumentation.ts` is built for the edge runtime too (`src/middleware.ts` makes one exist), so importing the stub from the boot file put a Node builtin in an edge bundle — and `process.env.NEXT_RUNTIME`, the usual way to split a boot, is forbidden by `check:env-reads`. `1h` removed the reason rather than working around it: the compare is now pure integer arithmetic over a fixed 256-character window (see that file's header for what it guarantees and what it bounds), nothing under `providers/stub-stripe/` touches a Node builtin, and the static import is safe in both runtimes. `check:bundle-secrets` (no client chunk names `stub-stripe`) and `src/__tests__/client-server-boundary.test.ts` are what keep it that way.
+
+**`stripe-uk` is still not built** (N-2, ADR-022: no account, no key, no payout logic on day one). Naming it in `PURCHASE_PROVIDER` leaves the registry on its fail-closed default **with the reason on the boot report** — never a silent fallback to the stub, which on a money seam would mean taking no money while reporting success.
+
 <!-- audit
-Last edited: 2026-09-16T15:40+10:00 — BB-LDN-Planner-070926/F-c
+Last edited: 2026-09-17T20:10+10:00 — BB-LDN-Planner-070926/1h
+Notes: the provider is wired at boot; `constantTimeEquals` rewritten from `node:crypto` to pure arithmetic, which
+is what made that possible. `stub-stripe.guards.test.ts` re-proves the three 07 §5.5 layers and the compare's
+properties (`security-reviewer` confirmed the rewrite sound: fixed iteration count, no length signal, no
+false-equal input).
+Prior: 2026-09-16T15:40+10:00 — BB-LDN-Planner-070926/F-c
 Notes: initial authoring — the connector, the fail-closed registry, `stub-stripe` and its three guards. Recorded
 gaps: no `stripe-uk` provider; `constantTimeEquals` is duplicated in the route layer because `platform` is
 outside this unit's touch surface.
