@@ -11,6 +11,9 @@ export type BootPort =
   | "areas"
   | "comms"
   | "scheduling"
+  | "scoring"
+  | "matching"
+  | "call-layer"
   | "parent-profile";
 
 export type PortWiring = {

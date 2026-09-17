@@ -2,6 +2,9 @@
 // source. Name + district only; the envelope of 01 §4c. No auth (reference data; anon SELECT on the table).
 // Rate limited on 07 §8 row 1 (`publicRead`, keyed by the hashed caller address) over the shared
 // `rate_limit_buckets` store of `0017` — before any work, so a burst costs one limiter round trip, not a scan.
+// P1-WIRE-2 correctly refused to build this before the store existed: `assertSharedStore` denies every
+// `consume` wherever `NODE_ENV === "production"` (on Vercel, preview **and** production) until boot declares a
+// shared store, so wiring it early would have denied every request to this route on every deployment.
 import { areas } from "@/modules/areas";
 import { ok, toResponse } from "@/modules/platform";
 import { parseAreaQuery } from "@/modules/public-site";

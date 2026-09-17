@@ -2,6 +2,9 @@
 // as JSON → count + the top cards. No auth, no write; the envelope of 01 §4c. Rate limited on 07 §8 row 1
 // (`publicRead`, keyed by the hashed caller address) over the shared `rate_limit_buckets` store of `0017` —
 // **before the body is parsed**, so a burst cannot spend a match run, or even a JSON parse, per request.
+// P1-WIRE-2 correctly refused to build this before the store existed: `assertSharedStore` denies every
+// `consume` wherever `NODE_ENV === "production"` (on Vercel, preview **and** production) until boot declares a
+// shared store, so wiring it early would have denied every request to this route on every deployment.
 import { z } from "zod";
 import { err, ok, toResponse } from "@/modules/platform";
 import { buildQuickMatchPage } from "@/modules/matching";
