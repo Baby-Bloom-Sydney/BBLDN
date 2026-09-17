@@ -1,6 +1,6 @@
 // ── M-7 (REVIEW-2) — the token a signed-out claim carries into the login redirect ──────────────────────────
 //
-// `claimInviteAction` spliced the **raw form string** into `/login?redirect=/invite/connect/${token}`.
+// `claimInviteAction` spliced the **raw form string** into `/login?next=/invite/connect/${token}`.
 // `normaliseInviteToken` runs later, inside `claimInvite`, so a value carrying `?`, `#` or `&` reshaped the
 // parameter that the login screen's `safeNextPath` later consumes. Same-origin-anchored, so not a full open
 // redirect — and the sibling `post-signup-destination.ts:19` does encode, which is what makes this an omission
@@ -43,12 +43,12 @@ describe("a signed-out claim carries a normalised, encoded token (M-7)", () => {
   it("normalises before it builds the URL, so the round trip is the token we would look up", async () => {
     // Lower case and no hyphen is a shape people retype from a message; `normaliseInviteToken` accepts it.
     expect(await submit("ab2cd3ef")).toBe(
-      `/login?redirect=${encodeURIComponent("/invite/connect/AB2C-D3EF")}`,
+      `/login?next=${encodeURIComponent("/invite/connect/AB2C-D3EF")}`,
     );
   });
 
   it("carries nothing at all when the string is not a token", async () => {
-    // `?redirect=` is the parameter being built; a token containing one would reshape it.
+    // `?next=` is the parameter being built (01 §4d's name — HARDEN-B debt 10); a token containing one would reshape it.
     for (const raw of ["", "not-a-token", "AB2C-D3EF?x=1", "AB2C-D3EF#frag"])
       expect(await submit(raw)).toBe("/login");
   });

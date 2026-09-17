@@ -102,7 +102,8 @@ describe("matching inside — the marketplace-safe read (07 §5.2 `nanny_public`
       photoUrl: null,
       bio: null,
       yearsExperience: null,
-      qualification: "Level 3 childcare",
+      // ADR-149: the stored value is the ladder key (what the funnel and S-N-18 write); the label is the screen's.
+      qualification: "level-3",
       certificates: [],
       languages: [],
       hasCar: true,

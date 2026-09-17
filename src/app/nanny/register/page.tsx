@@ -1,71 +1,32 @@
-import { redirect } from "next/navigation";
-import { isProfileComplete, getNannyProfile } from "@/lib/actions/nanny";
-import { NannyRegistrationFunnel } from "./NannyRegistrationFunnel";
-import { createClient } from "@/lib/supabase/server";
+// S-N-18 `/nanny/register` — the ten-step profile completion (04 §6.3; `03.17` / `03.18`). Thin by rule (05 §7
+// rule 5): the profile is prefilled from the nanny's own rows, the action is a prop, `?step=` picks up where
+// she left off. Done → S-N-17. A session with no party row is refused by the action, not guessed at here.
+import { notFound } from "next/navigation";
+import { LOCALE, MATCHING, SECURITY } from "@/modules/config";
+import { NannyProfileStepper, loadNannyProfile, saveNannyProfileStepAction } from "@/modules/onboarding-nanny";
 
-const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
+export const dynamic = "force-dynamic";
 
-export default async function NannyRegisterPage() {
-  if (!isDevMode) {
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      redirect("/login");
-    }
-
-    // Check if profile is already complete
-    const complete = await isProfileComplete();
-    if (complete) {
-      redirect("/nanny/profile");
-    }
-
-    // Get any existing partial data
-    const { data: profile } = await getNannyProfile();
-
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            Complete Your Profile
-          </h1>
-          <p className="mt-1 text-slate-500">
-            Tell us about yourself to start connecting with families
-          </p>
-        </div>
-
-        <NannyRegistrationFunnel
-          userId={user.id}
-          initialData={{
-            first_name: profile?.first_name || "",
-            last_name: profile?.last_name || "",
-          }}
-        />
-      </div>
-    );
-  }
-
-  // DEV MODE: skip all auth, render with mock data
+export default async function NannyRegisterPage({
+  searchParams,
+}: {
+  searchParams: Record<string, string | string[] | undefined>;
+}) {
+  const profile = await loadNannyProfile();
+  if (profile === null) notFound();
+  const step = Number.parseInt(String(searchParams.step ?? "0"), 10);
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">
-          Complete Your Profile
-        </h1>
-        <p className="mt-1 text-slate-500">
-          Tell us about yourself to start connecting with families
-        </p>
-      </div>
-
-      <NannyRegistrationFunnel
-        userId="dev-nanny-user"
-        initialData={{
-          first_name: "Emma",
-          last_name: "Wilson",
-        }}
-      />
-    </div>
+    <NannyProfileStepper
+      action={saveNannyProfileStepAction}
+      profile={profile}
+      step={Number.isFinite(step) ? step : 0}
+      options={{
+        qualifications: MATCHING.qualificationLadder,
+        minPasswordLength: SECURITY.password.minLength,
+        currency: LOCALE.currency,
+        areasApi: "/api/areas",
+      }}
+      doneHref="/nanny/profile"
+    />
   );
 }

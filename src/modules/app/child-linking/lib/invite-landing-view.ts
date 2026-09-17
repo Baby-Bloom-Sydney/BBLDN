@@ -39,13 +39,16 @@ export type InviteLandingView =
       readonly body: string;
       readonly childFirstName: string;
       readonly direction: InviteDirection;
-      /** Signed in as the right role → claim; signed out → sign up or sign in; wrong role → neither. */
+      /**
+       * Signed in as the right role → claim; signed out → sign up (a form that mints the invite cookie, ADR-150)
+       * or sign in; wrong role → neither.
+       */
       readonly action:
         | { readonly kind: "claim"; readonly label: string }
         | {
-            readonly kind: "link";
+            readonly kind: "signup";
             readonly label: string;
-            readonly href: string;
+            readonly role: "parent" | "nanny";
           }
         | { readonly kind: "none"; readonly label: string };
       readonly secondary?: { readonly label: string; readonly href: string };
@@ -58,7 +61,7 @@ export type InviteLandingInput = {
   readonly tokenWasMalformed: boolean;
   /** True when the lookup itself failed — an outage must never read as "your link was revoked". */
   readonly lookupFailed: boolean;
-  readonly signUpHref: string;
+  /** The sign-in return path (`next=`, 01 §4d) — the token-addressed claim route of 04 §2.3, no second copy. */
   readonly signInHref: string;
 };
 
@@ -119,9 +122,9 @@ export function inviteLandingView(
       childFirstName,
       direction,
       action: {
-        kind: "link",
+        kind: "signup",
         label: `Join ${childFirstName}'s app`,
-        href: input.signUpHref,
+        role: wanted,
       },
       secondary: { label: "I already have an account", href: input.signInHref },
     };

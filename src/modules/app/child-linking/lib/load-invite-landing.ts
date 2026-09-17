@@ -29,7 +29,6 @@ const closedView = (
     viewerRole,
     tokenWasMalformed: false,
     lookupFailed: false,
-    signUpHref: "/signup",
     signInHref: "/login",
   });
 
@@ -56,7 +55,6 @@ export async function loadInviteLanding(rawToken: string): Promise<{
         viewerRole,
         tokenWasMalformed: true,
         lookupFailed: false,
-        signUpHref: "/signup",
         signInHref: "/login",
       }),
     };
@@ -75,17 +73,13 @@ export async function loadInviteLanding(rawToken: string): Promise<{
     if ((await consumeInviteLookupLimit.afterMiss(missKey)) === "limited")
       return { token: null, view: closedView(viewerRole) };
   }
-  // The sign-up and sign-in links carry the return path so the visitor lands back here after making an account
-  // (04 §6.1: S-X-13 → S-X-06 / S-X-07 → the claim). `URLS.invite` is config's; the path is built from it
-  // rather than from a literal (L4).
-  //
-  // ★ **One copy of the token, not two** (security review M2). The first draft also passed `invite=<token>` as
-  // its own parameter, which put the same secret in two places in the same URL for no gain — `redirect` alone
-  // brings the visitor back to the page that knows it. The remaining copy is still a token in a query string,
-  // and therefore in browser history and in whatever logging `/signup` and `/login` do; 07 §4.6's pattern —
-  // a short-lived `HttpOnly` signed cookie, as the parent-lead flow uses — is the proper fix and is recorded
-  // as owed rather than half-built here, because it spans two modules' surfaces.
-  const back = encodeURIComponent(`${new URL(URLS.invite).pathname}/${token}`);
+  // ADR-150 (REVIEW-2 M-8, kickoff debt 4): the token no longer travels in a query string. The sign-up road
+  // is a **form** — `startInviteSignupAction` mints the `HttpOnly` invite cookie and sends the visitor to the
+  // account form for her side — so `/signup` and `/login` carry nothing to log. The sign-in road keeps `next=`
+  // (01 §4d's name; the invite cluster built a `redirect` parameter that S-X-08 never read, so the return was
+  // silently dropped — HARDEN-B debt 10) pointing at the **claim** route, which 04 §2.3 addresses by token
+  // anyway. `URLS.invite` is config's; the path is built from it rather than from a literal (L4).
+  const back = encodeURIComponent(`${new URL(URLS.invite).pathname}/connect/${token}`);
   return {
     token,
     view: inviteLandingView({
@@ -93,8 +87,7 @@ export async function loadInviteLanding(rawToken: string): Promise<{
       viewerRole,
       tokenWasMalformed: false,
       lookupFailed: !preview.ok,
-      signUpHref: `/signup?redirect=${back}`,
-      signInHref: `/login?redirect=${back}`,
+      signInHref: `/login?next=${back}`,
     }),
   };
 }

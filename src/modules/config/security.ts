@@ -123,6 +123,15 @@ export const SECURITY = Object.freeze({
     "publicRead",
   ] as const) satisfies ReadonlyArray<RateLimitPolicyName>,
   authLockoutMinutes: 15, // 07 §8 row 3
+  // ADR-150 — a bearer carried between two screens travels in an `HttpOnly` cookie, never a query string: the
+  // invite token from S-X-13 to S-X-06 / S-X-07 (REVIEW-2 M-8) and the nanny lead id from S-X-15 to S-X-19
+  // (07 §4.6's pattern). Minted by a server action, read by the receiving route + action, cleared by the action
+  // that consumes it. Unsigned by ADR-150's argument (neither value is guessable); a signing secret joins here
+  // the day a guessable id is carried.
+  carriedTokens: Object.freeze({
+    invite: Object.freeze({ name: "bb_invite", maxAgeSeconds: 3600 }),
+    nannyLead: Object.freeze({ name: "bb_nanny_lead", maxAgeSeconds: 86400 }),
+  }),
   inviteLookupBlock: Object.freeze({ failedPerHour: 5, blockMinutes: 60 }), // 07 §8 row 7
   burstAlertMultiple: 10, // ALERT_RATE_LIMIT_BURST when a key trips ≥ 10× in an hour (07 §8)
   signedUrlTtlSeconds: Object.freeze({

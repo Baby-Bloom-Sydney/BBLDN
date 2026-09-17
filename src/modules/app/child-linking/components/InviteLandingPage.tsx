@@ -8,6 +8,7 @@ import Link from "next/link";
 import { BRAND } from "@/modules/config";
 import type { InviteLandingView } from "../lib/invite-landing-view";
 import { ClaimInviteForm } from "./ClaimInviteForm";
+import { startInviteSignupAction } from "../actions/start-invite-signup-action";
 
 export type InviteLandingPageProps = {
   readonly view: InviteLandingView;
@@ -32,13 +33,19 @@ export function InviteLandingPage({ view, token }: InviteLandingPageProps) {
           {view.action.kind === "claim" && token !== null ? (
             <ClaimInviteForm token={token} label={view.action.label} />
           ) : null}
-          {view.action.kind === "link" ? (
-            <Link
-              href={view.action.href}
-              className="inline-flex w-full items-center justify-center rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-violet-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
-            >
-              {view.action.label}
-            </Link>
+          {view.action.kind === "signup" && token !== null ? (
+            // ADR-150: a form, not a link — the token travels in the `HttpOnly` cookie the action mints, and
+            // neither `/signup` nor `/login` ever sees it in a URL.
+            <form action={startInviteSignupAction}>
+              <input type="hidden" name="token" value={token} />
+              <input type="hidden" name="role" value={view.action.role} />
+              <button
+                type="submit"
+                className="inline-flex w-full items-center justify-center rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-violet-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+              >
+                {view.action.label}
+              </button>
+            </form>
           ) : null}
           {view.action.kind === "none" ? (
             <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">

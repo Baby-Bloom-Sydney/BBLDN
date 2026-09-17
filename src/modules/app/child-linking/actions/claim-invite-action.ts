@@ -18,6 +18,7 @@
 // switching road. A refused claim spends a miss, because a refused claim is a guess.
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { log } from "@/modules/platform";
 import { appActor } from "../lib/app-actor";
 import { consumeInviteLookupLimit } from "../lib/consume-invite-lookup-limit";
 import { inviteLookupKey } from "../lib/invite-lookup-key";
@@ -26,6 +27,13 @@ import { childLinking } from "../lib/default-child-linking";
 
 /** One sentence for every throttled or unavailable outcome: it must reveal nothing the guess was after. */
 const HELD = "Too many attempts just now. Try again in a little while.";
+/**
+ * ADR-151 (REVIEW-2 M-1): one sentence for every refusal a non-holder can provoke. The inside keeps its named
+ * reasons — they are logged and tested there — but the screen never learns whether the token was live, whose it
+ * was, or which side of the app it served. Only an outage (INTERNAL) reads differently, because an outage is
+ * not a statement about the invite.
+ */
+const CLOSED = "That link is no longer open.";
 
 export async function claimInviteAction(
   _state: { readonly error: string | null } | null,
@@ -43,7 +51,7 @@ export async function claimInviteAction(
     redirect(
       clean === null
         ? "/login"
-        : `/login?redirect=${encodeURIComponent(`/invite/connect/${clean}`)}`,
+        : `/login?next=${encodeURIComponent(`/invite/connect/${clean}`)}`,
     );
   }
 
@@ -61,7 +69,14 @@ export async function claimInviteAction(
     // the block. An INTERNAL is our fault, not a guess, so it does not spend the caller's budget.
     if (claimed.error.code !== "INTERNAL")
       await consumeInviteLookupLimit.afterMiss(missKey);
-    return { error: claimed.error.message };
+    log.info("invite claim refused", {
+      module: "app",
+      action: "claimInvite",
+      reason: claimed.error.details?.reason ?? null,
+    });
+    return {
+      error: claimed.error.code === "INTERNAL" ? claimed.error.message : CLOSED,
+    };
   }
   redirect(
     claimed.value.direction === "nanny_to_parent" ? "/parent/call" : "/nanny",

@@ -60,8 +60,7 @@ const landing = (over: Partial<Parameters<typeof inviteLandingView>[0]> = {}) =>
     viewerRole: null,
     tokenWasMalformed: false,
     lookupFailed: false,
-    signUpHref: "/signup?redirect=%2Finvite",
-    signInHref: "/login?redirect=%2Finvite",
+    signInHref: "/login?next=%2Finvite%2Fconnect%2F" + TOKEN,
     ...over,
   });
 
@@ -74,13 +73,14 @@ describe("S-X-13 — the public preview (04 §6.1)", () => {
     ).toBeInTheDocument();
   });
 
-  it("★ a signed-out visitor gets a sign-up link whose href carries NO token in a query it did not need", () => {
+  it("★ a signed-out visitor gets a sign-up FORM — no link href carries the token (ADR-150)", () => {
     render(<InviteLandingPage view={landing()} token={TOKEN} />);
 
-    const links = screen.getAllByRole("link");
-    // The return path is the invite *path*, encoded; the token is not pasted into a second parameter.
-    for (const link of links)
+    // The token travels in the form body to the action that mints the HttpOnly cookie; every link on the page
+    // is free of it, including the sign-in return path, which names the claim route and not the token twice.
+    for (const link of screen.getAllByRole("link"))
       expect(link.getAttribute("href")).not.toContain(`invite=${TOKEN}`);
+    expect(screen.getByRole("button", { name: /Join Amara's app/ })).toBeInTheDocument();
   });
 
   it("★ the claim button posts a form — the token is a hidden field, never an href", () => {
