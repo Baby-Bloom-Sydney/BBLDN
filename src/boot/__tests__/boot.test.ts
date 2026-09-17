@@ -90,17 +90,22 @@ describe("after register() in a valid preview environment", () => {
     expect(reasonOf(foreign)).toBe("unit-of-work-unknown");
   });
 
-  it("events — the db event-log store is installed; its reads fail closed with their own reason", async () => {
+  it("events — the db event-log store is installed and its reads are live; only an unkeyed query is refused", async () => {
+    // ADR-131 (1): `queryEvents` now answers on the two indexed access paths. A query with no key is not a read
+    // model — the refusal is the store's own, not the dark `event-log-read-not-available` P1-WIRE had to install.
     const page = await m.platform.Events.queryEvents({});
-    expect(reasonOf(page)).toBe("event-log-read-not-available");
+    expect(reasonOf(page)).toBe("event-log-read-requires-key");
   });
 
-  it("consent — the db consent store is installed; the cookie half fails closed with its own reason", async () => {
+  it("consent — the db consent store is installed and its cookie half reads instead of refusing", async () => {
+    // ADR-131 (1): `currentCookie` is a keyed read on `visitor_id`, so `hasMarketing` answers from the record.
+    // The boot's claim is that the dark binding is gone; that one row round-trips is proved deterministically in
+    // `db-consent-store.cookie.test.ts` against a fake port, not against whatever this environment can reach.
     const marketing = await m.platform.consent.hasMarketing({
       kind: "visitor",
       id: "v" as never,
     });
-    expect(reasonOf(marketing)).toBe("cookie-consent-not-available");
+    expect(reasonOf(marketing)).not.toBe("cookie-consent-not-available");
   });
 
   it("rate limiter — still denies in a production-resolved runtime: no shared store exists to declare (07 §8)", async () => {

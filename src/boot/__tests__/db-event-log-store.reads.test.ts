@@ -37,7 +37,7 @@ describe("dbEventLogStore.query — keyed on the position", () => {
           id: "e-2",
           ts: "2026-09-17T02:00:00.000Z",
           name: "call.slot-chosen",
-          props: { slotAt: "2026-09-18T09:00:00.000Z" },
+          props: { slotAt: "2026-09-18T11:17:00.000Z" },
         }),
         eventRow({ id: "e-1" }),
       ],
