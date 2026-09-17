@@ -13,12 +13,21 @@ import type {
   Instant,
   PositionId,
   StateAfter,
+  UserId,
 } from "@/modules/shared-types";
 import type { CallLayer, CallRef } from "./types";
 
 export type StubCallSeed = {
   readonly calls?: Readonly<
-    Record<string, { readonly state: CallState; readonly type: CallType }>
+    Record<
+      string,
+      {
+        readonly state: CallState;
+        readonly type: CallType;
+        /** the parent the call belongs to — what `findOpenCall` (connector extension, 1d) keys on */
+        readonly parentId?: UserId;
+      }
+    >
   >;
   readonly bookings?: Readonly<Record<string, Booking>>;
 };
@@ -92,6 +101,19 @@ export function stubCallLayer(seed: StubCallSeed = {}): CallLayer {
       return ok({
         kind: "call" as const,
         state: stateAfter(ref.positionId, "done"),
+      });
+    },
+    findOpenCall: async (parentId) => {
+      const open = [...calls.entries()].find(
+        ([, call]) => call.parentId === parentId && call.state !== "done",
+      );
+      if (open === undefined) return ok(null);
+      const [positionId, call] = open;
+      return ok({
+        state: call.state,
+        type: call.type,
+        positionId: positionId as PositionId,
+        afterNoAnswer: false,
       });
     },
     getCallState: async (ref: CallRef) => {
