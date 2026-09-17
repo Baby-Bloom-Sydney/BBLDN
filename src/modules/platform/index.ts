@@ -25,6 +25,8 @@ export { createRegistry } from "./lib/create-registry";
 // Clock + id minting (the one place a branded id is minted)
 export { nowInstant } from "./lib/now-instant";
 export { newId } from "./lib/new-id";
+// ADR-102 — the one UK-mobile rule, shared by both onboarding modules (lifted from `onboarding-parent` by `2a`).
+export { normaliseUkMobile } from "./lib/normalise-uk-mobile";
 
 // Sub-modules (01 §2.5) — the parent connector re-exports what the outside may use
 export * from "./log";

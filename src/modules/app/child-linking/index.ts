@@ -26,6 +26,7 @@ export { inviteLandingView } from "./lib/invite-landing-view";
 export { childrenCardView } from "./lib/children-card-view";
 export { appAccessView } from "./lib/app-access-view";
 export { claimInviteAction } from "./actions/claim-invite-action";
+export { startInviteSignupAction } from "./actions/start-invite-signup-action";
 export { createChildAction } from "./actions/create-child-action";
 export { createChildInviteAction } from "./actions/create-child-invite-action";
 export { revokeChildInviteAction } from "./actions/revoke-child-invite-action";

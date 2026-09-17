@@ -21,7 +21,7 @@ export default async function InviteConnectPage({
 }) {
   const { view, token } = await loadInviteLanding(params.token);
   // Signed out on the claim route: the public preview is the right screen for that, and it is one URL back.
-  if (view.kind === "open" && view.action.kind === "link")
+  if (view.kind === "open" && view.action.kind === "signup")
     redirect(`/invite/${params.token}`);
   return <InviteLandingPage view={view} token={token} />;
 }

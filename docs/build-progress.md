@@ -533,7 +533,52 @@ stay, still imported by the Sydney hub) · `src/app/parent/position/page.tsx` (*
 2. **`1i`'s 04 §4.4 c1 pin stays RED on purpose.** The schema half landed; the module half (`ChildFacts` gaining `createdByUserId`, `mayMint` accepting it, `insertChild` writing it, the store selecting it) did not, and flipping `mayMint` before those four would make a green test a claim about nothing.
 3. **`1i`'s third pin is untouched**: `connect_child_invite` still does not call `set_access_window` inside its own transaction. `0019` was not asked for it and did not take it.
 
+## Files created / modified in the current unit (2a — nanny entry + apply funnel + registration + invited-nanny isolation; L-008 Phase 2)
+
+**Migration + its twin + its suites**
+
+- `supabase/migrations/0021_nanny-onboarding.sql` — `create_nanny_account()` · `update_nanny_profile()` · `lift_nanny_isolation()` + the IMMUTABLE `nanny_profile_columns()` filter (ADR-152). `EXECUTE` to `authenticated` only; a metadata verify block. **One thing measured, not read:** under `search_path = ''` a bare `=` between two `citext` values resolves through the implicit cast to `text` and compares case-sensitively — `int.rpc-0021` caught it; the lead match uses `operator(extensions.=)`.
+- `supabase/rollbacks/0021_nanny-onboarding.rollback.sql` — the twin; loses no data, loses the road.
+- `supabase/__tests__/rpc-0021.test.ts` — **new `int.rpc-0021`, 16 tests, every one invokes a function** (four rows in one call · `is_isolated` from the argument · idempotent · guarded keys dropped · lead converts only unclaimed + email match, case-insensitively · a parent-role user refused · `profile_visible` computed and never accepted · the CHECK refuses a bad mobile · the lift is one-shot and mirrors the worklist tag · `is_active_nanny()` follows the flag). The role helpers run each statement inside a savepoint so an expected refusal is observable.
+- `supabase/__tests__/constraints.test.ts` — `db.constraints` grows by 3 claims (the three exist once, SECURITY DEFINER, pinned, `authenticated` yes / `anon` no; no client write policy on `nannies`; the filter drops every guarded column).
+- `src/modules/shared-types/database.types.ts` — regenerated with `npm run types:generate` against a local stack.
+
+**The module (`src/modules/onboarding-nanny/`) — the inside, from types-only**
+
+- `types.ts` (the connector's type surface) · `index.ts` (two store bindings + hooks + doubles, six actions, two reads, the cookie helper, the pure lists, five screens) · `README.md` (data handled; the three service-role uses named per 07 §5.1 rule 5; six gaps).
+- `lib/` (32 files, one export each): the two store registries / defaults / `configure*` / memory doubles; `funnel-options` · `funnel-steps` · `profile-steps`; the schemas (`nanny-application` · `nanny-portfolio` · `availability-field` · `nanny-bio` · `nanny-signup` · `nanny-portal` · `nanny-profile-step-schemas`); `parse-form` · `refuse-funnel`; `carried-token-cookie` · `read-lead-cookie`; `caller-ip-key` · `caller-ip-ua-key` · `email-rate-key` · `consume-funnel-step-limit` · `consume-nanny-signup-limit`; `record-nanny-signup-consent` (AGR-02: `professional-tos` + `privacy-policy`) · `send-nanny-welcome` (`welcome-nanny`, by user id — ADR-136); `is-nanny-profile-complete` · `lead-to-profile` · `nanny-hub-view` · `post-nanny-signup-destination` · `load-nanny-profile` · `load-nanny-hub`.
+- `actions/` (six, `"use server"`): `save-nanny-application-action` (S-X-15 page 8: lead captured, lead cookie minted, `lead.created`) · `save-nanny-portfolio-action` (S-X-17) · `save-nanny-bio-action` (S-X-18) · `sign-up-nanny-action` (S-X-19 **and** S-X-07 — one action, two roads; `is_isolated` from the road, ADR-147) · `apply-from-portal-action` (S-N-19: portal lead, profile, the one-shot lift, `nanny.applied` + `nanny.isolation-lifted`) · `save-nanny-profile-step-action` (S-N-18, ten steps).
+- `components/`: `NannyEntryContent` (S-X-24) · `NannyApplyFunnel` (the orchestrator; `apply` and `portal` modes) · `funnel/{StepForm,FunnelStepFrame,ErrorSummary,DistrictCombobox,AvailabilityGrid,LocationStep,ResidencyStep,CredentialsStep,ExperienceStep,ContactStep,InterstitialStep,PortfolioStep,ReviewStep,AccountStep,StopStep,field-styles}` · `NannySignupForm` (S-X-07) · `NannyHub` (S-N-11 / S-N-22) · `NannyProfileStepper` + `profile/ProfileStepFields` (S-N-18).
+- `__tests__/` — 7 new suites + the cookie-jar double: `schemas` (26) · `pure` (12) · `funnel` (10) · `signup` (8) · `isolation` (5) · `profile` (6) · `copy` (the glossary §8 nanny list over every component and lib file, the §6 parent list over S-X-24). **RED first:** all seven failed on missing modules before a line of the inside existed; 256 green at the end, 0 pins added, 0 bent.
+
+**Boot + routes + the invite cluster + shared files**
+
+- `src/boot/db-nanny-lead-store.ts` (service scope over `nanny_leads`; the id minted client-side; the "sign in instead" answer from `user_profiles.email` and a converted lead, never the identity provider) · `db-nanny-account-store.ts` (session scope over the three RPCs; the camel → snake column map in one place) · `wire-nanny-onboarding.ts` · `wire-ports.ts` + `types.ts` (`BootPort` gains `nanny-onboarding`) · `__tests__/db-nanny-stores.test.ts` (9).
+- Routes: `(public)/childcare-professionals/page.tsx` · `(funnel)/apply/{page,layout}.tsx` · `(auth)/signup/nanny/page.tsx` · `(auth)/signup/page.tsx` (merges the invite cookie into the query the parent connector reads — one line, no connector change) · `nanny/page.tsx` · `nanny/register/page.tsx` · `nanny/apply/page.tsx` (new; the legacy `(public)/nanny/apply/page.tsx` deleted) · `invite/connect/[token]/page.tsx` (`"link"` → `"signup"`). `next.config.mjs`: **the two redirects that contradicted 04 §2.1 are gone** (kickoff §2 debt 1).
+- `app/child-linking`: `actions/start-invite-signup-action.ts` (new — S-X-13's Join is a form that mints the invite cookie, ADR-150) · `lib/invite-landing-view.ts` (`link` → `signup`) · `lib/load-invite-landing.ts` (`next=` to the claim route; no token in a query — debts 4 + 10) · `components/InviteLandingPage.tsx` · `actions/claim-invite-action.ts` (`next=`; **one sentence for every non-outage refusal, ADR-151**; the reason logged) · the three suites re-argued to the amended document.
+- `config/security.ts` (`SECURITY.carriedTokens`) · `config/matching.ts` (ADR-149: DfE labels, keys unchanged, `[unverified]` struck) · `platform/lib/normalise-uk-mobile.ts` (lifted from `onboarding-parent`; that module's file is now a one-line re-export).
+
+**Design decisions worth carrying**
+
+1. **`is_isolated` is an argument of the account write, never a default reached by omission** (ADR-147). The column defaults `true`; the funnel is the one road that passes `false`. S-X-07 passes `true` whether or not an invite is present, so a bare direct signup is exactly as invisible as an invited one and S-N-22 offers both the same apply road.
+2. **One signup action, two roads, differing only in where the person comes from.** `/apply` reads the lead the cookie names (name, email, mobile, district asked once); an invite reads the invite cookie. Everything after — `auth.signUp`, AGR-02, `create_nanny_account`, the welcome, the events — is one path, so the enumeration argument (ADR-132) is one argument.
+3. **The carried tokens are unsigned, on ADR-150's argument, and `Secure` follows `x-forwarded-proto`** rather than an environment read: 07 §7 keeps `process.env` to `config`'s two readers, and the literal check enforces it — even in a comment.
+4. **`profile_visible` has one writer, in SQL.** `update_nanny_profile()` computes the `03.18` rule and returns it; the TypeScript mirror (`isNannyProfileComplete`) drives only the stepper's state and the memory double, and `int.rpc-0021` holds the two to the same fixtures.
+5. **★ zod 4's `z.record` over an enum key is exhaustive.** The availability grid refused every week with a day missing until it became `z.partialRecord` — caught by the RED suite, recorded because it will bite the next grid.
+
+**What the next unit must know**
+
+1. **`2b` starts from the flag, the level and a wired profile read.** `nannyAccountStore.get()` answers the nanny's own two rows; `MATCHING.minVerificationLevel` gates the hub. The wizard writes `verifications`, never `nannies.is_isolated`.
+2. **The nanny-mint pin stays RED and named** (`app/__tests__/child-linking.pins.test.ts`): S-N-01 is `2g`'s surface, so `2a` did not own it (kickoff debt 8).
+3. **Debt 2 (the nanny's name on parent surfaces) is not landed here** — the profile read this unit built is the nanny's own row under RLS, not the `nanny_public` read a parent surface needs; it stays with `2d`.
+4. **Three copies of the hashed rate-limit key helpers now exist** (`api/_lib/ip-key.ts`, `onboarding-parent`, `onboarding-nanny`) — the M-10 shape; one `platform/rate-limit` helper then a mechanical pass, for the checkpoint.
+5. **S-N-22's line says "your family"** — `child-linking` has no nanny-keyed read for the linked family's name; 04 §8's `{family}` waits on that read.
+
 ## Next unit
+
+**`2a` is built; `2b` is next, and it starts with §4.1's ruling** (kickoff §4.1: right-to-work as a level gate or a parallel section — 04 §10 item 22 and B-20 both carry "parallel section" as the default; rule it by 03 §4's connector shape, record the ADR, amend 04 §4 / 03 §4.2 one line each, then build the wizard behind `vetting-providers` / `stub-manual`). `2c` waits on `2b`; `2d` (Opus) can run beside `2b` — it owns S-N-17 (the profile edit, the photo) and the positions board, both named as this unit's gaps.
+
+<details><summary>Phase 1's closing note (kept for the trail)</summary>
 
 **Phase 1's build units are done; `1j` is not.** `1i` was the last of `1a`–`1i`. **`1j` — parent ID — has no code at all and D0.5 is open** (KICKOFF §3 lists it beside `1h` as the two not to start cold). It is the only sub-phase of Phase 1 with nothing built, and it is also the one most likely to cross ADR-123's line (§6 of the kickoff): identity documents are personal data of a kind the relaxed process was never meant to cover.
 
@@ -542,6 +587,8 @@ stay, still imported by the Sydney hub) · `src/app/parent/position/page.tsx` (*
 **A `0019` is owed, and three separate units want it.** `create_child_invite` / `revoke_child_invite` as SECURITY DEFINER functions (`1i`); `children.created_by_user_id`, or a fourth arm on `user_has_child_access` for the unlinked creator of an unclaimed child (`1i`); and a function folding the payment webhook's ledger insert and spine update into one transaction (`1h`). None is urgent; all three are pinned `it.fails` with their owners named.
 
 **Still owed across Phase 1.** A **recipient port for nannies** — no K-row message reaches a nanny, because 07 §5.2 keeps her address out of `nanny_public` (`1e`, `1g`; P1-STORES' ADR-136 may have closed it and the pin wants re-checking). **A nanny's name on a parent surface** — rail rows 4–6, S-P-08's cards and the admin drawer all carry a time or a date where 04 §7.1 prescribes "{nanny}"; one connector method fixes all three. **`08.43` is written but nothing schedules it** (`1g`). **ADR-134's fail-open allow-list is unwritten** (`1i`). And **eleven PRs are open and unmerged** — `main` is at P1-STORES.
+
+</details>
 
 ### Superseded — the handovers `1i` was written against, kept for the trail
 

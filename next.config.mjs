@@ -4,16 +4,8 @@ const nextConfig = {
     // strict: build fails on TS errors
     ignoreBuildErrors: false,
   },
-  async redirects() {
-    return [
-      { source: "/signup/nanny", destination: "/apply/nanny", permanent: true },
-      {
-        source: "/nanny/register",
-        destination: "/nanny/profile",
-        permanent: true,
-      },
-    ];
-  },
+  // No redirects: `/signup/nanny` is S-X-07 and `/nanny/register` is S-N-18 (04 §2.1 / §2.3) — the two Sydney
+  // redirects that contradicted them were removed by L-008 `2a` (kickoff §2 debt 1).
   experimental: {
     serverComponentsExternalPackages: ["sharp"],
     // Runs `src/instrumentation.ts` at start-up so `config/env.ts` parses the environment at boot rather than

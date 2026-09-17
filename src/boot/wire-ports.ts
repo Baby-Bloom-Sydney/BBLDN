@@ -23,6 +23,7 @@ import { wireConsent } from "./wire-consent";
 import { wireEvents } from "./wire-events";
 import { wireMatching } from "./wire-matching";
 import { wireParentProfileStore } from "./wire-parent-profile-store";
+import { wireNannyOnboarding } from "./wire-nanny-onboarding";
 import { wireApp } from "./wire-app";
 import { wirePayments } from "./wire-payments";
 import { wirePlacements } from "./wire-placements";
@@ -54,6 +55,9 @@ export function wirePorts(env: ParsedEnv): BootReport {
     wirePlacements(),
     wireConnections(),
     wireParentProfileStore(),
+    // `onboarding-nanny`'s two stores (L-008 `2a`) — like the parent profile store, a feature module's binding whose
+    // definers are a property of the applied schema, which is boot's to know.
+    wireNannyOnboarding(),
     // `purchase-paths` before `payments` for readability only — `payments` holds the module-level provider
     // binding, not a provider object, so an unconfigured provider is a fail-closed `Result` at call time.
     wirePurchaseProvider(

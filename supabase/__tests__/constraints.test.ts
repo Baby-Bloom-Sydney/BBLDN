@@ -700,3 +700,65 @@ describe("db.constraints — what 0019 added (the three write definers)", () => 
     );
   });
 });
+
+describe("db.constraints — what 0021 added (the nanny side's three definers; ADR-152)", () => {
+  const SESSION_ROADS = [
+    "create_nanny_account",
+    "update_nanny_profile",
+    "lift_nanny_isolation",
+  ] as const;
+
+  // 0005 gives `nannies` SELECT-only client policies and its verify block refuses a write policy; these three
+  // are the only road a nanny has to her own party row, and each acts for `auth.uid()` — the authority IS the
+  // session, so `authenticated` may execute them and `anon` may not (the opposite split from 0019's stage-writers).
+  it("all three exist exactly once, SECURITY DEFINER, search_path pinned, executable by authenticated and not by anon", async () => {
+    for (const name of SESSION_ROADS) {
+      const { rows } = await db.query<{
+        secdef: boolean;
+        config: string | null;
+        anon: boolean;
+        auth: boolean;
+      }>(
+        `select p.prosecdef as secdef, array_to_string(p.proconfig, ',') as config,
+                has_function_privilege('anon', p.oid, 'execute') as anon,
+                has_function_privilege('authenticated', p.oid, 'execute') as auth
+           from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+          where ns.nspname = 'public' and p.proname = $1`,
+        [name],
+      );
+      expect(rows.length, `${name} overload count`).toBe(1);
+      expect(rows[0]?.secdef, `${name} SECURITY DEFINER`).toBe(true);
+      expect(rows[0]?.config, `${name} search_path`).toContain(
+        'search_path=""',
+      );
+      expect(rows[0]?.anon, `${name} anon`).toBe(false);
+      expect(rows[0]?.auth, `${name} authenticated`).toBe(true);
+    }
+  });
+
+  it("0021 added no client write policy to nannies — 0005's rule still holds (07 §5.1 rule 4)", async () => {
+    const { rows } = await db.query<{ cmd: string }>(
+      "select cmd from pg_policies where schemaname = 'public' and tablename = 'nannies' and cmd <> 'SELECT'",
+    );
+    expect(rows).toEqual([]);
+  });
+
+  it("nanny_profile_columns() is the one static list, and it drops every guarded column", async () => {
+    const { rows } = await db.query<{ kept: Record<string, unknown> }>(
+      `select public.nanny_profile_columns($1::jsonb) as kept`,
+      [
+        JSON.stringify({
+          bio: "x",
+          is_isolated: false,
+          verification_level: "L4_FULLY_VERIFIED",
+          suspended_at: "2026-01-01",
+          profile_visible: true,
+          lead_id: "00000000-0000-4000-8000-000000000000",
+          is_vaccinated: true,
+          commission_pitch_opted_in_at: "2026-01-01",
+        }),
+      ],
+    );
+    expect(rows[0]?.kept).toEqual({ bio: "x" });
+  });
+});
