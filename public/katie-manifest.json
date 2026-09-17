@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-17T09:53:21.634Z",
+  "generated_at": "2026-09-17T10:18:57.681Z",
   "summary": {
     "route_count": 59,
     "page_count": 88,
@@ -971,8 +971,8 @@
     },
     {
       "filename": "0019_write-definers.sql",
-      "bytes": 57602,
-      "modified_at": "2026-09-17T09:50:10.851Z"
+      "bytes": 60835,
+      "modified_at": "2026-09-17T10:11:11.926Z"
     }
   ],
   "server_actions": [
