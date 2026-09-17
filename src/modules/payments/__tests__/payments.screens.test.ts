@@ -116,3 +116,40 @@ describe("the routes are thin and land where they should (05 §7 rule 5)", () =>
     },
   );
 });
+
+describe("the two money actions are rate limited, and refuse when the limiter cannot answer (ADR-134)", () => {
+  // `security-reviewer`, `1h` MEDIUM-1. Both actions create a session at the purchase provider, so a parent in a
+  // loop is unbounded provider cost. 07 §8 row 13's "no rate limit" is scoped to provider-retried,
+  // signature-verified paths (webhooks and crons) and does not reach a session-authenticated server action.
+  const actionSource = (file: string) =>
+    readFileSync(resolve(__dirname, `../actions/${file}`), "utf8");
+
+  it.each(["start-checkout-action.ts", "open-portal-action.ts"])(
+    "%s consumes the limit before it calls the provider",
+    (file) => {
+      const source = actionSource(file);
+      expect(source).toContain("consumeMoneyActionLimit");
+      // Before, not after: a refused attempt must cost the provider nothing.
+      expect(source.indexOf("consumeMoneyActionLimit(")).toBeLessThan(
+        source.indexOf("await payments."),
+      );
+    },
+  );
+
+  it("the consumer fails closed — it never copies the public-read helper's fail-open choice", async () => {
+    const source = readFileSync(
+      resolve(__dirname, "../lib/consume-money-action-limit.ts"),
+      "utf8",
+    );
+    // The public-read helper returns `null` (carry on) when the store cannot answer. This one returns a refusal
+    // on every non-ok result, and only the *logging* branches on which it was.
+    expect(source).toContain('return fail("E_PROVIDER"');
+    expect(source).not.toMatch(/if \(!allowed\.ok\)[\s\S]{0,120}return null/u);
+  });
+
+  it("the policy is keyed on the family, never on an address", async () => {
+    const { SECURITY } = await import("@/modules/config");
+    expect(SECURITY.rateLimits.purchaseActions.key).toBe("user");
+    expect(SECURITY.rateLimits.purchaseActions.perMinute).toBeGreaterThan(0);
+  });
+});

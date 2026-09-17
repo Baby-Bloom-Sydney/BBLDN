@@ -10,6 +10,7 @@ import { auth } from "@/modules/auth";
 import { toActionResult } from "@/modules/platform";
 import type { ClientResult } from "@/modules/platform";
 import type { FamilyId, Url } from "@/modules/shared-types";
+import { consumeMoneyActionLimit } from "../lib/consume-money-action-limit";
 import { payments } from "../lib/default-payments";
 
 export async function openPortalAction(): Promise<
@@ -17,9 +18,17 @@ export async function openPortalAction(): Promise<
 > {
   const session = await auth.requireRole("parent");
   if (!session.ok) return toActionResult(session);
-  const portal = await payments.portal(
-    session.value.userId as string as FamilyId,
-    { kind: "user", id: session.value.userId, role: "parent" },
-  );
+  const familyId = session.value.userId as string as FamilyId;
+
+  // Same rule as the checkout action: a portal session is a provider call, so a loop is provider cost, and the
+  // limiter failing is a refusal rather than a pass (ADR-134).
+  const limited = await consumeMoneyActionLimit(familyId, "portal");
+  if (limited !== null) return toActionResult(limited);
+
+  const portal = await payments.portal(familyId, {
+    kind: "user",
+    id: session.value.userId,
+    role: "parent",
+  });
   return toActionResult(portal);
 }

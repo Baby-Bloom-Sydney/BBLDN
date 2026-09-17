@@ -13,6 +13,7 @@ import { toActionResult } from "@/modules/platform";
 import type { ClientResult } from "@/modules/platform";
 import type { PlanShape } from "@/modules/purchase-paths";
 import type { FamilyId, Url } from "@/modules/shared-types";
+import { consumeMoneyActionLimit } from "../lib/consume-money-action-limit";
 import { payments } from "../lib/default-payments";
 import { fail } from "../lib/fail";
 
@@ -24,6 +25,12 @@ export async function startCheckoutAction(input: {
 }): Promise<ClientResult<{ readonly url: Url }>> {
   const session = await auth.requireRole("parent");
   if (!session.ok) return toActionResult(session);
+  const familyId = session.value.userId as string as FamilyId;
+
+  // Before the shape is even read: a refused attempt should cost the provider nothing (07 §8; ADR-134 — a money
+  // action refuses when the limiter cannot answer, it never fails open).
+  const limited = await consumeMoneyActionLimit(familyId, "checkout");
+  if (limited !== null) return toActionResult(limited);
 
   const monthly = input.shape === "instalments";
   const upfront = input.shape === "upfront";
@@ -37,7 +44,7 @@ export async function startCheckoutAction(input: {
     : { kind: "upfront" };
 
   const checkout = await payments.createCheckout(
-    session.value.userId as string as FamilyId,
+    familyId,
     "self-serve-app",
     plan,
     { kind: "user", id: session.value.userId, role: "parent" },
