@@ -6,8 +6,14 @@
 // the caller learns loudly that the row is the RPC's to write.
 import type { DataAccessPort } from "@/modules/auth";
 import type { CommsErrorDetails, CommsStore } from "@/modules/comms";
-import { err, newId, nowInstant } from "@/modules/platform";
-import type { Instant, MessageId, Result, Uuid } from "@/modules/shared-types";
+import { err, newId, nowInstant, ok } from "@/modules/platform";
+import type {
+  Email,
+  Instant,
+  MessageId,
+  Result,
+  Uuid,
+} from "@/modules/shared-types";
 import { emailLogInsertRow } from "./email-log-insert-row";
 import { inboxInsertRow } from "./inbox-insert-row";
 import { messageStateFromRow } from "./message-state-from-row";
@@ -16,6 +22,16 @@ import { settlePatch } from "./settle-patch";
 /** 02 §4.6: a dedupe key is live while its row is `queued` or `sent` (the partial unique index's predicate). */
 const LIVE = new Set<string>(["queued", "sent"]);
 const CANCEL_REASON = "dedupe-key-cancelled";
+
+/**
+ * ADR-136 — one refusal for every way a recipient fails to resolve. "No such user", "that user has no address"
+ * and "that address is malformed" must read the same from outside, or a send becomes an enumeration oracle over
+ * user ids (07 §4).
+ */
+const unresolvable = (): Result<never, CommsErrorDetails> =>
+  err<CommsErrorDetails>("VALIDATION", "A valid email address is required", {
+    reason: "invalid-recipient",
+  });
 
 const unknownMessage = (): Result<never, CommsErrorDetails> =>
   err<CommsErrorDetails>("NOT_FOUND", "That message could not be found.", {
@@ -32,6 +48,36 @@ export function dbCommsStore(
 ): CommsStore {
   const service = { scope: "service" as const };
   return Object.freeze({
+    /**
+     * ADR-136's read: `user_profiles` keyed on `user_id` (ADR-131 (1)), at service scope, in the store that
+     * already writes `email_logs` under it. `user_profiles` carries no RLS route a business module could take
+     * to the same column — and none is opened here: the address is answered **into a send** and the connector
+     * never returns it.
+     */
+    resolveRecipient: async (userId) => {
+      const row = await port.run(
+        {
+          name: "comms.resolveRecipient",
+          exec: (q) =>
+            q
+              .from("user_profiles")
+              .eq("user_id", userId as string)
+              .single(),
+        },
+        service,
+      );
+      if (!row.ok) return asComms(row);
+      const profile = row.value as {
+        readonly email: string | null;
+        readonly first_name: string | null;
+      } | null;
+      if (profile === null || profile.email === null) return unresolvable();
+      return ok({
+        email: profile.email as Email,
+        userId,
+        ...(profile.first_name === null ? {} : { name: profile.first_name }),
+      });
+    },
     findLiveByDedupeKey: async (dedupeKey) =>
       asComms(
         await port.run(

@@ -4,8 +4,10 @@
 // that fails must therefore not fail the transition — a family whose connection moved and whose email bounced
 // still has a moved connection, and the bounce is `comms`' own `email_logs` row to answer for (03 §8.4).
 //
-// 03 §8.1: the caller passes fully resolved data, `comms` never looks a person up. So a party this module
-// cannot resolve is a message **not sent**, recorded by its absence, rather than a guessed address.
+// 03 §8.1 as ADR-136 amends it: the caller passes an **id**, and `comms` resolves the address inside the send.
+// So a party this module cannot NAME is a message not sent; a party it can name is sent to without this module
+// ever holding an address. That is what closes `1g`'s pin — the nanny's `connection-requested` is sendable now,
+// and `connections` is stricter than it was, not looser.
 import type { Message } from "@/modules/comms";
 import type { ConnectionRecord, ConnectionsDeps } from "../types";
 import type { TransitionId } from "@/modules/shared-types";
@@ -20,12 +22,10 @@ export async function sendRowMessages(
   if (rows.length === 0) return;
 
   const nanny = await deps.nannyFacts(record.nannyId);
-  const nannyEmail = nanny.ok ? nanny.value?.email : undefined;
+  const nannyUserId = nanny.ok ? nanny.value?.userId : undefined;
 
-  // The parent's address comes from the injected recipient port — the same one K-1's C-c cascade uses, so
-  // there is one road to a person in this module and it is the profile's. The **nanny's** has none: 07 §5.2
-  // keeps her address out of `nanny_public` and no document authorises a service-scope read of it, so her
-  // messages are not sent and that is pinned as a failing test rather than papered over (see `1g`'s entry).
+  // The parent's address still comes from the injected recipient port: her messages predate ADR-136 and the
+  // mirror already carries a resolved address for `call-confirmation`. The **nanny** is named, never addressed.
   const parent =
     deps.recipientOf === undefined
       ? null
@@ -36,10 +36,10 @@ export async function sendRowMessages(
     const to =
       row.to === "parent"
         ? parentTo
-        : nannyEmail === undefined
+        : nannyUserId === undefined
           ? null
           : {
-              email: nannyEmail,
+              userId: nannyUserId,
               ...(nanny.ok && nanny.value?.firstName !== undefined
                 ? { name: nanny.value.firstName }
                 : {}),

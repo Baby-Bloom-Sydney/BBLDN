@@ -19,6 +19,7 @@ import type {
   TransitionHandler,
   TransitionId,
   UnitOfWork,
+  Uuid,
 } from "@/modules/shared-types";
 import type { Comms } from "@/modules/comms";
 import type { ConnectionCard } from "./lib/connection-card-view";
@@ -187,7 +188,13 @@ export type NannyFacts = {
   readonly verificationLevel: string;
   readonly isolated: boolean;
   readonly firstName?: string;
-  readonly email?: Email;
+  /**
+   * ADR-136 — the nanny's **user id**, not her address. It is what a `comms` `Recipient` now takes, and it is
+   * what makes K-1's `connection-requested` sendable at last: the address is resolved inside the send, from
+   * `comms`' own store, and never reaches this module. `1e` and `1g` both pinned the old gap; this is its fix,
+   * and it is stricter than the alternative — nothing in `connections` can obtain an address.
+   */
+  readonly userId?: Uuid;
 };
 
 // ── S-P-08 (04 §6.2) ──

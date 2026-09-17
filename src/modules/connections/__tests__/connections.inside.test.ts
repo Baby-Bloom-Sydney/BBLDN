@@ -42,6 +42,7 @@ import type {
   TransitionHandler,
   TransitionId,
   UserId,
+  Uuid,
 } from "@/modules/shared-types";
 
 /**
@@ -89,11 +90,22 @@ const adminActor: Actor = { kind: "admin", id: "admin-1" as never };
 const cascadeActor: Actor = { kind: "system", id: "cascade" };
 
 /** A `Comms` that records rather than sends — 03 §8.4's stub shape, local because the suite owns the claim. */
+/** ADR-136 — every message the slice posts, so a suite can ask HOW a party was addressed, not only whether. */
+const posted: Array<{ templateId: string; to: Record<string, unknown> }> = [];
+
 const recordingComms = (sent: Array<string>): Comms =>
   ({
     send: async () => ok("m1" as never),
-    sendMany: async (messages: ReadonlyArray<{ templateId: string }>) => {
-      for (const message of messages) sent.push(message.templateId);
+    sendMany: async (
+      messages: ReadonlyArray<{
+        templateId: string;
+        to: Record<string, unknown>;
+      }>,
+    ) => {
+      for (const message of messages) {
+        sent.push(message.templateId);
+        posted.push({ templateId: message.templateId, to: message.to });
+      }
       return ok([]);
     },
     schedule: async () => ok("m1" as never),
@@ -105,6 +117,8 @@ const recordingComms = (sent: Array<string>): Comms =>
 const POSITION = "00000000-0000-4000-8000-0000000000p1" as PositionId;
 const PARENT = "00000000-0000-4000-8000-0000000000a1" as ParentId;
 const NANNY_A = "00000000-0000-4000-8000-0000000000n1" as NannyId;
+/** The nanny's `auth.users` id — what `nannyFacts` answers under ADR-136, and what a `Recipient` now takes. */
+const NANNY_USER = "00000000-0000-4000-8000-0000000000u1" as Uuid;
 const NANNY_B = "00000000-0000-4000-8000-0000000000n2" as NannyId;
 const C1 = "00000000-0000-4000-8000-0000000000c1" as ConnectionId;
 const C2 = "00000000-0000-4000-8000-0000000000c2" as ConnectionId;
@@ -223,6 +237,8 @@ function world(
       ok({
         verificationLevel: nanny.level ?? "L3_PROVISIONALLY_VERIFIED",
         isolated: nanny.isolated ?? false,
+        // ADR-136 — an id, not an address. `comms` resolves the address inside the send.
+        userId: NANNY_USER,
       }),
     recipientOf: async () =>
       ok({ email: "family@example.test" as Email, name: "Rina" }),
@@ -553,17 +569,21 @@ describe("connections — the vocabulary a parent never sees", () => {
   });
 });
 
-// ── Pinned, because the document wins (ADR-120 rule 2) ──
+// ── `1g`'s pin, flipped by ADR-136 ──
 
-describe("connections — what is owed", () => {
+describe("connections — the nanny is reachable", () => {
   /**
-   * 03 §2.4 K-1's side effect is `connection-requested` **to the nanny**, and 03 §8.1 says the caller passes
-   * fully resolved data because `comms` never looks a person up. No document authorises a service-scope read
-   * of a nanny's contact details — `nanny_public` deliberately carries no address (07 §5.2) — so
-   * `dbNannyFacts` answers `email: undefined` and the message is not sent. The same gap `1e` pinned on
-   * autofire's `precheck-nanny` blast, and it wants the same fix: a recipient port, ruled and wired.
+   * 03 §2.4 K-1's side effect is `connection-requested` **to the nanny**. `1g` pinned this `it.fails` because
+   * 03 §8.1 then said the caller passes a fully resolved address, `nanny_public` deliberately carries none
+   * (07 §5.2), and no document authorised a service-scope read of her contact details — so `dbNannyFacts`
+   * answered `email: undefined` and the message was not sent.
+   *
+   * **ADR-136 removed the reason rather than the rule.** A `Recipient` is `{ userId } | { email }`; `comms`
+   * resolves the address inside the send, from its own store, and never returns it. So `connections` names the
+   * nanny and can still not obtain an address — the claim below, and the one after it, are the two halves of
+   * that, and the second is the one that must never regress.
    */
-  it.fails("K-1 sends the nanny her connection-requested message", async () => {
+  it("K-1 sends the nanny her connection-requested message", async () => {
     const sent: Array<string> = [];
     const w = world([], {}, sent);
     await w.advance({
@@ -575,5 +595,25 @@ describe("connections — what is owed", () => {
       idempotencyKey: "k1-msg",
     });
     expect(sent).toContain("connection-requested");
+  });
+
+  it("names the nanny by id and never by address — no module outside comms can obtain one", async () => {
+    posted.length = 0;
+    const sent: Array<string> = [];
+    const w = world([], {}, sent);
+    await w.advance({
+      entity: { kind: "connection", id: C1 },
+      transition: "K-1",
+      actor: parentActor,
+      payload: { positionId: POSITION, nannyId: NANNY_A },
+      expectedFrom: null,
+      idempotencyKey: "k1-addressing",
+    });
+    const toNanny = posted.find(
+      (message) => message.templateId === "connection-requested",
+    );
+    expect(toNanny?.to).toEqual({ userId: NANNY_USER });
+    // The claim that must never regress: there is no address anywhere in what this module posted about her.
+    expect(Object.keys(toNanny?.to ?? {})).not.toContain("email");
   });
 });

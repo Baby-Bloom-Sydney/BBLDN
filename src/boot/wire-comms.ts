@@ -3,7 +3,9 @@
 // than falling back to the stub, so a deployment that names it gets a loud boot line and a fail-closed seam —
 // not a stub quietly posing as a provider. `SMS_PROVIDER` has one legal value, `null-sms` (N-11, ADR-063).
 // The **store** is now real (ADR-131 (1), S5b): `dbCommsStore` over `auth`'s data port, keyed on `dedupe_key`
-// and `id` through the port's `eq()` — what P1-WIRE could not honestly build. The **renderer** is still the one
+// and `id` through the port's `eq()` — what P1-WIRE could not honestly build. Since `P1-STORES` it also carries
+// **ADR-136's `resolveRecipient`**: `user_profiles` keyed on `user_id`, at service scope, inside the store that
+// already writes `email_logs` under it — the one read that lets a caller name a nanny instead of addressing her. The **renderer** is still the one
 // port the seam lacks (no template files yet — F-b README gap 3), installed fail-closed with the reason
 // `comms/types.ts` reserves for it, so a send fails with the honest cause, not `comms-not-configured`.
 import {
