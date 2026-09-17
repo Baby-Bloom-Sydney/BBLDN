@@ -195,3 +195,24 @@ describe("signed in as the parent", () => {
     expect(await loadCallPage()).toEqual({ kind: "no-call" });
   });
 });
+
+describe("holdSlotAction — the position is checked, not taken on trust", () => {
+  it("refuses a hold against a position that is not the caller's own open call", async () => {
+    const held = await holdSlotAction(
+      await aSlot(),
+      "11111111-0000-4000-8000-000000000099" as PositionId,
+    );
+    expect(!held.ok && held.error.code).toBe("FORBIDDEN");
+  });
+
+  it("says the same thing whether the position is another family's or does not exist (07 §4)", async () => {
+    const someoneElses = await holdSlotAction(await aSlot(), OTHER_POSITION);
+    const nonsense = await holdSlotAction(
+      await aSlot(),
+      "22222222-0000-4000-8000-000000000098" as PositionId,
+    );
+    expect(!someoneElses.ok && someoneElses.error.message).toBe(
+      !nonsense.ok ? nonsense.error.message : "",
+    );
+  });
+});
