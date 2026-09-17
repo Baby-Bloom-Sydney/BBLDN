@@ -509,3 +509,104 @@ describe("db.constraints — what 0018 added (the call mirror)", () => {
     expect(def).toContain("calendar_id");
   });
 });
+
+describe("db.constraints — what 0019 added (the three write definers)", () => {
+  const SIGNATURES = [
+    "upsert_position",
+    "upsert_connection",
+    "upsert_placement",
+  ] as const;
+
+  // ADR-127: without these three, every position / connection / placement write is refused inside
+  // the caller's unit of work and no definer exists to call instead — the state P1-STORES measured.
+  it("all three exist exactly once, as SECURITY DEFINER with search_path pinned", async () => {
+    for (const name of SIGNATURES) {
+      const { rows } = await db.query<{
+        n: string;
+        secdef: boolean;
+        config: string | null;
+      }>(
+        `select count(*) over ()::text as n, p.prosecdef as secdef,
+                array_to_string(p.proconfig, ',') as config
+           from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+          where ns.nspname = 'public' and p.proname = $1`,
+        [name],
+      );
+      expect(rows.length, `${name} overload count`).toBe(1);
+      expect(rows[0]?.secdef, `${name} SECURITY DEFINER`).toBe(true);
+      expect(rows[0]?.config, `${name} search_path`).toContain(
+        'search_path=""',
+      );
+    }
+  });
+
+  // 07 §5.1 rule 5, and 0006 §4's own rule: each of these takes `stage` as an argument, and a
+  // parent may never touch `stage`, `call_*` or `precheck_*`. `book_slot()` — the one definer 07
+  // §5.1 rule 5 calls a user-session road — is granted the same way, to service_role alone.
+  it("none of the three is executable by anon or authenticated, and all three are by service_role", async () => {
+    for (const name of SIGNATURES) {
+      const { rows } = await db.query<{
+        anon: boolean;
+        auth: boolean;
+        service: boolean;
+      }>(
+        `select has_function_privilege('anon', p.oid, 'execute') as anon,
+                has_function_privilege('authenticated', p.oid, 'execute') as auth,
+                has_function_privilege('service_role', p.oid, 'execute') as service
+           from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+          where ns.nspname = 'public' and p.proname = $1`,
+        [name],
+      );
+      expect(rows[0], name).toEqual({
+        anon: false,
+        auth: false,
+        service: true,
+      });
+    }
+  });
+
+  // 0017's database-reviewer M-1: a definer over a FORCE RLS table reaches it only because its
+  // owner has BYPASSRLS. If ownership ever differed these would write nothing, silently.
+  it("all three are owned by a role that bypasses RLS", async () => {
+    const { rows } = await db.query<{ proname: string }>(
+      `select p.proname from pg_proc p
+         join pg_namespace ns on ns.oid = p.pronamespace
+         join pg_roles r on r.oid = p.proowner
+        where ns.nspname = 'public' and p.proname = any($1)
+          and not (r.rolbypassrls or r.rolsuper)`,
+      [[...SIGNATURES]],
+    );
+    expect(rows.map((r) => r.proname)).toEqual([]);
+  });
+
+  // The functions raise these by name so a caller gets a message it can act on; the indexes are
+  // what make the rule true under concurrency. Dropping one would leave the named refusal as a
+  // read-then-check that loses a race, which is exactly the failure this assertion guards.
+  it("the five stage-model partial uniques 0019 raises by name are all still present", async () => {
+    for (const index of [
+      "nanny_positions_one_live_per_parent_idx",
+      "connection_requests_one_live_per_pair_idx",
+      "connection_requests_one_offer_per_position_idx",
+      "nanny_placements_one_live_per_position_idx",
+      "nanny_placements_one_live_per_parent_idx",
+    ]) {
+      const def = await indexDef(index);
+      expect(def, index).not.toBeNull();
+      expect(def, index).toMatch(/UNIQUE/i);
+      expect(def, index).toContain("WHERE");
+    }
+  });
+
+  // 0019 is additive: it creates no table, column, index, policy or constraint, which is what lets
+  // the whole set still apply forwards from an empty database in one pass (02 §1).
+  it("0019 added no client write policy to any of the four tables it writes", async () => {
+    const { rows } = await db.query<{ tablename: string; cmd: string }>(
+      `select tablename, cmd from pg_policies
+        where schemaname = 'public'
+          and tablename in ('nanny_positions', 'position_schedule',
+                            'connection_requests', 'nanny_placements')
+          and cmd <> 'SELECT'`,
+    );
+    expect(rows).toEqual([]);
+  });
+});

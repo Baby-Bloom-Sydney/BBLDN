@@ -4392,6 +4392,46 @@ export type Database = {
         }
         Returns: number
       }
+      upsert_connection: {
+        Args: {
+          p_columns: Json
+          p_expected_version: number
+          p_id: string
+          p_nanny_id: string
+          p_origin: Database["public"]["Enums"]["connection_origin"]
+          p_parent_id: string
+          p_position_id: string
+          p_stage: Database["public"]["Enums"]["connection_stage"]
+        }
+        Returns: number
+      }
+      upsert_placement: {
+        Args: {
+          p_columns: Json
+          p_connection_id?: string
+          p_expected_version?: number
+          p_id: string
+          p_nanny_id: string
+          p_parent_id: string
+          p_position_id: string
+          p_source: Database["public"]["Enums"]["placement_source"]
+          p_state: Database["public"]["Enums"]["placement_state"]
+        }
+        Returns: number
+      }
+      upsert_position: {
+        Args: {
+          p_columns: Json
+          p_details: Json
+          p_expected_version: number
+          p_id: string
+          p_parent_id: string
+          p_schedule: Json
+          p_source: Database["public"]["Enums"]["position_source"]
+          p_stage: Database["public"]["Enums"]["position_stage"]
+        }
+        Returns: number
+      }
       user_has_child_access: { Args: { p_child_id: string }; Returns: boolean }
     }
     Enums: {
