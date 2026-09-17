@@ -156,3 +156,11 @@ export type CallQueueActions = {
   readonly clear: ClearCallSlotAction;
   readonly book: BookCallSlotAction;
 };
+
+/** `08.43`'s result (03 §3.5 seq 5). Counts only: an alert and a nudge never carry a family. */
+export type CallDueSweepResult = {
+  readonly kind: "swept";
+  readonly overdue: number;
+  readonly waiting: number;
+  readonly notified: boolean;
+};

@@ -18,3 +18,6 @@ export { bookCallSlotAction } from "./actions/book-call-slot-action";
 
 export { CallQueue } from "./components/CallQueue";
 export { CallItemDrawer } from "./components/CallItemDrawer";
+
+// `08.43` — the call-due / overdue sweep (03 §3.5 seq 5). Nothing schedules it yet; see the file header.
+export { callDueSweep } from "./lib/call-due-sweep";

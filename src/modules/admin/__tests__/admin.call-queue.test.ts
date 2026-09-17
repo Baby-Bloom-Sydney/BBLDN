@@ -21,6 +21,8 @@ import type {
   UserId,
 } from "@/modules/shared-types";
 import { loadCallQueue } from "../call-queue/lib/load-call-queue";
+import { callDueSweep } from "../call-queue/lib/call-due-sweep";
+import { configureComms } from "@/modules/comms";
 import { callStateOf } from "../call-queue/lib/call-state-of";
 import { queueGroupOf } from "../call-queue/lib/queue-group-of";
 import { QUEUE_HEADINGS } from "../call-queue/lib/queue-headings";
@@ -351,5 +353,111 @@ describe("admin/call-queue — S-A-19's call rows (04 §6.4)", () => {
     ]);
     expect(rows[0]?.detail).toContain("moved by a family booking");
     expect(rows[1]?.detail).toBe("No answer — waiting for a new time");
+  });
+});
+
+/**
+ * `08.43` (03 §3.5 seq 5). Two different facts on one sweep: a booked call nobody recorded an outcome for is
+ * **overdue** and raises the alert; a family with no booking at all is **waiting** and does not, because an
+ * alert that fires for every waiting family is one an admin learns to ignore.
+ */
+describe("admin/call-queue — the call-due sweep (08.43)", () => {
+  const NOW_LATE = "2026-01-09T12:00:00.000Z" as ISO;
+  // config-literal-ok: the sweep is handed the address it nudges, the way 03 §8.1 says a caller passes
+  // resolved data; `SENDERS` owns who mail comes FROM, which is a different fact and is not this.
+  const NOTIFY = Object.freeze({ email: "admin@example.test" }); // config-literal-ok: the address the sweep NUDGES, passed in by its caller (03 §8.1); SENDERS owns who mail comes from
+  const sent: Array<Record<string, unknown>> = [];
+
+  const withComms = () => {
+    sent.length = 0;
+    configureComms({
+      send: async (message: Record<string, unknown>) => {
+        sent.push(message);
+        return ok("m1");
+      },
+      sendMany: async () => ok([]),
+      schedule: async () => ok("m1"),
+      cancel: async () => ok({ cancelled: 0 }),
+      status: async () => ok({ status: "sent" }),
+      createInboxMessage: async () => ok({ id: "i1" }),
+    } as never);
+  };
+
+  const withCalls = (calls: ReadonlyArray<OpenCallSummary>) =>
+    configureCallLayer({
+      ...stubCallLayer({}),
+      listOpenCalls: async () => ok(calls),
+    });
+
+  const schedule = (items: ReadonlyArray<unknown>) =>
+    configureScheduling({
+      ...createSchedulingStub({ clock: () => NOW as ISO, rules }),
+      listSchedule: async () => ok(items),
+    } as never);
+
+  it("raises ALERT_CALL_OVERDUE only for a call that is actually late", async () => {
+    withComms();
+    withCalls([]);
+    schedule([
+      {
+        booking: booking({ start: "2026-01-09T10:00:00.000Z" as ISO }),
+        due: "past",
+        flags: [],
+      },
+    ]);
+    const swept = await callDueSweep(ADMIN, NOW_LATE, NOTIFY);
+    expect(swept.overdue).toBe(1);
+    expect(swept.notified).toBe(true);
+    expect(sent[0]?.templateId).toBe("admin-call-due");
+  });
+
+  it("counts a family with no booking as waiting, and does not call her late", async () => {
+    withComms();
+    withCalls([
+      {
+        positionId: POSITION,
+        parentId: PARENT,
+        type: "matchmaking",
+        state: "awaiting-slot",
+        bookingId: null,
+        requestedAt: "2026-01-05T09:00:00+00:00" as ISO,
+        noAnswerCount: 0,
+      },
+    ]);
+    schedule([]);
+    const swept = await callDueSweep(ADMIN, NOW_LATE, NOTIFY);
+    expect(swept.overdue).toBe(0);
+    expect(swept.waiting).toBe(1);
+    // she is still nudged — 03 §2.2's promise is that we ring anyway
+    expect(swept.notified).toBe(true);
+  });
+
+  // One message per day, not one per five-minute cron pass. 288 nudges is not a nudge.
+  it("dedupes the nudge by the day it is for", async () => {
+    withComms();
+    withCalls([]);
+    schedule([
+      {
+        booking: booking({ start: "2026-01-09T10:00:00.000Z" as ISO }),
+        due: "past",
+        flags: [],
+      },
+    ]);
+    await callDueSweep(ADMIN, NOW_LATE, NOTIFY);
+    expect(sent[0]?.dedupeKey).toBe("admin-call-due:2026-01-09");
+  });
+
+  it("sends nothing when there is nothing to chase", async () => {
+    withComms();
+    withCalls([]);
+    schedule([]);
+    const swept = await callDueSweep(ADMIN, NOW_LATE, NOTIFY);
+    expect(swept).toEqual({
+      kind: "swept",
+      overdue: 0,
+      waiting: 0,
+      notified: false,
+    });
+    expect(sent).toEqual([]);
   });
 });
