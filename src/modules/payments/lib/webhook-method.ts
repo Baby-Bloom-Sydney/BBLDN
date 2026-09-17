@@ -2,7 +2,7 @@
 //   1. `provider.parseEvent` verifies the signature **before** anything is parsed or dispatched (07 §10.1);
 //      unverified → `E_EVENT_UNVERIFIED` (400, the provider never retries).
 //   2. `payment_events(provider, event_id)` is inserted **before** dispatch; a duplicate → `skipped-duplicate`, 200.
-//   3. The family is resolved by the `LinkRef` we minted; unknown → `E_EVENT_UNRESOLVED`, answered as 200 `ignored`.
+//   3. The family is resolved by the `LinkRef` we minted; unknown → recorded and answered as 200 `ignored`.
 //   4. The pure table (`dispatch-purchase-event.ts`) decides the transition; the row is written; the window
 //      recomputed on a paid transition (ADR-083 / 084); events emitted post-write; `app-ready` sent once.
 //   5. The ledger row is stamped `processed_at` — or `processing_error` and the call fails, so the provider retries.
@@ -16,6 +16,13 @@
 // dispatches — and "transition atomically" is true for the first time. The ledger's `processed_at IS NULL`
 // index (0010 §2) still earns its place: the `unresolved` outcome commits the row with its `processing_error`
 // and no spine write, which is exactly what the runbook reconciles from.
+//
+// **`0020` (ADR-146) closed the last path here that was not one transaction.** S5d recorded it in this file
+// rather than hiding it: a delivery with nothing to do — an event type we do not handle, or a `LinkRef` we
+// never minted — had to be `applyEvent` **then** `stampEvent`, because the function's only answer for a null
+// family was `unresolved`, which stamps `processing_error` and leaves the row on the unprocessed index for
+// ever. The function now answers `ignored` when no patch crosses the seam: recorded, stamped, no money, one
+// statement. Every road out of `handleWebhook` is a single RPC.
 import { PRICES } from "@/modules/config";
 import { log, ok } from "@/modules/platform";
 import type { PurchaseEvent } from "@/modules/purchase-paths";
@@ -111,7 +118,18 @@ async function applyTransition(
       "The spine row this delivery belongs to is gone",
       deps.provider.name,
     );
+  // `ignored` is what the function answers when no patch reached it, which is precisely this branch: the
+  // transition moved nothing, the delivery is recorded and stamped, and the family's standing is unchanged.
   if (transition.handled === "ignored") return ok(ignored(familyId, before));
+  // A patch DID cross the seam, so anything but `applied` here is the database contradicting the transition
+  // this spine decided. Refusing lets the provider retry a delivery that was rolled back; reporting a move the
+  // function did not make would put the wrong standing in front of the family.
+  if (applied.value.outcome !== "applied")
+    return fail(
+      "E_EVENT_UNRESOLVED",
+      "The delivery was recorded without being applied",
+      deps.provider.name,
+    );
   // What the transaction wrote, without a second round trip to read it back: the patch is the columns
   // `0019` assigns by name, and `access_until` is the one column it does NOT take from the patch — the
   // function returns `set_access_window`'s answer instead, which is why it is merged separately here.
@@ -161,32 +179,26 @@ const purchasePath = (event: MoneyEvent): "payment-link" | "self-serve" =>
 
 /**
  * A delivery that needed nothing: an event type we do not handle, or a `LinkRef` we never minted. The ledger
- * row is written (03 §5.4.3 — the record is the point) and then stamped `processed_at`, because
- * `apply_payment_event` has no way to say "seen, and nothing to do": a null family is `unresolved` there,
- * which stamps `processing_error` and leaves the row on the runbook's `processed_at IS NULL` index for ever.
- * **Two statements, and the only path in this file that is not one transaction — there is no money in it to
- * be atomic with.** Recorded rather than hidden; closing it needs a fourth outcome in `0019`.
+ * row is written (03 §5.4.3 — the record is the point) and stamped `processed_at` by the **same** statement:
+ * no patch crosses the seam, so `apply_payment_event` has no money to move and answers `ignored` (`0020`;
+ * ADR-146). One transaction, like every other road out of this file.
+ *
+ * A failure to record is logged and swallowed on purpose — the delivery genuinely needed nothing, and the
+ * answer to the provider is a 200 either way. What the log protects is the runbook's view: a store that cannot
+ * write the ledger is an outage, and `ALERT_PROVIDER_DOWN` is how 06 hears about it.
  */
 async function recordWithNothingToDo(
   deps: PaymentsDeps,
   raw: RawDelivery,
-  now: Instant,
 ): Promise<void> {
   const applied = await deps.store.applyEvent(raw);
-  if (!applied.ok || applied.value.outcome !== "unresolved") return;
-  const eventId = applied.value.eventId;
-  if (eventId === null) return;
-  const stamped = await deps.store.stampEvent(eventId, {
-    processed_at: now,
-    processing_error: null,
+  if (applied.ok) return;
+  log.error("payment event ledger not written", {
+    module: "payments",
+    action: "webhook",
+    alert: "ALERT_PROVIDER_DOWN",
+    errorCode: applied.error.code,
   });
-  if (!stamped.ok)
-    log.error("payment event ledger not stamped", {
-      module: "payments",
-      action: "webhook",
-      alert: "ALERT_PROVIDER_DOWN",
-      errorCode: stamped.error.code,
-    });
 }
 
 export function webhookMethod(
@@ -212,7 +224,7 @@ export function webhookMethod(
       };
       // An event type we do not handle needs no family and no transition, so it never reaches the fold.
       if (event.kind === "ignored") {
-        await recordWithNothingToDo(deps, delivery, now);
+        await recordWithNothingToDo(deps, delivery);
         return ok(ignored(UNRESOLVED_FAMILY, NONE));
       }
       // **The family is resolved BEFORE the ledger row exists, and that is the reordering ADR-127 forces.**
@@ -227,7 +239,7 @@ export function webhookMethod(
           action: "webhook",
           provider: deps.provider.name,
         });
-        await recordWithNothingToDo(deps, delivery, now);
+        await recordWithNothingToDo(deps, delivery);
         return ok(ignored(UNRESOLVED_FAMILY, NONE));
       }
       // The spine could not be read at all: nothing is recorded, because recording a delivery we have not

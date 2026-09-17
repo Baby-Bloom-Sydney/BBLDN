@@ -2538,6 +2538,7 @@ export type Database = {
           converted_to_user_id: string | null
           created_at: string
           district: string | null
+          email: string | null
           form_data: Json
           id: string
           position_id: string | null
@@ -2550,6 +2551,7 @@ export type Database = {
           converted_to_user_id?: string | null
           created_at?: string
           district?: string | null
+          email?: string | null
           form_data?: Json
           id: string
           position_id?: string | null
@@ -2562,6 +2564,7 @@ export type Database = {
           converted_to_user_id?: string | null
           created_at?: string
           district?: string | null
+          email?: string | null
           form_data?: Json
           id?: string
           position_id?: string | null

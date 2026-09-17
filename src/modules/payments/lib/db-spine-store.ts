@@ -85,10 +85,7 @@ function reads(
 
 function writes(
   port: DataAccessPort,
-): Pick<
-  SpineStore,
-  "insertSpine" | "updateSpine" | "applyEvent" | "stampEvent"
-> {
+): Pick<SpineStore, "insertSpine" | "updateSpine" | "applyEvent"> {
   return {
     insertSpine: (row) =>
       port.run(
@@ -112,6 +109,11 @@ function writes(
     // money never landed. `apply_payment_event` is the same three statements inside one transaction: a failure
     // rolls the ledger row back with the money and the provider retries, and the `unresolved` outcome commits
     // the ledger row with its `processing_error` and no spine write — exactly the row the runbook reconciles.
+    //
+    // **`0020` (ADR-146) made it the only `payment_events` write here.** The function gained a fourth outcome,
+    // `ignored`: a delivery with no patch has no money in it, so it is recorded and stamped `processed_at` by
+    // this same call. `stampEvent` — the second statement the no-money paths used to need, and the last raw
+    // `from("payment_events").update()` in the module — has no caller left and is gone.
     //
     // Every argument is decided above this seam. The function's own refusals are not exceptions but outcomes,
     // so nothing here has to translate an error code.
@@ -147,16 +149,6 @@ function writes(
         },
         { scope: "service" },
       ),
-    stampEvent: (id, patch) =>
-      port.run(
-        {
-          name: "payments.stampEvent",
-          exec: async (q) => {
-            await q.from("payment_events").update(id, patch);
-          },
-        },
-        { scope: "service" },
-      ),
   };
 }
 
@@ -166,7 +158,9 @@ type ApplyArgs = AppDatabase["Functions"]["apply_payment_event"]["Args"];
 /**
  * `apply_payment_event`'s `jsonb` answer, read as the outcome the spine turns on. An answer the driver cannot
  * give (a double that records the call, a function that returned null) is `unresolved` with no id rather than
- * a crash: the ledger row's fate is the database's to state, and "we do not know" is not "applied".
+ * a crash: the ledger row's fate is the database's to state, "we do not know" is not "applied" — and it is not
+ * `ignored` either, because `ignored` asserts the row was stamped processed and an unreadable answer asserts
+ * nothing. The unknown falls to the outcome that leaves the delivery on the runbook's queue.
  */
 function outcomeOf(answer: unknown): ApplyEventOutcome {
   const held = (answer ?? {}) as {
@@ -175,6 +169,11 @@ function outcomeOf(answer: unknown): ApplyEventOutcome {
     readonly access_until?: string | null;
   };
   if (held.outcome === "duplicate") return { outcome: "duplicate" };
+  if (held.outcome === "ignored")
+    return {
+      outcome: "ignored",
+      eventId: (held.event_id ?? null) as Uuid | null,
+    };
   if (held.outcome === "applied" && held.event_id != null)
     return {
       outcome: "applied",

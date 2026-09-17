@@ -138,6 +138,7 @@ describe("S-X-04 — PreAuthResults", () => {
     source: "adv",
     completed: true,
     claimed: false,
+    email: null,
   };
 
   it("shows three cards, blurs the fourth behind '+N more', and links S-X-05 with the lead", () => {

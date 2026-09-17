@@ -1,9 +1,9 @@
 // S-X-05 / S-X-06 — the signup action: validated once at the boundary, the role always `parent`, a refusal that
-// never leaks provider text, the profile row written through the store `0017` made possible (ADR-131), and —
-// pinned as failing until the P-2 slice exists (ADR-120 rule 2) — the outcome the code cannot yet deliver.
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+// never leaks provider text, the profile row written through the store `0017` made possible (ADR-131), and the
+// lead conversion ADR-145 (2) narrows — unclaimed, and matching the captured contact when the lead carries one
+// (ADR-146 (2), `0020`). The last pin in this file was HARDEN-B's, waiting on that column; it is flipped and
+// the file read it needed is gone, because the control is the module's conduct and not a migration's text.
+import { beforeEach, describe, expect, it } from "vitest";
 import { auth, configureAuth, stubAuth } from "@/modules/auth";
 import { LOCALE, SECURITY } from "@/modules/config";
 import {
@@ -266,6 +266,7 @@ describe("onboarding-parent — the one-go signup with a lead (04 §3.1 steps 5�
             source: "adv",
             completed: true,
             claimed: false,
+            email: null,
           },
         ],
       }),
@@ -329,6 +330,7 @@ describe("onboarding-parent — the one-go signup with a lead (04 §3.1 steps 5�
             source: "adv",
             completed: true,
             claimed: true,
+            email: null,
           },
         ],
       }),
@@ -343,29 +345,79 @@ describe("onboarding-parent — the one-go signup with a lead (04 §3.1 steps 5�
     });
   });
 
-  // ADR-123 rule 2 — the half of ADR-145 (2) the schema cannot answer, pinned rather than invented.
+  // ── ADR-146 (2) — HARDEN-B's pin, flipped by behaviour rather than by a file read ────────────────────────
   //
-  // The ruling says the lead converts only if "its captured email equals the signup email case-insensitively".
-  // There is no captured email to compare: `parent_leads` (02 §4.7, `0014`) has **no email column** — the parent
-  // wizard is pre-auth and anonymous, and `WizardAnswers` has no email field either — so the address first
-  // exists at signup. Any comparison this module could write would be against a value it invented.
+  // HARDEN-B pinned the half of ADR-145 (2) the schema could not answer: the ruling compares the lead's
+  // "captured email" to the signup email case-insensitively, and `parent_leads` captured no contact at all, so
+  // the pin had to assert the **column** — there was no behaviour to assert. `0020` adds it, and the two claims
+  // below are the module's own conduct instead. The pin's file read is deleted with it: a migration's text was
+  // never the control, only the evidence that the control could exist.
   //
-  // Owner: 02 §4.7 (a captured-contact column on `parent_leads`, written by the wizard) or ADR-145 itself (drop
-  // the clause and let "unclaimed" carry the control, which is what is enforced today). Until then the
-  // unclaimed check is the whole of the defence, and the leak it leaves is a lead nobody has converted yet.
-  it.fails(
-    "PINNED (ADR-145 (2)): `parent_leads` captures the contact the signup email must match",
-    () => {
-      const sql = readFileSync(
-        resolve(__dirname, "../../../../supabase/migrations/0014_leads.sql"),
-        "utf8",
-      );
-      const table = sql.slice(
-        sql.indexOf("create table if not exists public.parent_leads"),
-      );
-      expect(table.slice(0, table.indexOf(");"))).toMatch(/\bemail\b/u);
-    },
-  );
+  // ADR-146 reads the ruling as: unclaimed **and**, *when the lead carries an email*, that email matches. A
+  // wizard-only lead carries none, and the "opens the position and lands on S-P-01" test above is that case.
+  it("converts a lead whose captured email matches the signup email in another case", async () => {
+    configureMatching(
+      stubMatching({
+        leadRows: [
+          {
+            id: LEAD as LeadId,
+            answers: {
+              area: AREA,
+              children: [{ ageLabel: "1–2 years" }],
+              days: [0],
+              parts: ["morning"],
+              scheduleType: "Fixed",
+            },
+            area: AREA,
+            source: "adv",
+            completed: true,
+            claimed: false,
+            email: "  ADA@Example.TEST ",
+          },
+        ],
+      }),
+    );
+    const result = await signUpParentAction(
+      null,
+      formDataOf({ ...VALID, source: "advanced_match", leadId: LEAD }),
+    );
+    expect(result.ok && result.value).toEqual({
+      destination: "/parent/call",
+      positionOpened: true,
+    });
+  });
+
+  it("ignores a lead captured against a different address, and the account still stands", async () => {
+    configureMatching(
+      stubMatching({
+        leadRows: [
+          {
+            id: LEAD as LeadId,
+            answers: {
+              area: AREA,
+              children: [{ ageLabel: "1–2 years" }],
+              days: [0],
+              parts: ["morning"],
+              scheduleType: "Fixed",
+            },
+            area: AREA,
+            source: "adv",
+            completed: true,
+            claimed: false,
+            email: "grace@example.test",
+          },
+        ],
+      }),
+    );
+    const result = await signUpParentAction(
+      null,
+      formDataOf({ ...VALID, source: "advanced_match", leadId: LEAD }),
+    );
+    expect(result.ok && result.value).toEqual({
+      destination: "/parent",
+      positionOpened: false,
+    });
+  });
 
   it("keeps the account and routes to S-P-03 state 0 when the lead has no London area", async () => {
     configureMatching(
@@ -378,6 +430,7 @@ describe("onboarding-parent — the one-go signup with a lead (04 §3.1 steps 5�
             source: null,
             completed: false,
             claimed: false,
+            email: null,
           },
         ],
       }),

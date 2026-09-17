@@ -35,15 +35,27 @@ export async function openPositionFromLead(
   // **ADR-145 (2) — caller-supplied ownership is verified, never trusted.** `leadId` arrives on the signup form
   // and was shape-validated only, so anyone holding another family's id (it travels in wizard URLs and in form
   // state) converted her area, her children's ages and her schedule into a position owned by the submitter
-  // (REVIEW-2 M-4). A lead that has already become a position is not available to a second account.
+  // (REVIEW-2 M-4). A lead that has already become a position is not available to a second account, and a lead
+  // captured against somebody else's address is not available to this one.
   //
-  // ★ The ruling's other half — "its captured email equals the signup email case-insensitively" — has nothing
-  // to compare against: `parent_leads` (02 §4.7, `0014`) has no email column and `WizardAnswers` no email field,
-  // because the parent wizard is pre-auth and anonymous. Pinned `it.fails` in
-  // `onboarding-parent.signup.test.ts` rather than invented; owner 02 §4.7 (a captured-contact column) or
-  // ADR-145 itself. Until then "unclaimed" is the whole of the control, and what it still lets through is a
-  // lead nobody has converted yet.
+  // Both refusals answer the **same** sentence and the same reason. A signup form that said "that lead was
+  // captured against a different email" would confirm, to anyone holding a lead id, which address the family
+  // who filled it in uses — the enumeration oracle 07 §4 forbids and ADR-132 protects on this very form.
+  //
   if (lead.value.claimed)
+    return err("CONFLICT", "That lead is no longer available", {
+      reason: "E_LEAD_ALREADY_CLAIMED" as const,
+    });
+  // ★ The ruling's other half, as ADR-146 reads it: the lead converts only if, **when it carries an email**,
+  // that email equals the signup email case-insensitively. `parent_leads.email` (`0020`) is that captured
+  // contact — the address the signup form held when the parent dropped it (S-X-05 / S-X-06, ADR-041) — and it
+  // is null for a wizard-only lead, which is the common case and converts on `unclaimed` alone. The comparison
+  // is folded on both sides here rather than trusted to either writer: the column is `citext` and the store
+  // folds what it stores, but the signup address arrives from a form and this is the one line that decides.
+  if (
+    lead.value.email !== null &&
+    lead.value.email.trim().toLowerCase() !== parent.email.trim().toLowerCase()
+  )
     return err("CONFLICT", "That lead is no longer available", {
       reason: "E_LEAD_ALREADY_CLAIMED" as const,
     });

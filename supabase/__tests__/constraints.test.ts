@@ -701,6 +701,82 @@ describe("db.constraints — what 0019 added (the three write definers)", () => 
   });
 });
 
+describe("db.constraints — what 0020 added (ADR-146)", () => {
+  // The shape of the column ADR-145 (2)'s control compares against. `citext` is the assertion that matters:
+  // `text` would compile, pass every unit test with a folded writer, and quietly answer "no" to a lead written
+  // any other way — which is a control that fails **open** on the path it exists to close.
+  it("parent_leads.email is citext and nullable, because a wizard-only lead captures none", async () => {
+    const { rows } = await db.query<{
+      udt: string;
+      nullable: string;
+    }>(
+      `select udt_name as udt, is_nullable as nullable
+         from information_schema.columns
+        where table_schema = 'public' and table_name = 'parent_leads' and column_name = 'email'`,
+    );
+    expect(rows[0]?.udt).toBe("citext");
+    expect(rows[0]?.nullable).toBe("YES");
+  });
+
+  it("parent_leads carries no unique on the address — two families may share one (ADR-041)", async () => {
+    const { rows } = await db.query<{ n: string }>(
+      `select count(*)::text as n from pg_indexes
+        where schemaname = 'public' and tablename = 'parent_leads' and indexdef ilike '%email%'`,
+    );
+    expect(rows[0]?.n).toBe("0");
+  });
+
+  // 07 §5.2's last row. A new column holding a contact is exactly the kind that invites a first policy, and
+  // `parent_leads` must keep having none at all — a nanny never reads her own lead row, and nor does a parent.
+  it("0020 added no policy to parent_leads — it is still service role only", async () => {
+    const { rows } = await db.query<{ n: string }>(
+      `select count(*)::text as n from pg_policies
+        where schemaname = 'public' and tablename = 'parent_leads'`,
+    );
+    expect(rows[0]?.n).toBe("0");
+  });
+
+  // `create or replace` keeps grants and ownership, and this is the assertion that it did. 0019's
+  // database-reviewer H-1 removed the in-function authority check as dead code, so **the grant is the whole
+  // defence** on this function: a replace that widened EXECUTE would be the entire hole.
+  it("apply_payment_event is still service_role only after the replace (I-M2)", async () => {
+    const { rows } = await db.query<{
+      anon: boolean;
+      auth: boolean;
+      service: boolean;
+      secdef: boolean;
+      config: string | null;
+      n: string;
+    }>(
+      `select count(*) over ()::text as n,
+              has_function_privilege('anon', p.oid, 'execute') as anon,
+              has_function_privilege('authenticated', p.oid, 'execute') as auth,
+              has_function_privilege('service_role', p.oid, 'execute') as service,
+              p.prosecdef as secdef,
+              array_to_string(p.proconfig, ',') as config
+         from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+        where ns.nspname = 'public' and p.proname = 'apply_payment_event'`,
+    );
+    // one overload, not two: a replace that changed an argument type would leave 0019's beside 0020's
+    expect(rows.length).toBe(1);
+    expect(rows[0]?.anon).toBe(false);
+    expect(rows[0]?.auth).toBe(false);
+    expect(rows[0]?.service).toBe(true);
+    expect(rows[0]?.secdef).toBe(true);
+    expect(rows[0]?.config).toContain('search_path=""');
+  });
+
+  it("apply_payment_event still recomputes the access window inside its own transaction", async () => {
+    const { rows } = await db.query<{ src: string }>(
+      `select p.prosrc as src from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+        where ns.nspname = 'public' and p.proname = 'apply_payment_event'`,
+    );
+    // ADR-083 / 084 — 0019's own assertion, which a rewrite of the body could silently drop
+    expect(rows[0]?.src).toContain("set_access_window");
+    expect(rows[0]?.src).toContain("'ignored'");
+  });
+});
+
 describe("db.constraints — what 0021 added (the nanny side's three definers; ADR-152)", () => {
   const SESSION_ROADS = [
     "create_nanny_account",
