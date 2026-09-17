@@ -56,7 +56,7 @@ const placement = (over: Partial<PlacementRecord> = {}): PlacementRecord => ({
   source: "connection",
   state: "CONFIRMED",
   weeklyHours: 30,
-  hourlyRatePence: 1500,
+  hourlyRatePence: 1500, // config-literal-ok: a fixture rate, asserted only as a round trip
   startDate: "2026-10-05" as ISODate,
   createdAt: NOW,
   version: 1,
@@ -134,7 +134,7 @@ describe("dbPlacementStore — the write is upsert_placement (ADR-127)", () => {
         source: "invite_shell",
         connectionId: "" as ConnectionId,
         weeklyHours: 0,
-        hourlyRatePence: 0,
+        hourlyRatePence: 0, // config-literal-ok: the read half's placeholder for a NULL column
         startDate: "" as ISODate,
       }),
     );
@@ -153,7 +153,7 @@ describe("dbPlacementStore — the write is upsert_placement (ADR-127)", () => {
     expect(args["p_connection_id"]).toBe(CONNECTION);
     expect(args["p_columns"]).toMatchObject({
       weekly_hours: 30,
-      hourly_rate_pence: 1500,
+      hourly_rate_pence: 1500, // config-literal-ok: the same fixture rate, read back
       start_date: "2026-10-05",
     });
   });
