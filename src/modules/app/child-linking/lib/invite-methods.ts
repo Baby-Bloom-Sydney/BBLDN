@@ -79,15 +79,16 @@ export function inviteMethods(
           "We can't find that child.",
         );
 
-      const links = await deps.store.activeLinks(
-        (child.value.parent_user_id ?? "") as UserId,
-      );
+      // Keyed on the **child**, not on the family. A `nanny_to_parent` invite exists exactly when the child
+      // has no parent yet, so the family's key is null there and the old lookup matched nothing at all —
+      // which made a linked nanny's branch of `mayMint` unreachable (security review M3).
+      const links = await deps.store.activeLinksForChild(childId);
       if (!links.ok) return carryLinkStoreError(links.error);
       const allowed = inviteAuthorisation.mayMint(actor, direction, {
         parentUserId: (child.value.parent_user_id as UserId | null) ?? null,
-        linkedNannyUserIds: links.value
-          .filter((row) => row.child_id === (childId as string))
-          .map((row) => row.nanny_user_id as UserId),
+        linkedNannyUserIds: links.value.map(
+          (row) => row.nanny_user_id as UserId,
+        ),
       });
       if (!allowed)
         return failChildLinking(

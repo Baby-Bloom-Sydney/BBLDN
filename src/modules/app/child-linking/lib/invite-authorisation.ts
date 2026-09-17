@@ -47,7 +47,11 @@ export const inviteAuthorisation = Object.freeze({
     direction: InviteDirection,
     child: ChildFacts,
   ): boolean => {
-    if (actor.kind === "admin") return true;
+    // ★ An admin acts **on behalf of a named person or not at all** (03 §2.5's actor rule; security review M1).
+    // The first draft returned `true` for any admin, which minted a row whose `created_by_user_id` was `null` —
+    // a live share link for somebody's child that could never be traced to a person and that only another admin
+    // could revoke. `createChild` and `claimInvite` already required `onBehalfOf`; these two now do too.
+    if (actor.kind === "admin") return actor.onBehalfOf !== undefined;
     if (actor.kind !== "user") return false;
     const id = userId(actor);
     if (id === null) return false;
@@ -60,7 +64,7 @@ export const inviteAuthorisation = Object.freeze({
     );
   },
   mayRevoke: (actor: Actor, createdByUserId: UserId | null): boolean => {
-    if (actor.kind === "admin") return true;
+    if (actor.kind === "admin") return actor.onBehalfOf !== undefined;
     if (actor.kind !== "user" || createdByUserId === null) return false;
     return userId(actor) === (createdByUserId as string);
   },

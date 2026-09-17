@@ -93,3 +93,90 @@ describe("Katie's gate (`07.09`; 07 §10.1 — tools re-check access per call)",
     expect(gate.kind === "blocked" && gate.line).toContain("matchmaker");
   });
 });
+
+describe("the security review's closed findings (H1 · M1 · M3)", () => {
+  it("★ M1 — an admin with no `onBehalfOf` may neither mint nor revoke", async () => {
+    const { inviteAuthorisation } = await import("@/modules/app");
+    const bare = { kind: "admin", id: "a1" } as never;
+    const named = {
+      kind: "admin",
+      id: "a1",
+      onBehalfOf: { role: "parent", id: "p1" },
+    } as never;
+
+    // A bare admin's mint would write `created_by_user_id = null`: a live share link for somebody's child
+    // that no audit trail can attribute and only another admin can revoke.
+    expect(
+      inviteAuthorisation.mayMint(bare, "parent_to_nanny", {
+        parentUserId: null,
+        linkedNannyUserIds: [],
+      }),
+    ).toBe(false);
+    expect(inviteAuthorisation.mayRevoke(bare, null)).toBe(false);
+    expect(
+      inviteAuthorisation.mayMint(named, "parent_to_nanny", {
+        parentUserId: "p1" as never,
+        linkedNannyUserIds: [],
+      }),
+    ).toBe(true);
+    expect(inviteAuthorisation.mayRevoke(named, null)).toBe(true);
+  });
+
+  it("★ M3 — a linked nanny's mint reads the links of the CHILD, not of a family that does not exist yet", async () => {
+    const { createChildLinking, memoryChildLinkingStore } =
+      await import("@/modules/app");
+    const CHILD = "33333333-3333-4333-8333-333333333333";
+    const NANNY = "22222222-2222-4222-8222-222222222222";
+    const NOW = "2026-09-17T09:00:00.000Z";
+
+    const inside = createChildLinking({
+      store: memoryChildLinkingStore({
+        // A `nanny_to_parent` invite exists precisely when the child has NO parent — so a lookup keyed on the
+        // family key matched nothing and this branch was unreachable.
+        children: [
+          {
+            id: CHILD,
+            parent_user_id: null,
+            first_name: "Amara",
+            date_of_birth: "2025-01-15",
+            gender: null,
+            profile_image_id: null,
+            status: "active",
+            onboarded: true,
+            orphaned_at: null,
+            feed_locked_for_nanny: false,
+            feed_locked_at: null,
+            created_at: NOW,
+            updated_at: NOW,
+          } as never,
+        ],
+        links: [
+          {
+            id: "l1",
+            child_id: CHILD,
+            nanny_user_id: NANNY,
+            parent_user_id: null,
+            placement_id: null,
+            source: "invite",
+            state: "active",
+            ended_at: null,
+            ended_by: null,
+            end_reason: null,
+            created_at: NOW,
+          } as never,
+        ],
+      }),
+      events: { emit: async () => ({ ok: true, value: undefined }) } as never,
+      now: () => NOW as never,
+      inviteBaseUrl: "https://example.test/invite",
+    });
+
+    const made = await inside.createInvite(CHILD as never, "nanny_to_parent", {
+      kind: "user",
+      id: NANNY as never,
+      role: "nanny",
+    });
+
+    expect(made.ok).toBe(true);
+  });
+});

@@ -79,7 +79,12 @@ describe("★ PIN — 04 §4.4 c1: a nanny adds an existing client and mints a t
     ).toBe(true);
     expect(
       inviteAuthorisation.mayMint(
-        { kind: "admin", id: "admin-1" as never },
+        {
+          kind: "admin",
+          id: "admin-1" as never,
+          // An admin acts on behalf of a named person or not at all (security review M1).
+          onBehalfOf: { role: "nanny", id: NANNY as UserId },
+        },
         "nanny_to_parent",
         { parentUserId: null, linkedNannyUserIds: [] },
       ),

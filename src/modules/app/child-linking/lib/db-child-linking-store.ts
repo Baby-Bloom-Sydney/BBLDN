@@ -57,6 +57,20 @@ export function dbChildLinkingStore(port: DataAccessPort): ChildLinkingStore {
         },
         { scope: "session" },
       ),
+    activeLinksForChild: (childId: ChildId) =>
+      port.run(
+        {
+          name: "app.childLinking.activeLinksForChild",
+          exec: async (q) => {
+            const rows = await q
+              .from("child_client")
+              .eq("child_id", childId as string)
+              .select();
+            return rows.filter((row) => row.state === "active");
+          },
+        },
+        { scope: "session" },
+      ),
     linkById: (linkId: Uuid) =>
       port.run(
         {

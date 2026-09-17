@@ -75,9 +75,16 @@ export async function loadInviteLanding(rawToken: string): Promise<{
     if ((await consumeInviteLookupLimit.afterMiss(missKey)) === "limited")
       return { token: null, view: closedView(viewerRole) };
   }
-  // The sign-up and sign-in links carry the token so the visitor lands back here after making an account
-  // (04 §6.1: S-X-13 → S-X-06 / S-X-07 → the claim). `URLS.invite` is config's; the return path is built from
-  // it rather than from a literal (L4).
+  // The sign-up and sign-in links carry the return path so the visitor lands back here after making an account
+  // (04 §6.1: S-X-13 → S-X-06 / S-X-07 → the claim). `URLS.invite` is config's; the path is built from it
+  // rather than from a literal (L4).
+  //
+  // ★ **One copy of the token, not two** (security review M2). The first draft also passed `invite=<token>` as
+  // its own parameter, which put the same secret in two places in the same URL for no gain — `redirect` alone
+  // brings the visitor back to the page that knows it. The remaining copy is still a token in a query string,
+  // and therefore in browser history and in whatever logging `/signup` and `/login` do; 07 §4.6's pattern —
+  // a short-lived `HttpOnly` signed cookie, as the parent-lead flow uses — is the proper fix and is recorded
+  // as owed rather than half-built here, because it spans two modules' surfaces.
   const back = encodeURIComponent(`${new URL(URLS.invite).pathname}/${token}`);
   return {
     token,
@@ -86,7 +93,7 @@ export async function loadInviteLanding(rawToken: string): Promise<{
       viewerRole,
       tokenWasMalformed: false,
       lookupFailed: !preview.ok,
-      signUpHref: `/signup?invite=${token}&redirect=${back}`,
+      signUpHref: `/signup?redirect=${back}`,
       signInHref: `/login?redirect=${back}`,
     }),
   };

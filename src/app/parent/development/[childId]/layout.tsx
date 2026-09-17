@@ -27,17 +27,33 @@ export default async function ParentDevelopmentLayout({
 
   const admin = createAdminClient();
 
-  // Fetch child and verify access
-  const { data: child, error } = await admin
-    .from("child_client")
-    .select("*")
-    .eq("id", params.childId)
-    .single();
+  // ★ `[childId]` is a `children.id` — the id S-P-13's card links with (`children-card-view.ts`) and the id
+  // every London app table is keyed by (02 §4.6). The Sydney code this replaces read `child_client` (the
+  // **link** table) by the same parameter and then cast the row to a shape carrying `first_name` and
+  // `date_of_birth`, which in London live on `children` and not on the link at all. The two id spaces never
+  // coincide, so every link from the new card would have bounced back to `/parent` (security review L1).
+  //
+  // The nanny is read from the link row separately, because in London she is a property of the engagement and
+  // not of the child.
+  const [{ data: childRow, error }, { data: linkRow }] = await Promise.all([
+    admin.from("children").select("*").eq("id", params.childId).maybeSingle(),
+    admin
+      .from("child_client")
+      .select("*")
+      .eq("child_id", params.childId)
+      .eq("state", "active")
+      .maybeSingle(),
+  ]);
 
-  if (error || !child) redirect("/parent");
+  if (error || !childRow) redirect("/parent");
 
-  // Verify parent has access
-  const c = child as ChildClient;
+  const c = {
+    ...(childRow as object),
+    nanny_user_id:
+      (linkRow as { nanny_user_id?: string } | null)?.nanny_user_id ?? null,
+  } as unknown as ChildClient;
+  // The ownership check is the child record's own `parent_user_id`, which `guard_children_protected_columns`
+  // makes un-rewritable by a linked nanny (S5's closed hole).
   if (c.parent_user_id !== user.id) {
     redirect("/parent");
   }

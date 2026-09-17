@@ -55,6 +55,16 @@ export interface ChildLinkingStore {
   ownedChildren(parentUserId: UserId): Promise<Result<ReadonlyArray<ChildRow>>>;
   /** Every **active** link row this family is a party to (`child_client`). */
   activeLinks(parentUserId: UserId): Promise<Result<ReadonlyArray<LinkRow>>>;
+  /**
+   * Every **active** link on one child. Separate from `activeLinks` because the two questions have different
+   * keys and the difference is not cosmetic: a `nanny_to_parent` invite exists precisely when the child has
+   * **no parent yet**, so asking for the family's links there asks for the links of nobody (security review
+   * M3 — the first draft passed `parent_user_id ?? ""`, which matched nothing and made a linked nanny's
+   * authorisation branch unreachable).
+   */
+  activeLinksForChild(
+    childId: ChildId,
+  ): Promise<Result<ReadonlyArray<LinkRow>>>;
   childById(childId: ChildId): Promise<Result<ChildRow | null>>;
   /** One link row by its own id — what a claim gets back from `connect_child_invite` and must resolve. */
   linkById(linkId: Uuid): Promise<Result<LinkRow | null>>;

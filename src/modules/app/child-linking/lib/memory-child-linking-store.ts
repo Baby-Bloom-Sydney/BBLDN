@@ -81,6 +81,13 @@ export function memoryChildLinkingStore(seed: Seed = {}): ChildLinkingStore & {
             row.parent_user_id === parentUserId && row.state === "active",
         ),
       ),
+    activeLinksForChild: async (childId: ChildId) =>
+      ok(
+        state.links.filter(
+          (row) =>
+            row.child_id === (childId as string) && row.state === "active",
+        ),
+      ),
     childById: async (childId: ChildId) =>
       ok(childOf(childId as string) ?? null),
     linkById: async (linkId: Uuid) =>
