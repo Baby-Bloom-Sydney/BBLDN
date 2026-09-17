@@ -10,6 +10,7 @@
 import { scheduling } from "@/modules/scheduling";
 import { ok, toActionResult } from "@/modules/platform";
 import type { Actor, AdminId } from "@/modules/shared-types";
+import { malformedRequest } from "../../lib/malformed-request";
 import type { BlockRangeAction } from "../types";
 
 /** The connector asks for an `Actor`; `scheduling` ignores it for authority and reads the session instead. */
@@ -19,6 +20,16 @@ const SESSION_ADMIN: Actor = Object.freeze({
 });
 
 export const blockRangeAction: BlockRangeAction = async (input) => {
+  // The boundary, before the range reaches the calendar (security review, MEDIUM). A start that is not before
+  // its end is refused here rather than by a CHECK constraint, so the admin gets a sentence, not a 500.
+  if (
+    typeof input?.start !== "string" ||
+    typeof input?.end !== "string" ||
+    typeof input?.reason !== "string" ||
+    input.reason.trim() === "" ||
+    !(input.start < input.end)
+  )
+    return toActionResult(malformedRequest());
   const blocked = await scheduling.block(
     { start: input.start, end: input.end },
     input.reason,

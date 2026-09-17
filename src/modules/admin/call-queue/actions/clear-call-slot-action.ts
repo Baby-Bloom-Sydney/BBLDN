@@ -5,9 +5,15 @@
 import { adminOnBehalf } from "@/modules/admin-on-behalf";
 import { ok, toActionResult } from "@/modules/platform";
 import type { ClearCallSlotAction } from "../types";
+import { malformedRequest } from "../../lib/malformed-request";
 import { onBehalfOfParent } from "../lib/on-behalf-actor";
 
 export const clearCallSlotAction: ClearCallSlotAction = async (input) => {
+  if (
+    typeof input?.positionId !== "string" ||
+    typeof input?.parentId !== "string"
+  )
+    return toActionResult(malformedRequest());
   const cleared = await adminOnBehalf.clearSlot(
     input.positionId,
     onBehalfOfParent(input.parentId),

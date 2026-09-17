@@ -8,9 +8,16 @@
 import { adminOnBehalf } from "@/modules/admin-on-behalf";
 import { ok, toActionResult } from "@/modules/platform";
 import type { BookCallSlotAction } from "../types";
+import { malformedRequest } from "../../lib/malformed-request";
 import { onBehalfOfParent } from "../lib/on-behalf-actor";
 
 export const bookCallSlotAction: BookCallSlotAction = async (input) => {
+  if (
+    typeof input?.positionId !== "string" ||
+    typeof input?.parentId !== "string" ||
+    typeof input?.slotId !== "string"
+  )
+    return toActionResult(malformedRequest());
   const booked = await adminOnBehalf.chooseSlot(
     input.positionId,
     input.slotId,

@@ -8,13 +8,18 @@ import { adminOnBehalf } from "@/modules/admin-on-behalf";
 import { ok, toActionResult } from "@/modules/platform";
 import type { MoveCallSlotAction } from "../types";
 import { callRefOf } from "../lib/call-ref-of";
+import { malformedRequest } from "../../lib/malformed-request";
+import { parsePartyRef } from "../lib/parse-party-ref";
 import { partyActor } from "../lib/party-actor";
 
 export const moveCallSlotAction: MoveCallSlotAction = async (input) => {
+  const ref = parsePartyRef(input?.ref);
+  if (ref === null || typeof input?.slotId !== "string")
+    return toActionResult(malformedRequest());
   const moved = await adminOnBehalf.moveSlot(
-    callRefOf(input.ref),
+    callRefOf(ref),
     input.slotId,
-    partyActor(input.ref),
+    partyActor(ref),
   );
   return toActionResult(moved.ok ? ok(undefined) : moved);
 };

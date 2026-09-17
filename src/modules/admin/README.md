@@ -55,14 +55,23 @@ not available — see `scheduling`'s README gap 1. (3) The family's **name and n
 `scheduling.listForSubject` on a position; no connector answers "which positions does this parent have", so
 `1g` mounts it where a position id is already in hand (S-A-06).
 
+**Boundary validation on the five actions.** Every `"use server"` export is a public HTTP surface, so each
+action shape-checks its body (`lib/malformed-request.ts`, `call-queue/lib/parse-party-ref.ts`) **before** it
+derives a `CallRef` or an `Actor` from it — otherwise a malformed request is a `TypeError` thrown out of an
+async function instead of a typed `VALIDATION` refusal (security review, MEDIUM). It is not an authorisation
+check and must not be read as one: `admin-on-behalf`'s gate decides who may act, from the session.
+
 **Suites.** `admin.swap.test.ts` — the panel set: eight, named, each with the route and screens 04 §6.4 gives
 it. `admin.call-queue.test.ts` — grouping, the state derivation, the decoration, the three read outcomes, and
 the outcome vocabulary. `admin.call-queue.screens.test.tsx` — S-A-03's table semantics, the announced count,
-the drawer's focus contract, and the calendar's block message.
+the drawer's focus contract, and the calendar's block message. `admin.call-queue.actions.test.ts` — the five
+actions: a malformed body refused with a type, an outcome outside 03 §2.7's enum refused, a signed-in parent
+and an `aal1` admin both refused **with the lever's inside never reached**, and the admin id that travels
+downstream being the session's rather than the placeholder this panel writes.
 
 <!-- audit
 Last edited: 2026-09-17T18:40+10:00 — BB-LDN-Planner-070926/1f
-Notes: 1f — call-queue and calendar built (S-A-03 / S-A-04): the decorated list, the four on-behalf levers, the block that flags, and the three absences the screens state out loud.
+Notes: 1f — boundary validation on the five actions (security review MEDIUM); call-queue and calendar built (S-A-03 / S-A-04): the decorated list, the four on-behalf levers, the block that flags, and the three absences the screens state out loud.
 Prior: 2026-09-16T16:25+10:00 — BB-LDN-Planner-070926/F-c
 Notes: initial authoring — the parent connector, the eight panel folders and the panel-set test.
 -->
