@@ -30,6 +30,24 @@ function stubGuardNames(values: Parsed, environment: Environment): string[] {
   return names;
 }
 
+/**
+ * ADR-141 (REVIEW-2 H-11 / M-9) — the other two stub bindings, refused in production for the reason
+ * `PURCHASE_PROVIDER` already is. `stub-email` records a send and delivers nothing, so every reset, invite and
+ * app-ready mail reports as sent while nothing leaves the building; `AREAS_SOURCE=stub` is the 20-area seed of
+ * 03 §6.3, which answers "out of area" for 271 of the 291 real London districts — fail-closed, but for an
+ * invisible reason. A production deployment that names either does not boot.
+ */
+function productionStubProviderNames(
+  values: Parsed,
+  environment: Environment,
+): string[] {
+  if (environment !== "production") return [];
+  const names: string[] = [];
+  if (values.EMAIL_PROVIDER === "stub-email") names.push("EMAIL_PROVIDER");
+  if (values.AREAS_SOURCE === "stub") names.push("AREAS_SOURCE");
+  return names;
+}
+
 function stripePrefixNames(values: Parsed): string[] {
   const mode = values.STRIPE_MODE;
   if (mode !== "test" && mode !== "live") return [];
@@ -54,6 +72,7 @@ export function refineEnv(
   return [
     ...devOnlyNamesPresent(values, environment),
     ...stubGuardNames(values, environment),
+    ...productionStubProviderNames(values, environment),
     ...stripePrefixNames(values),
   ];
 }

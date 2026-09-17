@@ -145,6 +145,12 @@ export type PublicFlagName =
   | "FUNNEL_LOG";
 
 export type RateLimit = {
+  /**
+   * The declared name — the key the policy sits under in `SECURITY.rateLimits`, stamped by `security.ts` so the
+   * two cannot drift (ADR-140). `platform/rate-limit` reads it to decide ADR-134's fail-open by membership in
+   * `SECURITY.failOpenOnLimiterOutage`; a policy built anywhere else carries no name and so is never on the list.
+   */
+  readonly name?: string;
   readonly key: string;
   readonly perMinute?: number;
   readonly perHour?: number;

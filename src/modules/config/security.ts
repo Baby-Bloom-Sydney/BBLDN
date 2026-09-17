@@ -5,85 +5,123 @@ import { publicEnv } from "./public-env";
 import type { RateLimit } from "./types";
 import { UPLOADS } from "./uploads";
 
-const rateLimit = (limit: RateLimit): RateLimit => Object.freeze(limit);
+// Every policy carries the name it is declared under, stamped here so the two can never drift. Two things read
+// that name: `platform/rate-limit` decides ADR-134's fail-open by its membership in `failOpenOnLimiterOutage`
+// below, and `check:limiter-call-sites` (ADR-140 / ADR-142) reads the same names out of this file to prove each
+// one has a consumer. A policy object built anywhere else carries no name and is therefore never on the list —
+// the safe default, because the list is what opens a door.
+const declarePolicies = <T extends Record<string, RateLimit>>(
+  declared: T,
+): Readonly<{ readonly [K in keyof T]: RateLimit }> =>
+  Object.freeze(
+    Object.fromEntries(
+      Object.entries(declared).map(([name, limit]) => [
+        name,
+        Object.freeze({ ...limit, name }),
+      ]),
+    ),
+  ) as Readonly<{ readonly [K in keyof T]: RateLimit }>;
+
+const RATE_LIMITS = declarePolicies({
+  publicRead: {
+    key: "ip",
+    perMinute: 30,
+    perDay: 300,
+    note: "quick-match API / browse / profile (row 1)",
+  },
+  funnelStep: {
+    key: "ip+ua",
+    perMinute: 10,
+    note: "wizard, /apply steps (row 2)",
+  },
+  signupPerIp: { key: "ip", perHour: 5, note: "row 2" },
+  signupPerEmail: { key: "email-hash", perDay: 3, note: "row 2" },
+  authPerEmail: {
+    key: "email-hash+ip",
+    perMinute: 5,
+    note: "5 / 15 min then 15-min lockout (row 3)",
+  },
+  authPerIp: { key: "ip", perHour: 20, note: "row 3" },
+  clientEvents: {
+    key: "ip+ua",
+    perMinute: 60,
+    perHour: 600,
+    note: "POST /api/events; batch ≤ 20 (row 4)",
+  },
+  cookieConsent: { key: "ip", perMinute: 10, note: "row 5" },
+  bookingHolds: {
+    key: "user",
+    perHour: 10,
+    note: "≤ 2 concurrent holds; 5 reschedules / day (row 6)",
+  },
+  inviteLookup: {
+    key: "ip",
+    perMinute: 10,
+    perDay: 60,
+    note: "5 failed / h → 1 h block (row 7)",
+  },
+  katieChat: {
+    key: "bot",
+    perMinute: 20,
+    perDay: 300,
+    note: "row 8",
+  },
+  katieUploads: { key: "user", perHour: 30, note: "row 8" },
+  agentRoute: {
+    key: "token",
+    perMinute: 60,
+    perDay: 200,
+    note: "positions created ≤ 200 / day (row 9)",
+  },
+  contactForm: {
+    key: "ip+email-hash",
+    perHour: 3,
+    perDay: 10,
+    note: "row 10",
+  },
+  verificationSubmissions: {
+    key: "user",
+    perDay: 5,
+    note: "per section (row 11)",
+  },
+  nannyApplications: { key: "user", perDay: 10, note: "row 12" },
+  adminRoutes: { key: "admin", perMinute: 600, note: "row 14" },
+  // 07 §8 has **no row** for a signed-in parent creating a checkout or a portal session, and `1h` needed one:
+  // both server actions call out to the purchase provider, so a parent in a tight loop is unbounded provider
+  // cost against a real account. Row 13's "no rate limit" is scoped to provider-retried, signature-verified
+  // paths (webhooks and crons) and does not reach these. Keyed on the family, because that is who is charged.
+  // Owner: 07 §8 — a row 16 to ratify the numbers (`security-reviewer`, `1h` MEDIUM-1).
+  purchaseActions: {
+    key: "user",
+    perMinute: 5,
+    perHour: 20,
+    note: "checkout + portal session creation (1h; 07 §8 has no row)",
+  },
+});
+
+/**
+ * The declared policy names of 07 §8 — the key each `SECURITY.rateLimits.*` value is declared under. Local, not
+ * exported: L1 gives this file one export, and nothing outside it needs the name as a type — callers read
+ * `SECURITY.failOpenOnLimiterOutage`, which carries the literals.
+ */
+type RateLimitPolicyName = keyof typeof RATE_LIMITS;
 
 export const SECURITY = Object.freeze({
-  rateLimits: Object.freeze({
-    publicRead: rateLimit({
-      key: "ip",
-      perMinute: 30,
-      perDay: 300,
-      note: "quick-match API / browse / profile (row 1)",
-    }),
-    funnelStep: rateLimit({
-      key: "ip+ua",
-      perMinute: 10,
-      note: "wizard, /apply steps (row 2)",
-    }),
-    signupPerIp: rateLimit({ key: "ip", perHour: 5, note: "row 2" }),
-    signupPerEmail: rateLimit({ key: "email-hash", perDay: 3, note: "row 2" }),
-    authPerEmail: rateLimit({
-      key: "email-hash+ip",
-      perMinute: 5,
-      note: "5 / 15 min then 15-min lockout (row 3)",
-    }),
-    authPerIp: rateLimit({ key: "ip", perHour: 20, note: "row 3" }),
-    clientEvents: rateLimit({
-      key: "ip+ua",
-      perMinute: 60,
-      perHour: 600,
-      note: "POST /api/events; batch ≤ 20 (row 4)",
-    }),
-    cookieConsent: rateLimit({ key: "ip", perMinute: 10, note: "row 5" }),
-    bookingHolds: rateLimit({
-      key: "user",
-      perHour: 10,
-      note: "≤ 2 concurrent holds; 5 reschedules / day (row 6)",
-    }),
-    inviteLookup: rateLimit({
-      key: "ip",
-      perMinute: 10,
-      perDay: 60,
-      note: "5 failed / h → 1 h block (row 7)",
-    }),
-    katieChat: rateLimit({
-      key: "bot",
-      perMinute: 20,
-      perDay: 300,
-      note: "row 8",
-    }),
-    katieUploads: rateLimit({ key: "user", perHour: 30, note: "row 8" }),
-    agentRoute: rateLimit({
-      key: "token",
-      perMinute: 60,
-      perDay: 200,
-      note: "positions created ≤ 200 / day (row 9)",
-    }),
-    contactForm: rateLimit({
-      key: "ip+email-hash",
-      perHour: 3,
-      perDay: 10,
-      note: "row 10",
-    }),
-    verificationSubmissions: rateLimit({
-      key: "user",
-      perDay: 5,
-      note: "per section (row 11)",
-    }),
-    nannyApplications: rateLimit({ key: "user", perDay: 10, note: "row 12" }),
-    adminRoutes: rateLimit({ key: "admin", perMinute: 600, note: "row 14" }),
-    // 07 §8 has **no row** for a signed-in parent creating a checkout or a portal session, and `1h` needed one:
-    // both server actions call out to the purchase provider, so a parent in a tight loop is unbounded provider
-    // cost against a real account. Row 13's "no rate limit" is scoped to provider-retried, signature-verified
-    // paths (webhooks and crons) and does not reach these. Keyed on the family, because that is who is charged.
-    // Owner: 07 §8 — a row 16 to ratify the numbers (`security-reviewer`, `1h` MEDIUM-1).
-    purchaseActions: rateLimit({
-      key: "user",
-      perMinute: 5,
-      perHour: 20,
-      note: "checkout + portal session creation (1h; 07 §8 has no row)",
-    }),
-  }),
+  rateLimits: RATE_LIMITS,
+  // ADR-134 / ADR-140 — **the fail-open allow-list, and the only one.** When the shared limiter store cannot
+  // answer, a policy named here continues and raises `ALERT_PROVIDER_DOWN`; every other policy refuses. It holds
+  // `publicRead` alone: the two unauthenticated reads it covers (`/api/areas`, the quick-match read) leak nothing
+  // and change nothing, so refusing them would turn one database blip into an outage of the public front door,
+  // while an authenticated, mutating, money or admin surface that failed open would hand back exactly the
+  // unbounded road its limit exists to close.
+  //
+  // It stands on that reason alone. It is **not** propped up by an edge fallback: `vercel.json` carries no
+  // firewall rule, so on a limiter outage these two reads have nothing else in front of them (B-44 is the rule
+  // BAI opens before the first ad). And fail-open is decided **here**, by name — never by a route file claiming
+  // the property for itself, which is what ADR-134 forbids and what REVIEW-2 found (M-2).
+  failOpenOnLimiterOutage: Object.freeze([
+    "publicRead",
+  ] as const) satisfies ReadonlyArray<RateLimitPolicyName>,
   authLockoutMinutes: 15, // 07 §8 row 3
   inviteLookupBlock: Object.freeze({ failedPerHour: 5, blockMinutes: 60 }), // 07 §8 row 7
   burstAlertMultiple: 10, // ALERT_RATE_LIMIT_BURST when a key trips ≥ 10× in an hour (07 §8)

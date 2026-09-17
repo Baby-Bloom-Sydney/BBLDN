@@ -2,11 +2,15 @@
 #
 # One job per protection-check name. `main` requires all eight (06 §3.4):
 #   typecheck · lint · test · build · allowed-imports · banned-literals · types-drift · gitleaks
+#   `limiter-call-sites` (ADR-140 (2)) is green from the PR that adds it and joins that list per ADR-109.
 #
 # Stage → job → what runs (05 §9 numbering):
 #   1 lint            → lint            eslint · prettier --check · CLAUDE.md = CODE-CLAUDE.md (local gate, see below)
 #   1 lint            → allowed-imports scripts/gen-boundary-rules.ts --check + eslint.boundaries.js (S6 — green;
 #                                        joins the required-check list per ADR-109 when this PR merges)
+#   1 lint            → limiter-call-sites  scripts/ci/check-limiter-call-sites.mjs — a rate-limit policy declared
+#                                        in config/security.ts with no consumer outside config/ fails (ADR-140 (2) /
+#                                        ADR-142 (2)); a recorded gap carries its reason in limiter-call-sites.allow.json
 #   1 lint            → banned-literals scripts/ci/check-config-literals.mjs · banned-words static pre-check ·
 #                                        env:check (.env.example) · crons:check (vercel.json) · process.env grep outside config
 #   2 typecheck       → typecheck       tsc --noEmit --pretty false
@@ -131,6 +135,19 @@ jobs:
       - name: eslint boundaries over src/modules (05 §7 rules 1–4) — S6; flat config, so ESLINT_USE_FLAT_CONFIG
         if: ${{ !cancelled() }}
         run: npm run lint:boundaries
+
+  limiter-call-sites:
+    name: limiter-call-sites
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: every declared rate-limit policy has a call site (ADR-140 (2); ADR-142 (2)) — recorded gaps in scripts/ci/limiter-call-sites.allow.json
+        run: npm run check:limiter-call-sites
 
   banned-literals:
     name: banned-literals
