@@ -14,6 +14,43 @@ import type {
 
 type Row = Record<string, unknown>;
 
+/**
+ * The keys `0019`'s `upsert_position()` strips from `p_columns` before it merges: each is either a typed
+ * argument of its own, a trigger's to own, or — the `call_*` four — `upsert_call_mirror()`'s to write.
+ */
+const RESERVED = [
+  "id",
+  "parent_id",
+  "source",
+  "stage",
+  "version",
+  "created_at",
+  "updated_at",
+  "details",
+  "call_state",
+  "call_type",
+  "call_requested_at",
+  "call_booking_id",
+] as const;
+
+const without = (columns: Row): Row =>
+  Object.fromEntries(
+    Object.entries(columns).filter(
+      ([key]) => !(RESERVED as ReadonlyArray<string>).includes(key),
+    ),
+  );
+
+type UpsertPositionArgs = {
+  readonly p_id: string;
+  readonly p_parent_id: string;
+  readonly p_source: string;
+  readonly p_stage: string;
+  readonly p_columns: Row;
+  readonly p_details: unknown;
+  readonly p_schedule: unknown;
+  readonly p_expected_version: number;
+};
+
 export type FakeSchemaPort = {
   readonly port: DataAccessPort;
   readonly calls: ReadonlyArray<{
@@ -81,10 +118,56 @@ export function fakeSchemaPort(
           };
         },
       }) as unknown as QueryHandle<AppDatabase, N>,
+    // `0019`'s `upsert_position()`, stood in so the round-trip claims above stay claims about state rather
+    // than about a call that returned `undefined`. It is a **stand-in, not a second implementation**: its
+    // fidelity to the real function is proven by `int.rpc-0019` against the applied migration, never here.
+    // Every other RPC is recorded and answers nothing, exactly as before.
     rpc: async (name, args) => {
       rpcs.push({ name, args });
-      return undefined as never;
+      if (name !== "upsert_position") return undefined as never;
+      return upsertPosition(args as unknown as UpsertPositionArgs) as never;
     },
+  };
+
+  const upsertPosition = (args: UpsertPositionArgs): number => {
+    const patch = without(args.p_columns);
+    const rows = of("nanny_positions");
+    let version: number;
+    if (args.p_expected_version === 0) {
+      version = 1;
+      rows.push({
+        ...patch,
+        id: args.p_id,
+        parent_id: args.p_parent_id,
+        source: args.p_source,
+        stage: args.p_stage,
+        version,
+        created_at: args.p_columns["created_at"],
+        details: args.p_details,
+      });
+    } else {
+      const held = rows.find((row) => row["id"] === args.p_id);
+      if (held === undefined) throw new Error("NOT_FOUND");
+      if (held["version"] !== args.p_expected_version)
+        throw new Error("VERSION_MISMATCH");
+      // `0006`'s `bump_version` trigger owns every number after the first, so the double bumps too —
+      // a double that left the number alone would make the store's compare-and-set untestable.
+      version = (held["version"] as number) + 1;
+      Object.assign(held, patch, {
+        source: args.p_source,
+        stage: args.p_stage,
+        version,
+        details: args.p_details ?? held["details"],
+      });
+    }
+    if (args.p_schedule !== null && args.p_schedule !== undefined) {
+      const roster = of("position_schedule");
+      const held = roster.find((row) => row["position_id"] === args.p_id);
+      if (held === undefined)
+        roster.push({ position_id: args.p_id, schedule: args.p_schedule });
+      else held["schedule"] = args.p_schedule;
+    }
+    return version;
   };
 
   const port: DataAccessPort = {

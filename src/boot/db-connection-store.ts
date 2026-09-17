@@ -8,7 +8,14 @@
 // One equality predicate is all 03 §1.4's `Query` offers, which is exactly what each read needs: by id, by
 // position, by parent. Nothing here filters by stage in SQL — `LIVE_STAGES` is the module's own definition and
 // must not be restated as a `WHERE`.
-import type { DataAccessPort } from "@/modules/auth";
+//
+// **The write is `upsert_connection()` (`0019`), not a table write.** ADR-127 makes one unit of work one RPC,
+// and every K row runs inside the caller's unit of work, so the table `insert` / `update` this store shipped
+// with was refused by the port (`write-outside-rpc`) the moment a real `uow` reached it — the gap P1-STORES
+// measured under all three of these stores. The two 02 §4.2 row 7 uniques (one live connection per
+// (position, nanny); one connection per position at OFFERED / CONFIRMED / ACTIVE) are raised **inside** the
+// function by name, so a refusal reads as what it is rather than as a bare duplicate-key error.
+import type { AppDatabase, DataAccessPort } from "@/modules/auth";
 import type { ConnectionRecord, ConnectionStore } from "@/modules/connections";
 import type {
   ConnectionId,
@@ -17,8 +24,11 @@ import type {
   PositionId,
   Result,
   UnitOfWork,
-  Uuid,
 } from "@/modules/shared-types";
+
+/** `0019`'s generated argument shape, so the `jsonb` seam is typed by the migration itself. */
+type ConnectionJson =
+  AppDatabase["Functions"]["upsert_connection"]["Args"]["p_columns"];
 
 type Row = {
   readonly id: string;
@@ -151,18 +161,21 @@ export function dbConnectionStore(port: DataAccessPort): ConnectionStore {
         {
           name: "connections.put",
           exec: async (q) => {
-            // `version: 1` is a create; `0007`'s `bump_version` trigger owns every later number, so the patch
-            // deliberately does not carry one — a client-supplied version would race the trigger.
-            if (record.version === 1) {
-              await q.from("connection_requests").insert({
-                id: record.connectionId as string,
-                ...patchOf(record),
-              });
-              return;
-            }
-            await q
-              .from("connection_requests")
-              .update(record.connectionId as string as Uuid, patchOf(record));
+            // `patchOf` is handed in whole: `0019` strips the keys it takes as typed arguments
+            // (`id` · `position_id` · `parent_id` · `nanny_id` · `stage` · `origin` · `version` ·
+            // `created_at`), so this adapter keeps no second copy of that list. `p_expected_version`
+            // is the version this record was derived FROM — a create sends `0`, which `0019` reads as
+            // "insert"; `0007`'s `bump_version` trigger still owns every number after the first.
+            await q.rpc("upsert_connection", {
+              p_id: record.connectionId as string,
+              p_position_id: record.positionId as string,
+              p_parent_id: record.parentId as string,
+              p_nanny_id: record.nannyId as string,
+              p_stage: record.stage,
+              p_origin: record.origin,
+              p_columns: patchOf(record) as unknown as ConnectionJson,
+              p_expected_version: record.version - 1,
+            });
           },
         },
         { scope: "service", ...(uow === undefined ? {} : { uow }) },

@@ -17,14 +17,15 @@
 // what `getJourneySteps` is handed — while `nanny_positions.parent_id` references `parents.id`. One keyed read
 // on `parents` each way, the same road `dbCallMirrorStore.findOpenForParent` takes.
 //
-// **The write is a table write, and that is pinned, not hidden.** ADR-127 makes one unit of work one RPC, and
-// every position write runs inside the caller's unit of work — so under a real `uow` the port refuses these
-// statements (`guard-unit-of-work-query.ts`, reason `write-outside-rpc`). `0006` / `0017` / `0018` define **no**
-// `SECURITY DEFINER` function for `nanny_positions`, so there is nothing to call instead; the exact function a
-// later `0019` owes is written down in `boot.test.ts` ("what 0019 owes") and measured there against the real
-// wired port. The same gap sits under `1g`'s `db-connection-store.ts` and `db-placement-store.ts`. The `uow` is
-// passed through rather than dropped, because dropping it would make this seam lie about atomicity.
-import type { DataAccessPort } from "@/modules/auth";
+// **The write is one RPC, which is what ADR-127 always said it would be.** P1-STORES wrote this store with a
+// table write and pinned the consequence rather than hiding it: one unit of work is one RPC, so under a real
+// `uow` the port refuses an `insert` / `update` on any table (`guard-unit-of-work-query.ts`, reason
+// `write-outside-rpc`), and `0006` / `0017` / `0018` defined no `SECURITY DEFINER` function to call instead.
+// `0019` is that function. `upsert_position()` writes `nanny_positions` **and** `position_schedule` in a single
+// transaction — which it must, because the guard lets exactly one `rpc()` through per unit of work, so the
+// roster could never have been a second statement. The `uow` is passed through rather than dropped, because
+// dropping it would make this seam lie about atomicity.
+import type { AppDatabase, DataAccessPort } from "@/modules/auth";
 import type { PositionRecord, PositionStore } from "@/modules/positions";
 import { err, nowInstant, ok } from "@/modules/platform";
 import type {
@@ -34,7 +35,6 @@ import type {
   PositionId,
   Result,
   UnitOfWork,
-  Uuid,
 } from "@/modules/shared-types";
 import { positionRow } from "./position-row";
 import { positionRecordFromRow } from "./position-record-from-row";
@@ -53,6 +53,10 @@ type Party = { readonly userId: ParentId; readonly recipient: Recipient };
 type ScheduleBlocks = Parameters<
   typeof positionRecordFromRow
 >[0]["scheduleBlocks"];
+
+/** `0019`'s generated argument shape, so the three `jsonb` seams are typed by the migration itself. */
+type UpsertPositionArgs = AppDatabase["Functions"]["upsert_position"]["Args"];
+type PositionJson = UpsertPositionArgs["p_columns"];
 
 const service = { scope: "service" as const };
 
@@ -177,35 +181,6 @@ export function dbPositionStore(
     return ok(Object.freeze(records));
   };
 
-  /** `position_schedule` is keyed on the position, so the roster is a delete-free upsert of one row. */
-  const writeSchedule = async (
-    record: PositionRecord,
-    uow?: UnitOfWork,
-  ): Promise<Result<void>> => {
-    const schedule = record.detail.schedule;
-    if (schedule === null) return ok(undefined);
-    const existing = await blocksOf(record.positionId as string);
-    if (!existing.ok) return existing;
-    return port.run(
-      {
-        name: "positions.writeSchedule",
-        exec: async (q) => {
-          const patch = { schedule: [...schedule.blocks] };
-          if (existing.value === null) {
-            await q
-              .from("position_schedule")
-              .insert({ position_id: record.positionId as string, ...patch });
-            return;
-          }
-          await q
-            .from("position_schedule")
-            .update(record.positionId as string as Uuid, patch);
-        },
-      },
-      { ...service, ...(uow === undefined ? {} : { uow }) },
-    );
-  };
-
   return Object.freeze({
     get: async (positionId: PositionId) => {
       const row = await port.run(
@@ -244,31 +219,38 @@ export function dbPositionStore(
           reason: "E_ENTITY_NOT_FOUND",
         });
       const row = positionRow(record, parentRowId.value, clock());
-      const written = await port.run(
+      const schedule = record.detail.schedule;
+      return port.run(
         {
           name: "positions.put",
           exec: async (q) => {
-            // `version: 1` is a create; `0006`'s `bump_version` trigger owns every later number, so the patch
-            // deliberately carries none — a client-supplied version would race the trigger (1g's rule).
-            if (record.version === 1) {
-              await q.from("nanny_positions").insert(row);
-              return;
-            }
-            const {
-              id: _id,
-              version: _version,
-              created_at: _createdAt,
-              ...patch
-            } = row;
-            await q
-              .from("nanny_positions")
-              .update(record.positionId as string as Uuid, patch);
+            // The whole row goes in as `p_columns`: `0019` strips the keys it takes as typed arguments
+            // (`id` · `parent_id` · `source` · `stage` · `version` · `created_at` · `details`) and every
+            // `call_*` key, so `upsert_call_mirror()` stays the one writer of the call's state and this
+            // adapter does not have to keep a second copy of that list in step with the migration.
+            // `p_expected_version` is the version this record was derived FROM: every slice computes
+            // `existing.version + 1` (`create-positions-slice.ts`), so a create sends `0` and `0019`
+            // reads `0` as "insert". A mismatch is refused, never overwritten (02 C-9).
+            await q.rpc("upsert_position", {
+              p_id: record.positionId as string,
+              p_parent_id: parentRowId.value as string,
+              p_source: record.source,
+              p_stage: record.stage,
+              p_columns: row as unknown as PositionJson,
+              p_details: (row.details ?? null) as PositionJson,
+              // A null roster is the absence of a `position_schedule` row (02 §4.2 row 6 — no row means
+              // flexible, full marks), and `0019` leaves an existing one alone rather than deleting it:
+              // `Query` has no delete and the module has never asked for one.
+              p_schedule:
+                schedule === null
+                  ? null
+                  : ([...schedule.blocks] as unknown as PositionJson),
+              p_expected_version: record.version - 1,
+            });
           },
         },
         { ...service, ...(uow === undefined ? {} : { uow }) },
       );
-      if (!written.ok) return written;
-      return writeSchedule(record, uow);
     },
   });
 }

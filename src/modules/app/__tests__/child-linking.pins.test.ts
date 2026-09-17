@@ -50,13 +50,19 @@ describe("★ PIN — 04 §4.4 c1: a nanny adds an existing client and mints a t
   it.fails(
     "a nanny may mint a `nanny_to_parent` invite for the child she just created (owner: 02 §4.6)",
     async () => {
-      // `children` has **no creator column**, and `user_has_child_access` admits only the parent, an actively
-      // linked nanny, or an admin. So a nanny cannot read back the child she created, let alone prove the row
-      // is hers — there is nothing in the schema that says so. 04 §4.4 c1 and the parent's path E both depend
-      // on this working. The fix is 02 §4.6's: `children` wants a `created_by_user_id`, or
-      // `user_has_child_access` a fourth arm for the unlinked creator of an unclaimed child. Until then
-      // `invite-authorisation.ts` authorises a **linked** nanny or an admin, path E runs from the admin's side
-      // (S-A-11, `09.28`), and this is the claim that flips when the column lands.
+      // **The schema half landed in `0019`; this stays red because the module half did not, and flipping it
+      // now would be the tautology ADR-120 rule 2 exists to stop.** `children.created_by_user_id` exists,
+      // is stamped from the session by a trigger so it cannot be spoofed, and `user_has_child_access()` has
+      // its fourth arm for the creator of an **unclaimed** child — all three measured in `int.rpc-0019`
+      // against the applied migration. What has not moved is this module: `ChildFacts` carries only
+      // `{ parentUserId, linkedNannyUserIds }`, `createChild` never sends a creator (its insert runs at
+      // service scope, where the stamp trigger deliberately keeps what it is given), and the store never
+      // reads the column back. Making `mayMint` answer `true` before those three land would turn a green
+      // test into a claim about nothing, which is exactly the failure ADR-120 was written after.
+      // **What flips this, precisely:** `ChildFacts` gains `createdByUserId`; `mayMint`'s `nanny_to_parent`
+      // arm accepts it beside `linkedNannyUserIds`; `insertChild` writes the creator; the store selects it.
+      // Until then `invite-authorisation.ts` authorises a **linked** nanny or an admin, and path E runs from
+      // the admin's side (S-A-11, `09.28`).
       const allowed = inviteAuthorisation.mayMint(
         nannyActor,
         "nanny_to_parent",
@@ -93,29 +99,51 @@ describe("★ PIN — 04 §4.4 c1: a nanny adds an existing client and mints a t
 });
 
 describe("★ PIN — 07 §5.2: 'links and invites are written only by the RPCs'", () => {
+  // **Half of this pin is flipped by `0019`, and half of it is not — so it is split rather than declared
+  // closed.** `1i` wrote one claim covering two facts: that the definers exist, and that the module goes
+  // through them. `0019` makes the first true and leaves the second exactly where `1i` left it.
+  //
+  // `1i` also addressed the assertion at `0012_app.sql` specifically, and noted it. That was a defect in the
+  // pin's *address*, not in its claim — the functions were always going to arrive in a later migration — so
+  // the read below is re-pointed at the whole ordered set. The claim is unchanged.
+  it("the mint and the revoke exist as SECURITY DEFINER functions in the migration set (0019)", async () => {
+    // Read the migration set itself rather than the generated types: the claim is about what `supabase/`
+    // ships, and reaching into another module's inside for it would break the boundary lint (correctly).
+    const { readdirSync, readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    const dir = resolve(__dirname, "../../../../supabase/migrations");
+    const sql = readdirSync(dir)
+      .filter((name) => name.endsWith(".sql"))
+      .map((name) => readFileSync(resolve(dir, name), "utf8"))
+      .join("\n");
+
+    expect(sql).toContain("function public.create_child_invite");
+    expect(sql).toContain("function public.revoke_child_invite");
+    // and they are the session road, which is what makes them a second gate rather than a rename of the
+    // service-scoped write they replace
+    expect(sql).toContain(
+      "grant execute on function public.create_child_invite(uuid, public.invite_direction, text) to authenticated",
+    );
+  });
+
   it.fails(
-    "the mint and the revoke go through SECURITY DEFINER functions, not a service-scoped write (owner: a `0019`)",
+    "the module's store calls those definers instead of writing `child_invites` at service scope (owner: the unit that wires `0019`)",
     async () => {
-      // `0012` ships `connect_child_invite`, `ensure_placement`, `remove_nanny_from_child` and
-      // `nanny_leave_child` — the claim and the unlinks. It ships **no function for the mint and none for the
-      // revoke**, and `child_invites` has a SELECT policy with no client INSERT or UPDATE. So this module
-      // writes both at service scope, and `invite-authorisation.ts` is the *only* authorisation there is:
-      // there is no second check in Postgres behind it.
-      //
-      // A `0019` should add `create_child_invite(p_child_id, p_direction)` and
-      // `revoke_child_invite(p_invite_id, p_reason)`, both SECURITY DEFINER with `search_path` pinned,
-      // asserting the same two rules in SQL. This unit may not write a migration, so the claim is pinned and
-      // the functions are named in `child-linking-store.ts`'s header.
-      // Read the migration set itself rather than the generated types: the claim is about what `supabase/`
-      // ships, and reaching into another module's inside for it would break the boundary lint (correctly).
+      // The other half, still red and still for `1i`'s reason. `0019` put the two rules in Postgres; until
+      // `db-child-linking-store.ts` calls them, `invite-authorisation.ts` is STILL the only gate a request
+      // actually passes through, and the definers are a second gate nobody walks past. Wiring them is not a
+      // rename: both functions derive their authority from `auth.uid()` and refuse a null one, so the calls
+      // must move from `{ scope: "service" }` to the caller's session — which is a change to this module's
+      // store, not to the migration.
       const { readFileSync } = await import("node:fs");
       const { resolve } = await import("node:path");
-      const sql = readFileSync(
-        resolve(__dirname, "../../../../supabase/migrations/0012_app.sql"),
+      const store = readFileSync(
+        resolve(__dirname, "../child-linking/lib/db-child-linking-store.ts"),
         "utf8",
       );
 
-      expect(sql).toContain("function public.create_child_invite");
+      expect(store).toContain('rpc("create_child_invite"');
+      expect(store).toContain('rpc("revoke_child_invite"');
     },
   );
 
