@@ -10,7 +10,6 @@
 //
 // The mint retries on a token collision rather than trusting one draw. At 32^8 a clash is vanishingly rare, but
 // `token` is `unique` and a rare unhandled failure on a share link is a support call nobody can reproduce.
-import { URLS } from "@/modules/config";
 import { ok } from "@/modules/platform";
 import type { Actor, ChildId, InviteId, UserId } from "@/modules/shared-types";
 import type {
@@ -42,7 +41,7 @@ export function inviteMethods(
   const invitesOf = async (childId: ChildId) => {
     const rows = await deps.store.invitesForChild(childId);
     return rows.ok
-      ? ok(rows.value.map((row) => childInviteOf(row, URLS.invite)))
+      ? ok(rows.value.map((row) => childInviteOf(row, deps.inviteBaseUrl)))
       : carryLinkStoreError(rows.error);
   };
 
@@ -102,7 +101,8 @@ export function inviteMethods(
         (row) => row.direction === direction && row.status === "pending",
       );
       // No rotation. The same link, handed over again — which is exactly what "resend" is (S-A-11).
-      if (pending !== undefined) return ok(childInviteOf(pending, URLS.invite));
+      if (pending !== undefined)
+        return ok(childInviteOf(pending, deps.inviteBaseUrl));
 
       const createdBy = actingUserId(actor);
       let lastError: { readonly message?: string } | null = null;
@@ -114,7 +114,7 @@ export function inviteMethods(
           created_by_user_id: createdBy,
         });
         if (written.ok) {
-          const made = childInviteOf(written.value, URLS.invite);
+          const made = childInviteOf(written.value, deps.inviteBaseUrl);
           // 03 §9.3 "App / invite": ids only. The token is NOT a prop — an event log is a place a token would
           // outlive its invite, and `props` is explicitly "ids only, no PII" (02 §4.6 `events`).
           await deps.events.emit({
@@ -156,7 +156,7 @@ export function inviteMethods(
           "Only whoever shared this link can close it.",
         );
       if (row.value.status !== "pending")
-        return ok(childInviteOf(row.value, URLS.invite));
+        return ok(childInviteOf(row.value, deps.inviteBaseUrl));
 
       const patched = await deps.store.updateInvite(inviteId, {
         status: "revoked",
@@ -164,7 +164,7 @@ export function inviteMethods(
         revoked_reason: reason,
       });
       return patched.ok
-        ? ok(childInviteOf(patched.value, URLS.invite))
+        ? ok(childInviteOf(patched.value, deps.inviteBaseUrl))
         : carryLinkStoreError(patched.error);
     },
   };
