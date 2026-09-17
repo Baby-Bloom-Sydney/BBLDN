@@ -39,8 +39,10 @@ async function capture(
   if (!(await consumeFunnelStepLimit("S-X-15")))
     return refuseFunnel(ACTION, "rate-limited", { reason: "rate-limited" });
   const captured = await nannyLeadStore.capture({ ...input, source: "apply" });
-  if (!captured.ok) return refuseFunnel(ACTION, "lead-not-captured", captured.error);
-  if (captured.value.state === "has-account") return ok({ next: "sign-in" as const });
+  if (!captured.ok)
+    return refuseFunnel(ACTION, "lead-not-captured", captured.error);
+  if (captured.value.state === "has-account")
+    return ok({ next: "sign-in" as const });
   carriedTokenCookie.set("nannyLead", captured.value.leadId);
   if (captured.value.state === "created")
     await Events.emit({
@@ -55,7 +57,9 @@ export const saveNannyApplicationAction: NannyApplicationAction = async (
   _previous: unknown,
   formData: FormData,
 ) => {
-  const parsed = parseForm(nannyApplicationSchema, formData, FIELDS, ["ageGroups"]);
+  const parsed = parseForm(nannyApplicationSchema, formData, FIELDS, [
+    "ageGroups",
+  ]);
   if (!parsed.ok) return toActionResult(parsed);
   return toActionResult(await capture(parsed.value));
 };

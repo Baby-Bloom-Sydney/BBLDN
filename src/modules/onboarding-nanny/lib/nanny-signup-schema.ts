@@ -28,7 +28,10 @@ const account = z.object({
   }),
 });
 
-const passwordsMatch = { message: "The two passwords don't match.", path: ["confirmPassword"] };
+const passwordsMatch = {
+  message: "The two passwords don't match.",
+  path: ["confirmPassword"],
+};
 
 const road = z.discriminatedUnion("path", [
   z
@@ -46,7 +49,11 @@ const road = z.discriminatedUnion("path", [
 export const nannySignupSchema = z.preprocess(
   (raw) =>
     typeof raw === "object" && raw !== null
-      ? { ...raw, path: (raw as { path?: unknown }).path === "invite" ? "invite" : "apply" }
+      ? {
+          ...raw,
+          path:
+            (raw as { path?: unknown }).path === "invite" ? "invite" : "apply",
+        }
       : raw,
   road,
 );

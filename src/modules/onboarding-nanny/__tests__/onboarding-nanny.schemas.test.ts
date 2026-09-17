@@ -20,8 +20,10 @@ const APPLICATION = {
   ageGroups: ["babies", "toddlers"],
 };
 
-const firstIssue = (result: { success: boolean; error?: { issues: ReadonlyArray<{ path: ReadonlyArray<PropertyKey> }> } }) =>
-  result.success ? null : String(result.error?.issues[0]?.path[0]);
+const firstIssue = (result: {
+  success: boolean;
+  error?: { issues: ReadonlyArray<{ path: ReadonlyArray<PropertyKey> }> };
+}) => (result.success ? null : String(result.error?.issues[0]?.path[0]));
 
 describe("onboarding-nanny — nannyApplicationSchema (S-X-15, 04 §4.1 rows 2–5)", () => {
   it("accepts the London answers and normalises the mobile to E.164 with the config prefix", () => {
@@ -46,11 +48,18 @@ describe("onboarding-nanny — nannyApplicationSchema (S-X-15, 04 §4.1 rows 2�
     [{ email: "not-an-email" }, "email"],
     [{ firstName: " " }, "firstName"],
   ])("refuses %j naming %s", (patch, field) => {
-    expect(firstIssue(nannyApplicationSchema.safeParse({ ...APPLICATION, ...patch }))).toBe(field);
+    expect(
+      firstIssue(
+        nannyApplicationSchema.safeParse({ ...APPLICATION, ...patch }),
+      ),
+    ).toBe(field);
   });
 
   it("a 'no' to the Enhanced DBS question is a valid answer — the stop is the screen's, not the schema's", () => {
-    const parsed = nannyApplicationSchema.safeParse({ ...APPLICATION, hasEnhancedDbs: "no" });
+    const parsed = nannyApplicationSchema.safeParse({
+      ...APPLICATION,
+      hasEnhancedDbs: "no",
+    });
     expect(parsed.success && parsed.data.hasEnhancedDbs).toBe(false);
   });
 });
@@ -58,17 +67,22 @@ describe("onboarding-nanny — nannyApplicationSchema (S-X-15, 04 §4.1 rows 2�
 describe("onboarding-nanny — nannyPortfolioSchema (S-X-17)", () => {
   const PORTFOLIO = {
     roleTypes: ["full-time", "nanny-share"],
-    availability: JSON.stringify({ monday: ["morning", "afternoon"], sunday: [] }),
+    availability: JSON.stringify({
+      monday: ["morning", "afternoon"],
+      sunday: [],
+    }),
     rateMin: "15",
     rateMax: "20",
   };
 
-  it("parses the £ band into pence and the availability grid into the one shared shape", () => {
+  it("parses the rate band into pence and the availability grid into the one shared shape", () => {
     const parsed = nannyPortfolioSchema.safeParse(PORTFOLIO);
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
-    expect(parsed.data.rateBand).toEqual({ minPence: 1500, maxPence: 2000 });
-    expect(parsed.data.availability).toEqual({ monday: ["morning", "afternoon"] });
+    expect(parsed.data.rateBand).toEqual({ minPence: 1500, maxPence: 2000 }); // config-literal-ok: a fixture's own rate, not a PRICES value
+    expect(parsed.data.availability).toEqual({
+      monday: ["morning", "afternoon"],
+    });
     expect(parsed.data.roleTypes).toEqual(["full-time", "nanny-share"]);
   });
 
@@ -81,27 +95,40 @@ describe("onboarding-nanny — nannyPortfolioSchema (S-X-17)", () => {
     [{ availability: "not json" }, "availability"],
     [{ availability: JSON.stringify({}) }, "availability"],
   ])("refuses %j naming %s", (patch, field) => {
-    expect(firstIssue(nannyPortfolioSchema.safeParse({ ...PORTFOLIO, ...patch }))).toBe(field);
+    expect(
+      firstIssue(nannyPortfolioSchema.safeParse({ ...PORTFOLIO, ...patch })),
+    ).toBe(field);
   });
 });
 
 describe("onboarding-nanny — nannyBioSchema (S-X-18)", () => {
   it("needs a few sentences, not a word", () => {
     expect(firstIssue(nannyBioSchema.safeParse({ bio: "Hi" }))).toBe("bio");
-    expect(nannyBioSchema.safeParse({ bio: "Ten years with under-fives across south London." }).success).toBe(true);
+    expect(
+      nannyBioSchema.safeParse({
+        bio: "Ten years with under-fives across south London.",
+      }).success,
+    ).toBe(true);
   });
 });
 
 describe("onboarding-nanny — nannySignupSchema (S-X-19 / S-X-07)", () => {
   const PASSWORD = "a".repeat(SECURITY.password.minLength);
-  const APPLY = { path: "apply", password: PASSWORD, confirmPassword: PASSWORD, consent: "on" };
+  const APPLY = {
+    path: "apply",
+    password: PASSWORD,
+    confirmPassword: PASSWORD,
+    consent: "on",
+  };
 
   it("the /apply road needs only the password and the AGR-02 tick — name and email are the lead's", () => {
     expect(nannySignupSchema.safeParse(APPLY).success).toBe(true);
   });
 
   it("the invite road needs the name and the email too", () => {
-    expect(firstIssue(nannySignupSchema.safeParse({ ...APPLY, path: "invite" }))).toBe("firstName");
+    expect(
+      firstIssue(nannySignupSchema.safeParse({ ...APPLY, path: "invite" })),
+    ).toBe("firstName");
     expect(
       nannySignupSchema.safeParse({
         ...APPLY,
@@ -118,7 +145,9 @@ describe("onboarding-nanny — nannySignupSchema (S-X-19 / S-X-07)", () => {
     [{ confirmPassword: "different-password!!" }, "confirmPassword"],
     [{ consent: "" }, "consent"],
   ])("refuses %j naming %s", (patch, field) => {
-    expect(firstIssue(nannySignupSchema.safeParse({ ...APPLY, ...patch }))).toBe(field);
+    expect(
+      firstIssue(nannySignupSchema.safeParse({ ...APPLY, ...patch })),
+    ).toBe(field);
   });
 
   it("an unknown path falls back to /apply rather than refusing", () => {

@@ -4,10 +4,16 @@
 import { FUNNEL_OPTIONS } from "../../lib/funnel-options";
 import { FIELD_STYLES } from "./field-styles";
 
-export function ResidencyStep({ defaultValue }: { readonly defaultValue?: string }) {
+export function ResidencyStep({
+  defaultValue,
+}: {
+  readonly defaultValue?: string;
+}) {
   return (
     <fieldset className="space-y-2">
-      <legend className={FIELD_STYLES.label}>Which of these describes you?</legend>
+      <legend className={FIELD_STYLES.label}>
+        Which of these describes you?
+      </legend>
       {FUNNEL_OPTIONS.rtwStatus.map((option) => (
         <label key={option.key} className={FIELD_STYLES.choice}>
           <input

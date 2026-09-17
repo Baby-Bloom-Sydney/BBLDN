@@ -13,5 +13,7 @@ const HREFS = Object.freeze({
 
 export async function loadNannyHub(): Promise<NannyHubView | null> {
   const profile = await loadNannyProfile();
-  return profile === null ? null : nannyHubView(profile, MATCHING.minVerificationLevel, HREFS);
+  return profile === null
+    ? null
+    : nannyHubView(profile, MATCHING.minVerificationLevel, HREFS);
 }

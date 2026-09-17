@@ -19,7 +19,10 @@ export async function callerIpKey(): Promise<string> {
   }
   const address = (forwarded ?? "").split(",")[0]?.trim() ?? "";
   if (address === "") return NO_ADDRESS;
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(address));
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(address),
+  );
   return Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("")

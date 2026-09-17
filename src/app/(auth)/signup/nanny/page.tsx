@@ -3,7 +3,11 @@
 // the token itself is the action's to read, never a prop, never a hidden field.
 import type { Metadata } from "next";
 import { SECURITY, URLS } from "@/modules/config";
-import { NannySignupForm, carriedTokenCookie, signUpNannyAction } from "@/modules/onboarding-nanny";
+import {
+  NannySignupForm,
+  carriedTokenCookie,
+  signUpNannyAction,
+} from "@/modules/onboarding-nanny";
 
 export const metadata: Metadata = { title: "Create your account" };
 export const dynamic = "force-dynamic";

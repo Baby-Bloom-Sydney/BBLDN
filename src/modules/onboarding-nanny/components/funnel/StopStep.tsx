@@ -6,7 +6,9 @@ import { useEffect, useRef } from "react";
 import type { FunnelStopKind } from "../../types";
 import { FIELD_STYLES } from "./field-styles";
 
-const STOPS: Readonly<Record<FunnelStopKind, { readonly heading: string; readonly body: string }>> = {
+const STOPS: Readonly<
+  Record<FunnelStopKind, { readonly heading: string; readonly body: string }>
+> = {
   "outside-london": {
     heading: "We currently work across Greater London",
     body: "If you're outside London we can't introduce you to a family yet. If your area is in London and you couldn't find it, try the first part of your postcode.",
@@ -17,19 +19,38 @@ const STOPS: Readonly<Record<FunnelStopKind, { readonly heading: string; readonl
   },
 };
 
-export function StopStep({ kind, onBack }: { readonly kind: FunnelStopKind; readonly onBack: () => void }) {
+export function StopStep({
+  kind,
+  onBack,
+}: {
+  readonly kind: FunnelStopKind;
+  readonly onBack: () => void;
+}) {
   const ref = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     ref.current?.focus();
   }, [kind]);
   const stop = STOPS[kind];
   return (
-    <section aria-labelledby="funnel-stop-heading" aria-live="polite" className="py-8">
-      <h1 id="funnel-stop-heading" ref={ref} tabIndex={-1} className="text-2xl font-bold text-slate-900 focus:outline-none">
+    <section
+      aria-labelledby="funnel-stop-heading"
+      aria-live="polite"
+      className="py-8"
+    >
+      <h1
+        id="funnel-stop-heading"
+        ref={ref}
+        tabIndex={-1}
+        className="text-2xl font-bold text-slate-900 focus:outline-none"
+      >
         {stop.heading}
       </h1>
       <p className="mt-3 text-sm text-slate-700">{stop.body}</p>
-      <button type="button" onClick={onBack} className={`mt-6 ${FIELD_STYLES.secondary}`}>
+      <button
+        type="button"
+        onClick={onBack}
+        className={`mt-6 ${FIELD_STYLES.secondary}`}
+      >
         Go back
       </button>
     </section>

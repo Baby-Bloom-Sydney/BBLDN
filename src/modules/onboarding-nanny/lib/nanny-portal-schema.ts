@@ -7,7 +7,13 @@ import { nannyApplicationSchema } from "./nanny-application-schema";
 import { nannyBioSchema } from "./nanny-bio-schema";
 import { nannyPortfolioSchema } from "./nanny-portfolio-schema";
 
-const { firstName: _f, lastName: _l, email: _e, mobile: _m, ...answers } = nannyApplicationSchema.shape;
+const {
+  firstName: _f,
+  lastName: _l,
+  email: _e,
+  mobile: _m,
+  ...answers
+} = nannyApplicationSchema.shape;
 
 export const nannyPortalSchema = z
   .object(answers)

@@ -11,7 +11,10 @@ import { ErrorSummary } from "./ErrorSummary";
 import { FIELD_STYLES } from "./field-styles";
 
 type StepResult = ClientResult<unknown, NannyFunnelErrorDetails>;
-type StepAction = (previous: unknown, formData: FormData) => Promise<StepResult>;
+type StepAction = (
+  previous: unknown,
+  formData: FormData,
+) => Promise<StepResult>;
 
 const collectOnly: StepAction = async () => ({ ok: true, value: undefined });
 
@@ -41,9 +44,16 @@ export function StepForm({
   readonly submitLabel: string;
   readonly children: React.ReactNode;
 }) {
-  const [state, formAction] = useFormState(action ?? collectOnly, null as StepResult | null);
+  const [state, formAction] = useFormState(
+    action ?? collectOnly,
+    null as StepResult | null,
+  );
   const failed = state !== null && !state.ok;
-  const badField = failed ? state.error.details?.reason === "invalid-input" ? state.error.details.field : null : null;
+  const badField = failed
+    ? state.error.details?.reason === "invalid-input"
+      ? state.error.details.field
+      : null
+    : null;
 
   useEffect(() => {
     if (state === null) return;
@@ -62,7 +72,14 @@ export function StepForm({
       {Object.entries(hidden ?? {}).flatMap(([name, value]) =>
         typeof value === "string"
           ? [<input key={name} type="hidden" name={name} value={value} />]
-          : value.map((item, index) => <input key={`${name}-${index}`} type="hidden" name={name} value={item} />),
+          : value.map((item, index) => (
+              <input
+                key={`${name}-${index}`}
+                type="hidden"
+                name={name}
+                value={item}
+              />
+            )),
       )}
       {children}
       <ErrorSummary message={failed ? state.error.message : null} />

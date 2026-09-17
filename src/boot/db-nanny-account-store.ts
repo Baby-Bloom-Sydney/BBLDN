@@ -11,7 +11,14 @@ import type {
   NannyStoreErrorDetails,
 } from "@/modules/onboarding-nanny";
 import { ok } from "@/modules/platform";
-import type { E164, Email, ISODate, NannyId, Result, UserId } from "@/modules/shared-types";
+import type {
+  E164,
+  Email,
+  ISODate,
+  NannyId,
+  Result,
+  UserId,
+} from "@/modules/shared-types";
 
 const session = { scope: "session" as const };
 
@@ -19,27 +26,29 @@ const asStore = <T>(result: Result<T>): Result<T, NannyStoreErrorDetails> =>
   result as Result<T, NannyStoreErrorDetails>;
 
 /** The camel → snake map of ADR-152 (2)'s static column list, one place, so the definer and this file agree. */
-const PROFILE_COLUMNS: Readonly<Record<keyof NannyProfilePatch, string>> = Object.freeze({
-  bio: "bio",
-  yearsExperience: "years_experience",
-  qualification: "qualification",
-  certificates: "certificates",
-  languages: "languages",
-  hasCar: "has_car",
-  hasDrivingLicence: "has_driving_licence",
-  isNonSmoker: "is_non_smoker",
-  comfortableWithPets: "comfortable_with_pets",
-  hourlyRateMinPence: "hourly_rate_min_pence",
-  availability: "availability",
-  availableFrom: "available_from",
-});
+const PROFILE_COLUMNS: Readonly<Record<keyof NannyProfilePatch, string>> =
+  Object.freeze({
+    bio: "bio",
+    yearsExperience: "years_experience",
+    qualification: "qualification",
+    certificates: "certificates",
+    languages: "languages",
+    hasCar: "has_car",
+    hasDrivingLicence: "has_driving_licence",
+    isNonSmoker: "is_non_smoker",
+    comfortableWithPets: "comfortable_with_pets",
+    hourlyRateMinPence: "hourly_rate_min_pence",
+    availability: "availability",
+    availableFrom: "available_from",
+  });
 
-const CONTACT_COLUMNS: Readonly<Record<keyof NannyContactPatch, string>> = Object.freeze({
-  mobile: "mobile",
-  district: "district",
-  area: "area",
-  dateOfBirth: "date_of_birth",
-});
+const CONTACT_COLUMNS: Readonly<Record<keyof NannyContactPatch, string>> =
+  Object.freeze({
+    mobile: "mobile",
+    district: "district",
+    area: "area",
+    dateOfBirth: "date_of_birth",
+  });
 
 const toColumns = <K extends string>(
   map: Readonly<Record<K, string>>,
@@ -81,7 +90,8 @@ type ProfileRow = {
   readonly date_of_birth: string | null;
 };
 
-const opt = <T>(key: string, value: T | null | undefined) => (value === null || value === undefined ? {} : { [key]: value });
+const opt = <T>(key: string, value: T | null | undefined) =>
+  value === null || value === undefined ? {} : { [key]: value };
 
 const profileOf = (nanny: NannyRow, profile: ProfileRow | null): NannyProfile =>
   Object.freeze({
@@ -104,18 +114,28 @@ const profileOf = (nanny: NannyRow, profile: ProfileRow | null): NannyProfile =>
     ...opt("isNonSmoker", nanny.is_non_smoker),
     ...opt("comfortableWithPets", nanny.comfortable_with_pets),
     ...opt("hourlyRateMinPence", nanny.hourly_rate_min_pence),
-    ...opt("availability", nanny.availability as NannyProfile["availability"] | null),
+    ...opt(
+      "availability",
+      nanny.availability as NannyProfile["availability"] | null,
+    ),
     ...opt("availableFrom", nanny.available_from as ISODate | null),
     isIsolated: nanny.is_isolated,
-    verificationLevel: nanny.verification_level as NannyProfile["verificationLevel"],
+    verificationLevel:
+      nanny.verification_level as NannyProfile["verificationLevel"],
     profileVisible: nanny.profile_visible,
   });
 
-export function dbNannyAccountStore(port: DataAccessPort, currentUserId: () => Promise<Result<UserId | null>>): NannyAccountStore {
+export function dbNannyAccountStore(
+  port: DataAccessPort,
+  currentUserId: () => Promise<Result<UserId | null>>,
+): NannyAccountStore {
   return Object.freeze({
     create: async (input) =>
       asStore(
-        await port.run<{ readonly nannyId: NannyId; readonly leadConverted: boolean }>(
+        await port.run<{
+          readonly nannyId: NannyId;
+          readonly leadConverted: boolean;
+        }>(
           {
             name: "onboarding-nanny.createAccount",
             exec: async (q) => {
@@ -128,8 +148,14 @@ export function dbNannyAccountStore(port: DataAccessPort, currentUserId: () => P
                 p_area: input.area ?? undefined,
                 p_lead_id: input.leadId ?? undefined,
                 p_profile: toColumns(PROFILE_COLUMNS, input.profile) as never,
-              })) as { readonly nanny_id: string; readonly lead_converted: boolean };
-              return { nannyId: out.nanny_id as NannyId, leadConverted: out.lead_converted === true };
+              })) as {
+                readonly nanny_id: string;
+                readonly lead_converted: boolean;
+              };
+              return {
+                nannyId: out.nanny_id as NannyId,
+                leadConverted: out.lead_converted === true,
+              };
             },
           },
           session,
@@ -140,7 +166,9 @@ export function dbNannyAccountStore(port: DataAccessPort, currentUserId: () => P
         await port.run<boolean>(
           {
             name: "onboarding-nanny.liftIsolation",
-            exec: async (q) => (await q.rpc("lift_nanny_isolation", undefined as never)) === true,
+            exec: async (q) =>
+              (await q.rpc("lift_nanny_isolation", undefined as never)) ===
+              true,
           },
           session,
         ),
@@ -171,9 +199,15 @@ export function dbNannyAccountStore(port: DataAccessPort, currentUserId: () => P
           {
             name: "onboarding-nanny.readProfile",
             exec: async (q) => {
-              const nanny = (await q.from("nannies").eq("user_id", userId as string).single()) as NannyRow | null;
+              const nanny = (await q
+                .from("nannies")
+                .eq("user_id", userId as string)
+                .single()) as NannyRow | null;
               if (nanny === null) return null;
-              const profile = (await q.from("user_profiles").eq("user_id", userId as string).single()) as ProfileRow | null;
+              const profile = (await q
+                .from("user_profiles")
+                .eq("user_id", userId as string)
+                .single()) as ProfileRow | null;
               return profileOf(nanny, profile);
             },
           },

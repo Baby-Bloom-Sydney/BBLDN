@@ -64,7 +64,8 @@ export function memoryNannyLeadStore(
       replace(fresh(id, input));
       return ok({
         leadId: id,
-        state: existing === undefined ? ("created" as const) : ("updated" as const),
+        state:
+          existing === undefined ? ("created" as const) : ("updated" as const),
       });
     },
     get: async (leadId) =>
@@ -79,7 +80,8 @@ export function memoryNannyLeadStore(
     rows: () => state.rows,
     markConverted: (leadId) => {
       const row = state.rows.find((entry) => entry.id === leadId);
-      if (row !== undefined) replace(Object.freeze({ ...row, status: "converted" }));
+      if (row !== undefined)
+        replace(Object.freeze({ ...row, status: "converted" }));
     },
   });
 }

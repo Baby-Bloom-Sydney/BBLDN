@@ -22,18 +22,26 @@ export const saveNannyProfileStepAction: NannyProfileStepAction = async (
   // 01 §4d defence in depth: the refusal keeps `auth`'s code and sentence; its `details` are the gate's, not
   // the form's, and stay server-side.
   if (!session.ok)
-    return toActionResult(err<NannyFunnelErrorDetails>(session.error.code, session.error.message));
+    return toActionResult(
+      err<NannyFunnelErrorDetails>(session.error.code, session.error.message),
+    );
   const index = Number(formData.get("step"));
   const step = Number.isInteger(index) ? PROFILE_STEPS[index] : undefined;
   if (step === undefined)
     return toActionResult(
-      err<NannyFunnelErrorDetails>("VALIDATION", "That step doesn't exist.", { reason: "invalid-input", field: "step" }),
+      err<NannyFunnelErrorDetails>("VALIDATION", "That step doesn't exist.", {
+        reason: "invalid-input",
+        field: "step",
+      }),
     );
   const { schema, toPatch } = nannyProfileStepSchemas[step.id];
   const parsed = parseForm(schema, formData, step.fields, LIST_FIELDS);
   if (!parsed.ok) return toActionResult(parsed);
-  const written = await nannyAccountStore.updateProfile(toPatch(parsed.value as never));
-  if (!written.ok) return toActionResult(refuseFunnel(ACTION, step.id, written.error));
+  const written = await nannyAccountStore.updateProfile(
+    toPatch(parsed.value as never),
+  );
+  if (!written.ok)
+    return toActionResult(refuseFunnel(ACTION, step.id, written.error));
   const next = index + 1 < PROFILE_STEPS.length ? index + 1 : null;
   return toActionResult(ok({ complete: written.value.complete, next }));
 };

@@ -20,7 +20,10 @@ export function FunnelStepFrame({
   }, [position]);
   return (
     <section aria-labelledby="funnel-step-heading" className="py-8">
-      <p className="text-xs font-medium uppercase tracking-wide text-violet-700" aria-current="step">
+      <p
+        className="text-xs font-medium uppercase tracking-wide text-violet-700"
+        aria-current="step"
+      >
         Step {position} of {count}
       </p>
       <h1

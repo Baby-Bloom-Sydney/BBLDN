@@ -19,7 +19,10 @@ export const availabilityField = z
   .string()
   .transform((raw, ctx): NannyAvailability => {
     const bad = (): NannyAvailability => {
-      ctx.addIssue({ code: "custom", message: "Please mark at least one time you're available." });
+      ctx.addIssue({
+        code: "custom",
+        message: "Please mark at least one time you're available.",
+      });
       return {};
     };
     let parsed: unknown;
@@ -30,7 +33,9 @@ export const availabilityField = z
     }
     const checked = availabilityShape.safeParse(parsed);
     if (!checked.success) return bad();
-    const days = Object.entries(checked.data).filter(([, blocks]) => (blocks ?? []).length > 0);
+    const days = Object.entries(checked.data).filter(
+      ([, blocks]) => (blocks ?? []).length > 0,
+    );
     if (days.length === 0) return bad();
     return Object.fromEntries(days) as Readonly<
       Partial<Record<NannyWeekday, ReadonlyArray<NannyDayBlock>>>

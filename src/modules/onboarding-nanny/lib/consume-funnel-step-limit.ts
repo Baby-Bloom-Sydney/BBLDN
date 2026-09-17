@@ -6,7 +6,9 @@ import { SECURITY } from "@/modules/config";
 import { log, rateLimiter } from "@/modules/platform";
 import { callerIpUaKey } from "./caller-ip-ua-key";
 
-export async function consumeFunnelStepLimit(surface: string): Promise<boolean> {
+export async function consumeFunnelStepLimit(
+  surface: string,
+): Promise<boolean> {
   const consumed = await rateLimiter.consume(
     `funnel:${await callerIpUaKey()}`,
     SECURITY.rateLimits.funnelStep,

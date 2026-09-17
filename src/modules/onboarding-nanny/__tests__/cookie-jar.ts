@@ -20,7 +20,9 @@ export function cookieJarModule() {
           ? { name, value: state.jar.get(name) ?? "" }
           : undefined,
       set: (
-        nameOrCookie: string | { readonly name: string; readonly value: string },
+        nameOrCookie:
+          | string
+          | { readonly name: string; readonly value: string },
         value?: string,
       ): void => {
         if (typeof nameOrCookie === "string")

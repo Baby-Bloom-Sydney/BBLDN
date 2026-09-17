@@ -7,7 +7,12 @@
 import { auth } from "@/modules/auth";
 import { Events, err, ok, toActionResult } from "@/modules/platform";
 import type { Result } from "@/modules/shared-types";
-import type { ApplyFromPortalAction, NannyFunnelErrorDetails, NannyProfile, NannySignupOutcome } from "../types";
+import type {
+  ApplyFromPortalAction,
+  NannyFunnelErrorDetails,
+  NannyProfile,
+  NannySignupOutcome,
+} from "../types";
 import { consumeFunnelStepLimit } from "../lib/consume-funnel-step-limit";
 import { nannyAccountStore } from "../lib/default-nanny-account-store";
 import { nannyLeadStore } from "../lib/default-nanny-lead-store";
@@ -52,7 +57,8 @@ async function apply(
     ageGroups: answers.ageGroups,
     source: "portal",
   });
-  if (!captured.ok) return refuseFunnel(ACTION, "lead-not-captured", captured.error);
+  if (!captured.ok)
+    return refuseFunnel(ACTION, "lead-not-captured", captured.error);
   if (captured.value.state !== "has-account") {
     const patched = await nannyLeadStore.patch(captured.value.leadId, {
       roleTypes: answers.roleTypes,
@@ -61,7 +67,8 @@ async function apply(
       bio: answers.bio,
       funnelStep: "S-N-19",
     });
-    if (!patched.ok) return refuseFunnel(ACTION, "lead-not-patched", patched.error);
+    if (!patched.ok)
+      return refuseFunnel(ACTION, "lead-not-patched", patched.error);
   }
   const profiled = await nannyAccountStore.updateProfile({
     profile: {
@@ -72,28 +79,47 @@ async function apply(
     },
     contact: { district: answers.district, area: answers.area },
   });
-  if (!profiled.ok) return refuseFunnel(ACTION, "profile-not-written", profiled.error);
+  if (!profiled.ok)
+    return refuseFunnel(ACTION, "profile-not-written", profiled.error);
 
   const lifted = await nannyAccountStore.liftIsolation();
-  if (!lifted.ok) return refuseFunnel(ACTION, "isolation-not-lifted", lifted.error);
+  if (!lifted.ok)
+    return refuseFunnel(ACTION, "isolation-not-lifted", lifted.error);
 
   const actor = { kind: "user", id: me.userId, role: "nanny" } as const;
-  const props = { nannyId: me.nannyId, path: "apply-from-portal", areaDistrict: answers.district } as const;
+  const props = {
+    nannyId: me.nannyId,
+    path: "apply-from-portal",
+    areaDistrict: answers.district,
+  } as const;
   await Events.emit({ name: "nanny.applied", actor, props });
-  if (lifted.value) await Events.emit({ name: "nanny.isolation-lifted", actor, props });
+  if (lifted.value)
+    await Events.emit({ name: "nanny.isolation-lifted", actor, props });
   return ok({ destination: WIZARD });
 }
 
-export const applyFromPortalAction: ApplyFromPortalAction = async (_previous: unknown, formData: FormData) => {
+export const applyFromPortalAction: ApplyFromPortalAction = async (
+  _previous: unknown,
+  formData: FormData,
+) => {
   const session = await auth.requireRole("nanny");
   // 01 §4d defence in depth: the refusal keeps `auth`'s code and sentence; its `details` are the gate's, not
   // the form's, and stay server-side.
   if (!session.ok)
-    return toActionResult(err<NannyFunnelErrorDetails>(session.error.code, session.error.message));
-  const parsed = parseForm(nannyPortalSchema, formData, FIELDS, ["ageGroups", "roleTypes"]);
+    return toActionResult(
+      err<NannyFunnelErrorDetails>(session.error.code, session.error.message),
+    );
+  const parsed = parseForm(nannyPortalSchema, formData, FIELDS, [
+    "ageGroups",
+    "roleTypes",
+  ]);
   if (!parsed.ok) return toActionResult(parsed);
   const me = await nannyAccountStore.get();
-  if (!me.ok) return toActionResult(refuseFunnel(ACTION, "profile-not-read", me.error));
-  if (me.value === null) return toActionResult(refuseFunnel(ACTION, "no-nanny-row", { reason: "no-nanny-row" }));
+  if (!me.ok)
+    return toActionResult(refuseFunnel(ACTION, "profile-not-read", me.error));
+  if (me.value === null)
+    return toActionResult(
+      refuseFunnel(ACTION, "no-nanny-row", { reason: "no-nanny-row" }),
+    );
   return toActionResult(await apply(me.value, parsed.value));
 };

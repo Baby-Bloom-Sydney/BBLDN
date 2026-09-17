@@ -5,5 +5,6 @@ import { NANNY_LEAD_STORE_REGISTRY } from "./nanny-lead-store-registry";
 export const nannyLeadStore: NannyLeadStore = Object.freeze({
   capture: (input) => NANNY_LEAD_STORE_REGISTRY.get().capture(input),
   get: (leadId) => NANNY_LEAD_STORE_REGISTRY.get().get(leadId),
-  patch: (leadId, patch) => NANNY_LEAD_STORE_REGISTRY.get().patch(leadId, patch),
+  patch: (leadId, patch) =>
+    NANNY_LEAD_STORE_REGISTRY.get().patch(leadId, patch),
 });

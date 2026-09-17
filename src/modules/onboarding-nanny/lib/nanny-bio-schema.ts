@@ -6,5 +6,8 @@ export const nannyBioSchema = z.object({
   bio: z
     .string()
     .trim()
-    .min(FUNNEL_OPTIONS.bioMinLength, "Please write a few sentences about yourself."),
+    .min(
+      FUNNEL_OPTIONS.bioMinLength,
+      "Please write a few sentences about yourself.",
+    ),
 });

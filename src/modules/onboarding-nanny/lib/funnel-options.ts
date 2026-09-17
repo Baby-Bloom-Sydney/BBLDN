@@ -15,9 +15,15 @@ export const FUNNEL_OPTIONS = Object.freeze({
   /** 02 §3 `lead_rtw_status` in UK words (T-0.8). `unknown` is never offered — it is the column's default, not an answer. */
   rtwStatus: Object.freeze([
     { key: "citizen", label: "British or Irish citizen" },
-    { key: "settled", label: "Settled or pre-settled status, or indefinite leave" },
+    {
+      key: "settled",
+      label: "Settled or pre-settled status, or indefinite leave",
+    },
     { key: "visa_with_rtw", label: "A visa that lets me work in the UK" },
-    { key: "no_rtw", label: "I don't currently have the right to work in the UK" },
+    {
+      key: "no_rtw",
+      label: "I don't currently have the right to work in the UK",
+    },
   ] as const satisfies ReadonlyArray<Option<NannyRtwStatus>>),
   ageGroups: Object.freeze([
     { key: "babies", label: "Babies (under 1)" },
@@ -26,7 +32,10 @@ export const FUNNEL_OPTIONS = Object.freeze({
     { key: "school-age", label: "School age (5+)" },
   ] as const satisfies ReadonlyArray<Option<NannyAgeGroup>>),
   /** The under-3 signal 04 §4.1 row 5 captures and never shows her. */
-  underThreeGroups: Object.freeze(["babies", "toddlers"] as const satisfies ReadonlyArray<NannyAgeGroup>),
+  underThreeGroups: Object.freeze([
+    "babies",
+    "toddlers",
+  ] as const satisfies ReadonlyArray<NannyAgeGroup>),
   roleTypes: Object.freeze([
     { key: "full-time", label: "Full-time" },
     { key: "part-time", label: "Part-time" },
@@ -49,7 +58,7 @@ export const FUNNEL_OPTIONS = Object.freeze({
     "afternoon",
     "evening",
   ] as const satisfies ReadonlyArray<NannyDayBlock>),
-  /** N3's £ band edges, per hour (04 §6.1 S-X-17 "£ band"). */
+  /** N3's rate-band edges, per hour (04 §6.1 S-X-17). */
   rate: Object.freeze({ minPerHour: 10, maxPerHour: 60 }),
   yearsExperience: Object.freeze({ min: 0, max: 60 }),
   bioMinLength: 40,

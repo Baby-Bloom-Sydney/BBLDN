@@ -10,9 +10,14 @@ const AGREEMENT_ID = "AGR-02" as const;
 const CHECKPOINT_ID = "agr02_terms_acceptance";
 const CHECKPOINT_TEXT =
   "I have read and agree to the professional terms and the privacy policy.";
-const DOCUMENTS: ReadonlyArray<LegalDocumentId> = ["professional-tos", "privacy-policy"];
+const DOCUMENTS: ReadonlyArray<LegalDocumentId> = [
+  "professional-tos",
+  "privacy-policy",
+];
 
-export async function recordNannySignupConsent(userId: UserId): Promise<Result<void>> {
+export async function recordNannySignupConsent(
+  userId: UserId,
+): Promise<Result<void>> {
   for (const purpose of DOCUMENTS) {
     const policy = await consent.getPolicy(purpose);
     if (!policy.ok) return policy;

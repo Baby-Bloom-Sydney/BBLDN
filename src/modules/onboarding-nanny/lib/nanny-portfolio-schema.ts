@@ -7,22 +7,33 @@ import type { NannyRoleType } from "../types";
 import { availabilityField } from "./availability-field";
 import { FUNNEL_OPTIONS } from "./funnel-options";
 
-const ROLE_TYPES = FUNNEL_OPTIONS.roleTypes.map((option) => option.key) as [NannyRoleType, ...NannyRoleType[]];
+const ROLE_TYPES = FUNNEL_OPTIONS.roleTypes.map((option) => option.key) as [
+  NannyRoleType,
+  ...NannyRoleType[],
+];
 const PENCE = 100;
 
 export const nannyPortfolioSchema = z
   .object({
     roleTypes: z
-      .array(z.enum(ROLE_TYPES), { error: "Please pick at least one type of work." })
+      .array(z.enum(ROLE_TYPES), {
+        error: "Please pick at least one type of work.",
+      })
       .min(1, "Please pick at least one type of work."),
     availability: availabilityField,
     rateMin: z.coerce
       .number({ error: "Please enter your lowest hourly rate." })
-      .min(FUNNEL_OPTIONS.rate.minPerHour, "Please enter your lowest hourly rate.")
+      .min(
+        FUNNEL_OPTIONS.rate.minPerHour,
+        "Please enter your lowest hourly rate.",
+      )
       .max(FUNNEL_OPTIONS.rate.maxPerHour, "Please check your hourly rate."),
     rateMax: z.coerce
       .number({ error: "Please enter your highest hourly rate." })
-      .min(FUNNEL_OPTIONS.rate.minPerHour, "Please enter your highest hourly rate.")
+      .min(
+        FUNNEL_OPTIONS.rate.minPerHour,
+        "Please enter your highest hourly rate.",
+      )
       .max(FUNNEL_OPTIONS.rate.maxPerHour, "Please check your hourly rate."),
   })
   .refine((data) => data.rateMax >= data.rateMin, {
@@ -32,5 +43,8 @@ export const nannyPortfolioSchema = z
   .transform(({ roleTypes, availability, rateMin, rateMax }) => ({
     roleTypes,
     availability,
-    rateBand: { minPence: Math.round(rateMin * PENCE), maxPence: Math.round(rateMax * PENCE) },
+    rateBand: {
+      minPence: Math.round(rateMin * PENCE),
+      maxPence: Math.round(rateMax * PENCE),
+    },
   }));

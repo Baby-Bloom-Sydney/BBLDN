@@ -10,8 +10,14 @@ import type { E164, Email } from "@/modules/shared-types";
 import type { NannyAgeGroup, NannyRtwStatus } from "../types";
 import { FUNNEL_OPTIONS } from "./funnel-options";
 
-const RTW = FUNNEL_OPTIONS.rtwStatus.map((option) => option.key) as [NannyRtwStatus, ...NannyRtwStatus[]];
-const AGE_GROUPS = FUNNEL_OPTIONS.ageGroups.map((option) => option.key) as [NannyAgeGroup, ...NannyAgeGroup[]];
+const RTW = FUNNEL_OPTIONS.rtwStatus.map((option) => option.key) as [
+  NannyRtwStatus,
+  ...NannyRtwStatus[],
+];
+const AGE_GROUPS = FUNNEL_OPTIONS.ageGroups.map((option) => option.key) as [
+  NannyAgeGroup,
+  ...NannyAgeGroup[],
+];
 
 const yesNo = z
   .enum(["yes", "no"], { error: "Please answer yes or no." })
@@ -48,7 +54,10 @@ export const nannyApplicationSchema = z.object({
     .number({ error: "Please tell us how many years' experience you have." })
     .int("Please enter whole years.")
     .min(FUNNEL_OPTIONS.yearsExperience.min, "Please enter whole years.")
-    .max(FUNNEL_OPTIONS.yearsExperience.max, "Please check the number of years."),
+    .max(
+      FUNNEL_OPTIONS.yearsExperience.max,
+      "Please check the number of years.",
+    ),
   ageGroups: z
     .array(z.enum(AGE_GROUPS), { error: "Please pick at least one age group." })
     .min(1, "Please pick at least one age group."),

@@ -4,18 +4,27 @@
 // answer says the next step and whether the profile is complete (`03.18`). Done → S-N-17.
 import { useState } from "react";
 import { PROFILE_STEPS } from "../lib/profile-steps";
-import type { NannyProfileStepOutcome, NannyProfileStepperProps } from "../types";
+import type {
+  NannyProfileStepOutcome,
+  NannyProfileStepperProps,
+} from "../types";
 import { FunnelStepFrame } from "./funnel/FunnelStepFrame";
 import { StepForm } from "./funnel/StepForm";
 import { ProfileStepFields } from "./profile/ProfileStepFields";
 
 export function NannyProfileStepper(props: NannyProfileStepperProps) {
-  const [index, setIndex] = useState(Math.min(Math.max(props.step, 0), PROFILE_STEPS.length - 1));
+  const [index, setIndex] = useState(
+    Math.min(Math.max(props.step, 0), PROFILE_STEPS.length - 1),
+  );
   const step = PROFILE_STEPS[index];
   if (step === undefined) return null;
   const last = index === PROFILE_STEPS.length - 1;
   return (
-    <FunnelStepFrame position={index + 1} count={PROFILE_STEPS.length} heading={step.heading}>
+    <FunnelStepFrame
+      position={index + 1}
+      count={PROFILE_STEPS.length}
+      heading={step.heading}
+    >
       <StepForm
         key={step.id}
         action={props.action}
@@ -27,7 +36,11 @@ export function NannyProfileStepper(props: NannyProfileStepperProps) {
         }}
         submitLabel={last ? "Finish" : "Save and continue"}
       >
-        <ProfileStepFields id={step.id} profile={props.profile} options={props.options} />
+        <ProfileStepFields
+          id={step.id}
+          profile={props.profile}
+          options={props.options}
+        />
       </StepForm>
     </FunnelStepFrame>
   );

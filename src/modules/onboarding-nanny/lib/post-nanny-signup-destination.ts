@@ -12,6 +12,7 @@ export function postNannySignupDestination(input: {
   readonly inviteToken: string | null;
 }): string {
   if (input.path === "apply") return ADD_CHILD;
-  if (input.inviteToken !== null) return `${CLAIM}/${encodeURIComponent(input.inviteToken)}`;
+  if (input.inviteToken !== null)
+    return `${CLAIM}/${encodeURIComponent(input.inviteToken)}`;
   return HUB;
 }

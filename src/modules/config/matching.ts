@@ -66,7 +66,11 @@ export const MATCHING = Object.freeze({
   // DfE qualifications finder). `other` = outside the framework (Montessori, Norland, overseas) until named.
   qualificationLadder: Object.freeze([
     Object.freeze({ key: "none", label: "No formal qualification", rung: 0 }),
-    Object.freeze({ key: "other", label: "Other childcare qualification", rung: 1 }),
+    Object.freeze({
+      key: "other",
+      label: "Other childcare qualification",
+      rung: 1,
+    }),
     Object.freeze({ key: "level-2", label: "Level 2 early years", rung: 2 }),
     Object.freeze({
       key: "level-3",

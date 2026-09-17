@@ -32,7 +32,15 @@ import { recordNannySignupConsent } from "../lib/record-nanny-signup-consent";
 import { refuseFunnel } from "../lib/refuse-funnel";
 import { sendNannyWelcome } from "../lib/send-nanny-welcome";
 
-const FIELDS = ["path", "firstName", "lastName", "email", "password", "confirmPassword", "consent"] as const;
+const FIELDS = [
+  "path",
+  "firstName",
+  "lastName",
+  "email",
+  "password",
+  "confirmPassword",
+  "consent",
+] as const;
 const CALLBACK_PATH = "/api/auth/callback";
 const INVITE_TOKEN = /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/;
 const ACTION = "signUpNanny";
@@ -76,7 +84,8 @@ async function personFor(parsed: {
     lastName: parsed.lastName ?? "",
     email: parsed.email as Email,
     lead: null,
-    inviteToken: carried !== null && INVITE_TOKEN.test(carried) ? carried : null,
+    inviteToken:
+      carried !== null && INVITE_TOKEN.test(carried) ? carried : null,
   });
 }
 
@@ -104,7 +113,8 @@ async function createAccount(
   const userId: UserId = signedUp.value.userId;
 
   const consented = await recordNannySignupConsent(userId);
-  if (!consented.ok) return refuseFunnel(ACTION, "consent-not-recorded", consented.error);
+  if (!consented.ok)
+    return refuseFunnel(ACTION, "consent-not-recorded", consented.error);
 
   const created = await nannyAccountStore.create({
     firstName: person.firstName,
@@ -114,16 +124,27 @@ async function createAccount(
     ...(person.mobile === undefined ? {} : { mobile: person.mobile }),
     ...(person.district === undefined ? {} : { district: person.district }),
     ...(person.area === undefined ? {} : { area: person.area }),
-    ...(person.lead === null ? {} : { leadId: person.lead.id, profile: leadToProfile(person.lead) }),
+    ...(person.lead === null
+      ? {}
+      : { leadId: person.lead.id, profile: leadToProfile(person.lead) }),
   });
-  if (!created.ok) return refuseFunnel(ACTION, "party-rows-not-written", created.error);
+  if (!created.ok)
+    return refuseFunnel(ACTION, "party-rows-not-written", created.error);
 
   await sendNannyWelcome({ userId, firstName: person.firstName });
   const actor = { kind: "user", id: userId, role: "nanny" } as const;
   await Events.emit({
     name: "signup.completed",
     actor,
-    props: { role: "nanny", signupSource: person.inviteToken === null ? (path === "apply" ? "cold" : "cold") : "invite" },
+    props: {
+      role: "nanny",
+      signupSource:
+        person.inviteToken === null
+          ? path === "apply"
+            ? "cold"
+            : "cold"
+          : "invite",
+    },
   });
   if (path === "apply")
     await Events.emit({
@@ -132,17 +153,29 @@ async function createAccount(
       props: {
         nannyId: created.value.nannyId,
         path: "apply",
-        ...(person.district === undefined ? {} : { areaDistrict: person.district }),
+        ...(person.district === undefined
+          ? {}
+          : { areaDistrict: person.district }),
       },
     });
   carriedTokenCookie.clear(path === "apply" ? "nannyLead" : "invite");
-  return ok({ destination: postNannySignupDestination({ path, inviteToken: person.inviteToken }) });
+  return ok({
+    destination: postNannySignupDestination({
+      path,
+      inviteToken: person.inviteToken,
+    }),
+  });
 }
 
-export const signUpNannyAction: NannySignupAction = async (_previous: unknown, formData: FormData) => {
+export const signUpNannyAction: NannySignupAction = async (
+  _previous: unknown,
+  formData: FormData,
+) => {
   const parsed = parseForm(nannySignupSchema, formData, FIELDS);
   if (!parsed.ok) return toActionResult(parsed);
   const person = await personFor(parsed.value);
   if (!person.ok) return toActionResult(person);
-  return toActionResult(await createAccount(parsed.value.path, person.value, parsed.value.password));
+  return toActionResult(
+    await createAccount(parsed.value.path, person.value, parsed.value.password),
+  );
 };

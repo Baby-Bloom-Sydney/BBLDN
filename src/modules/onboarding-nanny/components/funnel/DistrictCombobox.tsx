@@ -10,9 +10,13 @@ type Option = { readonly name: string; readonly district: string };
 
 const MIN_QUERY = 2;
 const DEBOUNCE_MS = 150;
-const labelOf = (option: Option): string => `${option.name}, ${option.district}`;
+const labelOf = (option: Option): string =>
+  `${option.name}, ${option.district}`;
 
-async function searchAreas(api: string, query: string): Promise<ReadonlyArray<Option>> {
+async function searchAreas(
+  api: string,
+  query: string,
+): Promise<ReadonlyArray<Option>> {
   const response = await fetch(`${api}?q=${encodeURIComponent(query)}`, {
     headers: { accept: "application/json" },
   });
@@ -122,7 +126,9 @@ export function DistrictCombobox({
         aria-controls={listId}
         aria-autocomplete="list"
         aria-invalid={invalid === true ? true : undefined}
-        aria-activedescendant={open && active >= 0 ? `${id}-option-${active}` : undefined}
+        aria-activedescendant={
+          open && active >= 0 ? `${id}-option-${active}` : undefined
+        }
         aria-describedby={statusId}
         onChange={(event) => onInput(event.target.value)}
         onKeyDown={onKeyDown}

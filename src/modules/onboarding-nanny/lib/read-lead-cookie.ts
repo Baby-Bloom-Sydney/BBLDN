@@ -15,7 +15,9 @@ const NO_LEAD = err<NannyFunnelErrorDetails>(
   { reason: "no-lead" },
 );
 
-export async function readLeadCookie(): Promise<Result<NannyLead, NannyFunnelErrorDetails>> {
+export async function readLeadCookie(): Promise<
+  Result<NannyLead, NannyFunnelErrorDetails>
+> {
   const value = carriedTokenCookie.read("nannyLead");
   if (value === null || !UUID.test(value)) return NO_LEAD;
   const lead = await nannyLeadStore.get(value as LeadId);

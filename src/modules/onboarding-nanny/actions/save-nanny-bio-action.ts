@@ -11,14 +11,25 @@ import { readLeadCookie } from "../lib/read-lead-cookie";
 
 const ACTION = "saveNannyBio";
 
-export const saveNannyBioAction: NannyBioAction = async (_previous: unknown, formData: FormData) => {
+export const saveNannyBioAction: NannyBioAction = async (
+  _previous: unknown,
+  formData: FormData,
+) => {
   const parsed = parseForm(nannyBioSchema, formData, ["bio"]);
   if (!parsed.ok) return toActionResult(parsed);
   const lead = await readLeadCookie();
   if (!lead.ok) return toActionResult(lead);
   if (!(await consumeFunnelStepLimit("S-X-18")))
-    return toActionResult(refuseFunnel(ACTION, "rate-limited", { reason: "rate-limited" }));
-  const patched = await nannyLeadStore.patch(lead.value.id, { bio: parsed.value.bio, funnelStep: "S-X-18" });
-  if (!patched.ok) return toActionResult(refuseFunnel(ACTION, "lead-not-patched", patched.error));
+    return toActionResult(
+      refuseFunnel(ACTION, "rate-limited", { reason: "rate-limited" }),
+    );
+  const patched = await nannyLeadStore.patch(lead.value.id, {
+    bio: parsed.value.bio,
+    funnelStep: "S-X-18",
+  });
+  if (!patched.ok)
+    return toActionResult(
+      refuseFunnel(ACTION, "lead-not-patched", patched.error),
+    );
   return toActionResult(ok(undefined));
 };

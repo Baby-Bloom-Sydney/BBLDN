@@ -5,8 +5,12 @@ import type { NannyLead, NannyProfilePatch } from "../types";
 
 export function leadToProfile(lead: NannyLead): NannyProfilePatch {
   return Object.freeze({
-    ...(lead.yearsExperience === null ? {} : { yearsExperience: lead.yearsExperience }),
-    ...(lead.rateBand === null ? {} : { hourlyRateMinPence: lead.rateBand.minPence }),
+    ...(lead.yearsExperience === null
+      ? {}
+      : { yearsExperience: lead.yearsExperience }),
+    ...(lead.rateBand === null
+      ? {}
+      : { hourlyRateMinPence: lead.rateBand.minPence }),
     ...(lead.availability === null ? {} : { availability: lead.availability }),
     ...(lead.bio === null ? {} : { bio: lead.bio }),
   });

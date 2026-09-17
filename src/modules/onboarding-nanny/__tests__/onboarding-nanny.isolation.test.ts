@@ -24,7 +24,9 @@ import { applyFromPortalAction } from "../actions/apply-from-portal-action";
 
 vi.mock("next/headers", () => cookieJarModule());
 
-const formDataOf = (fields: Record<string, string | ReadonlyArray<string>>): FormData => {
+const formDataOf = (
+  fields: Record<string, string | ReadonlyArray<string>>,
+): FormData => {
   const data = new FormData();
   for (const [key, value] of Object.entries(fields)) {
     if (typeof value === "string") data.set(key, value);
@@ -36,8 +38,18 @@ const formDataOf = (fields: Record<string, string | ReadonlyArray<string>>): For
 const NANNY = "22222222-2222-4222-8222-222222222222";
 const PARENT = "11111111-1111-4111-8111-111111111111";
 const users = [
-  { id: NANNY, email: "bea@example.test" as Email, password: "x".repeat(12), role: "nanny" as const },
-  { id: PARENT, email: "ada@example.test" as Email, password: "x".repeat(12), role: "parent" as const },
+  {
+    id: NANNY,
+    email: "bea@example.test" as Email,
+    password: "x".repeat(12),
+    role: "nanny" as const,
+  },
+  {
+    id: PARENT,
+    email: "ada@example.test" as Email,
+    password: "x".repeat(12),
+    role: "parent" as const,
+  },
 ];
 
 const PORTAL = {
@@ -61,27 +73,40 @@ let accounts: ReturnType<typeof memoryNannyAccountStore>;
 beforeEach(() => {
   resetJar();
   configureRateLimiter(
-    createRateLimiter({ store: memoryRateLimitStore(), burstAlertMultiple: SECURITY.burstAlertMultiple }),
+    createRateLimiter({
+      store: memoryRateLimitStore(),
+      burstAlertMultiple: SECURITY.burstAlertMultiple,
+    }),
   );
   events = memoryEventLogStore();
   configureEvents(createEvents({ store: events, log }));
   leads = memoryNannyLeadStore();
   configureNannyLeadStore(leads);
-  accounts = memoryNannyAccountStore({ emails: { [NANNY]: "bea@example.test" as Email } });
+  accounts = memoryNannyAccountStore({
+    emails: { [NANNY]: "bea@example.test" as Email },
+  });
   configureNannyAccountStore(accounts);
 });
 
-const signedInAs = (id: string) => configureAuth(stubAuth({ users, signedInUserId: id }));
+const signedInAs = (id: string) =>
+  configureAuth(stubAuth({ users, signedInUserId: id }));
 
 describe("onboarding-nanny — applyFromPortalAction (S-N-19)", () => {
   beforeEach(async () => {
     signedInAs(NANNY);
-    await accounts.create({ firstName: "Bea", lastName: "Lin", isolated: true });
+    await accounts.create({
+      firstName: "Bea",
+      lastName: "Lin",
+      isolated: true,
+    });
   });
 
   it("writes the portal lead, lifts the flag once, emits both events and sends her to the wizard", async () => {
     const result = await applyFromPortalAction(null, formDataOf(PORTAL));
-    expect(result).toEqual({ ok: true, value: { destination: "/nanny/onboarding-verification" } });
+    expect(result).toEqual({
+      ok: true,
+      value: { destination: "/nanny/onboarding-verification" },
+    });
 
     expect(leads.rows()).toHaveLength(1);
     expect(leads.rows()[0]).toMatchObject({
@@ -91,31 +116,45 @@ describe("onboarding-nanny — applyFromPortalAction (S-N-19)", () => {
       district: "SW4",
       rtwStatus: "settled",
       roleTypes: ["part-time"],
-      rateBand: { minPence: 1600, maxPence: 2200 },
+      rateBand: { minPence: 1600, maxPence: 2200 }, // config-literal-ok: a fixture's own rate, not a PRICES value
       bio: PORTAL.bio,
     });
     expect(accounts.rows()[0]?.isolated).toBe(false);
     // and the profile she just gave is on her account row, not only on the lead
-    expect(accounts.rows()[0]?.profile).toMatchObject({ yearsExperience: 4, hourlyRateMinPence: 1600, bio: PORTAL.bio });
+    expect(accounts.rows()[0]?.profile).toMatchObject({
+      yearsExperience: 4,
+      hourlyRateMinPence: 1600, // config-literal-ok: a fixture's own rate, not a PRICES value
+      bio: PORTAL.bio,
+    });
 
     const names = events.rows.map((e) => e.name);
     expect(names).toContain("nanny.applied");
     expect(names).toContain("nanny.isolation-lifted");
-    expect(events.rows.find((e) => e.name === "nanny.applied")?.props).toMatchObject({ path: "apply-from-portal" });
+    expect(
+      events.rows.find((e) => e.name === "nanny.applied")?.props,
+    ).toMatchObject({ path: "apply-from-portal" });
   });
 
   it("applying again does not lift twice — one isolation-lifted event ever", async () => {
     await applyFromPortalAction(null, formDataOf(PORTAL));
     const again = await applyFromPortalAction(null, formDataOf(PORTAL));
     expect(again.ok).toBe(true);
-    expect(events.rows.filter((e) => e.name === "nanny.isolation-lifted")).toHaveLength(1);
+    expect(
+      events.rows.filter((e) => e.name === "nanny.isolation-lifted"),
+    ).toHaveLength(1);
   });
 
   it("refuses a field it cannot accept, naming it, and lifts nothing", async () => {
-    const result = await applyFromPortalAction(null, formDataOf({ ...PORTAL, rtwStatus: "australian" }));
+    const result = await applyFromPortalAction(
+      null,
+      formDataOf({ ...PORTAL, rtwStatus: "australian" }),
+    );
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.error.details).toEqual({ reason: "invalid-input", field: "rtwStatus" });
+    expect(result.error.details).toEqual({
+      reason: "invalid-input",
+      field: "rtwStatus",
+    });
     expect(accounts.rows()[0]?.isolated).toBe(true);
   });
 });

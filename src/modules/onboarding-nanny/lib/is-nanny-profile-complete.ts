@@ -7,7 +7,13 @@ import type { NannyProfile } from "../types";
 export function isNannyProfileComplete(
   profile: Pick<
     NannyProfile,
-    "yearsExperience" | "qualification" | "hourlyRateMinPence" | "availability" | "bio" | "district" | "mobile"
+    | "yearsExperience"
+    | "qualification"
+    | "hourlyRateMinPence"
+    | "availability"
+    | "bio"
+    | "district"
+    | "mobile"
   >,
 ): boolean {
   return (

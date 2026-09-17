@@ -5,11 +5,16 @@ import { BRAND } from "@/modules/config";
 
 export const metadata: Metadata = {
   title: `Apply to ${BRAND.name}`,
-  description: "About ten minutes: where you are in London, your experience, and the work you're looking for.",
+  description:
+    "About ten minutes: where you are in London, your experience, and the work you're looking for.",
   robots: { index: false, follow: false },
 };
 
-export default function ApplyLayout({ children }: { children: React.ReactNode }) {
+export default function ApplyLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <div className="min-h-screen bg-white">
       <main className="mx-auto max-w-2xl px-4 lg:px-6">{children}</main>

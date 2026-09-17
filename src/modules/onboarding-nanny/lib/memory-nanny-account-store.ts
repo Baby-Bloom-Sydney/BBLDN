@@ -55,7 +55,9 @@ export function memoryNannyAccountStore(
     if (!user.ok) return user;
     const row = state.rows.find((entry) => entry.userId === user.value);
     return row === undefined
-      ? err("INTERNAL", "We couldn't find your account.", { reason: "no-nanny-row" as const })
+      ? err("INTERNAL", "We couldn't find your account.", {
+          reason: "no-nanny-row" as const,
+        })
       : ok(row);
   };
 
@@ -68,7 +70,8 @@ export function memoryNannyAccountStore(
         return ok({ nannyId: existing.nannyId, leadConverted: false });
       // `create_nanny_account()` reads the address from `auth.users`; the double is told it (a `Session`
       // carries no email — 03 §1.4), and falls back to a marked placeholder no real address can collide with.
-      const email = seed.emails?.[user.value] ?? (`${user.value}@session.invalid` as Email);
+      const email =
+        seed.emails?.[user.value] ?? (`${user.value}@session.invalid` as Email);
       replace(
         Object.freeze({
           ...input,
@@ -97,9 +100,13 @@ export function memoryNannyAccountStore(
       const next: MemoryNannyAccountRow = Object.freeze({
         ...row.value,
         ...(contact?.mobile === undefined ? {} : { mobile: contact.mobile }),
-        ...(contact?.district === undefined ? {} : { district: contact.district }),
+        ...(contact?.district === undefined
+          ? {}
+          : { district: contact.district }),
         ...(contact?.area === undefined ? {} : { area: contact.area }),
-        ...(contact?.dateOfBirth === undefined ? {} : { dateOfBirth: contact.dateOfBirth }),
+        ...(contact?.dateOfBirth === undefined
+          ? {}
+          : { dateOfBirth: contact.dateOfBirth }),
         profile: { ...(row.value.profile ?? {}), ...(profile ?? {}) },
       });
       const complete = isNannyProfileComplete(toProfile(next));

@@ -21,17 +21,25 @@ function Submit() {
 export function NannySignupForm(props: NannySignupFormProps) {
   const [state, formAction] = useFormState(props.action, null);
   const failed = state !== null && !state.ok;
-  const badField = failed && state.error.details?.reason === "invalid-input" ? state.error.details.field : null;
-  const invalid = (name: string) => (badField === name ? { "aria-invalid": true as const } : {});
+  const badField =
+    failed && state.error.details?.reason === "invalid-input"
+      ? state.error.details.field
+      : null;
+  const invalid = (name: string) =>
+    badField === name ? { "aria-invalid": true as const } : {};
 
   useEffect(() => {
-    if (state !== null && state.ok) window.location.assign(state.value.destination);
+    if (state !== null && state.ok)
+      window.location.assign(state.value.destination);
   }, [state]);
 
   return (
     <form action={formAction} noValidate aria-labelledby="nanny-signup-heading">
       <input type="hidden" name="path" value="invite" />
-      <h1 id="nanny-signup-heading" className="text-2xl font-bold [letter-spacing:-0.025em] text-slate-900">
+      <h1
+        id="nanny-signup-heading"
+        className="text-2xl font-bold [letter-spacing:-0.025em] text-slate-900"
+      >
         Create your account
       </h1>
       <p className="mt-2 text-sm text-slate-600">
@@ -42,17 +50,45 @@ export function NannySignupForm(props: NannySignupFormProps) {
       <div className="mt-6 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="firstName" className={FIELD_STYLES.label}>First name</label>
-            <input id="firstName" name="firstName" autoComplete="given-name" required className={FIELD_STYLES.input} {...invalid("firstName")} />
+            <label htmlFor="firstName" className={FIELD_STYLES.label}>
+              First name
+            </label>
+            <input
+              id="firstName"
+              name="firstName"
+              autoComplete="given-name"
+              required
+              className={FIELD_STYLES.input}
+              {...invalid("firstName")}
+            />
           </div>
           <div>
-            <label htmlFor="lastName" className={FIELD_STYLES.label}>Last name</label>
-            <input id="lastName" name="lastName" autoComplete="family-name" required className={FIELD_STYLES.input} {...invalid("lastName")} />
+            <label htmlFor="lastName" className={FIELD_STYLES.label}>
+              Last name
+            </label>
+            <input
+              id="lastName"
+              name="lastName"
+              autoComplete="family-name"
+              required
+              className={FIELD_STYLES.input}
+              {...invalid("lastName")}
+            />
           </div>
         </div>
         <div>
-          <label htmlFor="email" className={FIELD_STYLES.label}>Email</label>
-          <input id="email" name="email" type="email" autoComplete="email" required className={FIELD_STYLES.input} {...invalid("email")} />
+          <label htmlFor="email" className={FIELD_STYLES.label}>
+            Email
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            className={FIELD_STYLES.input}
+            {...invalid("email")}
+          />
         </div>
         <AccountFields
           minPasswordLength={props.minPasswordLength}
@@ -67,7 +103,9 @@ export function NannySignupForm(props: NannySignupFormProps) {
       </div>
       <p className="mt-4 text-sm text-slate-600">
         Already have an account?{" "}
-        <a href={props.signInHref} className={FIELD_STYLES.link}>Sign in</a>
+        <a href={props.signInHref} className={FIELD_STYLES.link}>
+          Sign in
+        </a>
       </p>
     </form>
   );

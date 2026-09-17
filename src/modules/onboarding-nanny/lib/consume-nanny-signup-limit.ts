@@ -8,10 +8,19 @@ import type { Email } from "@/modules/shared-types";
 import { callerIpKey } from "./caller-ip-key";
 import { emailRateKey } from "./email-rate-key";
 
-export async function consumeNannySignupLimit(email: Email, surface: string): Promise<boolean> {
+export async function consumeNannySignupLimit(
+  email: Email,
+  surface: string,
+): Promise<boolean> {
   const results = [
-    await rateLimiter.consume(`signup:${await emailRateKey(email)}`, SECURITY.rateLimits.signupPerEmail),
-    await rateLimiter.consume(`signup-ip:${await callerIpKey()}`, SECURITY.rateLimits.signupPerIp),
+    await rateLimiter.consume(
+      `signup:${await emailRateKey(email)}`,
+      SECURITY.rateLimits.signupPerEmail,
+    ),
+    await rateLimiter.consume(
+      `signup-ip:${await callerIpKey()}`,
+      SECURITY.rateLimits.signupPerIp,
+    ),
   ];
   const consumed = results.find((result) => !result.ok) ?? results[0];
   if (consumed.ok) return true;

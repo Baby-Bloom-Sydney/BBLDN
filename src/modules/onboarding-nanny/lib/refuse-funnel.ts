@@ -10,6 +10,14 @@ export function refuseFunnel(
   step: string,
   cause: unknown,
 ): Result<never, NannyFunnelErrorDetails> {
-  log.error("nanny funnel refused", { module: "onboarding-nanny", action, step, cause });
-  return err("INTERNAL", "We couldn't save that just now. Try again in a moment.");
+  log.error("nanny funnel refused", {
+    module: "onboarding-nanny",
+    action,
+    step,
+    cause,
+  });
+  return err(
+    "INTERNAL",
+    "We couldn't save that just now. Try again in a moment.",
+  );
 }

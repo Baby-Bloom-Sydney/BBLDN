@@ -206,9 +206,7 @@ export type NannyProfile = NannyContactPatch &
   };
 
 export type NannyAccountStore = {
-  create(
-    input: NannyAccountInput,
-  ): Promise<
+  create(input: NannyAccountInput): Promise<
     NannyStoreResult<{
       readonly nannyId: NannyId;
       readonly leadConverted: boolean;

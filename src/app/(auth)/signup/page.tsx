@@ -20,7 +20,8 @@ type Props = {
 
 export default function SignupPage({ searchParams }: Props) {
   const carried = carriedTokenCookie.read("invite");
-  const query = carried === null ? searchParams : { ...searchParams, invite: carried };
+  const query =
+    carried === null ? searchParams : { ...searchParams, invite: carried };
   return (
     <ParentSignupForm
       action={signUpParentAction}

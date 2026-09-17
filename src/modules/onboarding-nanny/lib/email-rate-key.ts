@@ -6,7 +6,10 @@ import type { Email } from "@/modules/shared-types";
 const KEY_LENGTH = 32;
 
 export async function emailRateKey(email: Email): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(email));
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(email),
+  );
   return Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("")

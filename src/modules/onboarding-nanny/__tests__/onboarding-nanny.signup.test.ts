@@ -4,7 +4,7 @@
 // and lands on the hub. AGR-02 is recorded, the welcome is best effort, the events say which road. RED first.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { configureAuth, stubAuth } from "@/modules/auth";
-import { SECURITY } from "@/modules/config";
+import { LOCALE, SECURITY } from "@/modules/config";
 import {
   configureConsent,
   configureEvents,
@@ -30,7 +30,9 @@ import { signUpNannyAction } from "../actions/sign-up-nanny-action";
 
 vi.mock("next/headers", () => cookieJarModule());
 
-const formDataOf = (fields: Record<string, string | ReadonlyArray<string>>): FormData => {
+const formDataOf = (
+  fields: Record<string, string | ReadonlyArray<string>>,
+): FormData => {
   const data = new FormData();
   for (const [key, value] of Object.entries(fields)) {
     if (typeof value === "string") data.set(key, value);
@@ -52,7 +54,12 @@ const APPLICATION = {
   yearsExperience: "6",
   ageGroups: ["babies"],
 };
-const APPLY_SIGNUP = { path: "apply", password: PASSWORD, confirmPassword: PASSWORD, consent: "on" };
+const APPLY_SIGNUP = {
+  path: "apply",
+  password: PASSWORD,
+  confirmPassword: PASSWORD,
+  consent: "on",
+};
 const INVITE_SIGNUP = {
   ...APPLY_SIGNUP,
   path: "invite",
@@ -74,19 +81,35 @@ const runFunnelToN4 = async (): Promise<void> => {
   await saveNannyApplicationAction(null, formDataOf(APPLICATION));
   await saveNannyPortfolioAction(
     null,
-    formDataOf({ roleTypes: ["full-time"], availability: JSON.stringify({ monday: ["morning"] }), rateMin: "15", rateMax: "20" }),
+    formDataOf({
+      roleTypes: ["full-time"],
+      availability: JSON.stringify({ monday: ["morning"] }),
+      rateMin: "15",
+      rateMax: "20",
+    }),
   );
-  await saveNannyBioAction(null, formDataOf({ bio: "Ten years with under-fives across south London." }));
+  await saveNannyBioAction(
+    null,
+    formDataOf({ bio: "Ten years with under-fives across south London." }),
+  );
 };
 
 beforeEach(() => {
   resetJar();
   configureRateLimiter(
-    createRateLimiter({ store: memoryRateLimitStore(), burstAlertMultiple: SECURITY.burstAlertMultiple }),
+    createRateLimiter({
+      store: memoryRateLimitStore(),
+      burstAlertMultiple: SECURITY.burstAlertMultiple,
+    }),
   );
   configureAuth(stubAuth());
   consents = memoryConsentStore();
-  configureConsent(createConsent({ store: consents, cookieExpiryDays: SECURITY.retention.cookieExpiryDays }));
+  configureConsent(
+    createConsent({
+      store: consents,
+      cookieExpiryDays: SECURITY.retention.cookieExpiryDays,
+    }),
+  );
   events = memoryEventLogStore();
   configureEvents(createEvents({ store: events, log }));
   leads = memoryNannyLeadStore();
@@ -100,20 +123,23 @@ describe("onboarding-nanny — signUpNannyAction from /apply (S-X-19; 04 §4.1 r
 
   it("creates the account NOT isolated, converts the lead, carries its profile, records AGR-02 and lands on S-N-01", async () => {
     const result = await signUpNannyAction(null, formDataOf(APPLY_SIGNUP));
-    expect(result).toEqual({ ok: true, value: { destination: "/nanny/onboarding/add-child" } });
+    expect(result).toEqual({
+      ok: true,
+      value: { destination: "/nanny/onboarding/add-child" },
+    });
 
     const [row] = accounts.rows();
     expect(row).toMatchObject({
       firstName: "Amara",
       lastName: "Okafor",
       isolated: false,
-      mobile: "+447700900123",
+      mobile: `${LOCALE.phonePrefix}7700900123`,
       district: "SW4",
       area: "Clapham",
       leadId: leads.rows()[0]?.id,
       profile: {
         yearsExperience: 6,
-        hourlyRateMinPence: 1500,
+        hourlyRateMinPence: 1500, // config-literal-ok: a fixture's own rate, not a PRICES value
         availability: { monday: ["morning"] },
         bio: "Ten years with under-fives across south London.",
       },
@@ -122,14 +148,22 @@ describe("onboarding-nanny — signUpNannyAction from /apply (S-X-19; 04 §4.1 r
     // action is seen handing the lead over, which is what it owns
 
     const recorded = consents.consents;
-    expect(recorded.map((c) => c.purpose).sort()).toEqual(["privacy-policy", "professional-tos"]);
-    expect(recorded.every((c) => c.party === "nanny" && c.agreementId === "AGR-02")).toBe(true);
+    expect(recorded.map((c) => c.purpose).sort()).toEqual([
+      "privacy-policy",
+      "professional-tos",
+    ]);
+    expect(
+      recorded.every((c) => c.party === "nanny" && c.agreementId === "AGR-02"),
+    ).toBe(true);
 
     const names = events.rows.map((e) => e.name);
     expect(names).toContain("signup.completed");
     expect(names).toContain("nanny.applied");
     const applied = events.rows.find((e) => e.name === "nanny.applied");
-    expect(applied?.props).toMatchObject({ path: "apply", areaDistrict: "SW4" });
+    expect(applied?.props).toMatchObject({
+      path: "apply",
+      areaDistrict: "SW4",
+    });
 
     expect(jarOf().has(LEAD_COOKIE)).toBe(false);
   });
@@ -180,12 +214,20 @@ describe("onboarding-nanny — signUpNannyAction from an invite (S-X-07; 04 §4.
   it("creates the account ISOLATED, clears the invite cookie and goes to the claim", async () => {
     jarOf().set(INVITE_COOKIE, "ABCD-2345");
     const result = await signUpNannyAction(null, formDataOf(INVITE_SIGNUP));
-    expect(result).toEqual({ ok: true, value: { destination: "/invite/connect/ABCD-2345" } });
-    expect(accounts.rows()[0]).toMatchObject({ firstName: "Bea", isolated: true });
+    expect(result).toEqual({
+      ok: true,
+      value: { destination: "/invite/connect/ABCD-2345" },
+    });
+    expect(accounts.rows()[0]).toMatchObject({
+      firstName: "Bea",
+      isolated: true,
+    });
     expect(accounts.rows()[0]?.leadId).toBeUndefined();
     expect(jarOf().has(INVITE_COOKIE)).toBe(false);
     expect(events.rows.map((e) => e.name)).not.toContain("nanny.applied");
-    expect(events.rows.find((e) => e.name === "signup.completed")?.props).toMatchObject({
+    expect(
+      events.rows.find((e) => e.name === "signup.completed")?.props,
+    ).toMatchObject({
       role: "nanny",
       signupSource: "invite",
     });
@@ -202,14 +244,22 @@ describe("onboarding-nanny — signUpNannyAction from an invite (S-X-07; 04 §4.
     const result = await signUpNannyAction(null, formDataOf(INVITE_SIGNUP));
     expect(result).toEqual({ ok: true, value: { destination: "/nanny" } });
     expect(accounts.rows()[0]?.isolated).toBe(true);
-    expect(events.rows.find((e) => e.name === "signup.completed")?.props).toMatchObject({ signupSource: "cold" });
+    expect(
+      events.rows.find((e) => e.name === "signup.completed")?.props,
+    ).toMatchObject({ signupSource: "cold" });
   });
 
   it("validation refuses before any write, naming the field", async () => {
-    const result = await signUpNannyAction(null, formDataOf({ ...INVITE_SIGNUP, email: "nope" }));
+    const result = await signUpNannyAction(
+      null,
+      formDataOf({ ...INVITE_SIGNUP, email: "nope" }),
+    );
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.error.details).toEqual({ reason: "invalid-input", field: "email" });
+    expect(result.error.details).toEqual({
+      reason: "invalid-input",
+      field: "email",
+    });
     expect(accounts.rows()).toHaveLength(0);
   });
 });

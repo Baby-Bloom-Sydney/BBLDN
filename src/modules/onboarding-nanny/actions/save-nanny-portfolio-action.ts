@@ -17,16 +17,23 @@ export const saveNannyPortfolioAction: NannyPortfolioAction = async (
   _previous: unknown,
   formData: FormData,
 ) => {
-  const parsed = parseForm(nannyPortfolioSchema, formData, FIELDS, ["roleTypes"]);
+  const parsed = parseForm(nannyPortfolioSchema, formData, FIELDS, [
+    "roleTypes",
+  ]);
   if (!parsed.ok) return toActionResult(parsed);
   const lead = await readLeadCookie();
   if (!lead.ok) return toActionResult(lead);
   if (!(await consumeFunnelStepLimit("S-X-17")))
-    return toActionResult(refuseFunnel(ACTION, "rate-limited", { reason: "rate-limited" }));
+    return toActionResult(
+      refuseFunnel(ACTION, "rate-limited", { reason: "rate-limited" }),
+    );
   const patched = await nannyLeadStore.patch(lead.value.id, {
     ...parsed.value,
     funnelStep: "S-X-17",
   });
-  if (!patched.ok) return toActionResult(refuseFunnel(ACTION, "lead-not-patched", patched.error));
+  if (!patched.ok)
+    return toActionResult(
+      refuseFunnel(ACTION, "lead-not-patched", patched.error),
+    );
   return toActionResult(ok(undefined));
 };

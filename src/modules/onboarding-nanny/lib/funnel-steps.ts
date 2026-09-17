@@ -5,12 +5,24 @@ import type { FunnelStep, NannyFunnelMode } from "../types";
 
 const N1: ReadonlyArray<FunnelStep> = [
   { id: "location", screen: "S-X-15", heading: "Where in London are you?" },
-  { id: "residency", screen: "S-X-15", heading: "Your right to work in the UK" },
-  { id: "credentials", screen: "S-X-15", heading: "Your Enhanced DBS certificate" },
+  {
+    id: "residency",
+    screen: "S-X-15",
+    heading: "Your right to work in the UK",
+  },
+  {
+    id: "credentials",
+    screen: "S-X-15",
+    heading: "Your Enhanced DBS certificate",
+  },
   { id: "experience", screen: "S-X-15", heading: "Your experience" },
 ];
 
-const CONTACT: FunnelStep = { id: "contact", screen: "S-X-15", heading: "How can we reach you?" };
+const CONTACT: FunnelStep = {
+  id: "contact",
+  screen: "S-X-15",
+  heading: "How can we reach you?",
+};
 
 const REST: ReadonlyArray<FunnelStep> = [
   { id: "interstitial", screen: "S-X-16", heading: "Application received" },
@@ -18,10 +30,15 @@ const REST: ReadonlyArray<FunnelStep> = [
   { id: "review", screen: "S-X-18", heading: "Your profile" },
 ];
 
-const ACCOUNT: FunnelStep = { id: "account", screen: "S-X-19", heading: "Create your account" };
+const ACCOUNT: FunnelStep = {
+  id: "account",
+  screen: "S-X-19",
+  heading: "Create your account",
+};
 
-export const FUNNEL_STEPS: Readonly<Record<NannyFunnelMode, ReadonlyArray<FunnelStep>>> =
-  Object.freeze({
-    apply: Object.freeze([...N1, CONTACT, ...REST, ACCOUNT]),
-    portal: Object.freeze([...N1, ...REST]),
-  });
+export const FUNNEL_STEPS: Readonly<
+  Record<NannyFunnelMode, ReadonlyArray<FunnelStep>>
+> = Object.freeze({
+  apply: Object.freeze([...N1, CONTACT, ...REST, ACCOUNT]),
+  portal: Object.freeze([...N1, ...REST]),
+});

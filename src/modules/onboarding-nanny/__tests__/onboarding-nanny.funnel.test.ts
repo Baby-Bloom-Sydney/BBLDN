@@ -23,7 +23,9 @@ import { saveNannyBioAction } from "../actions/save-nanny-bio-action";
 
 vi.mock("next/headers", () => cookieJarModule());
 
-const formDataOf = (fields: Record<string, string | ReadonlyArray<string>>): FormData => {
+const formDataOf = (
+  fields: Record<string, string | ReadonlyArray<string>>,
+): FormData => {
   const data = new FormData();
   for (const [key, value] of Object.entries(fields)) {
     if (typeof value === "string") data.set(key, value);
@@ -67,7 +69,10 @@ beforeEach(() => {
 
 describe("onboarding-nanny — saveNannyApplicationAction (S-X-15 page 8: the lead is written)", () => {
   it("captures the lead, mints the lead cookie, emits lead.created and answers the interstitial", async () => {
-    const result = await saveNannyApplicationAction(null, formDataOf(APPLICATION));
+    const result = await saveNannyApplicationAction(
+      null,
+      formDataOf(APPLICATION),
+    );
     expect(result).toEqual({ ok: true, value: { next: "interstitial" } });
     expect(leads.rows()).toHaveLength(1);
     expect(leads.rows()[0]).toMatchObject({
@@ -86,7 +91,10 @@ describe("onboarding-nanny — saveNannyApplicationAction (S-X-15 page 8: the le
   it("an address that already has an account is sent to sign in, with no lead and no cookie (04 §4.1 row 5)", async () => {
     leads = memoryNannyLeadStore({ accounts: ["amara@example.test"] });
     configureNannyLeadStore(leads);
-    const result = await saveNannyApplicationAction(null, formDataOf(APPLICATION));
+    const result = await saveNannyApplicationAction(
+      null,
+      formDataOf(APPLICATION),
+    );
     expect(result).toEqual({ ok: true, value: { next: "sign-in" } });
     expect(leads.rows()).toHaveLength(0);
     expect(jarOf().has(LEAD_COOKIE)).toBe(false);
@@ -94,23 +102,35 @@ describe("onboarding-nanny — saveNannyApplicationAction (S-X-15 page 8: the le
 
   it("a second submission under the same address overwrites the unconverted lead in place (02 §4.7)", async () => {
     await saveNannyApplicationAction(null, formDataOf(APPLICATION));
-    await saveNannyApplicationAction(null, formDataOf({ ...APPLICATION, yearsExperience: "9" }));
+    await saveNannyApplicationAction(
+      null,
+      formDataOf({ ...APPLICATION, yearsExperience: "9" }),
+    );
     expect(leads.rows()).toHaveLength(1);
     expect(leads.rows()[0]?.yearsExperience).toBe(9);
   });
 
   it("refuses an invalid field with a VALIDATION naming it and writes nothing", async () => {
-    const result = await saveNannyApplicationAction(null, formDataOf({ ...APPLICATION, mobile: "no" }));
+    const result = await saveNannyApplicationAction(
+      null,
+      formDataOf({ ...APPLICATION, mobile: "no" }),
+    );
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.code).toBe("VALIDATION");
-    expect(result.error.details).toEqual({ reason: "invalid-input", field: "mobile" });
+    expect(result.error.details).toEqual({
+      reason: "invalid-input",
+      field: "mobile",
+    });
     expect(leads.rows()).toHaveLength(0);
   });
 
   it("fails closed while the lead store is unconfigured, and keeps the reason server-side (01 §4a)", async () => {
     NANNY_LEAD_STORE_REGISTRY.set(UNCONFIGURED);
-    const result = await saveNannyApplicationAction(null, formDataOf(APPLICATION));
+    const result = await saveNannyApplicationAction(
+      null,
+      formDataOf(APPLICATION),
+    );
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.code).toBe("INTERNAL");
@@ -120,19 +140,30 @@ describe("onboarding-nanny — saveNannyApplicationAction (S-X-15 page 8: the le
   it("07 §8 row 2 — over the funnelStep limit the refusal is the same generic line, and no lead is written", async () => {
     const generic = await (async () => {
       NANNY_LEAD_STORE_REGISTRY.set(UNCONFIGURED);
-      const refused = await saveNannyApplicationAction(null, formDataOf(APPLICATION));
+      const refused = await saveNannyApplicationAction(
+        null,
+        formDataOf(APPLICATION),
+      );
       configureNannyLeadStore(leads);
       return refused.ok ? "" : refused.error.message;
     })();
     const limit = SECURITY.rateLimits.funnelStep.perMinute ?? 0;
     for (let i = 0; i < limit; i += 1)
-      await saveNannyApplicationAction(null, formDataOf({ ...APPLICATION, email: `n${i}@example.test` }));
-    const over = await saveNannyApplicationAction(null, formDataOf({ ...APPLICATION, email: "over@example.test" }));
+      await saveNannyApplicationAction(
+        null,
+        formDataOf({ ...APPLICATION, email: `n${i}@example.test` }),
+      );
+    const over = await saveNannyApplicationAction(
+      null,
+      formDataOf({ ...APPLICATION, email: "over@example.test" }),
+    );
     expect(over.ok).toBe(false);
     if (over.ok) return;
     expect(over.error.code).toBe("INTERNAL");
     expect(over.error.message).toBe(generic);
-    expect(leads.rows().some((row) => row.email === "over@example.test")).toBe(false);
+    expect(leads.rows().some((row) => row.email === "over@example.test")).toBe(
+      false,
+    );
   });
 });
 
@@ -149,15 +180,22 @@ describe("onboarding-nanny — saveNannyPortfolioAction · saveNannyBioAction (S
   });
 
   it("patches the lead the cookie names", async () => {
-    expect(await saveNannyPortfolioAction(null, formDataOf(PORTFOLIO))).toEqual({ ok: true, value: undefined });
-    expect(await saveNannyBioAction(null, formDataOf({ bio: "Ten years with under-fives across south London." }))).toEqual({
+    expect(await saveNannyPortfolioAction(null, formDataOf(PORTFOLIO))).toEqual(
+      { ok: true, value: undefined },
+    );
+    expect(
+      await saveNannyBioAction(
+        null,
+        formDataOf({ bio: "Ten years with under-fives across south London." }),
+      ),
+    ).toEqual({
       ok: true,
       value: undefined,
     });
     expect(leads.rows()[0]).toMatchObject({
       roleTypes: ["full-time"],
       availability: { monday: ["morning"] },
-      rateBand: { minPence: 1500, maxPence: 2000 },
+      rateBand: { minPence: 1500, maxPence: 2000 }, // config-literal-ok: a fixture's own rate, not a PRICES value
       bio: "Ten years with under-fives across south London.",
     });
   });
@@ -173,7 +211,10 @@ describe("onboarding-nanny — saveNannyPortfolioAction · saveNannyBioAction (S
 
   it("refuses with `no-lead` when the cookie names a lead the store does not hold", async () => {
     jarOf().set(LEAD_COOKIE, "00000000-0000-4000-8000-000000000000");
-    const result = await saveNannyBioAction(null, formDataOf({ bio: "Ten years with under-fives across south London." }));
+    const result = await saveNannyBioAction(
+      null,
+      formDataOf({ bio: "Ten years with under-fives across south London." }),
+    );
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.details).toEqual({ reason: "no-lead" });
