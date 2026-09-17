@@ -1,6 +1,12 @@
 // `POST /api/public/quick-match` (03 §6.3; `02.09`) — the inline widget's contract: the front door's three fields
 // as JSON → count + the top cards. No auth, no write; the envelope of 01 §4c. Rate limit (07 §8 row 1) owed with
 // the shared store.
+// **P1-WIRE-2 looked at this and did not build it, on purpose.** `assertSharedStore` denies every `consume`
+// whenever `NODE_ENV === "production"` — on Vercel that is **preview and production both** — until boot calls
+// `configureRateLimiter(limiter, "shared")`. The shared store is `rate_limit_buckets`, which S5b creates in
+// migration `0017`; `main` stops at `0016` and S5b is not merged. So wiring `consume` here today would deny
+// every request to this route on every deployed environment. Declaring the per-instance memory store
+// "shared" instead is the exact failure that assertion exists to catch. Land it with S5b, not before.
 import { z } from "zod";
 import { err, ok, toResponse } from "@/modules/platform";
 import { buildQuickMatchPage } from "@/modules/matching";
