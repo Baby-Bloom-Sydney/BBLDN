@@ -39,5 +39,19 @@ export { registerSlice } from "./lib/register-slice";
 export { positions } from "./lib/default-positions";
 export { configurePositions } from "./lib/configure-positions";
 
-// The stub the contract names (03 §11 test 1 `stage-model.stub.ts`). The 44 rows of §2.4 are Phase 1e.
+// The stub the contract names (03 §11 test 1 `stage-model.stub.ts`).
 export { stubPositions } from "./positions.stub";
+
+// The inside (`1e`): the P-row slice over the store port, the reads, and the §2.4 position table.
+export { createPositions } from "./lib/create-positions";
+export { createPositionsSlice } from "./lib/create-positions-slice";
+export { registerPositionsSlice } from "./lib/register-positions-slice";
+export { memoryPositionStore } from "./lib/memory-position-store";
+export { POSITION_TRANSITIONS } from "./lib/position-transitions";
+export { journeySteps } from "./lib/journey-steps";
+
+// S-P-05 — the read the route calls and the view it renders (01 §2.5 "thin").
+export { loadPositionPage } from "./lib/load-position-page";
+export { positionPageView } from "./lib/position-page-view";
+export { PositionPage } from "./components/PositionPage";
+export { closePositionAction } from "./actions/close-position-action";

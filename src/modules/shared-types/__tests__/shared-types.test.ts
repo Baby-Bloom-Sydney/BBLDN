@@ -12,7 +12,7 @@ import {
 } from "@/modules/shared-types";
 import { ENUMS } from "@/modules/shared-types/enums";
 
-const ENUM_COUNT = 79; // 02 §3 "Count: 79 enums"
+const ENUM_COUNT = 80; // 02 §3 "Count: 79 enums" + `consent_purpose` (0017, ADR-131 (2))
 const EVENT_NAME_COUNT = 88; // 03 §9.3
 const TRANSITION_COUNT = 44; // 03 §2.4 "44 rows"
 const MODULE_COUNT = 26; // 00 §3 / HANDOFF §4.1

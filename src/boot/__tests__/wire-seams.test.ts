@@ -27,19 +27,24 @@ afterEach(() => {
 });
 
 describe("wireScheduling", () => {
-  it("installs the in-memory stub outside production, with the reason on the report", async () => {
-    const report = wireScheduling("preview");
-    expect(report.binding).toBe("in-memory stub");
-    expect(report.reason).toContain("cold start");
-    expect(await scheduling.expireHolds(NOW)).toEqual({
-      ok: true,
-      value: { expired: 0 },
-    });
+  // `1f` replaced the stub with the db inside in EVERY environment. The two cases these replace were P1-WIRE's
+  // honest record of a gap ("there is no inside, and here is why production must not get the stub"); with the
+  // gap closed they assert what is now true, and the one thing that matters is asserted on a REASON rather than
+  // on a happy path — a port that answered by accident could not pass.
+  it("binds the db inside, and production is no longer left fail-closed", async () => {
+    const report = wireScheduling();
+    expect(report.binding).toBe("db inside");
+    expect(report.reason).toContain("book_slot()");
+    const swept = await scheduling.expireHolds(NOW);
+    // `auth` is unconfigured in this suite, so the read fails — but it fails as the CALENDAR, not as the
+    // fail-closed default, which is what proves the binding replaced it.
+    expect(!swept.ok && swept.error.details?.reason).not.toBe(
+      "SCHEDULING_NOT_CONFIGURED",
+    );
   });
 
-  it("leaves production on the fail-closed default — a cold start would drop live bookings silently", async () => {
-    const report = wireScheduling("production");
-    expect(report.binding).toBe("unconfigured");
+  it("still refuses with its own named reason while nothing has wired it", async () => {
+    configureScheduling(unconfiguredScheduling);
     const result = await scheduling.expireHolds(NOW);
     expect(!result.ok && result.error.details?.reason).toBe(
       "SCHEDULING_NOT_CONFIGURED",

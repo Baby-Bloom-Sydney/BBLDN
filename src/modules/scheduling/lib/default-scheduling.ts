@@ -6,7 +6,8 @@ import { SCHEDULING_REGISTRY } from "./scheduling-registry";
 export const scheduling: Scheduling = Object.freeze({
   getAvailableSlots: (query) =>
     SCHEDULING_REGISTRY.get().getAvailableSlots(query),
-  hold: (slotId, actor) => SCHEDULING_REGISTRY.get().hold(slotId, actor),
+  hold: (slotId, actor, held) =>
+    SCHEDULING_REGISTRY.get().hold(slotId, actor, held),
   release: (holdId, actor) => SCHEDULING_REGISTRY.get().release(holdId, actor),
   book: (input) => SCHEDULING_REGISTRY.get().book(input),
   reschedule: (bookingId, slotId, actor) =>

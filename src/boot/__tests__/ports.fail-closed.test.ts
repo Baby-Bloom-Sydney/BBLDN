@@ -6,7 +6,9 @@
 import { describe, expect, it } from "vitest";
 import { areas } from "@/modules/areas";
 import { auth } from "@/modules/auth";
+import { callLayer } from "@/modules/call-layer";
 import { comms } from "@/modules/comms";
+import { matching } from "@/modules/matching";
 import {
   consent,
   Events,
@@ -14,10 +16,20 @@ import {
   unitOfWorkJoin,
   withUnitOfWork,
 } from "@/modules/platform";
+import { advance } from "@/modules/positions";
 import { scheduling } from "@/modules/scheduling";
-import type { Email, UnitOfWork } from "@/modules/shared-types";
+import { scoring } from "@/modules/scoring";
+import type {
+  Email,
+  PositionId,
+  UnitOfWork,
+  UserId,
+} from "@/modules/shared-types";
 
 const FOREIGN = {} as UnitOfWork;
+const DISTRICT = Object.freeze({ area: "Lambeth", district: "SW4" });
+const POSITION = "0f1e2d3c-0000-4000-8000-000000000001" as PositionId;
+const PARENT = "0a1b2c3d-0000-4000-8000-000000000011" as UserId;
 const reasonOf = (result: { ok: boolean }): unknown =>
   "error" in result
     ? (result as { error: { details?: { reason?: unknown } } }).error.details
@@ -88,5 +100,37 @@ describe("every port fails closed until src/instrumentation.ts wires it", () => 
         await scheduling.expireHolds("2026-09-17T09:00:00.000Z" as never),
       ),
     ).toBe("SCHEDULING_NOT_CONFIGURED");
+  });
+
+  // P1-WIRE-2. The three ports 1b and 1d left owed. Each has a real inside now, so the fail-closed default is
+  // the only thing standing between an unwired boot and a made-up answer on a parent's screen: an empty result
+  // set read as the true one (`matching`), a score nobody computed (`scoring`), a call said to be booked when
+  // nothing says so (`call-layer`). Each must still refuse with its own reason, and say which port it was.
+  it("scoring · matching · call-layer — each answers its own not-configured reason (03 §7.2 · §10.1 · §2.7)", async () => {
+    expect(reasonOf(await scoring.quickMatch(null, DISTRICT, []))).toBe(
+      "scoring-not-configured",
+    );
+    expect(reasonOf(await matching.quickMatch(null, DISTRICT))).toBe(
+      "matching-not-configured",
+    );
+    expect(reasonOf(await callLayer.findOpenCall(PARENT))).toBe(
+      "call-layer-not-configured",
+    );
+  });
+
+  it("the C-row slice is unregistered, so advance refuses rather than dispatching nowhere (03 §2.1)", async () => {
+    // The second half of `call-layer`'s wiring: `configureCallLayer` installs the orchestrator, but the C rows
+    // reach the stage model only through `registerCallLayerSlice`. A `{ uow }` is passed so `advance` takes the
+    // caller's branch and the refusal is the registry's, not a unit of work's.
+    const moved = await advance({
+      transition: "C-a",
+      entity: { kind: "call", id: POSITION },
+      actor: { kind: "system", id: "call-request" },
+      payload: { parentId: PARENT, type: "matchmaking", recipient: "parent" },
+      expectedFrom: null,
+      idempotencyKey: "fail-closed-probe",
+      uow: FOREIGN,
+    });
+    expect(reasonOf(moved)).toBe("E_SLICE_NOT_REGISTERED");
   });
 });

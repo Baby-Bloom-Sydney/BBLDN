@@ -29,11 +29,13 @@ export type LegalDocumentId =
   | "agr14_nanny_child_add";
 
 /**
- * What a `consent_records` row is *for*: a legal document accepted, or the one non-document purpose the
- * foundations name — `vaccination-status` (ADR-103; 07 §2.7(a): its own purpose, a distinct explicit tick).
- * Values: `CONSENT_PURPOSES`.
+ * What a `consent_records` row is *for*: a legal document accepted, or one of the non-document purposes
+ * 07 §2.7(a) names — `vaccination-status` (ADR-103: its own purpose, a distinct explicit tick), `marketing`
+ * and `cookie`. **Derived from the `consent_purpose` enum register** (ADR-131 (2); `0017` gave the table the
+ * column), so the union here and the database's labels cannot drift: `enum-ordinals.test.ts` judges the
+ * register against the applied schema, and `tsc` judges this against the register.
  */
-export type ConsentPurpose = LegalDocumentId | "vaccination-status";
+export type ConsentPurpose = EnumValue<"consent_purpose">;
 
 /** `AGR-nn` (02 §4.1 `agreement_id`). */
 export type AgreementId = `AGR-${string}`;

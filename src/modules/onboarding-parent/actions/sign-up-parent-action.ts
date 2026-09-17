@@ -110,7 +110,7 @@ async function createAccount(
   const opened =
     input.leadId === undefined
       ? null
-      : await openPositionFromLead(input.leadId, actor);
+      : await openPositionFromLead(input.leadId, actor, input);
   if (opened !== null && !opened.ok)
     log.warn("lead not converted at signup", {
       module: "onboarding-parent",

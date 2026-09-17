@@ -4,4 +4,5 @@ import { PARENT_PROFILE_STORE_REGISTRY } from "./parent-profile-store-registry";
 
 export const parentProfileStore: ParentProfileStore = Object.freeze({
   create: (input) => PARENT_PROFILE_STORE_REGISTRY.get().create(input),
+  get: (userId) => PARENT_PROFILE_STORE_REGISTRY.get().get(userId),
 });

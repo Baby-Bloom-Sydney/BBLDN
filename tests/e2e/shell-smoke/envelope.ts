@@ -22,6 +22,8 @@ export const STATUS = Object.freeze({
   notFound: 404 satisfies ErrorStatus,
   validation: 422 satisfies ErrorStatus,
   internal: 500 satisfies ErrorStatus,
+  /** ADR-130: a readiness status, not an `AppError` — `/api/health` pairs it with a success body. */
+  unavailable: 503 as const,
 });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

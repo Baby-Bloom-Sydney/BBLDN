@@ -91,6 +91,12 @@ beforeEach(() => {
     quickMatch: async () => matchingUnavailable,
     preAuthMatch: async () => matchingUnavailable,
     resultsFor: async () => matchingUnavailable,
+
+    listPublicNannies: async () => matchingUnavailable,
+    getPublicNanny: async () => matchingUnavailable,
+    saveLead: async () => matchingUnavailable,
+    getLead: async () => matchingUnavailable,
+    connect: async () => matchingUnavailable,
   });
   configureAdminOnBehalf(stubAdminOnBehalf());
 });

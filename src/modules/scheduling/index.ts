@@ -13,7 +13,11 @@ export { scheduling } from "./lib/default-scheduling";
 export { configureScheduling } from "./lib/configure-scheduling";
 export { unconfiguredScheduling } from "./lib/unconfigured-scheduling";
 
-// The stub (03 §3.6) — selected by config, never by editing an import (05 §3 rule 1).
+// The real inside (`1f`) — 02 §4.4's four tables through `auth`'s data port, `book_slot()` (02 §7) for the one
+// booking transaction. Selected at boot, never by editing an import (05 §3 rule 1).
+export { createScheduling } from "./lib/create-scheduling";
+
+// The stub (03 §3.6) — still the swap test's second implementation and every test's calendar double.
 export { createSchedulingStub } from "./scheduling.stub";
 
 // The pure rules the stub and the real inside share (03 §3.6).

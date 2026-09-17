@@ -8,10 +8,16 @@
 import { expect, test } from "@playwright/test";
 import { errorEnvelopeOf, isRequestId, STATUS } from "./envelope";
 
-test("GET /api/health answers 200 with JSON", async ({ request }) => {
+// This server boots with Supabase deliberately unreachable (`scripts/ci/lib/smoke-env.sh`), so the probe's one
+// real read cannot succeed — and since ADR-130 that is a **503**, not a 200 carrying a dead dependency. The
+// assertion is therefore "answers JSON at all", which is what proves the app booted and routed, plus the status
+// the next test pins. A 200 here would mean the probe had stopped telling the truth.
+test("GET /api/health answers with JSON — the app booted and routes", async ({
+  request,
+}) => {
   const response = await request.get("/api/health");
 
-  expect(response.status()).toBe(STATUS.ok);
+  expect(response.status()).toBe(STATUS.unavailable);
   expect(response.headers()["content-type"]).toContain("application/json");
 });
 
@@ -24,8 +30,10 @@ test("GET /api/health answers 200 with JSON", async ({ request }) => {
 // boots with Supabase deliberately unreachable (`scripts/ci/lib/smoke-env.sh` — 01 §4d step 2 wants a session
 // the app cannot read *refused*), so the one real read `db` performs cannot succeed here. The honest, fail-closed
 // answer is therefore `db: "failed"` — and that is what is asserted, because a probe that said `"ok"` with no
-// database behind it is exactly the lie the field exists to prevent. The `db: "ok"` half of the contract is
-// pinned by `src/app/api/health/route.test.ts` against a reachable (in-memory) port.
+// database behind it is exactly the lie the field exists to prevent. **ADR-130** makes the status say the same
+// thing: a failed probe is a **503** with the body unchanged, so Better Stack (ADR-106) and Vercel's own checks
+// fire on the code instead of having to parse a 200. The `db: "ok"` + 200 half of the contract is pinned by
+// `src/app/api/health/route.test.ts` against a reachable (in-memory) port.
 //
 // The shape is spelled out inline here rather than read through `envelope.ts`: `SuccessEnvelope<T>`'s `T` is
 // whatever the route returns, and what 06 §7.3 says that `T` is — `{ sha, env, db }` — is exactly the claim
@@ -41,7 +49,8 @@ test("GET /api/health answers in the 01 §4c envelope with the deploy sha (06 §
     requestId?: string;
   };
 
-  expect(response.status()).toBe(STATUS.ok);
+  // ADR-130: 503 because `db` is `"failed"` — the body is the report, the status is what the monitor reads
+  expect(response.status()).toBe(STATUS.unavailable);
   expect(isRequestId(body.requestId)).toBe(true);
   expect(response.headers()["x-request-id"]).toBe(body.requestId);
   expect(body.error).toBeUndefined();
