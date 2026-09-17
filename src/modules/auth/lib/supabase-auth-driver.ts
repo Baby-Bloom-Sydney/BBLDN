@@ -89,6 +89,9 @@ const unwrapUser = (
     email: user.email ?? null,
     hasPassword,
     aal: "aal1",
+    // Same rule as `aal` above: the credential calls report the neutral value and the gate never reads it from
+    // here — `refreshSession` / `getSession` re-derive both from the provider's own `amr` (`readDriverUser`).
+    isRecovery: false,
     expiresAtEpochSeconds: session?.expires_at ?? null,
   };
 };

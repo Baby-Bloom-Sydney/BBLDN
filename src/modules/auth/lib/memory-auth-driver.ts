@@ -29,6 +29,7 @@ const toDriverUser = (user: StubUser): DriverUser => ({
   email: user.email,
   hasPassword: user.password !== undefined,
   aal: user.mfaVerified === true ? "aal2" : "aal1",
+  isRecovery: user.isRecovery === true,
   expiresAtEpochSeconds: STUB_EXPIRY_EPOCH_SECONDS,
 });
 

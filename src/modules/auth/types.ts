@@ -46,6 +46,13 @@ export type Session = {
  */
 export type GateSession = Session & {
   readonly needsPasswordSetup: boolean;
+  /**
+   * The session was created by a recovery link rather than by signing in (the provider's `amr` says `recovery`).
+   * It is the one signal that distinguishes "here to set a new password" from "already signed in", and the gate
+   * uses it for exactly one path — `/reset-password`, which 01 §4d's signed-out-only `(auth)` rule would
+   * otherwise close against the very session the link exists to create (ADR-132; 04 §6.1 S-X-09).
+   */
+  readonly isRecovery: boolean;
 };
 
 /**
@@ -165,6 +172,8 @@ export type DriverUser = {
   readonly hasPassword: boolean;
   /** Supabase assurance level; `aal2` is `mfaVerified` (07 §5.4 row 2). */
   readonly aal: string | null;
+  /** The provider's `amr` names `recovery` — this session came from a password-recovery link, not a sign-in. */
+  readonly isRecovery: boolean;
   /** Session expiry as an epoch-second stamp, as the provider reports it. */
   readonly expiresAtEpochSeconds: number | null;
 };
@@ -225,6 +234,8 @@ export type StubUser = {
   /** Absent ⇒ authenticated with the provider but not a known actor — the gate treats it as no session. */
   readonly role?: Role;
   readonly mfaVerified?: boolean;
+  /** The seeded session came from a recovery link (the provider's `amr` would say `recovery`). */
+  readonly isRecovery?: boolean;
 };
 
 export type StubAuthOptions = {

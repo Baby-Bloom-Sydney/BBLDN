@@ -106,6 +106,7 @@ describe("auth — the passwordless account meets set-password, never an error (
     mfaVerified: false,
     expiresAt: "2030-01-01T00:00:00.000Z" as GateSession["expiresAt"],
     needsPasswordSetup: false,
+    isRecovery: false,
     ...over,
   });
 
@@ -144,5 +145,86 @@ describe("auth — a refused sign-in says one thing (ADR-132; the road to S-X-09
     expect(attempts[0].ok).toBe(false);
     expect(attempts[1]).toEqual(attempts[0]);
     expect(attempts[2]).toEqual(attempts[0]);
+  });
+});
+
+describe("auth — the gate's recovery exception (ADR-132 / 04 §6.1 vs ROUTE_MAP.authGroupPaths)", () => {
+  // `/reset-password` sits in the `(auth)` group, which 01 §4d makes signed-out only — and the recovery link
+  // arrives *with* a session, so the screen the link exists to reach was the one screen it could not reach.
+  // The exception is exactly one path for exactly one session class; every other class is untouched, and that
+  // is asserted here as carefully as the exception itself.
+  const sessionOf = (over: Partial<GateSession>): GateSession => ({
+    userId: "u-1" as UserId,
+    role: "parent",
+    mfaVerified: false,
+    expiresAt: "2030-01-01T00:00:00.000Z" as GateSession["expiresAt"],
+    needsPasswordSetup: false,
+    isRecovery: false,
+    ...over,
+  });
+
+  it("lets a recovery session reach /reset-password", () => {
+    expect(
+      gateDecision({
+        pathname: ROUTE_MAP.resetPasswordPath,
+        session: sessionOf({ isRecovery: true }),
+      }),
+    ).toEqual({ kind: "allow" });
+  });
+
+  it("gives a recovery session the ordinary answer everywhere else in the (auth) group", () => {
+    for (const path of ROUTE_MAP.authGroupPaths.filter(
+      (p) => p !== ROUTE_MAP.resetPasswordPath,
+    ))
+      expect(
+        gateDecision({
+          pathname: path,
+          session: sessionOf({ isRecovery: true }),
+        }),
+      ).toEqual({ kind: "redirect", to: "/parent" });
+  });
+
+  it("gives a recovery session the ordinary answer outside the (auth) group", () => {
+    const session = sessionOf({ isRecovery: true });
+    expect(gateDecision({ pathname: "/parent/call", session })).toEqual({
+      kind: "allow",
+    });
+    expect(gateDecision({ pathname: "/nanny", session })).toEqual({
+      kind: "redirect",
+      to: "/parent",
+    });
+  });
+
+  it("does not widen the path: an ordinary session is still bounced off /reset-password", () => {
+    expect(
+      gateDecision({
+        pathname: ROUTE_MAP.resetPasswordPath,
+        session: sessionOf({}),
+      }),
+    ).toEqual({ kind: "redirect", to: "/parent" });
+  });
+
+  it("leaves a signed-out visitor exactly where she was — /reset-password needs no role", () => {
+    expect(
+      gateDecision({ pathname: ROUTE_MAP.resetPasswordPath, session: null }),
+    ).toEqual({ kind: "allow" });
+  });
+
+  it("keeps step 3 ahead of it: a recovery session with no password still goes to set-password", () => {
+    expect(
+      gateDecision({
+        pathname: ROUTE_MAP.resetPasswordPath,
+        session: sessionOf({ isRecovery: true, needsPasswordSetup: true }),
+      }),
+    ).toEqual({ kind: "redirect", to: ROUTE_MAP.setPasswordPath });
+  });
+
+  it("does not hand an aal1 admin a way in: 07 §5.4 row 2 answers first", () => {
+    expect(
+      gateDecision({
+        pathname: "/admin/dashboard",
+        session: sessionOf({ isRecovery: true, role: "admin" }),
+      }),
+    ).toEqual({ kind: "redirect", to: "/login?next=%2Fadmin%2Fdashboard" });
   });
 });

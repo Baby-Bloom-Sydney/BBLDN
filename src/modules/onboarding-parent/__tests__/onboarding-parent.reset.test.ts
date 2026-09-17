@@ -92,7 +92,18 @@ describe("onboarding-parent — /reset-password behind the gate (S-X-09 reset ha
     mfaVerified: false,
     expiresAt: "2030-01-01T00:00:00.000Z" as GateSession["expiresAt"],
     needsPasswordSetup: false,
+    isRecovery: false,
     ...over,
+  });
+
+  // `1c` pin (6), closed by AUTH-2.
+  it("lets the session the recovery link created reach /reset-password", () => {
+    expect(
+      gateDecision({
+        pathname: ROUTE_MAP.resetPasswordPath,
+        session: sessionOf({ isRecovery: true }),
+      }),
+    ).toEqual({ kind: "allow" });
   });
 
   it("still bounces an ordinary signed-in session off /reset-password (01 §4d: the (auth) group is signed-out only)", () => {

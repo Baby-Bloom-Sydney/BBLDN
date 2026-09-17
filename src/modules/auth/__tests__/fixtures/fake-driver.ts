@@ -36,6 +36,7 @@ export const aDriverUser = (over: Partial<DriverUser> = {}): DriverUser => ({
   email: "someone@example.test",
   hasPassword: true,
   aal: "aal1",
+  isRecovery: false,
   expiresAtEpochSeconds: 1_800_000_000,
   ...over,
 });

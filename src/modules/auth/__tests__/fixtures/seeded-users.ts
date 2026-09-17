@@ -33,6 +33,17 @@ export const seededUsers: Readonly<Record<string, StubUser>> = Object.freeze({
     role: "admin",
     mfaVerified: false,
   }),
+  /**
+   * 04 §6.1 S-X-09: a parent who has a password and whose session came from the recovery link. She is the one
+   * session class allowed through the `(auth)` group's signed-out-only rule, and only onto `/reset-password`.
+   */
+  recovering: Object.freeze({
+    id: "66666666-6666-4666-8666-666666666666",
+    email: "forgot@example.test" as Email,
+    password: PASSWORD,
+    role: "parent",
+    isRecovery: true,
+  }),
   /** ADR-042: an account created without a password — routed to set-password, never shown an error. */
   passwordless: Object.freeze({
     id: "55555555-5555-4555-8555-555555555555",
