@@ -3698,6 +3698,7 @@ export type Database = {
         Row: {
           checked_at: string | null
           created_at: string
+          evidence_id: string
           evidence_type: string
           id: string
           nanny_id: string
@@ -3712,6 +3713,7 @@ export type Database = {
         Insert: {
           checked_at?: string | null
           created_at?: string
+          evidence_id: string
           evidence_type: string
           id?: string
           nanny_id: string
@@ -3726,6 +3728,7 @@ export type Database = {
         Update: {
           checked_at?: string | null
           created_at?: string
+          evidence_id?: string
           evidence_type?: string
           id?: string
           nanny_id?: string
@@ -4117,6 +4120,18 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_vetting_check_result: {
+        Args: {
+          p_checked_by?: Database["public"]["Enums"]["checked_by"]
+          p_expires_at?: string
+          p_extracted?: Json
+          p_guidance_key?: string
+          p_reject_reason?: string
+          p_status: string
+          p_submission_id: string
+        }
+        Returns: Json
+      }
       book_slot: {
         Args: {
           p_actor_role: Database["public"]["Enums"]["actor_role"]
@@ -4137,6 +4152,7 @@ export type Database = {
         Args: { p_child_id: string }
         Returns: boolean
       }
+      claim_verification_processing: { Args: never; Returns: string[] }
       connect_child_invite: {
         Args: { p_token: string; p_user_id: string }
         Returns: string
@@ -4352,6 +4368,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      save_verification_contact: { Args: never; Returns: boolean }
       set_access_window: {
         Args: { p_access_age_years: number; p_parent_user_id: string }
         Returns: string
@@ -4419,6 +4436,17 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      submit_verification_evidence: {
+        Args: {
+          p_columns?: Json
+          p_evidence_id: string
+          p_evidence_type: string
+          p_provider_key: string
+          p_section: Database["public"]["Enums"]["verification_section"]
+          p_status: Database["public"]["Enums"]["vetting_submission_status"]
+        }
+        Returns: Json
+      }
       update_nanny_profile: {
         Args: { p_contact?: Json; p_profile?: Json }
         Returns: boolean
@@ -4483,6 +4511,13 @@ export type Database = {
         Returns: number
       }
       user_has_child_access: { Args: { p_child_id: string }; Returns: boolean }
+      verification_submission_columns: {
+        Args: {
+          p_columns: Json
+          p_section: Database["public"]["Enums"]["verification_section"]
+        }
+        Returns: Json
+      }
     }
     Enums: {
       actor_role: "parent" | "nanny" | "admin" | "system"
