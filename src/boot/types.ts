@@ -10,7 +10,10 @@ export type BootPort =
   | "rate-limit"
   | "areas"
   | "comms"
-  | "scheduling";
+  | "scheduling"
+  | "scoring"
+  | "matching"
+  | "call-layer";
 
 export type PortWiring = {
   readonly port: BootPort;

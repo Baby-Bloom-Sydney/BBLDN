@@ -8,7 +8,13 @@
 // env is stubbed: `config/env.ts` parses the environment once at module load, and `process.exit` is trapped so a
 // misconfigured fixture fails this test instead of the worker.
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { Email, UnitOfWork } from "@/modules/shared-types";
+import type {
+  Email,
+  NannyId,
+  PositionId,
+  UnitOfWork,
+  UserId,
+} from "@/modules/shared-types";
 
 const PREVIEW_ENV: Readonly<Record<string, string | undefined>> = {
   VERCEL_ENV: "preview",
@@ -28,7 +34,16 @@ type Modules = {
   readonly comms: typeof import("@/modules/comms");
   readonly scheduling: typeof import("@/modules/scheduling");
   readonly config: typeof import("@/modules/config");
+  readonly scoring: typeof import("@/modules/scoring");
+  readonly matching: typeof import("@/modules/matching");
+  readonly callLayer: typeof import("@/modules/call-layer");
+  readonly positions: typeof import("@/modules/positions");
 };
+
+const DISTRICT = Object.freeze({ area: "Lambeth", district: "SW4" });
+const POSITION = "0f1e2d3c-0000-4000-8000-000000000001" as PositionId;
+const PARENT = "0a1b2c3d-0000-4000-8000-000000000011" as UserId;
+const NANNY = "0a1b2c3d-0000-4000-8000-000000000021" as NannyId;
 
 const reasonOf = (result: { ok: boolean }): unknown =>
   "error" in result
@@ -59,6 +74,10 @@ beforeAll(async () => {
     comms: await import("@/modules/comms"),
     scheduling: await import("@/modules/scheduling"),
     config: await import("@/modules/config"),
+    scoring: await import("@/modules/scoring"),
+    matching: await import("@/modules/matching"),
+    callLayer: await import("@/modules/call-layer"),
+    positions: await import("@/modules/positions"),
   };
 });
 
@@ -138,5 +157,58 @@ describe("after register() in a valid preview environment", () => {
     expect(
       m.platform.scrubPii({ envNames: ["CRON_SECRET"] }).envNames,
     ).not.toEqual(["CRON_SECRET"]);
+  });
+
+  // P1-WIRE-2 — the three ports 1b and 1d left owed. Each claim is the replacement of a named fail-closed
+  // default, asserted against the *reason* rather than a happy path, so a port that answered by accident could
+  // not pass: `scoring-not-configured`, `matching-not-configured` and `call-layer-not-configured` are what the
+  // registries say with no wiring, and `ports.fail-closed.test.ts` proves they still say it.
+  it("scoring — the three-layer engine is installed; an empty candidate set scores rather than refusing", async () => {
+    const result = await m.scoring.scoring.quickMatch(null, DISTRICT, []);
+    expect(reasonOf(result)).not.toBe("scoring-not-configured");
+    expect(result).toEqual({ ok: true, value: { total: 0, top: [] } });
+  });
+
+  it("matching — the inside over auth's data port is installed; the two 1e methods answer their own not-built", async () => {
+    const results = await m.matching.matching.resultsFor(POSITION, {
+      kind: "system",
+      id: "cascade",
+    });
+    expect(reasonOf(results)).toBe("not-built");
+    expect(reasonOf(results)).not.toBe("matching-not-configured");
+    // `connect` is the ADR-126 entry point and is pure, so it answers here with no database at all: a guest is
+    // sent to the wizard with the nanny remembered. Only the inside can decide that — the registry refuses.
+    const decided = await m.matching.matching.connect({
+      nannyId: NANNY,
+      surface: "browse",
+      session: null,
+      leadId: null,
+    });
+    expect(decided.ok && decided.value.kind).toBe("redirect");
+  });
+
+  it("call-layer — the orchestrator is installed on preview, over one memory mirror", async () => {
+    const open = await m.callLayer.callLayer.findOpenCall(PARENT);
+    expect(reasonOf(open)).not.toBe("call-layer-not-configured");
+    expect(open).toEqual({ ok: true, value: null });
+  });
+
+  it("call-layer — its C rows are registered with the stage model, so advance dispatches into the slice (03 §2.1)", async () => {
+    // `C-a` names three system jobs (03 §2.4) — `call-request`, `signup-convert-lead`, `cascade`. `autofire` is
+    // a real `SystemJobName` and is none of them, so the **handler's own** actor rule
+    // answers. That is the claim: the row reached the registered slice. The probe is deliberately refused at the
+    // actor gate rather than allowed to run, because a row that passed would write the mirror and then emit
+    // `call.requested` through the event-log store — a real database this environment does not have. The slice's
+    // own behaviour is 1d's `call-layer.inside.test.ts`; what boot owes is that the slice is reachable at all.
+    const moved = await m.positions.advance({
+      transition: "C-a",
+      entity: { kind: "call", id: POSITION },
+      actor: { kind: "system", id: "autofire" },
+      payload: { parentId: PARENT, type: "matchmaking", recipient: "parent" },
+      expectedFrom: null,
+      idempotencyKey: "boot-probe",
+    });
+    expect(reasonOf(moved)).not.toBe("E_SLICE_NOT_REGISTERED");
+    expect(reasonOf(moved)).toBe("E_ACTOR_FORBIDDEN");
   });
 });
