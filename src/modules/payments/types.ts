@@ -9,6 +9,7 @@ import type {
   Price,
   PricePreset,
 } from "@/modules/purchase-paths";
+import type { MoneyPageView } from "./lib/money-page-view";
 import type {
   Actor,
   AdminId,
@@ -215,6 +216,20 @@ export interface PurchasePath {
   /** The presets, from `config` — never a literal (03 §5.2; 01 §3.2 rule 1). */
   prices(): ReadonlyArray<Price>;
 }
+
+/**
+ * What the three money screens' one server read hands back (04 §6.2 S-P-10 / S-P-11 / S-P-12). `failed` is a
+ * state of its own rather than an empty standing: an outage must never render as "nothing to pay".
+ */
+export type MoneyPageLoad =
+  | { readonly kind: "signed-out" }
+  | { readonly kind: "failed" }
+  | {
+      readonly kind: "standing";
+      readonly familyId: FamilyId;
+      readonly state: AccessState;
+      readonly view: MoneyPageView;
+    };
 
 /** The five scheduled jobs `payments` owns (01 §4f; 02 §4.5 "jobs"); the cron shells call them by name. */
 export type PaymentJobName =

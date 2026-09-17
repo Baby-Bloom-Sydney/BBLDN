@@ -17,6 +17,15 @@ export { paymentsJobs } from "./lib/default-payments-jobs";
 export { configurePaymentsJobs } from "./lib/configure-payments-jobs";
 export { createPaymentsJobs } from "./lib/create-payments-jobs";
 
+// The three screens of 04 §6.2 and their server reads / actions (05 §7 rule 5 — the route files are thin).
+export { BundlePage } from "./components/BundlePage";
+export { BundleStatusPage } from "./components/BundleStatusPage";
+export { SelfServePage } from "./components/SelfServePage";
+export { loadMoneyPage } from "./lib/load-money-page";
+export { moneyPageView } from "./lib/money-page-view";
+export { startCheckoutAction } from "./actions/start-checkout-action";
+export { openPortalAction } from "./actions/open-portal-action";
+
 // The two stores the boot file chooses between (03 §11 row 4: swap either half).
 export { dbSpineStore } from "./lib/db-spine-store";
 export { memorySpineStore } from "./lib/memory-spine-store";
