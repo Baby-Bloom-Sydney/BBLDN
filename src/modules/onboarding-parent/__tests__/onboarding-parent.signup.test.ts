@@ -197,18 +197,10 @@ describe("onboarding-parent — signUpParentAction with the profile store config
     expect(JSON.stringify(again)).not.toContain("already exists");
   });
 
-  it.fails(
-    "PINNED (04 §6.1 S-X-05 'duplicate email → S-X-08'; auth.signUp cannot tell a duplicate from an outage): a duplicate is a VALIDATION naming the email",
-    async () => {
-      await signUpParentAction(null, formDataOf(VALID));
-      const again = await signUpParentAction(null, formDataOf(VALID));
-      expect(!again.ok && again.error.code).toBe("VALIDATION");
-      expect(!again.ok && again.error.details).toEqual({
-        reason: "invalid-input",
-        field: "email",
-      });
-    },
-  );
+  // `1c`'s pin (5) — "a duplicate is a VALIDATION naming the email" — was DELETED here (P1-STORES), not built.
+  // ADR-132 and ADR-137 ruled that routing or labelling a taken address differently is itself the enumeration
+  // oracle 07 §4 forbids, so the pin asked for a defect; the claim above it (one generic line, no provider text)
+  // is what the document now wants, and it passes. Recorded rather than quietly dropped.
 
   it("keeps the account and lands on S-P-03 state 0 when P-2 refuses (no slice registered)", async () => {
     const result = await signUpParentAction(

@@ -20,6 +20,11 @@ export type MatchingDeps = {
   readonly auth: Auth;
   /** 03 §7.5 — which distance provider boot wired, for `precheck.fired.providerKind`. */
   readonly distanceKind?: Parameters<typeof autofire>[0]["distanceKind"];
+  /**
+   * 03 §7.4's `precheck-nanny` batch, handed in at boot — 01 §2.3 gives `matching` no arrow to `comms`, so the
+   * send arrives as a port rather than an import (ADR-136; see `PrecheckBlast`).
+   */
+  readonly blast?: Parameters<typeof autofire>[0]["blast"];
 };
 
 const NOT_BUILT = err("INTERNAL", "Not available yet", {
@@ -103,6 +108,7 @@ export function createMatching(deps: MatchingDeps): Matching {
       ...(deps.distanceKind === undefined
         ? {}
         : { distanceKind: deps.distanceKind }),
+      ...(deps.blast === undefined ? {} : { blast: deps.blast }),
     }),
     listPublicNannies: () => loadPublicNannies(auth),
     getPublicNanny: async (nannyId: NannyId) => {
