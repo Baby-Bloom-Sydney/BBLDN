@@ -169,7 +169,10 @@ describe("scheduling — booking invariants", () => {
   it("expires a hold rather than silently booking another slot (I-8)", async () => {
     const calendar = stub();
     const slotId = slotOn(GMT_FRIDAY, "10:00");
-    const held = await calendar.hold(slotId, parent);
+    const held = await calendar.hold(slotId, parent, {
+      kind: "matchmaking",
+      subject: parentSubject,
+    });
     expect(held.ok).toBe(true);
     const swept = await calendar.expireHolds("2099-01-01T00:00:00.000Z" as ISO);
     expect(swept.ok && swept.value.expired).toBe(1);

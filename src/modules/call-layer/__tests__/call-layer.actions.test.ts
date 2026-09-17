@@ -133,7 +133,7 @@ afterEach(() => {
 describe("signed out", () => {
   it("every action and the page read fail closed, never throw", async () => {
     signIn(undefined);
-    const held = await holdSlotAction(await aSlot());
+    const held = await holdSlotAction(await aSlot(), POSITION);
     expect(!held.ok && held.error.code).toBe("UNAUTHENTICATED");
     const chosen = await chooseSlotAction({
       positionId: POSITION,
@@ -158,7 +158,7 @@ describe("signed in as the parent", () => {
 
   it("holds a slot, then the button books it on her position", async () => {
     const slotId = await aSlot();
-    const held = await holdSlotAction(slotId);
+    const held = await holdSlotAction(slotId, POSITION);
     expect(held.ok).toBe(true);
     if (!held.ok) return;
 
@@ -193,5 +193,26 @@ describe("signed in as the parent", () => {
       createCallLayer({ store, scheduling, comms: unconfiguredComms }),
     );
     expect(await loadCallPage()).toEqual({ kind: "no-call" });
+  });
+});
+
+describe("holdSlotAction — the position is checked, not taken on trust", () => {
+  it("refuses a hold against a position that is not the caller's own open call", async () => {
+    const held = await holdSlotAction(
+      await aSlot(),
+      "11111111-0000-4000-8000-000000000099" as PositionId,
+    );
+    expect(!held.ok && held.error.code).toBe("FORBIDDEN");
+  });
+
+  it("says the same thing whether the position is another family's or does not exist (07 §4)", async () => {
+    const someoneElses = await holdSlotAction(await aSlot(), OTHER_POSITION);
+    const nonsense = await holdSlotAction(
+      await aSlot(),
+      "22222222-0000-4000-8000-000000000098" as PositionId,
+    );
+    expect(!someoneElses.ok && someoneElses.error.message).toBe(
+      !nonsense.ok ? nonsense.error.message : "",
+    );
   });
 });

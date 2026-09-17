@@ -151,7 +151,7 @@ export function SlotPicker({
     async (slotId: SlotId) => {
       setMessage(null);
       setPicked({ slotId });
-      const held = await actions.hold(slotId);
+      const held = await actions.hold(slotId, positionId);
       if (held.ok) {
         setPicked({ slotId, holdId: held.value.holdId });
         return;
@@ -160,7 +160,7 @@ export function SlotPicker({
       setGone((previous) => new Set([...previous, slotId]));
       setMessage(messageFor(held.error.details?.reason));
     },
-    [actions],
+    [actions, positionId],
   );
 
   const confirm = useCallback(async () => {
