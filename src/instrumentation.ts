@@ -11,11 +11,13 @@
 //
 // Still deliberately NOT wired here — each with its reason on the boot report or in the L-007 P1-WIRE entry:
 //   · the rate limiter as `"shared"` — `rate_limit_buckets` has no specification (`wire-rate-limiter.ts`);
-//   · `configurePurchaseProvider` — the only provider is `stub-stripe`, and reaching it from this file would
-//     place `node:crypto` in the **edge** instrumentation bundle (this hook runs once per runtime, and
-//     `src/middleware.ts` makes an edge runtime exist); the purchase registry stays fail-closed (F-c);
 //   · the stage-model slices and `admin-on-behalf` — their insides are Phase 1e's; a stub wired here would be a
 //     silent success against a stub (03 §2.1 registration lands with the insides).
+//
+// `configurePurchaseProvider` **is** wired now (`1h`, `src/boot/wire-purchase-paths.ts`). Its reason for not
+// being — `stub-stripe` reaching `node:crypto`, which this hook would have carried into the edge bundle — was
+// removed at the source rather than worked around: the stub's constant-time compare is pure arithmetic and the
+// folder touches no Node builtin.
 /**
  * `EnvInvalidError` carries a frozen `names` array and **never a value** — that is the whole point of its shape
  * (`config/lib/env-invalid-error.ts`). It is read structurally rather than by importing the class, because the

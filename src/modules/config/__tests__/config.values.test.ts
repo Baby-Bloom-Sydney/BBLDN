@@ -165,6 +165,7 @@ describe("config — values from the foundations (01 §3.1)", () => {
       "selfServeAppMonthlyPence",
       "selfServeAppUpfrontPence",
       "trialDays",
+      "trialReminderDaysBefore",
     ]);
     for (const value of Object.values(amounts))
       expect(Number.isInteger(value)).toBe(true);
@@ -176,6 +177,8 @@ describe("config — values from the foundations (01 §3.1)", () => {
     ]);
     expect(universal.PRICES.accessAgeYears).toBe(3);
     expect(universal.PRICES.paymentAfterStartDays).toBe(7);
+    // 03 §5.4.4 — the reminder is sent five days before the trial ends, and it is the operator's cue to call.
+    expect(universal.PRICES.trialReminderDaysBefore).toBe(5);
   });
 
   it("SCHEDULING carries the ADR-076 defaults with the LOCALE timezone", () => {
