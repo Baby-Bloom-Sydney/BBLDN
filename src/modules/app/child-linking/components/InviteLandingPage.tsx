@@ -20,7 +20,7 @@ export function InviteLandingPage({ view, token }: InviteLandingPageProps) {
       <p className="text-xs font-semibold uppercase [letter-spacing:0.14em] text-violet-700">
         {BRAND.name}
       </p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+      <h1 className="mt-2 text-2xl font-semibold [letter-spacing:-0.01em] text-slate-900">
         {view.heading}
       </h1>
       <p className="mt-3 max-w-prose text-sm leading-relaxed text-slate-600">

@@ -1,7 +1,7 @@
 // The two non-open states of S-P-13 (04 §6.2), rendered from `appAccessView` and nowhere else.
 //
 // The distinction between them is the whole reason this component exists. `closed` is the paywall — in guide
-// voice, saying what the family gets rather than what they lack, never a "your free trial has ended" line
+// voice, saying what the family gets rather than what they lack, never the "your 30 days have run out" framing
 // (04 §8; 00-glossary §6). `unknown` is an outage, and it carries **no action to pay**: `accessGate.hasAccess`
 // fails closed by carrying `payments`' error rather than defaulting to `open: false` (`1h`), and this is where
 // that choice earns its keep — a paying family caught in a database blip is told we couldn't check, not asked
@@ -24,7 +24,7 @@ export function AppGateNotice({ view }: AppGateNoticeProps) {
     >
       <h2
         id="app-gate-heading"
-        className="text-lg font-semibold tracking-tight text-slate-900"
+        className="text-lg font-semibold [letter-spacing:-0.01em] text-slate-900"
       >
         {view.heading}
       </h2>

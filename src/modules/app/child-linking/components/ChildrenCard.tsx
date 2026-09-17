@@ -24,7 +24,7 @@ export function ChildrenCard({ view }: ChildrenCardProps) {
       >
         <h2
           id="children-heading"
-          className="text-lg font-semibold tracking-tight text-slate-900"
+          className="text-lg font-semibold [letter-spacing:-0.01em] text-slate-900"
         >
           {view.heading}
         </h2>
@@ -47,7 +47,7 @@ export function ChildrenCard({ view }: ChildrenCardProps) {
     >
       <h2
         id="children-heading"
-        className="text-lg font-semibold tracking-tight text-slate-900"
+        className="text-lg font-semibold [letter-spacing:-0.01em] text-slate-900"
       >
         {view.heading}
       </h2>
