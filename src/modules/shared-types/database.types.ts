@@ -4159,6 +4159,19 @@ export type Database = {
         }
         Returns: string
       }
+      create_nanny_account: {
+        Args: {
+          p_area?: string
+          p_district?: string
+          p_first_name: string
+          p_isolated: boolean
+          p_last_name: string
+          p_lead_id?: string
+          p_mobile?: string
+          p_profile?: Json
+        }
+        Returns: Json
+      }
       create_parent_profile: {
         Args: { p_first_name: string; p_last_name: string; p_mobile: string }
         Returns: undefined
@@ -4246,10 +4259,12 @@ export type Database = {
       is_parent: { Args: never; Returns: boolean }
       is_privileged_writer: { Args: never; Returns: boolean }
       is_retention_job: { Args: never; Returns: boolean }
+      lift_nanny_isolation: { Args: never; Returns: boolean }
       nanny_leave_child: {
         Args: { p_child_id: string; p_reason: string }
         Returns: string
       }
+      nanny_profile_columns: { Args: { p_profile: Json }; Returns: Json }
       open_dfy_access: {
         Args: {
           p_parent_user_id: string
@@ -4406,6 +4421,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      update_nanny_profile: {
+        Args: { p_contact?: Json; p_profile?: Json }
+        Returns: boolean
       }
       update_soft_lock: {
         Args: { p_child_id: string; p_locked: boolean }

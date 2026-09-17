@@ -18,6 +18,7 @@ export type BootPort =
   | "connections"
   | "placements"
   | "parent-profile"
+  | "nanny-onboarding"
   | "purchase-paths"
   | "payments"
   | "app/child-linking"

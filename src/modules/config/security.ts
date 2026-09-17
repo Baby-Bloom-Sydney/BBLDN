@@ -86,6 +86,20 @@ const RATE_LIMITS = declarePolicies({
   },
   nannyApplications: { key: "user", perDay: 10, note: "row 12" },
   adminRoutes: { key: "admin", perMinute: 600, note: "row 14" },
+  // 07 §8 row 16 (2a's ADR-142 pass): N1's "sign in instead" answer is a deliberate reveal (04 §4.1 row 5), so the
+  // lead capture is bounded per **address** as well as per caller — a rotated User-Agent buys nothing against a
+  // target list; and S-N-18's authenticated one-write-per-step action carries a per-user ceiling of its own.
+  funnelLeadPerEmail: {
+    key: "email-hash",
+    perDay: 10,
+    note: "S-X-15 lead capture per address (row 16)",
+  },
+  profileSteps: {
+    key: "user",
+    perMinute: 30,
+    perDay: 300,
+    note: "S-N-18 profile steps per user (row 16)",
+  },
   // 07 §8 has **no row** for a signed-in parent creating a checkout or a portal session, and `1h` needed one:
   // both server actions call out to the purchase provider, so a parent in a tight loop is unbounded provider
   // cost against a real account. Row 13's "no rate limit" is scoped to provider-retried, signature-verified
@@ -123,6 +137,15 @@ export const SECURITY = Object.freeze({
     "publicRead",
   ] as const) satisfies ReadonlyArray<RateLimitPolicyName>,
   authLockoutMinutes: 15, // 07 §8 row 3
+  // ADR-150 — a bearer carried between two screens travels in an `HttpOnly` cookie, never a query string: the
+  // invite token from S-X-13 to S-X-06 / S-X-07 (REVIEW-2 M-8) and the nanny lead id from S-X-15 to S-X-19
+  // (07 §4.6's pattern). Minted by a server action, read by the receiving route + action, cleared by the action
+  // that consumes it. Unsigned by ADR-150's argument (neither value is guessable); a signing secret joins here
+  // the day a guessable id is carried.
+  carriedTokens: Object.freeze({
+    invite: Object.freeze({ name: "bb_invite", maxAgeSeconds: 3600 }),
+    nannyLead: Object.freeze({ name: "bb_nanny_lead", maxAgeSeconds: 86400 }),
+  }),
   inviteLookupBlock: Object.freeze({ failedPerHour: 5, blockMinutes: 60 }), // 07 §8 row 7
   burstAlertMultiple: 10, // ALERT_RATE_LIMIT_BURST when a key trips ≥ 10× in an hour (07 §8)
   signedUrlTtlSeconds: Object.freeze({

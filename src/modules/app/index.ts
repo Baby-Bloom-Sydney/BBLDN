@@ -29,6 +29,7 @@ export {
   childrenCardView,
   appAccessView,
   claimInviteAction,
+  startInviteSignupAction,
   createChildAction,
   createChildInviteAction,
   revokeChildInviteAction,

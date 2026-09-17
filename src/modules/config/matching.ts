@@ -60,22 +60,34 @@ export const MATCHING = Object.freeze({
   }),
   bonusCap: 1.25,
   displayRange: Object.freeze({ min: 50, max: 100 }),
+  // ADR-149 — the one UK childcare-qualification vocabulary (S-X-15 · S-N-17 · S-N-18 · position requirements ·
+  // scoring). Keys are the `0006` CHECK's and never change without regenerating it; labels are the DfE's early
+  // years framework names (EYFS statutory framework ratio levels 2 / 3 / 6; foundation degrees at level 5 per the
+  // DfE qualifications finder). `other` = outside the framework (Montessori, Norland, overseas) until named.
   qualificationLadder: Object.freeze([
-    Object.freeze({ key: "none", label: "No qualifications", rung: 0 }),
-    Object.freeze({ key: "other", label: "Other", rung: 1 }),
-    Object.freeze({ key: "level-2", label: "Level 2 childcare", rung: 2 }),
-    Object.freeze({ key: "level-3", label: "Level 3 childcare", rung: 3 }),
+    Object.freeze({ key: "none", label: "No formal qualification", rung: 0 }),
+    Object.freeze({
+      key: "other",
+      label: "Other childcare qualification",
+      rung: 1,
+    }),
+    Object.freeze({ key: "level-2", label: "Level 2 early years", rung: 2 }),
+    Object.freeze({
+      key: "level-3",
+      label: "Level 3 early years educator (incl. NNEB / CACHE diploma)",
+      rung: 3,
+    }),
     Object.freeze({
       key: "level-5",
-      label: "Level 5 / foundation degree",
+      label: "Level 5 / foundation degree in early years",
       rung: 4,
     }),
     Object.freeze({
       key: "degree",
-      label: "Degree in early years (or equivalent)",
+      label: "Level 6 — degree in early years, EYTS or QTS",
       rung: 5,
     }),
-  ]), // [unverified] UK vocabulary @pending: 03 §12 item 26 (Sydney's AU names are not carried)
+  ]),
   minVerificationLevel: 3, // visible in matching from L3_PROVISIONALLY_VERIFIED (03 §4.3)
   precheckN: 20, // Sydney standard tier totalNannies; tiers collapse into one pre-check (03 §7.4)
   precheck: Object.freeze({ waves: 1, maxRespondents: 5, expiryDays: 3 }), // Sydney standard tier — @pending: 01 §10 O-8 (08.25)
