@@ -1,6 +1,8 @@
 // S-X-05 / S-X-06 — the signup action: validated once at the boundary, the role always `parent`, a refusal that
 // never leaks provider text, the profile row written through the store `0017` made possible (ADR-131), and —
 // pinned as failing until the P-2 slice exists (ADR-120 rule 2) — the outcome the code cannot yet deliver.
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { auth, configureAuth, stubAuth } from "@/modules/auth";
 import { LOCALE, SECURITY } from "@/modules/config";
@@ -263,6 +265,7 @@ describe("onboarding-parent — the one-go signup with a lead (04 §3.1 steps 5�
             area: AREA,
             source: "adv",
             completed: true,
+            claimed: false,
           },
         ],
       }),
@@ -302,6 +305,68 @@ describe("onboarding-parent — the one-go signup with a lead (04 §3.1 steps 5�
     });
   });
 
+  // ── ADR-145 (2) — caller-supplied ownership is verified, never trusted ──────────────────────────────────
+  //
+  // REVIEW-2 M-4: `leadId` arrives on the signup form and was shape-validated only. A `leadId` travels in wizard
+  // URLs and in form state, so anyone holding another family's id converted her area, her children's ages and
+  // her schedule into a position owned by the submitter. The ruling: a lead converts only if it is **unclaimed**
+  // (and only to a matching captured email — see the pin below), otherwise it is ignored with one log line and
+  // signup proceeds to S-P-03 state 0, which is `1c`'s own degrade path.
+  it("ignores a lead that has already been converted, and the account still stands", async () => {
+    configureMatching(
+      stubMatching({
+        leadRows: [
+          {
+            id: LEAD as LeadId,
+            answers: {
+              area: AREA,
+              children: [{ ageLabel: "1\u20132 years" }],
+              days: [0],
+              parts: ["morning"],
+              scheduleType: "Fixed",
+            },
+            area: AREA,
+            source: "adv",
+            completed: true,
+            claimed: true,
+          },
+        ],
+      }),
+    );
+    const result = await signUpParentAction(
+      null,
+      formDataOf({ ...VALID, source: "advanced_match", leadId: LEAD }),
+    );
+    expect(result.ok && result.value).toEqual({
+      destination: "/parent",
+      positionOpened: false,
+    });
+  });
+
+  // ADR-123 rule 2 — the half of ADR-145 (2) the schema cannot answer, pinned rather than invented.
+  //
+  // The ruling says the lead converts only if "its captured email equals the signup email case-insensitively".
+  // There is no captured email to compare: `parent_leads` (02 §4.7, `0014`) has **no email column** — the parent
+  // wizard is pre-auth and anonymous, and `WizardAnswers` has no email field either — so the address first
+  // exists at signup. Any comparison this module could write would be against a value it invented.
+  //
+  // Owner: 02 §4.7 (a captured-contact column on `parent_leads`, written by the wizard) or ADR-145 itself (drop
+  // the clause and let "unclaimed" carry the control, which is what is enforced today). Until then the
+  // unclaimed check is the whole of the defence, and the leak it leaves is a lead nobody has converted yet.
+  it.fails(
+    "PINNED (ADR-145 (2)): `parent_leads` captures the contact the signup email must match",
+    () => {
+      const sql = readFileSync(
+        resolve(__dirname, "../../../../supabase/migrations/0014_leads.sql"),
+        "utf8",
+      );
+      const table = sql.slice(
+        sql.indexOf("create table if not exists public.parent_leads"),
+      );
+      expect(table.slice(0, table.indexOf(");"))).toMatch(/\bemail\b/u);
+    },
+  );
+
   it("keeps the account and routes to S-P-03 state 0 when the lead has no London area", async () => {
     configureMatching(
       stubMatching({
@@ -312,6 +377,7 @@ describe("onboarding-parent — the one-go signup with a lead (04 §3.1 steps 5�
             area: null,
             source: null,
             completed: false,
+            claimed: false,
           },
         ],
       }),

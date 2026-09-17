@@ -10,6 +10,7 @@ import { ok, toActionResult } from "@/modules/platform";
 import type { BookCallSlotAction } from "../types";
 import { malformedRequest } from "../../lib/malformed-request";
 import { onBehalfOfParent } from "../lib/on-behalf-actor";
+import { positionBelongsTo } from "../lib/position-belongs-to";
 
 export const bookCallSlotAction: BookCallSlotAction = async (input) => {
   if (
@@ -18,6 +19,11 @@ export const bookCallSlotAction: BookCallSlotAction = async (input) => {
     typeof input?.slotId !== "string"
   )
     return toActionResult(malformedRequest());
+  // ADR-145 (1). Both ids come from the caller and nothing tied them together, so the `onBehalfOf` this action
+  // records — 07 §5.4 row 6's audit subject, and the control the whole on-behalf design rests on — was
+  // forgeable. Checked before the lever, so a mismatch costs no write and leaves no half-move behind.
+  const owns = await positionBelongsTo(input.positionId, input.parentId);
+  if (!owns.ok) return toActionResult(owns);
   const booked = await adminOnBehalf.chooseSlot(
     input.positionId,
     input.slotId,

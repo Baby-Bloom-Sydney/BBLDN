@@ -32,6 +32,21 @@ export async function openPositionFromLead(
     return err("NOT_FOUND", "That lead is no longer available", {
       reason: "E_ENTITY_NOT_FOUND" as const,
     });
+  // **ADR-145 (2) — caller-supplied ownership is verified, never trusted.** `leadId` arrives on the signup form
+  // and was shape-validated only, so anyone holding another family's id (it travels in wizard URLs and in form
+  // state) converted her area, her children's ages and her schedule into a position owned by the submitter
+  // (REVIEW-2 M-4). A lead that has already become a position is not available to a second account.
+  //
+  // ★ The ruling's other half — "its captured email equals the signup email case-insensitively" — has nothing
+  // to compare against: `parent_leads` (02 §4.7, `0014`) has no email column and `WizardAnswers` no email field,
+  // because the parent wizard is pre-auth and anonymous. Pinned `it.fails` in
+  // `onboarding-parent.signup.test.ts` rather than invented; owner 02 §4.7 (a captured-contact column) or
+  // ADR-145 itself. Until then "unclaimed" is the whole of the control, and what it still lets through is a
+  // lead nobody has converted yet.
+  if (lead.value.claimed)
+    return err("CONFLICT", "That lead is no longer available", {
+      reason: "E_LEAD_ALREADY_CLAIMED" as const,
+    });
   const detail = positionDetailOf(lead.value.answers);
   if (detail === null)
     return err("VALIDATION", "The answers do not make a position yet", {
