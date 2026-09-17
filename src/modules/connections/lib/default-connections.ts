@@ -8,4 +8,5 @@ export const connections: ConnectionsReads = Object.freeze({
     CONNECTIONS_REGISTRY.get().liveNannyIdsForParent(parentId),
   liveCountForPosition: (positionId) =>
     CONNECTIONS_REGISTRY.get().liveCountForPosition(positionId),
+  forParent: (parentId) => CONNECTIONS_REGISTRY.get().forParent(parentId),
 });

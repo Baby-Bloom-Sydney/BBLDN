@@ -39,11 +39,18 @@ export function schedulingReads(auth: Auth): SchedulingReads {
       auth.data.run(
         {
           name: "scheduling.readBlocks",
-          exec: (q) =>
-            q
+          // `0018`'s `revoked_at` is the in-force predicate, and it is applied here rather than in SQL because
+          // 03 §1.4's `Query` has one equality predicate and it is already spent on `calendar_id`. The partial
+          // index `availability_blocks_in_force_idx` is what keeps this cheap.
+          exec: async (q) => {
+            const rows = await q
               .from("availability_blocks")
               .eq("calendar_id", calendarId)
-              .select(),
+              .select();
+            // `== null` on purpose: a revoked row has an instant, an in-force one has SQL NULL, and a row
+            // built by a fixture has the column absent. All three of those mean the same thing here.
+            return rows.filter((row) => row.revoked_at == null);
+          },
         },
         service,
       ),

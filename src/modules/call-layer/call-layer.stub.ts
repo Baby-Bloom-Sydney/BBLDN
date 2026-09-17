@@ -12,6 +12,7 @@ import type {
   CallType,
   Instant,
   PositionId,
+  ISO,
   StateAfter,
   UserId,
 } from "@/modules/shared-types";
@@ -103,6 +104,30 @@ export function stubCallLayer(seed: StubCallSeed = {}): CallLayer {
         state: stateAfter(ref.positionId, "done"),
       });
     },
+    // 03 §3.6's awaiting-slot half, as the stub can answer it: the seed carries a state, a type and a
+    // parent, so that is what a summary is made of. A `nanny-commission` call has no position and so is
+    // never in this list (02 R-1).
+    listOpenCalls: async () =>
+      ok(
+        Object.freeze(
+          [...calls.entries()]
+            .filter(
+              ([, call]) =>
+                call.state !== "done" && call.type !== "nanny-commission",
+            )
+            .map(([positionId, call]) =>
+              Object.freeze({
+                positionId: positionId as PositionId,
+                parentId: (call.parentId ?? "") as UserId,
+                type: call.type as "matchmaking" | "onboarding",
+                state: call.state,
+                bookingId: null,
+                requestedAt: AT as string as ISO,
+                noAnswerCount: 0,
+              }),
+            ),
+        ),
+      ),
     findOpenCall: async (parentId) => {
       const open = [...calls.entries()].find(
         ([, call]) => call.parentId === parentId && call.state !== "done",

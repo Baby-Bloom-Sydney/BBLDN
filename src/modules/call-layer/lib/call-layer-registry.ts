@@ -18,6 +18,7 @@ const unconfigured: CallLayer = Object.freeze({
   recordOutcome: async () => NOT_CONFIGURED,
   getCallState: async () => NOT_CONFIGURED,
   findOpenCall: async () => NOT_CONFIGURED,
+  listOpenCalls: async () => NOT_CONFIGURED,
 });
 
 const slot = { current: unconfigured };

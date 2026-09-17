@@ -221,19 +221,23 @@ describe("after register() in a valid preview environment", () => {
     expect(decided.ok && decided.value.kind).toBe("redirect");
   });
 
-  it("call-layer — the orchestrator is installed on preview, over one memory mirror", async () => {
+  // `1g` changed what this claim is worth. The mirror used to be `memoryCallMirrorStore`, so the port answered
+  // `ok(null)` in a process with no database — a comfortable answer that was not a fact about anything. It is
+  // now `dbCallMirrorStore`, so the same call reaches `auth`'s data port and fails there, in an environment
+  // that has no database. **That failure is the claim**: the port is installed (it no longer says
+  // `call-layer-not-configured`) and it is installed over the schema, not over a map that can only agree.
+  it("call-layer — the orchestrator is installed on preview, over the db mirror", async () => {
     const open = await m.callLayer.callLayer.findOpenCall(PARENT);
     expect(reasonOf(open)).not.toBe("call-layer-not-configured");
-    expect(open).toEqual({ ok: true, value: null });
+    expect(open.ok).toBe(false);
   });
 
   it("call-layer — its C rows are registered with the stage model, so advance dispatches into the slice (03 §2.1)", async () => {
-    // `C-a` names three system jobs (03 §2.4) — `call-request`, `signup-convert-lead`, `cascade`. `autofire` is
-    // a real `SystemJobName` and is none of them, so the **handler's own** actor rule
-    // answers. That is the claim: the row reached the registered slice. The probe is deliberately refused at the
-    // actor gate rather than allowed to run, because a row that passed would write the mirror and then emit
-    // `call.requested` through the event-log store — a real database this environment does not have. The slice's
-    // own behaviour is 1d's `call-layer.inside.test.ts`; what boot owes is that the slice is reachable at all.
+    // What boot owes is that the row reaches the registered slice at all; the slice's own behaviour is `1d`'s
+    // `call-layer.inside.test.ts`. Since `1g` the handler reads the mirror from the database **before** it
+    // reaches its actor gate, so in an environment with no database the probe is refused by the store rather
+    // than by the gate — and either way it never reaches a write. `E_SLICE_NOT_REGISTERED` is the answer that
+    // would mean boot had not registered anything, and that is what is pinned.
     const moved = await m.positions.advance({
       transition: "C-a",
       entity: { kind: "call", id: POSITION },
@@ -242,8 +246,9 @@ describe("after register() in a valid preview environment", () => {
       expectedFrom: null,
       idempotencyKey: "boot-probe",
     });
+    expect(moved.ok).toBe(false);
     expect(reasonOf(moved)).not.toBe("E_SLICE_NOT_REGISTERED");
-    expect(reasonOf(moved)).toBe("E_ACTOR_FORBIDDEN");
+    expect(reasonOf(moved)).not.toBe("E_TRANSITION_UNKNOWN");
   });
 
   // AUTH-2 — the wiring `1e` left owed, in the same shape and asserted the same way: against the *named*
@@ -280,4 +285,33 @@ describe("after register() in a valid preview environment", () => {
     expect(reasonOf(moved)).not.toBe("E_SLICE_NOT_REGISTERED");
     expect(reasonOf(moved)).toBe("E_ACTOR_FORBIDDEN");
   });
+});
+
+/**
+ * ★ The one thing `1g` finished that boot cannot yet run end to end, pinned rather than written down.
+ *
+ * `call-layer`'s mirror is now a **db** store (`0018`), and `connections` / `placements` are db stores too — so
+ * all three are installed in every environment. `positions` is not: `wire-positions.ts` (AUTH-2) installs
+ * `memoryPositionStore` and refuses in production, because the store over `nanny_positions` is still owed from
+ * `1e`. The two halves therefore disagree about where a position lives: `positions.advance(P-2)` writes a
+ * position to memory, and the C-row mirror that P-2 cascades into looks for it in `nanny_positions` — where it
+ * is not.
+ *
+ * Nothing is broken by this that was not already: production refuses `positions` outright, so the chain is
+ * refused as a whole rather than half-running. But it is the **last** thing between this unit and a parent
+ * journey that runs against the schema, and it is one file: a `dbPositionStore` over `0006`, wired where
+ * `memoryPositionStore` is now. Pinned here so the unit that writes it flips this test rather than discovering
+ * the seam.
+ */
+describe("boot — what 1g left for the position store", () => {
+  it.fails(
+    "positions and the call mirror agree about where a position lives",
+    async () => {
+      const { wirePorts } = await import("@/boot/wire-ports");
+      const { env } = await import("@/modules/config/server");
+      const report = wirePorts(env);
+      const positions = report.find((row) => row.port === "positions");
+      expect(positions?.binding).not.toContain("memory");
+    },
+  );
 });

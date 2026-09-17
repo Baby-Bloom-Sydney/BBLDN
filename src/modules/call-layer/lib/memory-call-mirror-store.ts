@@ -1,10 +1,27 @@
-// The in-memory `CallMirrorStore` (1d) — the one the tests and the pre-schema boot use. Replaced, never mutated:
-// every `put` swaps the frozen map for a new one, so a reader holding an old snapshot never sees a half write.
-// The implementation over `nanny_positions` (0006's four call columns) arrives with the RPC opener (P1-WIRE,
-// ADR-127) and `positions`' inside (1e) — recorded in the `1d` PROGRESS entry.
+// The in-memory `CallMirrorStore` (1d) — the one the suites use. Replaced, never mutated: every `put` swaps the
+// frozen map for a new one, so a reader holding an old snapshot never sees a half write.
+//
+// `1g`: the real store over `nanny_positions` + `position_call_mirror` (migration `0018`) lives in
+// `src/boot/db-call-mirror-store.ts` and is what boot installs in every environment now. This one stays because
+// the suites need a mirror with no database behind it, and because it is the one place the port's semantics are
+// written out in twenty lines rather than in SQL.
 import { ok } from "@/modules/platform";
 import type { PositionId, UserId } from "@/modules/shared-types";
-import type { CallMirror, CallMirrorStore } from "../types";
+import type { CallMirror, CallMirrorStore, OpenCallSummary } from "../types";
+
+const summaryOf = (mirror: CallMirror): OpenCallSummary =>
+  Object.freeze({
+    positionId: mirror.positionId,
+    parentId: mirror.parentId,
+    type: mirror.type,
+    state: mirror.state,
+    bookingId: mirror.bookingId,
+    requestedAt: mirror.requestedAt,
+    noAnswerCount: mirror.noAnswerCount,
+    ...(mirror.aboutNanny === undefined
+      ? {}
+      : { aboutNanny: mirror.aboutNanny }),
+  });
 
 export function memoryCallMirrorStore(
   seed: ReadonlyArray<CallMirror> = [],
@@ -23,6 +40,14 @@ export function memoryCallMirrorStore(
         [...holder.current.values()].find(
           (mirror) => mirror.parentId === parentId && mirror.state !== "done",
         ) ?? null,
+      ),
+    listOpen: async () =>
+      ok(
+        Object.freeze(
+          [...holder.current.values()]
+            .filter((mirror) => mirror.state !== "done")
+            .map(summaryOf),
+        ),
       ),
     put: async (mirror: CallMirror) => {
       holder.current = new Map([

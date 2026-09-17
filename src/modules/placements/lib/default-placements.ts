@@ -6,4 +6,6 @@ import { PLACEMENTS_REGISTRY } from "./placements-registry";
 export const placements: PlacementsReads = Object.freeze({
   activeForPosition: (positionId) =>
     PLACEMENTS_REGISTRY.get().activeForPosition(positionId),
+  liveForParent: (parentId) =>
+    PLACEMENTS_REGISTRY.get().liveForParent(parentId),
 });

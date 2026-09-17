@@ -29,6 +29,7 @@ import type {
   SchedulingErrorDetails,
 } from "../types";
 import { bookingFromRow } from "./booking-from-row";
+import { schedulingEvents } from "./scheduling-events";
 import { patchBooking } from "./patch-booking";
 import { resolveCalendar } from "./resolve-calendar";
 import { ruleFromRow } from "./rule-from-row";
@@ -102,9 +103,15 @@ export function schedulingAdminWrites(
       },
       service,
     );
-    return written.ok
-      ? ok(ruleFromRow(written.value as AvailabilityRuleRow))
-      : schedulingFailure(written.error);
+    if (!written.ok) return schedulingFailure(written.error);
+    const saved = ruleFromRow(written.value as AvailabilityRuleRow);
+    // 03 §3.6 — the calendar's shape changed, so the slots a family is shown changed with it.
+    schedulingEvents.availabilityChanged(
+      { kind: "admin", id: admin.value as never },
+      "created",
+      { ruleId: saved.id },
+    );
+    return ok(saved);
   };
 
   /**
@@ -132,7 +139,13 @@ export function schedulingAdminWrites(
       },
       service,
     );
-    return written.ok ? ok(undefined) : schedulingFailure(written.error);
+    if (!written.ok) return schedulingFailure(written.error);
+    schedulingEvents.availabilityChanged(
+      { kind: "admin", id: admin.value as never },
+      "removed",
+      { ruleId },
+    );
+    return ok(undefined);
   };
 
   const block = async (
@@ -186,6 +199,19 @@ export function schedulingAdminWrites(
       affected.push(bookingFromRow(flagged.value));
     }
     const blockRow = written.value as AvailabilityBlockRow;
+    // 03 §3.6 / §3.5 seq 4: an admin notification only, no customer message — the admin opens each and moves
+    // or clears it herself (I-4 / ADR-077: a block flags, it never cancels).
+    for (const booking of affected)
+      schedulingEvents.blockedOver(
+        { kind: "admin", id: admin.value as never },
+        booking,
+        blockRow.id,
+      );
+    schedulingEvents.availabilityChanged(
+      { kind: "admin", id: admin.value as never },
+      "created",
+      { blockId: blockRow.id as BlockId },
+    );
     return ok({
       block: Object.freeze({
         id: blockRow.id as BlockId,
@@ -204,23 +230,38 @@ export function schedulingAdminWrites(
     removeAvailabilityRule,
     block,
     /**
-     * ★ **Not built, and pinned as a failing test rather than faked** (`scheduling.inside.test.ts`, "the
-     * document's `unblock` removes a block"). 03 §3.2 says a block is removed and its slots return; 02 §4.4
-     * row 3 gives `availability_blocks` no revocation column, and 03 §1.4's `Query` has no `delete`, so there
-     * is no honest write that undoes one. Flipping `kind` to `'open'` was rejected: precedence is
-     * blocked > open > rule, so an `open` row *adds* availability, and a block laid outside the rules would
-     * come back as newly open time — a different calendar, not the one the admin had.
+    /**
+     * 03 §3.2 `unblock`. `1f` pinned this `it.fails` and named its own fix: `availability_blocks` had no
+     * revocation column, 03 §1.4's `Query` has no `delete`, and flipping `kind` to `'open'` was rejected
+     * because precedence is blocked > open > rule — an `open` row *adds* availability, so a block laid outside
+     * the rules would come back as newly open time.
      *
-     * Two candidate fixes, neither this unit's to make (no migration in `1f`; `shared-types` and `auth` are not
-     * this unit's surface): a `delete` on `TableQuery` (the ADR-131 (1) class), or an
-     * `availability_blocks.revoked_at` column in `0018`. Recorded in the L-007 PROGRESS entry.
+     * `0018` adds `revoked_at`, which is the honest write: the block goes out of force and the row survives,
+     * so the bookings it flagged stay auditable (I-4 / ADR-077 again — a block never erases its own history).
+     * The in-force predicate is `revoked_at is null` and lives in one place, `scheduling-reads.ts`.
      */
     unblock: async (
-      _blockId: BlockId,
+      blockId: BlockId,
     ): Promise<Result<void, SchedulingErrorDetails>> => {
       const admin = await asAdmin();
       if (!admin.ok) return admin;
-      return schedulingFailure(undefined, "NOT_IMPLEMENTED");
+      const written = await auth.data.run(
+        {
+          name: "scheduling.unblock",
+          exec: (q) =>
+            q.from("availability_blocks").update(blockId as string as Uuid, {
+              revoked_at: clock(),
+            }),
+        },
+        service,
+      );
+      if (!written.ok) return schedulingFailure(written.error);
+      schedulingEvents.availabilityChanged(
+        { kind: "admin", id: admin.value as never },
+        "removed",
+        { blockId },
+      );
+      return ok(undefined);
     },
   });
 }

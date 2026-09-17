@@ -14,10 +14,12 @@ import { wireAreas } from "./wire-areas";
 import { wireAuth } from "./wire-auth";
 import { wireCallLayer } from "./wire-call-layer";
 import { wireComms } from "./wire-comms";
+import { wireConnections } from "./wire-connections";
 import { wireConsent } from "./wire-consent";
 import { wireEvents } from "./wire-events";
 import { wireMatching } from "./wire-matching";
 import { wireParentProfileStore } from "./wire-parent-profile-store";
+import { wirePlacements } from "./wire-placements";
 import { wirePositions } from "./wire-positions";
 import { wireRateLimiter } from "./wire-rate-limiter";
 import { wireScheduling } from "./wire-scheduling";
@@ -37,8 +39,13 @@ export function wirePorts(env: ParsedEnv): BootReport {
     wireScheduling(),
     wireScoring(),
     wireMatching(),
-    wireCallLayer(env.environment),
+    wireCallLayer(),
+    // `positions` first, then the two slices whose cascades dispatch into its P rows (03 §2.1). The order is
+    // not load-bearing — `registerSlice` is last-wins and `positionFacts` is read at run time, not at wire
+    // time — but the file reads in dependency order and there is no reason to be the exception.
     wirePositions(env.environment),
+    wirePlacements(),
+    wireConnections(),
     wireParentProfileStore(),
   ]);
 }

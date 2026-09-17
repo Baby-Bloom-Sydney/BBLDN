@@ -193,6 +193,7 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["block_kind"]
           reason: string | null
+          revoked_at: string | null
           start_at: string
         }
         Insert: {
@@ -203,6 +204,7 @@ export type Database = {
           id?: string
           kind: Database["public"]["Enums"]["block_kind"]
           reason?: string | null
+          revoked_at?: string | null
           start_at: string
         }
         Update: {
@@ -213,6 +215,7 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["block_kind"]
           reason?: string | null
+          revoked_at?: string | null
           start_at?: string
         }
         Relationships: [
@@ -2875,6 +2878,47 @@ export type Database = {
         }
         Relationships: []
       }
+      position_call_mirror: {
+        Row: {
+          about_nanny: string | null
+          created_at: string
+          no_answer_count: number
+          notes: string | null
+          outcome: Database["public"]["Enums"]["call_outcome"] | null
+          position_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          about_nanny?: string | null
+          created_at?: string
+          no_answer_count?: number
+          notes?: string | null
+          outcome?: Database["public"]["Enums"]["call_outcome"] | null
+          position_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          about_nanny?: string | null
+          created_at?: string
+          no_answer_count?: number
+          notes?: string | null
+          outcome?: Database["public"]["Enums"]["call_outcome"] | null
+          position_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "position_call_mirror_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: true
+            referencedRelation: "nanny_positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       position_children: {
         Row: {
           age_months: number | null
@@ -4332,6 +4376,21 @@ export type Database = {
       update_soft_lock: {
         Args: { p_child_id: string; p_locked: boolean }
         Returns: undefined
+      }
+      upsert_call_mirror: {
+        Args: {
+          p_about_nanny?: string
+          p_call_booking_id?: string
+          p_call_requested_at?: string
+          p_call_state: Database["public"]["Enums"]["call_state"]
+          p_call_type?: Database["public"]["Enums"]["call_type"]
+          p_no_answer_count: number
+          p_notes?: string
+          p_outcome?: Database["public"]["Enums"]["call_outcome"]
+          p_position_id: string
+          p_version: number
+        }
+        Returns: number
       }
       user_has_child_access: { Args: { p_child_id: string }; Returns: boolean }
     }

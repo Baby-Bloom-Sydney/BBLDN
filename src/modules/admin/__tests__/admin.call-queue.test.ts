@@ -6,6 +6,8 @@ import {
   createSchedulingStub,
 } from "@/modules/scheduling";
 import { configurePositions } from "@/modules/positions";
+import { configureCallLayer, stubCallLayer } from "@/modules/call-layer";
+import type { OpenCallSummary } from "@/modules/call-layer";
 import { ok } from "@/modules/platform";
 import type {
   Actor,
@@ -19,6 +21,8 @@ import type {
   UserId,
 } from "@/modules/shared-types";
 import { loadCallQueue } from "../call-queue/lib/load-call-queue";
+import { callDueSweep } from "../call-queue/lib/call-due-sweep";
+import { configureComms } from "@/modules/comms";
 import { callStateOf } from "../call-queue/lib/call-state-of";
 import { queueGroupOf } from "../call-queue/lib/queue-group-of";
 import { QUEUE_HEADINGS } from "../call-queue/lib/queue-headings";
@@ -28,6 +32,7 @@ const ADMIN: Actor = { kind: "admin", id: "admin-1" as AdminId };
 const POSITION = "pos-1" as PositionId;
 const PARENT = "parent-1" as UserId;
 const NOW = "2026-01-08T08:00:00.000Z";
+const BOOKING = "bk-1" as BookingId;
 
 const rules: ReadonlyArray<AvailabilityRule> = [0, 1, 2, 3, 4].map(
   (weekday) => ({
@@ -143,6 +148,29 @@ describe("admin/call-queue — the read (03 §3.6: scheduling returns ids, admin
       listSchedule: async () => ok(items),
     } as never);
 
+  /**
+   * 03 §3.6's other half. `call-layer` is the source of the never-booked calls, so the panel is handed one —
+   * the same way `withSchedule` hands it a `Scheduling`. Nothing here reaches a database.
+   */
+  const withOpenCalls = (calls: ReadonlyArray<OpenCallSummary>) =>
+    configureCallLayer({
+      ...stubCallLayer({}),
+      listOpenCalls: async () => ok(calls),
+    });
+
+  const withOpenCallsFailing = () =>
+    configureCallLayer({
+      ...stubCallLayer({}),
+      listOpenCalls: async () => ({
+        ok: false as const,
+        error: {
+          code: "INTERNAL" as const,
+          message: "no",
+          details: { reason: "call-layer-not-configured" as const },
+        },
+      }),
+    });
+
   const refusing = (code: string) =>
     configureScheduling({
       ...createSchedulingStub({ clock: () => NOW as ISO, rules }),
@@ -181,12 +209,62 @@ describe("admin/call-queue — the read (03 §3.6: scheduling returns ids, admin
     expect(row?.state).toBe("slot-chosen");
   });
 
-  it("says out loud that a never-booked call is not on this screen", async () => {
+  // `1f`'s pin, flipped. The claim used to be "the screen says this half is missing"; `0018` gave the mirror a
+  // table, so the claim is now the half itself — 03 §3.6's "awaiting-slot calls come from `call-layer`", merged
+  // into the one queue, decorated the same way a booked row is.
+  it("lists the calls that have never had a time set, from call-layer", async () => {
     withSchedule([]);
+    withOpenCalls([
+      {
+        positionId: POSITION,
+        parentId: PARENT,
+        type: "matchmaking",
+        state: "awaiting-slot",
+        bookingId: null,
+        requestedAt: "2026-01-05T09:00:00+00:00" as ISO,
+        noAnswerCount: 2,
+        aboutNanny: "Amara",
+      },
+    ]);
     const read = await loadCallQueue(ADMIN);
-    expect(read.kind === "queue" && read.view.neverBookedUnavailable).toBe(
-      true,
-    );
+    expect(read.kind === "queue" && read.view.awaiting).toHaveLength(1);
+    const row = read.kind === "queue" ? read.view.awaiting[0] : undefined;
+    expect(row?.noAnswerCount).toBe(2);
+    expect(row?.aboutNanny).toBe("Amara");
+    expect(row?.requestedWhen).toContain("London time");
+    // it counts toward the queue total, or an admin reads "0 calls" with a family waiting
+    expect(read.kind === "queue" && read.view.total).toBe(1);
+  });
+
+  // A family must not appear twice. Once she has picked a time, `scheduling.listSchedule` already returns her.
+  it("drops a call that already points at a booking — listSchedule has it", async () => {
+    withSchedule([]);
+    withOpenCalls([
+      {
+        positionId: POSITION,
+        parentId: PARENT,
+        type: "matchmaking",
+        state: "slot-chosen",
+        bookingId: BOOKING as BookingId,
+        requestedAt: "2026-01-05T09:00:00+00:00" as ISO,
+        noAnswerCount: 0,
+      },
+    ]);
+    const read = await loadCallQueue(ADMIN);
+    expect(read.kind === "queue" && read.view.awaiting).toEqual([]);
+  });
+
+  // A refused enumeration must not take the booked half down with it: the admin still sees the calls that are
+  // actually in the diary, and the waiting group simply reads as empty.
+  it("keeps the booked half when call-layer cannot answer", async () => {
+    withSchedule([item()]);
+    withOpenCallsFailing();
+    const read = await loadCallQueue(ADMIN);
+    expect(read.kind).toBe("queue");
+    expect(read.kind === "queue" && read.view.awaiting).toEqual([]);
+    expect(
+      read.kind === "queue" && read.view.groups.some((g) => g.rows.length > 0),
+    ).toBe(true);
   });
 
   it("answers `forbidden`, not an empty list, when the calendar refuses the session", async () => {
@@ -275,5 +353,111 @@ describe("admin/call-queue — S-A-19's call rows (04 §6.4)", () => {
     ]);
     expect(rows[0]?.detail).toContain("moved by a family booking");
     expect(rows[1]?.detail).toBe("No answer — waiting for a new time");
+  });
+});
+
+/**
+ * `08.43` (03 §3.5 seq 5). Two different facts on one sweep: a booked call nobody recorded an outcome for is
+ * **overdue** and raises the alert; a family with no booking at all is **waiting** and does not, because an
+ * alert that fires for every waiting family is one an admin learns to ignore.
+ */
+describe("admin/call-queue — the call-due sweep (08.43)", () => {
+  const NOW_LATE = "2026-01-09T12:00:00.000Z" as ISO;
+  // config-literal-ok: the sweep is handed the address it nudges, the way 03 §8.1 says a caller passes
+  // resolved data; `SENDERS` owns who mail comes FROM, which is a different fact and is not this.
+  const NOTIFY = Object.freeze({ email: "admin@example.test" }); // config-literal-ok: the address the sweep NUDGES, passed in by its caller (03 §8.1); SENDERS owns who mail comes from
+  const sent: Array<Record<string, unknown>> = [];
+
+  const withComms = () => {
+    sent.length = 0;
+    configureComms({
+      send: async (message: Record<string, unknown>) => {
+        sent.push(message);
+        return ok("m1");
+      },
+      sendMany: async () => ok([]),
+      schedule: async () => ok("m1"),
+      cancel: async () => ok({ cancelled: 0 }),
+      status: async () => ok({ status: "sent" }),
+      createInboxMessage: async () => ok({ id: "i1" }),
+    } as never);
+  };
+
+  const withCalls = (calls: ReadonlyArray<OpenCallSummary>) =>
+    configureCallLayer({
+      ...stubCallLayer({}),
+      listOpenCalls: async () => ok(calls),
+    });
+
+  const schedule = (items: ReadonlyArray<unknown>) =>
+    configureScheduling({
+      ...createSchedulingStub({ clock: () => NOW as ISO, rules }),
+      listSchedule: async () => ok(items),
+    } as never);
+
+  it("raises ALERT_CALL_OVERDUE only for a call that is actually late", async () => {
+    withComms();
+    withCalls([]);
+    schedule([
+      {
+        booking: booking({ start: "2026-01-09T10:00:00.000Z" as ISO }),
+        due: "past",
+        flags: [],
+      },
+    ]);
+    const swept = await callDueSweep(ADMIN, NOW_LATE, NOTIFY);
+    expect(swept.overdue).toBe(1);
+    expect(swept.notified).toBe(true);
+    expect(sent[0]?.templateId).toBe("admin-call-due");
+  });
+
+  it("counts a family with no booking as waiting, and does not call her late", async () => {
+    withComms();
+    withCalls([
+      {
+        positionId: POSITION,
+        parentId: PARENT,
+        type: "matchmaking",
+        state: "awaiting-slot",
+        bookingId: null,
+        requestedAt: "2026-01-05T09:00:00+00:00" as ISO,
+        noAnswerCount: 0,
+      },
+    ]);
+    schedule([]);
+    const swept = await callDueSweep(ADMIN, NOW_LATE, NOTIFY);
+    expect(swept.overdue).toBe(0);
+    expect(swept.waiting).toBe(1);
+    // she is still nudged — 03 §2.2's promise is that we ring anyway
+    expect(swept.notified).toBe(true);
+  });
+
+  // One message per day, not one per five-minute cron pass. 288 nudges is not a nudge.
+  it("dedupes the nudge by the day it is for", async () => {
+    withComms();
+    withCalls([]);
+    schedule([
+      {
+        booking: booking({ start: "2026-01-09T10:00:00.000Z" as ISO }),
+        due: "past",
+        flags: [],
+      },
+    ]);
+    await callDueSweep(ADMIN, NOW_LATE, NOTIFY);
+    expect(sent[0]?.dedupeKey).toBe("admin-call-due:2026-01-09");
+  });
+
+  it("sends nothing when there is nothing to chase", async () => {
+    withComms();
+    withCalls([]);
+    schedule([]);
+    const swept = await callDueSweep(ADMIN, NOW_LATE, NOTIFY);
+    expect(swept).toEqual({
+      kind: "swept",
+      overdue: 0,
+      waiting: 0,
+      notified: false,
+    });
+    expect(sent).toEqual([]);
   });
 });

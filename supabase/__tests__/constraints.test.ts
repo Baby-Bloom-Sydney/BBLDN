@@ -248,7 +248,7 @@ describe("db.constraints — the schema-wide conventions", () => {
     expect(rows.map((r) => r.proname)).toEqual([]);
   });
 
-  it("the schema is the 57 tables and 9 views of 02 §4 and §7 (56 + rate_limit_buckets, 0017)", async () => {
+  it("the schema is the 58 tables and 9 views of 02 §4 and §7 (56 + rate_limit_buckets 0017 + position_call_mirror 0018)", async () => {
     const { rows } = await db.query<{ tables: string; views: string }>(
       `select
          (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -256,7 +256,7 @@ describe("db.constraints — the schema-wide conventions", () => {
          (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
           where n.nspname = 'public' and c.relkind = 'v') as views`,
     );
-    expect(Number(rows[0].tables)).toBe(57);
+    expect(Number(rows[0].tables)).toBe(58);
     expect(Number(rows[0].views)).toBe(9);
   });
 
@@ -394,5 +394,118 @@ describe("db.constraints — what 0017 added (ADR-131)", () => {
       { name: "create_parent_profile", anon: false, authed: true },
       { name: "record_cookie_consent", anon: false, authed: false },
     ]);
+  });
+});
+
+describe("db.constraints — what 0018 added (the call mirror)", () => {
+  // 02 R-1 is the whole point of the table's shape: it holds the call's DETAIL and none of its
+  // state. A later edit that "helpfully" adds `call_state` here would give the model two homes for
+  // one fact, which is the drift R-1 exists to prevent.
+  it("position_call_mirror duplicates none of the call state R-1 puts on nanny_positions", async () => {
+    const { rows } = await db.query<{ column_name: string }>(
+      `select column_name from information_schema.columns
+        where table_schema = 'public' and table_name = 'position_call_mirror'
+        order by column_name`,
+    );
+    expect(rows.map((r) => r.column_name)).toEqual([
+      "about_nanny",
+      "created_at",
+      "no_answer_count",
+      "notes",
+      "outcome",
+      "position_id",
+      "updated_at",
+      "version",
+    ]);
+  });
+
+  it("position_call_mirror is keyed by position_id alone and cascades with its position", async () => {
+    const { rows } = await db.query<{ def: string }>(
+      `select pg_get_constraintdef(oid) as def from pg_constraint
+        where conrelid = 'public.position_call_mirror'::regclass and contype in ('p', 'f')
+        order by contype`,
+    );
+    expect(rows.map((r) => r.def)).toEqual([
+      "FOREIGN KEY (position_id) REFERENCES nanny_positions(id) ON DELETE CASCADE",
+      "PRIMARY KEY (position_id)",
+    ]);
+  });
+
+  it("position_call_mirror carries only SELECT policies, and none for anon (07 §5.1 rule 4)", async () => {
+    const { rows } = await db.query<{
+      policyname: string;
+      cmd: string;
+      roles: string;
+    }>(
+      `select policyname, cmd, roles::text as roles from pg_policies
+        where schemaname = 'public' and tablename = 'position_call_mirror'
+        order by policyname`,
+    );
+    expect(rows.map((r) => r.policyname)).toEqual([
+      "position_call_mirror_select_admin",
+      "position_call_mirror_select_own",
+    ]);
+    expect(rows.every((r) => r.cmd === "SELECT")).toBe(true);
+    expect(rows.some((r) => r.roles.includes("anon"))).toBe(false);
+  });
+
+  // fix: database-reviewer H-1. The parent check goes through 0002's definer helper, like every
+  // other "is this my position" policy, and not through a second join of its own.
+  it("the parent's SELECT resolves ownership through current_parent_id()", async () => {
+    const { rows } = await db.query<{ qual: string }>(
+      `select qual from pg_policies
+        where schemaname = 'public' and tablename = 'position_call_mirror'
+          and policyname = 'position_call_mirror_select_own'`,
+    );
+    expect(rows[0]?.qual).toContain("current_parent_id");
+    expect(rows[0]?.qual).not.toContain("parents");
+  });
+
+  it("the no_answer_count tally cannot be wound backwards (R5)", async () => {
+    const def = await checkDef("position_call_mirror_no_answer_count_check");
+    expect(def).toBe("CHECK ((no_answer_count >= 0))");
+    const { rows } = await db.query<{ tgname: string }>(
+      `select tgname from pg_trigger
+        where tgrelid = 'public.position_call_mirror'::regclass and not tgisinternal
+        order by tgname`,
+    );
+    expect(rows.map((r) => r.tgname)).toEqual([
+      "position_call_mirror_no_answer_count_guard",
+      "position_call_mirror_set_updated_at",
+    ]);
+  });
+
+  it("a note cannot stand without the outcome it is about", async () => {
+    const def = await checkDef("position_call_mirror_notes_need_outcome_check");
+    expect(def).toBe("CHECK (((notes IS NULL) OR (outcome IS NOT NULL)))");
+  });
+
+  // ADR-127: the C rows' one write is one RPC because it is two tables.
+  it("upsert_call_mirror is a single service-role-only definer", async () => {
+    const { rows } = await db.query<{ n: string }>(
+      `select count(*)::text as n from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+        where ns.nspname = 'public' and p.proname = 'upsert_call_mirror'`,
+    );
+    expect(rows[0]?.n).toBe("1");
+    const { rows: priv } = await db.query<{ anon: boolean; auth: boolean }>(
+      `select has_function_privilege('anon', p.oid, 'execute') as anon,
+              has_function_privilege('authenticated', p.oid, 'execute') as auth
+         from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+        where ns.nspname = 'public' and p.proname = 'upsert_call_mirror'`,
+    );
+    expect(priv[0]).toEqual({ anon: false, auth: false });
+  });
+
+  // 1f pinned `unblock` because nothing could take a block out of force.
+  it("availability_blocks.revoked_at exists with a partial index over the in-force rows", async () => {
+    const { rows } = await db.query<{ is_nullable: string }>(
+      `select is_nullable from information_schema.columns
+        where table_schema = 'public' and table_name = 'availability_blocks'
+          and column_name = 'revoked_at'`,
+    );
+    expect(rows[0]?.is_nullable).toBe("YES");
+    const def = await indexDef("availability_blocks_in_force_idx");
+    expect(def).toContain("revoked_at IS NULL");
+    expect(def).toContain("calendar_id");
   });
 });

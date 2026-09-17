@@ -15,6 +15,8 @@ export type BootPort =
   | "matching"
   | "call-layer"
   | "positions"
+  | "connections"
+  | "placements"
   | "parent-profile";
 
 export type PortWiring = {
