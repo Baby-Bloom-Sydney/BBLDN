@@ -484,3 +484,68 @@ describe("int.rpc-0019 — apply_payment_event folds the webhook's two writes in
     }
   });
 });
+
+// --------------------------------------------------------------------------- the insert the module makes
+
+describe("int.rpc-0019 — `insert … returning` on `children`, which is what decides insertChild's scope", () => {
+  /**
+   * ★ The claim `dbChildLinkingStore.insertChild` now rests on, measured rather than reasoned.
+   *
+   * `children_access_select` reads `user_has_child_access(id)`, a STABLE SECURITY DEFINER that queries
+   * `public.children`. A STABLE function sees the snapshot the statement started with, so the row being
+   * inserted is invisible to it and the RETURNING clause's SELECT check fails — **for the child's own
+   * parent as much as for anybody else**. `0019` did not change that and could not: making the predicate
+   * VOLATILE would make it unusable as a policy.
+   *
+   * The consequence for the module is the whole of it: the insert cannot run under the caller's session, so
+   * it runs at service scope — and `children_stamp_creator` then keeps what the caller sends, because
+   * `is_privileged_writer()` is true and `auth.uid()` is null there. Hence `createChild` sending
+   * `created_by_user_id` itself.
+   */
+  it("is refused for the child's own parent — the read the RETURNING clause needs cannot see the new row", async () => {
+    const message = await refusalOf(() =>
+      asRole(
+        db,
+        fx.parentA,
+        `insert into public.children (parent_user_id, first_name, date_of_birth)
+         values ($1, 'Returning', current_date - 400)
+         returning id`,
+        [fx.parentA],
+      ),
+    );
+
+    expect(message).not.toBe("NO_ERROR");
+    expect(message).toMatch(/row-level security|violates row-level/iu);
+  });
+
+  it("succeeds without RETURNING for the same parent, so the policy is the SELECT half and not the INSERT", async () => {
+    const message = await refusalOf(() =>
+      asRole(
+        db,
+        fx.parentA,
+        `insert into public.children (parent_user_id, first_name, date_of_birth)
+         values ($1, 'NoReturning', current_date - 400)`,
+        [fx.parentA],
+      ),
+    );
+
+    expect(message).toBe("NO_ERROR");
+  });
+
+  it("succeeds WITH returning at service scope, and keeps the creator the caller sent", async () => {
+    // What `insertChild` actually does now: the row comes back, and the column the trigger would have
+    // stamped from a session is the one the module supplied.
+    const { rows } = await db.query<{
+      id: string;
+      created_by_user_id: string | null;
+    }>(
+      `insert into public.children (parent_user_id, first_name, date_of_birth, created_by_user_id)
+       values ($1, 'ServiceScope', current_date - 400, $1)
+       returning id, created_by_user_id`,
+      [fx.parentA],
+    );
+
+    expect(rows[0].id).toBeTruthy();
+    expect(rows[0].created_by_user_id).toBe(fx.parentA);
+  });
+});

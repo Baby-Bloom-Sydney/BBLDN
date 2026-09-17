@@ -25,7 +25,6 @@ import type {
   ParentId,
   PlacementId,
   PositionId,
-  Uuid,
 } from "@/modules/shared-types";
 import { fakeSchemaPort } from "./fixtures/fake-schema-port";
 
