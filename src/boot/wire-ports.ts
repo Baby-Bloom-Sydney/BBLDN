@@ -4,8 +4,10 @@
 // Every binding is chosen by the parsed env (05 §3 rule 1); a port left on its fail-closed default carries its
 // reason on the report, never silence.
 //
-// Order is load-bearing twice over: `scoring` before `matching`, because `matching` is the engine's only caller
-// (03 §7.2), and `call-layer` after `scheduling` and `comms`, because its orchestrator holds both.
+// Order is load-bearing three times over: `scoring` before `matching`, because `matching` is the engine's only
+// caller (03 §7.2); `call-layer` after `scheduling` and `comms`, because its orchestrator holds both; and
+// `positions` after `areas`, whose provider answers P-2's service-area precondition, and after `call-layer`,
+// whose C rows P-2 and P-7 cascade into through the registry (03 §2.4).
 import type { ParsedEnv } from "@/modules/config";
 import type { BootReport } from "./types";
 import { wireAreas } from "./wire-areas";
@@ -16,6 +18,7 @@ import { wireConsent } from "./wire-consent";
 import { wireEvents } from "./wire-events";
 import { wireMatching } from "./wire-matching";
 import { wireParentProfileStore } from "./wire-parent-profile-store";
+import { wirePositions } from "./wire-positions";
 import { wireRateLimiter } from "./wire-rate-limiter";
 import { wireScheduling } from "./wire-scheduling";
 import { wireScoring } from "./wire-scoring";
@@ -35,6 +38,7 @@ export function wirePorts(env: ParsedEnv): BootReport {
     wireScoring(),
     wireMatching(),
     wireCallLayer(env.environment),
+    wirePositions(env.environment),
     wireParentProfileStore(),
   ]);
 }

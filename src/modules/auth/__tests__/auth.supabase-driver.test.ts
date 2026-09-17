@@ -75,8 +75,43 @@ describe("currentUser", () => {
       email: "someone@example.test",
       hasPassword: true,
       aal: "aal2",
+      isRecovery: false,
       expiresAtEpochSeconds: 1_800_000_000,
     });
+  });
+
+  // The gate's recovery exception (04 §6.1 S-X-09) reads this and nothing else, so the mapping from the
+  // provider's own `amr` is pinned here rather than inferred from a link's query string — which the visitor
+  // controls and the session does not.
+  it("reports a recovery session when the provider's amr names recovery", async () => {
+    serverClient.auth.mfa.getAuthenticatorAssuranceLevel.mockResolvedValue({
+      data: {
+        currentLevel: "aal1",
+        currentAuthenticationMethods: [
+          { method: "recovery", timestamp: 1_800_000_000 },
+        ],
+      },
+    });
+    expect((await supabaseAuthDriver().currentUser())?.isRecovery).toBe(true);
+  });
+
+  it("reports no recovery session for an ordinary password sign-in", async () => {
+    serverClient.auth.mfa.getAuthenticatorAssuranceLevel.mockResolvedValue({
+      data: {
+        currentLevel: "aal1",
+        currentAuthenticationMethods: [
+          { method: "password", timestamp: 1_800_000_000 },
+        ],
+      },
+    });
+    expect((await supabaseAuthDriver().currentUser())?.isRecovery).toBe(false);
+  });
+
+  it("fails closed on the recovery claim too when the assurance read throws", async () => {
+    serverClient.auth.mfa.getAuthenticatorAssuranceLevel.mockRejectedValue(
+      new Error("offline"),
+    );
+    expect((await supabaseAuthDriver().currentUser())?.isRecovery).toBe(false);
   });
 
   it("reports no password when there is no email identity (ADR-042)", async () => {

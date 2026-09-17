@@ -10,6 +10,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type {
   Email,
+  ParentId,
   NannyId,
   PositionId,
   UnitOfWork,
@@ -44,6 +45,9 @@ type Modules = {
 const DISTRICT = Object.freeze({ area: "Lambeth", district: "SW4" });
 const POSITION = "0f1e2d3c-0000-4000-8000-000000000001" as PositionId;
 const PARENT = "0a1b2c3d-0000-4000-8000-000000000011" as UserId;
+// The `ParentId` / `UserId` seam `1e` recorded: `findLive` is keyed by `ParentId` (03 §2.5 `JourneyOwner`) and
+// a session carries a `UserId`. The same id, two brands — spelled out here rather than cast at the call site.
+const PARENT_OWNER = PARENT as unknown as ParentId;
 const NANNY = "0a1b2c3d-0000-4000-8000-000000000021" as NannyId;
 
 const reasonOf = (result: { ok: boolean }): unknown =>
@@ -238,6 +242,41 @@ describe("after register() in a valid preview environment", () => {
       expectedFrom: null,
       idempotencyKey: "boot-probe",
     });
+    expect(reasonOf(moved)).not.toBe("E_SLICE_NOT_REGISTERED");
+    expect(reasonOf(moved)).toBe("E_ACTOR_FORBIDDEN");
+  });
+
+  // AUTH-2 — the wiring `1e` left owed, in the same shape and asserted the same way: against the *named*
+  // fail-closed reason, never a happy path.
+  it("positions — the reads are installed; `positions-not-configured` is gone and a parent with no position gets an answer, not a refusal", async () => {
+    const live = await m.positions.positions.findLive(PARENT_OWNER);
+    expect(reasonOf(live)).not.toBe("positions-not-configured");
+    expect(live).toEqual({ ok: true, value: null });
+    const stage = await m.positions.positions.getStage({
+      kind: "position",
+      id: POSITION,
+    });
+    expect(reasonOf(stage)).not.toBe("positions-not-configured");
+  });
+
+  it("positions — the P rows are registered with the stage model, so advance dispatches into the slice (03 §2.1 / §2.5)", async () => {
+    // Same deliberate refusal the C-row probe uses: `P-2` names exactly one system job
+    // (`signup-convert-lead`, 03 §2.4), so `autofire` — a real `SystemJobName` and not that one — is turned away
+    // by the **handler's own** actor rule. That is the whole claim boot owes: the row reached the registered
+    // slice. A probe that passed the gate would write the position row and emit `position.opened` through the
+    // event-log store, i.e. need a database this environment does not have.
+    const moved = await m.positions.advance({
+      transition: "P-2",
+      entity: { kind: "position", id: POSITION },
+      actor: { kind: "system", id: "autofire" },
+      payload: {
+        parentId: PARENT,
+        source: "signup",
+        detail: { district: DISTRICT.district },
+      },
+      expectedFrom: null,
+      idempotencyKey: "boot-probe-p2",
+    } as never);
     expect(reasonOf(moved)).not.toBe("E_SLICE_NOT_REGISTERED");
     expect(reasonOf(moved)).toBe("E_ACTOR_FORBIDDEN");
   });

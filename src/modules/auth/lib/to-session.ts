@@ -24,5 +24,6 @@ export function toSession(
     mfaVerified: user.aal === MFA_ASSURANCE_LEVEL,
     expiresAt,
     needsPasswordSetup: !user.hasPassword,
+    isRecovery: user.isRecovery,
   });
 }

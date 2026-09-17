@@ -8,6 +8,13 @@ export const ROUTE_MAP = Object.freeze({
   loginPath: "/login",
   /** ADR-042 / 01 §4d step 3 — the one destination for a signed-in account with no password. */
   setPasswordPath: "/set-password",
+  /**
+   * S-X-09's reset half (04 §6.1). Named here as well as inside `authGroupPaths` because two rules read it: the
+   * recovery-session exception below, and the landing path `requestPasswordReset` hands the provider.
+   */
+  resetPasswordPath: "/reset-password",
+  /** `03.06` — where every emailed link lands before the app decides where the person goes (ADR-042). */
+  authCallbackPath: "/api/auth/callback",
   nextParam: "next",
   /** Longest-first is irrelevant: the three prefixes are disjoint. Matched on a segment boundary. */
   protectedPrefixes: Object.freeze([
