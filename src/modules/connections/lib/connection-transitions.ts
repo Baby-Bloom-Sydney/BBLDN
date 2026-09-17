@@ -9,12 +9,11 @@
 // "Any live" (K-22 / K-24 / K-26) is `LIVE_STAGES`, derived from the 02 §3 enum in its own file so the terminal
 // list has one home.
 import type { ConnectionStage, TransitionSpec } from "@/modules/shared-types";
+import { CANCELLABLE_STAGES } from "./cancellable-stages";
 import { LIVE_STAGES } from "./live-stages";
 
 /** K-22 / K-24 "any live post-`ACCEPTED`" — a confirmed or active connection ends through L-2, never here. */
-const CANCELLABLE: ReadonlyArray<ConnectionStage> = Object.freeze(
-  LIVE_STAGES.filter((stage) => stage !== "CONFIRMED" && stage !== "ACTIVE"),
-);
+const CANCELLABLE = CANCELLABLE_STAGES;
 
 const OUTCOME_FROM: ReadonlyArray<ConnectionStage> = Object.freeze([
   "INTRO_COMPLETE",
