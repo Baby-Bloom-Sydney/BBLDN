@@ -99,7 +99,7 @@ export function createMatching(deps: MatchingDeps): Matching {
     },
     resultsFor: async () => NOT_BUILT,
     autofire: autofire({
-      candidates: pool,
+      pool,
       ...(deps.distanceKind === undefined
         ? {}
         : { distanceKind: deps.distanceKind }),

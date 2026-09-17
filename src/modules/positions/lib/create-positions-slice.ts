@@ -231,11 +231,9 @@ function moved(
       actor: input.actor,
       subject: input.entity,
       positionId: next.positionId,
-      props: {
-        ...stageProps(next, spec),
-        from: record.stage,
-        ...(spec.id === "P-5" ? { filledByNannyId: filledBy } : {}),
-      },
+      // 03 §9.3: `position.active` carries the stage props only — `filledByNannyId` rides on `position.ended`
+      // (the schema is the authority, and an extra prop is a refused emit, not a silently dropped one).
+      props: { ...stageProps(next, spec), from: record.stage },
       idempotencyKey: input.idempotencyKey,
     },
   });

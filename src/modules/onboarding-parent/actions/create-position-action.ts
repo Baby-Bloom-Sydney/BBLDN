@@ -6,7 +6,7 @@
 //
 // Order, as 04 §3.1 step 6 states it: the signed-in parent (role gate, never a caller-supplied id), the profile
 // facts P-2 carries, `advance(P-2)`, then `matching.autofire` after the commit (03 §7.4). A failed autofire
-// never fails the position — the `dfy-waves` sweep re-fires it.
+// never fails the position — the waves sweep of §7.4 re-fires it.
 //
 // **Done-for-you is not sold here (ADR-082 / 093).** The position form asks what the family needs; the paid
 // path, the amounts and the guarantees are the call's (04 §3.1 step 13, D2) and appear on no pre-call screen.

@@ -7,7 +7,7 @@
 // where both arrows exist — and handed over as facts. A lead with no area (or an age label config does not
 // know) cannot make a position: that is a refusal, not a guessed district.
 //
-// A failed autofire never fails the signup (§7.4 — the `dfy-waves` sweep re-fires); a failed P-2 never fails the
+// A failed autofire never fails the signup (§7.4 — the waves sweep re-fires it); a failed P-2 never fails the
 // signup either — the account stands and the parent routes to S-P-03 state 0, which is path C's own rule.
 import { err, log, newId, ok } from "@/modules/platform";
 import { advance } from "@/modules/positions";

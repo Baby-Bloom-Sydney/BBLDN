@@ -179,7 +179,7 @@ describe("matching inside — quick match + pre-auth through scoring (03 §7.2)"
     expect(result.ok && result.value[0]?.unmet).toEqual([]);
   });
 
-  it("answers `not-built` for the two 1e methods rather than a fabricated result", async () => {
+  it("answers `not-built` for `resultsFor` rather than a fabricated result", async () => {
     const m = matchingOver([]);
     const results = await m.resultsFor("p" as never, {
       kind: "system",
@@ -188,11 +188,18 @@ describe("matching inside — quick match + pre-auth through scoring (03 §7.2)"
     expect(!results.ok && results.error.details).toEqual({
       reason: "not-built",
     });
-    const fired = await m.autofire("p" as never, {
+  });
+
+  // `1e` built `autofire`. With `positions` unconfigured it forwards **that module's** fail-closed refusal
+  // rather than dressing it as its own — the reading `MatchingResult` records (types.ts).
+  it("forwards positions' refusal from `autofire` when the stage model is not configured", async () => {
+    const fired = await matchingOver([]).autofire("p" as never, {
       kind: "system",
       id: "dfy-waves",
     });
-    expect(!fired.ok && fired.error.details).toEqual({ reason: "not-built" });
+    expect(!fired.ok && fired.error.details).toEqual({
+      reason: "positions-not-configured",
+    });
   });
 });
 

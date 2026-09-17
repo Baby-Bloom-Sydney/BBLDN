@@ -9,7 +9,7 @@ export { matching } from "./lib/default-matching";
 export { configureMatching } from "./lib/configure-matching";
 export { createMatching } from "./lib/create-matching";
 
-// `1e` — the 03 §7.4 pre-check task, exported so the `dfy-waves` sweep composes the same job the P-2 caller runs.
+// `1e` — the 03 §7.4 pre-check task, exported so the waves sweep composes the same task the P-2 caller runs.
 export { autofire } from "./lib/autofire";
 export { stubMatching } from "./matching.stub";
 

@@ -2,14 +2,14 @@
 // before the matchmaker rings, the top nannies have been ranked and the lever recorded, so the call is about
 // choosing who to meet rather than about whether anyone exists.
 //
-// The job lives **here**, not in `positions` (fix: A-1 / R2). It reads the position through
+// The task lives **here**, not in `positions` (fix: A-1 / R2). It reads the position through
 // `positions.getForMatching`, loads the candidate set itself (the loader pre-filters, `scoring` re-checks, so
-// the rule lives in one place), runs `topN(position, candidates, config.precheckN)` and writes the lever through
+// the rule lives in one place), runs `topN(position, pool, config.precheckN)` and writes the lever through
 // `positions.recordPrecheck`.
 //
 // **Blast failure never fails the position write** (§7.4): the position is already committed when this runs, a
 // provider error is logged by the caller and `precheck.failed` is emitted for the admin chase, and the
-// `dfy-waves` sweep re-fires any `OPEN` position with no `precheck_fired_at`.
+// waves sweep re-fires any `OPEN` position with no `precheck_fired_at`.
 //
 // **GAP, pinned (`matching.autofire.test.ts`, `it.fails`).** §7.4 also has autofire "notify each nanny
 // (`precheck-nanny` batch via `comms.sendMany`)". A `comms` `Recipient` needs an `Email`, and the only nanny
@@ -32,7 +32,7 @@ import type {
 import type { AutofireOutcome } from "../types";
 
 export type AutofireDeps = {
-  readonly candidates: () => Promise<Result<ReadonlyArray<Candidate>>>;
+  readonly pool: () => Promise<Result<ReadonlyArray<Candidate>>>;
   /**
    * Which distance provider the boot wired, for `precheck.fired.providerKind` (03 §7.5). `scoring`'s connector
    * does not publish it, so the composer that built the engine names it; day one it is haversine (§7.1).
@@ -41,7 +41,7 @@ export type AutofireDeps = {
   readonly clock?: () => Instant;
 };
 
-/** The first wave; `dfy-waves` owns the later ones (03 §7.4 — waves / expiry / reminder are config). */
+/** The first wave; the waves sweep owns the later ones (03 §7.4 — waves / expiry / reminder are config). */
 const FIRST_WAVE = 1;
 const HOURS_PER_DAY = 24;
 const MS_PER_HOUR = 60 * 60 * 1000;
@@ -71,16 +71,12 @@ export function autofire(deps: AutofireDeps) {
   ): Promise<Result<AutofireOutcome>> => {
     const position = await positions.getForMatching(positionId);
     if (!position.ok) return position;
-    const candidates = await deps.candidates();
-    if (!candidates.ok) return candidates;
+    const pool = await deps.pool();
+    if (!pool.ok) return pool;
 
     const subject = { kind: "position" as const, id: positionId };
     const input = { id: positionId, ...position.value.detail };
-    const ranked = await scoring.topN(
-      input,
-      candidates.value,
-      MATCHING.precheckN,
-    );
+    const ranked = await scoring.topN(input, pool.value, MATCHING.precheckN);
     if (!ranked.ok) {
       await Events.emit({
         name: "precheck.failed",
@@ -91,7 +87,7 @@ export function autofire(deps: AutofireDeps) {
       });
       return ranked;
     }
-    const scored = await scoring.scorePosition(input, candidates.value);
+    const scored = await scoring.scorePosition(input, pool.value);
 
     const firedAt = clock();
     const lever = await positions.recordPrecheck(positionId, {
@@ -103,7 +99,7 @@ export function autofire(deps: AutofireDeps) {
 
     const outcome: AutofireOutcome = {
       positionId,
-      candidateCount: candidates.value.length,
+      candidateCount: pool.value.length,
       rankedCount: ranked.value.length,
       excludedByReason: scored.ok
         ? tally(scored.value.excluded.map((entry) => entry.reason))
