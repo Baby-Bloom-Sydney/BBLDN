@@ -1,29 +1,25 @@
-// `scheduling` (03 §3; ADR-074) — there is no real inside yet (no store over `bookings` / `availability_rules`),
-// so the in-memory stub is the only implementation. It is installed **outside production only**: an in-memory
-// calendar on a serverless runtime forgets every booking on a cold start and tells no one, which on a real
-// family's call is a silent loss, not a stub. Production stays on the fail-closed default until the real inside
-// lands, and says so. Selection is by the resolved environment (05 §3 rule 1), never by an import edit.
-import type { Environment } from "@/modules/config";
-import {
-  configureScheduling,
-  createSchedulingStub,
-} from "@/modules/scheduling";
+// `scheduling` (03 §3; ADR-074) — the real inside, in **every** environment (`1f`).
+//
+// It replaces the in-memory stub P1-WIRE installed outside production only, and closes the hole that wiring
+// left open: production sat on the fail-closed default, so the London calendar did not exist there at all. The
+// inside stands on `auth`'s data port and `book_slot()` (02 §7), both of which are real wherever a database is,
+// so there is no longer an environment in which the stub is the better answer — a calendar that forgets a
+// family's call on a cold start was only ever a placeholder for this.
+//
+// The binding is still chosen here rather than by an import edit (05 §3 rule 1), and the report still carries
+// its reason; what changed is that the reason is no longer "there is no inside". One thing it is honest about:
+// `unblock` is not built — no write available to the module lifts a block (see
+// `scheduling/lib/scheduling-admin-writes.ts` and the `1f` PROGRESS entry).
+import { auth } from "@/modules/auth";
+import { configureScheduling, createScheduling } from "@/modules/scheduling";
 import type { PortWiring } from "./types";
 
-const NO_INSIDE =
-  "no real inside yet (no store over bookings / availability_rules — F-b README gap 4)";
-
-export function wireScheduling(environment: Environment): PortWiring {
-  if (environment === "production")
-    return {
-      port: "scheduling",
-      binding: "unconfigured",
-      reason: `${NO_INSIDE}; the in-memory stub is refused in production because a cold start would drop live bookings silently`,
-    };
-  configureScheduling(createSchedulingStub());
+export function wireScheduling(): PortWiring {
+  configureScheduling(createScheduling({ auth }));
   return {
     port: "scheduling",
-    binding: "in-memory stub",
-    reason: `${NO_INSIDE}; the stub forgets on every cold start — preview and development only`,
+    binding: "db inside",
+    reason:
+      "02 §4.4's four tables through auth's data port; book_slot() (02 §7) is the one booking transaction, displacement included (ADR-127). Not built: unblock — 03 §1.4's Query has no delete and availability_blocks has no revocation column",
   };
 }

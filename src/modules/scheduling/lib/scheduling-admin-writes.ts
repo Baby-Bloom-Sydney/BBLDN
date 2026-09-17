@@ -9,7 +9,6 @@
 // + `attention_reason = 'blocked-over'`) and returns it as `affected`; it never cancels it. The admin moves or
 // clears each flagged call by hand from S-A-04.
 import { ok } from "@/modules/platform";
-import type { Auth } from "@/modules/auth";
 import type {
   AvailabilityRule,
   Block,

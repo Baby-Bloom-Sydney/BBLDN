@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ADMIN_NAV_ITEMS } from "./admin-nav-items";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { displayName, displayFullName } from "@/lib/auth/display-name";
@@ -69,16 +70,7 @@ const parentNavItems: NavItem[] = [
   { href: "/parent/settings", icon: Settings, label: "Settings" },
 ];
 
-const adminNavItems: NavItem[] = [
-  { href: "/admin/dashboard", icon: Home, label: "Dashboard" },
-  { href: "/admin/pipeline", icon: Filter, label: "User Pipeline" },
-  { href: "/admin/leads", icon: Phone, label: "Contacts" },
-  { href: "/admin/verifications", icon: ShieldCheck, label: "Verifications" },
-  { href: "/admin/users", icon: Users, label: "User Management" },
-  { href: "/admin/subscriptions", icon: CreditCard, label: "Subscriptions" },
-  { href: "/admin/support", icon: LifeBuoy, label: "Support" },
-  { href: "/admin/settings", icon: Settings, label: "Settings" },
-];
+const adminNavItems = [...ADMIN_NAV_ITEMS];
 
 const publicNavItems: NavItem[] = [
   { href: "/", icon: Home, label: "Home" },

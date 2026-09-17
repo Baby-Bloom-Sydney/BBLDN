@@ -31,7 +31,7 @@ export function wirePorts(env: ParsedEnv): BootReport {
     wireRateLimiter(env.environment),
     wireAreas(env.server.AREAS_SOURCE),
     wireComms(env.server.EMAIL_PROVIDER),
-    wireScheduling(env.environment),
+    wireScheduling(),
     wireScoring(),
     wireMatching(),
     wireCallLayer(env.environment),

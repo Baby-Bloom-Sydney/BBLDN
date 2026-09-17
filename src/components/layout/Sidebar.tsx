@@ -31,6 +31,7 @@ import {
   Phone,
 } from "lucide-react";
 import Link from "next/link";
+import { ADMIN_NAV_ITEMS } from "./admin-nav-items";
 
 type UserRole = "nanny" | "parent" | "admin" | "super_admin" | "guest";
 
@@ -62,21 +63,7 @@ const parentNavItems = [
   { href: "/parent/settings", icon: Settings, label: "Settings" },
 ];
 
-const adminNavItems = [
-  { href: "/admin/dashboard", icon: Home, label: "Dashboard" },
-  { href: "/admin/pipeline", icon: Filter, label: "User Pipeline" },
-  { href: "/admin/leads", icon: Phone, label: "Contacts" },
-  { href: "/admin/positions", icon: Briefcase, label: "Positions" },
-  { href: "/admin/users", icon: Users, label: "User Management" },
-  { href: "/admin/subscriptions", icon: CreditCard, label: "Subscriptions" },
-  { href: "/admin/support", icon: LifeBuoy, label: "Support" },
-  {
-    href: "/admin/verification-reference",
-    icon: BookOpen,
-    label: "Verification Ref",
-  },
-  { href: "/admin/settings", icon: Settings, label: "Settings" },
-];
+const adminNavItems = [...ADMIN_NAV_ITEMS];
 
 const publicNavItems = [
   { href: "/", icon: Home, label: "Home" },
