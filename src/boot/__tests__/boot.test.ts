@@ -28,6 +28,7 @@ type Modules = {
   readonly comms: typeof import("@/modules/comms");
   readonly scheduling: typeof import("@/modules/scheduling");
   readonly config: typeof import("@/modules/config");
+  readonly onboardingParent: typeof import("@/modules/onboarding-parent");
 };
 
 const reasonOf = (result: { ok: boolean }): unknown =>
@@ -59,6 +60,7 @@ beforeAll(async () => {
     comms: await import("@/modules/comms"),
     scheduling: await import("@/modules/scheduling"),
     config: await import("@/modules/config"),
+    onboardingParent: await import("@/modules/onboarding-parent"),
   };
 });
 
@@ -108,12 +110,30 @@ describe("after register() in a valid preview environment", () => {
     expect(reasonOf(marketing)).not.toBe("cookie-consent-not-available");
   });
 
-  it("rate limiter — still denies in a production-resolved runtime: no shared store exists to declare (07 §8)", async () => {
+  it("rate limiter — a shared store is declared, so assertSharedStore no longer denies (07 §8; 0017)", async () => {
+    // P1-WIRE pinned the opposite: with no `rate_limit_buckets` table there was nothing to declare, so every
+    // consume denied. `0017` created it and `wire-rate-limiter.ts` declares it — the denial that remains, if
+    // any, comes from the limit or from the database, never from the assertion refusing an undeclared store.
     const policy = Object.values(m.config.SECURITY.rateLimits)[0];
     expect(policy).toBeDefined();
-    const result = await m.platform.rateLimiter.consume("k", policy as never);
-    expect(result.ok).toBe(false);
-    expect(!result.ok && result.error.code).toBe("INTERNAL");
+    const result = await m.platform.rateLimiter.consume(
+      "boot-probe",
+      policy as never,
+    );
+    expect(reasonOf(result)).not.toBe("rate-limit-store-not-shared");
+  });
+
+  it("parent profile — the signup pair store is installed, so signup no longer fails closed (02 §4.1; 1c)", async () => {
+    // `1c` shipped `parentProfileStore` fail-closed because 0000–0016 had no definer to write through. 0017
+    // has one; the claim here is only that boot replaced the default — the row it writes is proved against
+    // the port seam in `db-0017-stores.test.ts`.
+    const created = await m.onboardingParent.parentProfileStore.create({
+      userId: "00000000-0000-4000-8000-000000000000" as never,
+      firstName: "Boot",
+      lastName: "Probe",
+      mobile: `${m.config.LOCALE.phonePrefix}7700900123` as never,
+    });
+    expect(reasonOf(created)).not.toBe("profile-store-not-configured");
   });
 
   it("areas — the provider AREAS_SOURCE names answers (stub in .env.test)", async () => {

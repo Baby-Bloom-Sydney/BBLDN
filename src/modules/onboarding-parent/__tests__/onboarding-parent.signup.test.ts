@@ -1,6 +1,6 @@
 // S-X-05 / S-X-06 — the signup action: validated once at the boundary, the role always `parent`, a refusal that
-// never leaks provider text, and — pinned as failing until the schema and the P-2 slice exist (ADR-120 rule 2) —
-// the two documented outcomes the code cannot yet deliver.
+// never leaks provider text, the profile row written through the store `0017` made possible (ADR-131), and —
+// pinned as failing until the P-2 slice exists (ADR-120 rule 2) — the outcome the code cannot yet deliver.
 import { beforeEach, describe, expect, it } from "vitest";
 import { auth, configureAuth, stubAuth } from "@/modules/auth";
 import { LOCALE, SECURITY } from "@/modules/config";
@@ -35,7 +35,13 @@ const LEAD = "6f1d2c3b-4a5e-4f60-9b71-8c2d3e4f5a6b";
 
 let consents: ReturnType<typeof memoryConsentStore>;
 
+/** The module's own fail-closed default, captured before any test installs a store: the registry is
+ *  module-level, so without restoring it here one describe's `configureParentProfileStore` would decide
+ *  what the next one is testing. */
+const UNCONFIGURED_PROFILE_STORE = PARENT_PROFILE_STORE_REGISTRY.get();
+
 beforeEach(() => {
+  PARENT_PROFILE_STORE_REGISTRY.set(UNCONFIGURED_PROFILE_STORE);
   configureAuth(stubAuth());
   consents = memoryConsentStore();
   configureConsent(
@@ -46,15 +52,29 @@ beforeEach(() => {
   );
 });
 
-describe("onboarding-parent — signUpParentAction while the profile store is unconfigured", () => {
-  it.fails(
-    "PINNED (02 §4.1; migration owed): the default binding writes the user_profiles row and the signup completes",
-    async () => {
-      const result = await signUpParentAction(null, formDataOf(VALID));
-      expect(result.ok).toBe(true);
-    },
-  );
+describe("onboarding-parent — signUpParentAction once a profile store is installed", () => {
+  // Was `it.fails` with "migration owed": `0017`'s `create_parent_profile` is that migration, and
+  // `src/boot/wire-parent-profile-store.ts` installs the adapter over it. The pin asked for the wrong
+  // thing — it asked the *unconfigured* default to write a row, which would be the fail-closed hole
+  // `parent-profile-store-registry.ts` exists to prevent — so what it was actually pinning is asserted
+  // here instead: with a store bound, the signup completes **and a profile row exists behind it**.
+  // 02 §4.1: "exactly one `user_roles` + one `user_profiles` row per user, created in the signup action".
+  it("writes the profile row and completes (02 §4.1; 0017 create_parent_profile)", async () => {
+    const profiles = memoryParentProfileStore();
+    configureParentProfileStore(profiles);
 
+    const result = await signUpParentAction(null, formDataOf(VALID));
+
+    expect(result.ok).toBe(true);
+    expect(profiles.rows()).toHaveLength(1);
+    expect(profiles.rows()[0]).toMatchObject({
+      firstName: VALID.firstName,
+      lastName: VALID.lastName,
+    });
+  });
+});
+
+describe("onboarding-parent — signUpParentAction while the profile store is unconfigured", () => {
   it("fails closed, never throws, and keeps the reason server-side (01 §4a)", async () => {
     const result = await signUpParentAction(null, formDataOf(VALID));
     expect(result.ok).toBe(false);

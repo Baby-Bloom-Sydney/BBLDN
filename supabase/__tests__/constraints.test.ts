@@ -248,7 +248,7 @@ describe("db.constraints — the schema-wide conventions", () => {
     expect(rows.map((r) => r.proname)).toEqual([]);
   });
 
-  it("the schema is the 56 tables and 9 views of 02 §4 and §7", async () => {
+  it("the schema is the 57 tables and 9 views of 02 §4 and §7 (56 + rate_limit_buckets, 0017)", async () => {
     const { rows } = await db.query<{ tables: string; views: string }>(
       `select
          (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -256,7 +256,7 @@ describe("db.constraints — the schema-wide conventions", () => {
          (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
           where n.nspname = 'public' and c.relkind = 'v') as views`,
     );
-    expect(Number(rows[0].tables)).toBe(56);
+    expect(Number(rows[0].tables)).toBe(57);
     expect(Number(rows[0].views)).toBe(9);
   });
 
@@ -302,5 +302,97 @@ describe("db.constraints — the schema-wide conventions", () => {
       "verification-documents",
     ]);
     expect(rows.every((r) => r.public === false)).toBe(true);
+  });
+});
+
+describe("db.constraints — what 0017 added (ADR-131)", () => {
+  // ADR-131 (2): without this column a consent row written for a non-document purpose has
+  // `document_id IS NULL` and cannot be attributed on the way back, so `hasConsent` answers false
+  // for evidence that exists. The CHECK is what stops the column and `document_id` drifting apart.
+  it("consent_records.purpose is NOT NULL and agrees with document_id", async () => {
+    const { rows } = await db.query<{ is_nullable: string; udt_name: string }>(
+      `select is_nullable, udt_name from information_schema.columns
+        where table_schema = 'public' and table_name = 'consent_records' and column_name = 'purpose'`,
+    );
+    expect(rows[0]?.is_nullable).toBe("NO");
+    expect(rows[0]?.udt_name).toBe("consent_purpose");
+    const def = await checkDef("consent_records_purpose_document_check");
+    expect(def).not.toBeNull();
+    expect(def).toMatch(/document_id/);
+    expect(def).toMatch(/purpose/);
+  });
+
+  it("consent_records keeps the (user_id, purpose, created_at desc) read index", async () => {
+    const def = await indexDef("consent_records_user_purpose_idx");
+    expect(def).not.toBeNull();
+    expect(def).toMatch(/user_id/);
+    expect(def).toMatch(/purpose/);
+  });
+
+  // ADR-131 (3) / 07 §8: the limiter is only a limiter if every instance counts into one row. The
+  // table is service-role only — a client policy here would let a caller reset its own bucket.
+  it("rate_limit_buckets exists, forces RLS and carries no policy at all (07 §5.2)", async () => {
+    const { rows } = await db.query<{ forced: boolean; enabled: boolean }>(
+      `select c.relrowsecurity as enabled, c.relforcerowsecurity as forced
+         from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public' and c.relname = 'rate_limit_buckets'`,
+    );
+    expect(rows[0]).toEqual({ enabled: true, forced: true });
+    const policies = await db.query(
+      `select 1 from pg_policies where schemaname = 'public' and tablename = 'rate_limit_buckets'`,
+    );
+    expect(policies.rowCount).toBe(0);
+  });
+
+  it("rate_limit_buckets refuses a non-positive count and an already-expired window", async () => {
+    expect(await checkDef("rate_limit_buckets_count_positive_check")).toMatch(
+      /count/,
+    );
+    expect(await checkDef("rate_limit_buckets_window_open_check")).toMatch(
+      /reset_at/,
+    );
+  });
+
+  // 02 §7: every definer is SECURITY DEFINER with `search_path` pinned, or it is a search-path
+  // hijack waiting for a schema a caller controls.
+  it.each([
+    "consume_rate_limit",
+    "create_parent_profile",
+    "record_cookie_consent",
+  ])("%s is SECURITY DEFINER with search_path pinned", async (name: string) => {
+    const { rows } = await db.query<{
+      prosecdef: boolean;
+      proconfig: string[] | null;
+    }>(
+      `select p.prosecdef, p.proconfig from pg_proc p
+         join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = $1`,
+      [name],
+    );
+    expect(rows[0]?.prosecdef).toBe(true);
+    expect(rows[0]?.proconfig).toContain('search_path=""');
+  });
+
+  // 07 §5.1 rule 5 / §5.2: `anon` executes none of them; only the signup definer reaches
+  // `authenticated`, and it takes no user id so it can only ever write the caller's own rows.
+  it("grants: anon executes none of the 0017 functions; authenticated only create_parent_profile", async () => {
+    const { rows } = await db.query<{
+      name: string;
+      anon: boolean;
+      authed: boolean;
+    }>(
+      `select p.proname as name,
+              has_function_privilege('anon', p.oid, 'execute') as anon,
+              has_function_privilege('authenticated', p.oid, 'execute') as authed
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+          and p.proname in ('consume_rate_limit', 'create_parent_profile', 'record_cookie_consent')
+        order by p.proname`,
+    );
+    expect(rows).toEqual([
+      { name: "consume_rate_limit", anon: false, authed: false },
+      { name: "create_parent_profile", anon: false, authed: true },
+      { name: "record_cookie_consent", anon: false, authed: false },
+    ]);
   });
 });

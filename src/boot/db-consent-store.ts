@@ -8,28 +8,23 @@
 // The cookie half runs under the **service role** — `cookie_consent_records` has no client policy and 07 §5.1
 // rule 5 names `recordCookieConsent` as a service-role use. `currentCookie` is a keyed read on `visitor_id` /
 // `user_id`, the current choice being the newest un-superseded row (0004 makes that unique). `insertCookie` is the
-// `record_cookie_consent` RPC of `0017`: the new row and the `superseded_by` stamp on the old one cannot be two
-// PostgREST statements (the partial unique + the FK forbid either order), so it is one definer function — ADR-127.
+// `record_cookie_consent` RPC of `0017`: the new row and the `superseded_by` stamp on the one it replaces cannot
+// be two PostgREST statements — between them a visitor would briefly have two current rows, which is exactly what
+// `currentCookie` reads — so it is one definer function (ADR-127).
 import type { DataAccessPort } from "@/modules/auth";
-import { err } from "@/modules/platform";
 import type {
   ConsentPurpose,
   ConsentRecord,
   ConsentStore,
   CookieConsentRecord,
 } from "@/modules/platform";
-import type { UserId } from "@/modules/shared-types";
+import type { ConsentRecordId, UserId } from "@/modules/shared-types";
+import { cookieConsentArgs } from "./cookie-consent-args";
 import { biometricInsertRow } from "./biometric-insert-row";
 import { consentInsertRow } from "./consent-insert-row";
 import { consentRecordFromRow } from "./consent-record-from-row";
 import { cookieRecordFromRow } from "./cookie-record-from-row";
 import { currentDocumentFromRows } from "./current-document-from-rows";
-
-const COOKIE_WRITE_NOT_AVAILABLE = err(
-  "INTERNAL",
-  "Cookie consent storage is not available",
-  { reason: "cookie-consent-write-not-available" },
-);
 
 const newestCurrent = (
   rows: ReadonlyArray<CookieConsentRecord>,
@@ -92,7 +87,24 @@ export function dbConsentStore(port: DataAccessPort): ConsentStore {
         },
         { uow: opts?.uow },
       ),
-    insertCookie: async () => COOKIE_WRITE_NOT_AVAILABLE,
+    insertCookie: (row) =>
+      port.run(
+        {
+          name: "platform.consent.insertCookie",
+          exec: async (q) => {
+            const supersededId = await q.rpc(
+              "record_cookie_consent",
+              cookieConsentArgs(row),
+            );
+            return supersededId === null
+              ? Object.freeze({})
+              : Object.freeze({
+                  supersededId: supersededId as ConsentRecordId,
+                });
+          },
+        },
+        { scope: "service" },
+      ),
     currentCookie: (subject) =>
       port.run(
         {

@@ -9,6 +9,7 @@ import { wireAuth } from "./wire-auth";
 import { wireComms } from "./wire-comms";
 import { wireConsent } from "./wire-consent";
 import { wireEvents } from "./wire-events";
+import { wireParentProfileStore } from "./wire-parent-profile-store";
 import { wireRateLimiter } from "./wire-rate-limiter";
 import { wireScheduling } from "./wire-scheduling";
 import { wireUnitOfWork } from "./wire-unit-of-work";
@@ -20,9 +21,10 @@ export function wirePorts(env: ParsedEnv): BootReport {
     wireAuth(unitOfWork.binding.join),
     wireEvents(env.environment),
     wireConsent(),
-    wireRateLimiter(),
+    wireRateLimiter(env.environment),
     wireAreas(env.server.AREAS_SOURCE),
     wireComms(env.server.EMAIL_PROVIDER),
     wireScheduling(env.environment),
+    wireParentProfileStore(),
   ]);
 }

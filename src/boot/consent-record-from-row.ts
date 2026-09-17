@@ -1,9 +1,8 @@
-// One `consent_records` row → `ConsentRecord`, or `null` when the row cannot be read back as one. **The table has
-// no `purpose` column** (02 §4.1 row 5 stores the document pair, the agreement and the checkpoint), so a row's
-// purpose is recoverable only from `document_id`; a row written for `vaccination-status` (ADR-103) or an informed
-// action with no document has `null` there and cannot be attributed to any purpose on the way back — such a row
-// is skipped, so `hasConsent` answers `false` for it (fail closed). Recorded as a foundations gap for the 02
-// owner in the L-007 P1-WIRE entry: the column exists in the connector's `ConsentRecord`, not in the row.
+// One `consent_records` row → `ConsentRecord`, or `null` when the row cannot be read back as one. Since `0017`
+// the row carries its own `purpose` (ADR-131 (2)), so a `vaccination-status` consent — or any informed action
+// with no document — round-trips instead of being skipped; before it, such a row could not be attributed and
+// `hasConsent` answered `false` for evidence that existed. The document pair is still optional, and `0017`'s
+// CHECK is what guarantees `document_id` and `purpose` agree when both are present.
 import type { AppDatabase } from "@/modules/auth";
 import type {
   ConsentContext,
@@ -34,11 +33,13 @@ function contextOf(row: ConsentRow): ConsentContext {
 
 export function consentRecordFromRow(row: ConsentRow): ConsentRecord | null {
   if (row.party === "admin") return null; // the table's CHECK forbids it; a row that has it is not a consent
-  if (row.document_id === null || row.document_version === null) return null;
-  const document = Object.freeze({
-    id: row.document_id as LegalDocumentId,
-    version: row.document_version,
-  });
+  const document =
+    row.document_id === null || row.document_version === null
+      ? null
+      : Object.freeze({
+          id: row.document_id as LegalDocumentId,
+          version: row.document_version,
+        });
   return Object.freeze({
     id: row.id as ConsentRecordId,
     userId: row.user_id as UserId,
@@ -50,8 +51,8 @@ export function consentRecordFromRow(row: ConsentRow): ConsentRecord | null {
     ...(row.related_entity_id === null
       ? {}
       : { relatedEntityId: row.related_entity_id as Uuid }),
-    purpose: document.id,
-    document,
+    purpose: row.purpose,
+    ...(document === null ? {} : { document }),
     consentGiven: row.consent_given,
     createdAt: row.created_at as Instant,
   });
