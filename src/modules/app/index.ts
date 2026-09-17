@@ -9,6 +9,28 @@ export type * from "./katie";
 export type * from "./child-development";
 export type * from "./child-linking";
 
-// The one runtime surface today: the child-link reads that bound a family's access (ADR-083 / 084).
-export { childLinking, configureChildLinking } from "./child-linking";
+// `child-linking`'s runtime surface (ADR-083 / 084; `1i`): the reads that bound a family's access, the writes
+// that create a child and move an invite, and the screens of 04 §6.1 / §6.2.
+export {
+  childLinking,
+  configureChildLinking,
+  createChildLinking,
+  dbChildLinkingStore,
+  memoryChildLinkingStore,
+  normaliseInviteToken,
+  mintInviteToken,
+  inviteAuthorisation,
+  InviteLandingPage,
+  ChildrenCard,
+  AppGateNotice,
+  loadInviteLanding,
+  loadChildrenCard,
+  inviteLandingView,
+  childrenCardView,
+  appAccessView,
+  claimInviteAction,
+  createChildAction,
+  createChildInviteAction,
+  revokeChildInviteAction,
+} from "./child-linking";
 export { stubApp } from "./app.stub";
