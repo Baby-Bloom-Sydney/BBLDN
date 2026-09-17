@@ -13,13 +13,15 @@ import { expect, test } from "@playwright/test";
 import { STATUS } from "../envelope";
 import { requiredSecret } from "../secrets";
 
-test("the server under test really is up — /api/health answers 200", async ({
+test("the server under test really is up — /api/health answers", async ({
   request,
 }) => {
   const response = await request.get("/api/health");
 
-  // Without this, every 404 below would also be produced by a server that never started.
-  expect(response.status()).toBe(STATUS.ok);
+  // Without this, every 404 below would also be produced by a server that never started. The status is 503,
+  // not 200: this server boots with Supabase deliberately unreachable, and ADR-130 makes a failed probe a 503
+  // with the report still in the body. What matters here is that a route answered at all.
+  expect(response.status()).toBe(STATUS.unavailable);
 });
 
 test("/api/dev/stub-purchase 404s in a production-resolved environment", async ({
