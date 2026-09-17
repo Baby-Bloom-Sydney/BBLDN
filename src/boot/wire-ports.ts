@@ -13,6 +13,7 @@
 import { URLS } from "@/modules/config";
 import type { ParsedEnv } from "@/modules/config";
 import type { BootReport } from "./types";
+import { unwiredPorts } from "./unwired-ports";
 import { wireAreas } from "./wire-areas";
 import { wireAuth } from "./wire-auth";
 import { wireCallLayer } from "./wire-call-layer";
@@ -66,5 +67,8 @@ export function wirePorts(env: ParsedEnv): BootReport {
     // money port is wired before it. Neither is load-bearing at wire time — both are closures over module-level
     // bindings, which fail closed at call time — but the reading order is the dependency order.
     wireApp(),
+    // Last, and they bind nothing: the four ports boot deliberately leaves on their fail-closed default, stated
+    // so the report can never be read as "boot forgot" (REVIEW-2, code-review HIGH-1).
+    ...unwiredPorts(),
   ]);
 }
