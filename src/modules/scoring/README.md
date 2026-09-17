@@ -52,6 +52,14 @@ propagation, determinism) and nothing more — it is not a cheap engine and must
 distance provider swapped underneath it, the fail-closed seam, and the table test over `MATCHING` (brackets
 ascending, weights sum to one).
 
+**The engine (Phase 1 `1b`, row `04.01`).** `createScoring(deps)` is the three-layer engine of 03 §7.1: quality
+base (location × schedule × experience × role fit × qualifications × support fit, `MATCHING.weights`) ×
+requirement penalties (floored at `penaltyFloor`, unmet keys reported) × over-qualified bonuses (capped at
+`bonusCap`, names reported), mapped to `displayRange`; exclusions before any layer; ordered score desc, distance
+asc, `nannyId`; a failed distance fails the whole call. Role fit and support fit read the snapshot's `attributes`
+only — the `RoleType` vocabulary is still the recorded gap above, so they score full marks with no stated need and
+the floor with one. `__tests__/scoring.engine.test.ts` pins each claim.
+
 <!-- audit
 Last edited: 2026-09-16T14:20+10:00 — BB-LDN-Planner-070926/F-a
 Notes: initial authoring — the F-a connector, `scoring/distance` (haversine + stub), `stubScoring` and swap

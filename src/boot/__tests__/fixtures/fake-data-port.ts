@@ -6,9 +6,10 @@ import { err, fromThrown, ok } from "@/modules/platform";
 import type {
   AppError,
   Query,
-  TableName,
-  TableRow,
   UnitOfWork,
+  QueryHandle,
+  ReadableName,
+  RowOf,
 } from "@/modules/shared-types";
 
 type Row = Readonly<Record<string, unknown>>;
@@ -33,18 +34,21 @@ export function fakeDataPort(seed: FakeTables = {}): FakeDataPort {
   const calls: FakeDataPort["calls"][number][] = [];
   const inserted: FakeDataPort["inserted"][number][] = [];
   const state: FakeDataPort["state"] = { failWith: undefined };
-  const asRow = <T extends TableName<AppDatabase>>(row: Row) =>
-    row as TableRow<AppDatabase, T>;
+  const asRow = <N extends ReadableName<AppDatabase>>(row: Row) =>
+    row as RowOf<AppDatabase, N>;
 
+  // ADR-129: `from()` is typed over tables **and** views; this double hands every name the table shape (a
+  // fixture, not the driver — the select-only view handle is the drivers' rule, pinned in auth.views.test.ts).
   const query: Query<AppDatabase> = {
-    from: <T extends TableName<AppDatabase>>(table: T) => ({
-      select: async () => (seed[table] ?? []).map(asRow<T>),
-      insert: async (row: Row) => {
-        inserted.push({ table, row });
-        return asRow<T>(row);
-      },
-      update: async (_id: unknown, patch: Row) => asRow<T>(patch),
-    }),
+    from: <N extends ReadableName<AppDatabase>>(table: N) =>
+      ({
+        select: async () => (seed[table] ?? []).map(asRow<N>),
+        insert: async (row: Row) => {
+          inserted.push({ table, row });
+          return asRow<N>(row);
+        },
+        update: async (_id: unknown, patch: Row) => asRow<N>(patch),
+      }) as unknown as QueryHandle<AppDatabase, N>,
     rpc: async () => undefined as never,
   };
 

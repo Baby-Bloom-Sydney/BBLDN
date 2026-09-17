@@ -2,5 +2,7 @@
 // concatenates a name and a district itself; the banned-literal test watches for the ones that try.
 import type { Area, AreaLabel } from "../types";
 
-export const formatAreaLabel = (area: Area): AreaLabel =>
-  `${area.name}, ${area.district}`;
+/** Takes a full `Area` or just its two rendered fields — an `AreaRef` from `scoring` renders through it too. */
+export const formatAreaLabel = (
+  area: Pick<Area, "name" | "district"> & Partial<Area>,
+): AreaLabel => `${area.name}, ${area.district}`;

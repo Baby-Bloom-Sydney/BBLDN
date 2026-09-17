@@ -7,7 +7,8 @@ export type * from "./types";
 export { scoring } from "./lib/default-scoring";
 export { configureScoring } from "./lib/configure-scoring";
 
-// The stub the contract names (03 §7.5). The real three-layer engine is Phase 1, not this unit.
+// The engine (03 §7.2 `createScoring(deps)` — Phase 1 `1b`, row `04.01`) and the stub the contract names (03 §7.5).
+export { createScoring } from "./lib/create-scoring";
 export { stubScoring } from "./scoring.stub";
 
 // `scoring/distance` — the swappable, re-exported so the outside never deep-imports the sub-module (05 §7 rule 2).
