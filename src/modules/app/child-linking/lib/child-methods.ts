@@ -77,6 +77,11 @@ export function childMethods(
         parent_user_id: owner,
         first_name: name,
         date_of_birth: input.dateOfBirth,
+        // 04 §4.4 c1: who created the row. The store writes at service scope (an `insert … returning` on
+        // `children` is refused for every client role — `int.rpc-0019`), where `children_stamp_creator` keeps
+        // what the caller sends because there is no `auth.uid()` to stamp from. The value is the verified
+        // actor's, never an input field, so it is the answer the trigger would have reached under a session.
+        created_by_user_id: owner,
       });
       if (!written.ok) return carryLinkStoreError(written.error);
 

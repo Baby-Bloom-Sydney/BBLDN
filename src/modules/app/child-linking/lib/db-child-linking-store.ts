@@ -9,16 +9,45 @@
 //
 // **The token never appears in a name, a field or a message** (07 §8 row 7: "tokens never in logs"). The two
 // operations that take one are named for what they do, not for what they were given.
-import type { DataAccessPort } from "@/modules/auth";
+import type { AppDatabase, DataAccessPort } from "@/modules/auth";
 import type { ChildId, InviteId, UserId, Uuid } from "@/modules/shared-types";
 import type {
   ChildInsert,
   ChildLinkingStore,
   InviteInsert,
   InvitePatch,
+  InviteRow,
   PendingInviteRow,
   PreviewRow,
 } from "./child-linking-store";
+
+/** `0019`'s generated argument shapes, so the two enum seams are typed by the migration itself. */
+type InviteDirection =
+  AppDatabase["Functions"]["create_child_invite"]["Args"]["p_direction"];
+type RevokedReason =
+  AppDatabase["Functions"]["revoke_child_invite"]["Args"]["p_reason"];
+
+/**
+ * The one patch `0019` has a writer for. `revoke_child_invite` takes the reason and stamps the status and the
+ * instant itself, so anything else in the patch is a column no function writes — answered `null` and refused
+ * by the caller above rather than written behind the definer's back.
+ */
+const revokeReasonOf = (patch: InvitePatch): RevokedReason | null =>
+  patch.status === "revoked" && patch.revoked_reason != null
+    ? (patch.revoked_reason as RevokedReason)
+    : null;
+
+/**
+ * The row after a definer has written it. `null` is not a refusal the caller can act on — the function
+ * committed and the row is there — so it is a store failure, carried up as `E_STORE` like any other.
+ */
+const inviteOrThrow = (row: InviteRow | null): InviteRow => {
+  if (row === null)
+    throw new Error(
+      "child_invites: the row a 0019 definer wrote is not visible",
+    );
+  return row;
+};
 
 export function dbChildLinkingStore(port: DataAccessPort): ChildLinkingStore {
   return Object.freeze({
@@ -79,13 +108,22 @@ export function dbChildLinkingStore(port: DataAccessPort): ChildLinkingStore {
         },
         { scope: "session" },
       ),
+    // **Service scope, and the reason is measured rather than reasoned (`int.rpc-0019`).** `insert … returning`
+    // on `children` is refused for **every** client role, including the child's own parent:
+    // `children_access_select` reads `user_has_child_access(id)`, a STABLE definer that queries
+    // `public.children`, and a STABLE function sees the statement's start snapshot — so the row being inserted
+    // is invisible to it and the RETURNING clause's SELECT check fails. No migration can change that without
+    // making the predicate VOLATILE, which would make it unusable as a policy. The module is therefore the
+    // writer, at service scope, and `created_by_user_id` travels **with** the insert: `children_stamp_creator`
+    // stamps `auth.uid()` only for a non-privileged caller and there is no session here, so a service-scope
+    // insert that did not send the column would leave it null for ever (`0019` §4 states exactly this).
     insertChild: (row: ChildInsert) =>
       port.run(
         {
           name: "app.childLinking.insertChild",
           exec: (q) => q.from("children").insert(row),
         },
-        { scope: "session" },
+        { scope: "service" },
       ),
     invitesForChild: (childId: ChildId) =>
       port.run(
@@ -111,24 +149,66 @@ export function dbChildLinkingStore(port: DataAccessPort): ChildLinkingStore {
         },
         { scope: "session" },
       ),
-    // Service scope — `child_invites` has no client INSERT policy (07 §5.2) and `0012` ships no mint RPC.
-    // The ★ pin in `child-linking-store.ts` names the `0019` function that should take this over.
+    // **`create_child_invite()` (`0019`), under the caller's own session.** `child_invites` has no client
+    // INSERT policy (07 §5.2 — "links and invites written only by the RPCs") and until `0019` there was no RPC
+    // to call, so this ran at service scope with `invite-authorisation.ts` as the only gate anything passed
+    // through. The definer asserts `mayMint` again in SQL, and it derives its authority from `auth.uid()` and
+    // refuses a null one outright — so moving onto it is **not** a rename: the call has to carry the session,
+    // and a service-scope call is refused (`INVITE_NO_SESSION`) rather than quietly minting with no authority.
+    //
+    // `created_by_user_id` on the row is **ignored**: the function stamps `auth.uid()`. Passing it would be a
+    // caller naming the creator, which is the spoof `children_stamp_creator` exists to stop one table over.
+    //
+    // The read-back is a second statement and deliberately so — the function returns the invite's id, and
+    // nothing here needs it to be atomic with the mint: `create_child_invite` is idempotent on the one pending
+    // invite per (child, direction), so a retry after a failed read returns the same id and the same token.
     insertInvite: (row: InviteInsert) =>
       port.run(
         {
           name: "app.childLinking.insertInvite",
-          exec: (q) => q.from("child_invites").insert(row),
+          exec: async (q) => {
+            const id = (await q.rpc("create_child_invite", {
+              p_child_id: row.child_id,
+              p_direction: row.direction as InviteDirection,
+              p_token: row.token,
+            })) as string;
+            return inviteOrThrow(
+              await q.from("child_invites").eq("id", id).single(),
+            );
+          },
         },
-        { scope: "service" },
+        { scope: "session" },
       ),
+    // **`revoke_child_invite()` (`0019`), under the caller's own session**, for the same reason as the mint.
+    // The function is the *only* invalidation path a token has (there is no rotation and no expiry — `0012`'s
+    // own assertion), so a patch that is not a revoke has no writer at all and is refused here rather than
+    // falling back to the table write this unit exists to close. Nothing in the module sends one.
+    //
+    // A terminal invite is `false` from the function and no write; the row is read back either way, so the
+    // caller sees what stands rather than what it asked for.
     updateInvite: (inviteId: InviteId, patch: InvitePatch) =>
       port.run(
         {
           name: "app.childLinking.updateInvite",
-          exec: (q) =>
-            q.from("child_invites").update(inviteId as string as Uuid, patch),
+          exec: async (q) => {
+            const reason = revokeReasonOf(patch);
+            if (reason === null)
+              throw new Error(
+                "child_invites has no writer but revoke_child_invite (0019 §5)",
+              );
+            await q.rpc("revoke_child_invite", {
+              p_invite_id: inviteId as string,
+              p_reason: reason,
+            });
+            return inviteOrThrow(
+              await q
+                .from("child_invites")
+                .eq("id", inviteId as string)
+                .single(),
+            );
+          },
         },
-        { scope: "service" },
+        { scope: "session" },
       ),
     invitePreview: (token: string) =>
       port.run(

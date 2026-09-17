@@ -40,6 +40,17 @@ const without = (columns: Row): Row =>
     ),
   );
 
+type CreateChildInviteArgs = {
+  readonly p_child_id: string;
+  readonly p_direction: string;
+  readonly p_token: string;
+};
+
+type RevokeChildInviteArgs = {
+  readonly p_invite_id: string;
+  readonly p_reason: string;
+};
+
 type UpsertPositionArgs = {
   readonly p_id: string;
   readonly p_parent_id: string;
@@ -66,9 +77,25 @@ export type FakeSchemaPort = {
   rows(table: string): ReadonlyArray<Readonly<Row>>;
 };
 
+/**
+ * What the two `child_invites` definers read as `auth.uid()`. They refuse a null one outright, so the double
+ * carries a session the way the real call does — a store that sent them at service scope would be refused by
+ * Postgres and must be refused here too, or the claim would be about nothing.
+ */
+export type FakeSession = {
+  /** `auth.uid()` for a `{ scope: "session" }` call; `null` stands for a service-role call. */
+  readonly userId?: string;
+  /** a clock for the columns the definers stamp (`revoked_at`) */
+  readonly now?: () => string;
+};
+
 export function fakeSchemaPort(
   seed: Readonly<Record<string, ReadonlyArray<Row>>> = {},
+  session: FakeSession = {},
 ): FakeSchemaPort {
+  const sessionUserId =
+    session.userId ?? "5e551011-0000-4000-8000-00000000fe01";
+  const now = session.now ?? (() => "2026-09-17T09:00:00.000Z");
   const tables = new Map<string, Row[]>(
     Object.entries(seed).map(([name, rows]) => [
       name,
@@ -77,6 +104,8 @@ export function fakeSchemaPort(
   );
   const calls: FakeSchemaPort["calls"][number][] = [];
   const rpcs: FakeSchemaPort["rpcs"][number][] = [];
+  /** the scope of the operation currently running — what the definers read as `auth.uid()` or refuse on */
+  let scope: DataScope = "session";
   const of = (table: string): Row[] => {
     const held = tables.get(table);
     if (held !== undefined) return held;
@@ -118,15 +147,74 @@ export function fakeSchemaPort(
           };
         },
       }) as unknown as QueryHandle<AppDatabase, N>,
-    // `0019`'s `upsert_position()`, stood in so the round-trip claims above stay claims about state rather
-    // than about a call that returned `undefined`. It is a **stand-in, not a second implementation**: its
-    // fidelity to the real function is proven by `int.rpc-0019` against the applied migration, never here.
-    // Every other RPC is recorded and answers nothing, exactly as before.
+    // `0019`'s definers, stood in so the round-trip claims stay claims about state rather than about a call
+    // that returned `undefined`. They are **stand-ins, not second implementations**: their fidelity to the
+    // real functions is proven by `int.rpc-0019` against the applied migration, never here. Every other RPC
+    // is recorded and answers nothing, exactly as before.
     rpc: async (name, args) => {
       rpcs.push({ name, args });
-      if (name !== "upsert_position") return undefined as never;
-      return upsertPosition(args as unknown as UpsertPositionArgs) as never;
+      if (name === "upsert_position")
+        return upsertPosition(args as unknown as UpsertPositionArgs) as never;
+      if (name === "create_child_invite")
+        return createChildInvite(
+          args as unknown as CreateChildInviteArgs,
+        ) as never;
+      if (name === "revoke_child_invite")
+        return revokeChildInvite(
+          args as unknown as RevokeChildInviteArgs,
+        ) as never;
+      return undefined as never;
     },
+  };
+
+  /**
+   * `create_child_invite()`: `auth.uid()` or nothing, idempotent on the one pending invite per
+   * (child, direction), and the creator stamped from the session rather than taken from the caller.
+   */
+  const createChildInvite = (args: CreateChildInviteArgs): string => {
+    const actor = actorOrRefuse();
+    const rows = of("child_invites");
+    const pending = rows.find(
+      (row) =>
+        row["child_id"] === args.p_child_id &&
+        row["direction"] === args.p_direction &&
+        row["status"] === "pending",
+    );
+    if (pending !== undefined) return pending["id"] as string;
+    const id = `1de17e00-0000-4000-8000-${String(rows.length + 1).padStart(12, "0")}`;
+    rows.push({
+      id,
+      child_id: args.p_child_id,
+      token: args.p_token,
+      direction: args.p_direction,
+      status: "pending",
+      created_by_user_id: actor,
+      created_at: now(),
+      revoked_at: null,
+      revoked_reason: null,
+    });
+    return id;
+  };
+
+  /** `revoke_child_invite()`: terminal rows are returned unchanged, never re-revoked. */
+  const revokeChildInvite = (args: RevokeChildInviteArgs): boolean => {
+    actorOrRefuse();
+    const held = of("child_invites").find(
+      (row) => row["id"] === args.p_invite_id,
+    );
+    if (held === undefined) throw new Error("INVITE_NOT_FOUND");
+    if (held["status"] !== "pending") return false;
+    Object.assign(held, {
+      status: "revoked",
+      revoked_at: now(),
+      revoked_reason: args.p_reason,
+    });
+    return true;
+  };
+
+  const actorOrRefuse = (): string => {
+    if (scope !== "session") throw new Error("INVITE_NO_SESSION");
+    return sessionUserId;
   };
 
   const upsertPosition = (args: UpsertPositionArgs): number => {
@@ -172,9 +260,10 @@ export function fakeSchemaPort(
 
   const port: DataAccessPort = {
     run: async (op, opts) => {
+      scope = opts?.scope ?? "session";
       calls.push({
         name: op.name,
-        scope: opts?.scope ?? "session",
+        scope,
         uow: opts?.uow,
       });
       try {

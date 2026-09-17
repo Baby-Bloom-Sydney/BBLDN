@@ -15,6 +15,7 @@ import type {
 } from "@/modules/shared-types";
 import type { PurchaseEvent, PurchaseProvider } from "@/modules/purchase-paths";
 import { createPayments } from "../lib/create-payments";
+import { blankSpineRow } from "../lib/blank-spine-row";
 import { memorySpineStore } from "../lib/memory-spine-store";
 import { mintLinkRef } from "../lib/mint-link-ref";
 
@@ -190,5 +191,153 @@ describe("07 §8 row 13 — no rate limit on this path, by design", () => {
     // A limiter here would drop events a provider then stops retrying — which on a money spine loses a payment.
     expect(route).not.toMatch(/rateLimiter|consume/u);
     expect(route).toContain("07 §8 row 13");
+  });
+});
+
+// --------------------------------------------------------------------------- 0019: the fold
+
+describe("ADR-127 — the ledger row, the spine and the stamp are one transaction (0019)", () => {
+  const ref = mintLinkRef(FAMILY, "checkout");
+  const paid: PurchaseEvent = {
+    kind: "purchase.completed",
+    eventId: "evt-fold",
+    ref,
+    linkKind: "checkout",
+    preset: "self-serve-app",
+    shape: { kind: "upfront" },
+    paid: money(PRICES.selfServeAppUpfrontPence),
+    at: NOW,
+  };
+
+  /** A store that records the order the spine asked for things, so "one write" is observable. */
+  const recording = (rows: Parameters<typeof memorySpineStore>[0] = {}) => {
+    const inner = memorySpineStore({ now: () => NOW, ...rows });
+    const order: string[] = [];
+    const store = {
+      ...inner,
+      applyEvent: async (delivery: Parameters<typeof inner.applyEvent>[0]) => {
+        order.push("applyEvent");
+        return inner.applyEvent(delivery);
+      },
+      updateSpine: async (
+        id: Parameters<typeof inner.updateSpine>[0],
+        patch: Parameters<typeof inner.updateSpine>[1],
+      ) => {
+        order.push("updateSpine");
+        return inner.updateSpine(id, patch);
+      },
+      setAccessWindow: async (
+        familyId: Parameters<typeof inner.setAccessWindow>[0],
+        years: Parameters<typeof inner.setAccessWindow>[1],
+      ) => {
+        order.push("setAccessWindow");
+        return inner.setAccessWindow(familyId, years);
+      },
+      stampEvent: async (
+        id: Parameters<typeof inner.stampEvent>[0],
+        patch: Parameters<typeof inner.stampEvent>[1],
+      ) => {
+        order.push("stampEvent");
+        return inner.stampEvent(id, patch);
+      },
+    };
+    return { inner, store, order };
+  };
+
+  const pathOver = (store: unknown, event: PurchaseEvent) => {
+    const { provider } = fakeProvider(() => event);
+    return createPayments({
+      store: store as never,
+      provider,
+      comms: { send: async () => ({ ok: true, value: "m" as never }) },
+      events: { emit: async () => ({ ok: true, value: { id: "e" as never } }) },
+      now: () => NOW,
+      paymentsEnabled: () => true,
+      newTrialsEnabled: () => true,
+      appUrl: "https://app",
+    });
+  };
+
+  it("a paid delivery is ONE store write — no spine update and no stamp beside it", async () => {
+    const { inner, store, order } = recording();
+    await inner.insertSpine({
+      parent_user_id: FAMILY as string,
+      status: "lapsed",
+    });
+    const out = await pathOver(store, paid).handleWebhook(raw(paid));
+
+    expect(out.ok && out.value.handled).toBe("handled");
+    expect(order).toEqual(["applyEvent"]);
+    expect(inner.rows()[0]?.status).toBe("paid_in_full");
+    // and the ledger row is stamped by the same transaction, not by a second statement
+    expect(inner.events()[0]?.processed_at).toBe(NOW);
+    expect(inner.events()[0]?.parent_user_id).toBe(FAMILY);
+  });
+
+  it("carries the access window the transaction opened into the AccessChange it returns (ADR-083 / 084)", async () => {
+    // The old spine read `after` off the row `updateSpine` returned, which predates `set_access_window` — so
+    // a paid delivery answered with the window it had BEFORE the purchase moved it. The function returns
+    // that instant, and the fold merges it.
+    const { inner, store } = recording({
+      childrenDob: { [FAMILY]: ["2025-01-15"] },
+    });
+    await inner.insertSpine({
+      parent_user_id: FAMILY as string,
+      status: "lapsed",
+    });
+    const out = await pathOver(store, paid).handleWebhook(raw(paid));
+
+    const opened = new Date(
+      Date.UTC(2025 + PRICES.accessAgeYears, 0, 15),
+    ).toISOString();
+    expect(inner.rows()[0]?.access_until).toBe(opened);
+    // the half that was wrong before the fold: the answer the caller gets carries it too
+    expect(
+      out.ok && out.value.after.state === "paid-in-full"
+        ? out.value.after.accessUntil
+        : "not paid-in-full",
+    ).toBe(opened);
+  });
+
+  it("a spine row that vanishes between the read and the write is refused, never invented — I-M1", async () => {
+    // The only way `apply_payment_event`'s `E_SPINE_MISSING` is reachable from this spine: `resolveFamily`
+    // reads the row first, so the row can only be gone if something deleted it in between. The function
+    // stamps the ledger row `E_SPINE_MISSING` and answers `unresolved`; the webhook refuses rather than
+    // reporting a transition that did not happen, and the provider retries.
+    const { store, inner } = recording();
+    const phantom = {
+      ...blankSpineRow(FAMILY, NOW),
+      id: "99999999-9999-4999-8999-999999999999",
+      status: "lapsed" as const,
+    };
+    const racing = {
+      ...store,
+      readByFamily: async () => ({ ok: true as const, value: phantom }),
+    };
+    const out = await pathOver(racing, paid).handleWebhook(raw(paid));
+
+    expect(out.ok).toBe(false);
+    expect(inner.events()).toHaveLength(1);
+    expect(inner.events()[0]?.processed_at).toBeNull();
+    expect(inner.events()[0]?.processing_error).toBe("E_SPINE_MISSING");
+  });
+
+  it("an event type we do not handle is recorded and stamped — the one path that is still two statements", async () => {
+    // `apply_payment_event` has no "seen, nothing to do" outcome: a null family is `unresolved` there, which
+    // would leave a payout notification on the `processed_at IS NULL` index for ever. There is no money in
+    // this path to be atomic with, and the second statement is stated in `webhook-method.ts` rather than hidden.
+    const { store, inner, order } = recording();
+    const ignoredEvent: PurchaseEvent = {
+      kind: "ignored",
+      eventId: "evt-payout-2",
+      providerType: "payout.paid",
+    };
+    await pathOver(store, ignoredEvent).handleWebhook(
+      raw({ t: "payout.paid" }),
+    );
+
+    expect(order).toEqual(["applyEvent", "stampEvent"]);
+    expect(inner.events()[0]?.processed_at).toBe(NOW);
+    expect(inner.events()[0]?.processing_error).toBeNull();
   });
 });

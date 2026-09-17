@@ -10,13 +10,9 @@
 //
 // **Scope, per operation.** Parent-facing reads run `session` so RLS bounds them to the caller's own row; the
 // webhook, the sweeps and the three RPCs run `service` — the caller is the provider or a cron, not a session.
-import type { DataAccessPort } from "@/modules/auth";
-import { ok } from "@/modules/platform";
-import type { Email, FamilyId, Instant, Uuid } from "@/modules/shared-types";
-import { isDuplicateKeyError } from "./is-duplicate-key-error";
-import type { SpineRow, SpineStore } from "./spine-store";
-
-const EVENT_UNIQUE = "payment_events_provider_event_key";
+import type { AppDatabase, DataAccessPort } from "@/modules/auth";
+import type { Email, Instant, Uuid } from "@/modules/shared-types";
+import type { ApplyEventOutcome, SpineStore } from "./spine-store";
 
 function reads(
   port: DataAccessPort,
@@ -91,7 +87,7 @@ function writes(
   port: DataAccessPort,
 ): Pick<
   SpineStore,
-  "insertSpine" | "updateSpine" | "insertEvent" | "stampEvent"
+  "insertSpine" | "updateSpine" | "applyEvent" | "stampEvent"
 > {
   return {
     insertSpine: (row) =>
@@ -110,20 +106,47 @@ function writes(
         },
         { scope: "service" },
       ),
-    insertEvent: async (row) => {
-      const inserted = await port.run(
+    // **The webhook's three writes, made one (`0019`; ADR-127).** `1h` shipped them as a ledger `insert`, a
+    // spine `update` and a `processed_at` `update` — three implicit transactions under PostgREST, so a crash
+    // between them left money applied against a delivery that was never stamped, or a stamped delivery whose
+    // money never landed. `apply_payment_event` is the same three statements inside one transaction: a failure
+    // rolls the ledger row back with the money and the provider retries, and the `unresolved` outcome commits
+    // the ledger row with its `processing_error` and no spine write — exactly the row the runbook reconciles.
+    //
+    // Every argument is decided above this seam. The function's own refusals are not exceptions but outcomes,
+    // so nothing here has to translate an error code.
+    applyEvent: (delivery) =>
+      port.run(
         {
-          name: "payments.insertEvent",
+          name: "payments.applyEvent",
           exec: async (q) =>
-            (await q.from("payment_events").insert(row)).id as Uuid,
+            outcomeOf(
+              await q.rpc("apply_payment_event", {
+                p_provider: delivery.provider,
+                p_provider_event_id: delivery.providerEventId,
+                p_event_type: delivery.eventType,
+                p_payload: delivery.payload as ApplyArgs["p_payload"],
+                p_received_at: delivery.receivedAt,
+                // `0019` gives the last three `default null`, and an omitted argument IS that null — the
+                // same seam `upsert_placement`'s `p_connection_id` uses. Sending an explicit null would be
+                // the same answer; omitting keeps the generated `Args` type honest about which are optional.
+                ...(delivery.familyId == null
+                  ? {}
+                  : { p_parent_user_id: delivery.familyId as string }),
+                ...(delivery.spinePatch == null
+                  ? {}
+                  : {
+                      p_spine_patch:
+                        delivery.spinePatch as ApplyArgs["p_spine_patch"],
+                    }),
+                ...(delivery.accessAgeYears == null
+                  ? {}
+                  : { p_access_age_years: delivery.accessAgeYears }),
+              }),
+            ),
         },
         { scope: "service" },
-      );
-      if (inserted.ok) return ok({ kind: "inserted", id: inserted.value });
-      if (isDuplicateKeyError(inserted.error, EVENT_UNIQUE))
-        return ok({ kind: "duplicate" });
-      return inserted;
-    },
+      ),
     stampEvent: (id, patch) =>
       port.run(
         {
@@ -134,6 +157,33 @@ function writes(
         },
         { scope: "service" },
       ),
+  };
+}
+
+/** `0019`'s generated argument shape, so the two `jsonb` seams are typed by the migration itself. */
+type ApplyArgs = AppDatabase["Functions"]["apply_payment_event"]["Args"];
+
+/**
+ * `apply_payment_event`'s `jsonb` answer, read as the outcome the spine turns on. An answer the driver cannot
+ * give (a double that records the call, a function that returned null) is `unresolved` with no id rather than
+ * a crash: the ledger row's fate is the database's to state, and "we do not know" is not "applied".
+ */
+function outcomeOf(answer: unknown): ApplyEventOutcome {
+  const held = (answer ?? {}) as {
+    readonly outcome?: string;
+    readonly event_id?: string | null;
+    readonly access_until?: string | null;
+  };
+  if (held.outcome === "duplicate") return { outcome: "duplicate" };
+  if (held.outcome === "applied" && held.event_id != null)
+    return {
+      outcome: "applied",
+      eventId: held.event_id as Uuid,
+      accessUntil: (held.access_until ?? null) as Instant | null,
+    };
+  return {
+    outcome: "unresolved",
+    eventId: (held.event_id ?? null) as Uuid | null,
   };
 }
 

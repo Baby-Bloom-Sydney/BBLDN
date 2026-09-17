@@ -513,3 +513,53 @@ describe("the fail-closed default (ADR-135)", () => {
     expect(added.ok).toBe(true);
   });
 });
+
+// --------------------------------------------------------------------------- 0019's refusals, carried
+
+describe("a definer's named refusal reaches the caller as its own coded error (0019 §5)", () => {
+  // `create_child_invite` and `revoke_child_invite` raise `INVITE_NOT_YOURS` when `mayMint` / `mayRevoke`
+  // fails in SQL — the second gate that survives a caller which forgets the first. The port turns any driver
+  // throw into a generic `INTERNAL` whose message is deliberately blank of provider text (01 §4a), and
+  // carries the throw as `cause`; the names therefore have to be read off the cause, not the message. Before
+  // this unit `carryLinkStoreError` read only the message, so every named refusal — including
+  // `connect_child_invite`'s five, which `1i` wrote the map for — collapsed to `E_STORE`.
+  const refusingStore = (named: string) =>
+    ({
+      ...memoryChildLinkingStore({
+        children: [childRow({ id: CHILD, parent: PARENT })],
+      }),
+      insertInvite: async () => ({
+        ok: false as const,
+        error: {
+          code: "INTERNAL" as const,
+          message: "Something went wrong on our side. Please try again.",
+          cause: new Error(`${named}: raised by the definer`),
+        },
+      }),
+      invitesForChild: async () => ({ ok: true as const, value: [] }),
+    }) as never;
+
+  const inviteWith = (named: string) =>
+    createChildLinking({
+      store: refusingStore(named),
+      events: { emit: async () => ({ ok: true, value: undefined }) } as never,
+      now: () => NOW,
+      inviteBaseUrl: "https://example.test/invite",
+    }).createInvite(CHILD as ChildId, "parent_to_nanny", parentActor);
+
+  it("INVITE_NOT_YOURS is E_INVITE_NOT_YOURS, not E_STORE", async () => {
+    const refused = await inviteWith("INVITE_NOT_YOURS");
+    expect(refused.ok).toBe(false);
+    expect(!refused.ok && refused.error.details?.reason).toBe(
+      "E_INVITE_NOT_YOURS",
+    );
+  });
+
+  it("a refusal 0019 raises that this contract has no code for stays E_STORE", async () => {
+    // `INVITE_NO_SESSION`, `INVITE_TOKEN_MALFORMED` and `INVITE_MINT_RACE` have no `ChildLinkingErrorReason`
+    // of their own, and none is invented here: each is a bug in the caller (a service-scope call, a token the
+    // module minted wrongly, a mint racing its own revoke), not a sentence a parent should read.
+    const refused = await inviteWith("INVITE_NO_SESSION");
+    expect(!refused.ok && refused.error.details?.reason).toBe("E_STORE");
+  });
+});

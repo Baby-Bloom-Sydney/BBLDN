@@ -41,8 +41,30 @@ const NAMED: ReadonlyArray<readonly [string, ChildLinkingErrorReason, string]> =
     ["INVITE_INCOMPLETE", "E_INVITE_NOT_FOUND", "That link is no longer open."],
   ] as const);
 
-export function carryLinkStoreError(error: { readonly message?: string }) {
-  const message = error.message ?? "";
+type StoreFailure = {
+  readonly message?: string;
+  readonly cause?: unknown;
+};
+
+/**
+ * Where a raised name actually **is**. `DataAccessPort.run` turns a driver throw into `fromThrown`, whose
+ * message is the one generic INTERNAL sentence 01 §4a mandates and whose `cause` is the throw itself — so
+ * matching the message alone matched nothing and every named refusal collapsed to `E_STORE`, including
+ * `connect_child_invite`'s five that the map above was written for. `cause` is server-side only
+ * (`toClientError` strips it), so reading it here carries no provider text towards a browser.
+ */
+const textOf = (error: StoreFailure): string => {
+  const raised =
+    error.cause instanceof Error
+      ? error.cause.message
+      : typeof error.cause === "string"
+        ? error.cause
+        : "";
+  return `${error.message ?? ""} ${raised}`;
+};
+
+export function carryLinkStoreError(error: StoreFailure) {
+  const message = textOf(error);
   for (const [name, reason, sentence] of NAMED)
     if (new RegExp(`\\b${name}\\b`).test(message))
       return failChildLinking(reason, sentence);

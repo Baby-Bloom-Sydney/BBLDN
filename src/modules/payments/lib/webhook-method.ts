@@ -7,9 +7,15 @@
 //      recomputed on a paid transition (ADR-083 / 084); events emitted post-write; `app-ready` sent once.
 //   5. The ledger row is stamped `processed_at` — or `processing_error` and the call fails, so the provider retries.
 //
-// There is no unit of work here, and that is stated rather than hidden: ADR-127 makes one RPC one transaction,
-// and this spine is a table insert + a table update. The ledger's `processed_at IS NULL` index (0010 §2) is what
-// the runbook reconciles from when a write lands between the two.
+// **Steps 2, 4 and 5 are ONE statement: `apply_payment_event` (`0019`; ADR-127).** `1h` wrote this spine as a
+// ledger insert, a spine update and a stamp — three implicit PostgREST transactions — and recorded the gap:
+// "making it atomic means a new SECURITY DEFINER function and therefore a migration, which this unit may not
+// write." `0019` is that function, and this file now calls it. The consequence is a reordering: the family is
+// resolved **before** the ledger row exists, because the function is handed a decided patch. 03 §5.4.3's
+// "insert before dispatch" survives it intact — the insert is the first statement inside the transaction that
+// dispatches — and "transition atomically" is true for the first time. The ledger's `processed_at IS NULL`
+// index (0010 §2) still earns its place: the `unresolved` outcome commits the row with its `processing_error`
+// and no spine write, which is exactly what the runbook reconciles from.
 import { PRICES } from "@/modules/config";
 import { log, ok } from "@/modules/platform";
 import type { PurchaseEvent } from "@/modules/purchase-paths";
@@ -19,7 +25,6 @@ import type {
   Instant,
   Json,
   Result,
-  Uuid,
 } from "@/modules/shared-types";
 import type { AccessChange, AccessState, PurchasePath } from "../types";
 import { accessStateFromRow } from "./access-state-from-row";
@@ -30,7 +35,15 @@ import { emitMoneyEvents } from "./emit-money-events";
 import { fail } from "./fail";
 import { parseLinkRef } from "./parse-link-ref";
 import { sendAppReady } from "./send-app-ready";
-import type { SpineRow } from "./spine-store";
+import type { PaymentDelivery, SpineRow } from "./spine-store";
+
+/** The delivery as it arrived: everything `apply_payment_event` needs before a family is known. */
+type RawDelivery = Required<
+  Pick<
+    PaymentDelivery,
+    "provider" | "providerEventId" | "eventType" | "payload" | "receivedAt"
+  >
+>;
 
 const NONE: AccessState = Object.freeze({ state: "none" });
 const UNRESOLVED_FAMILY = "" as FamilyId;
@@ -68,19 +81,47 @@ async function applyTransition(
   deps: PaymentsDeps,
   row: SpineRow,
   event: MoneyEvent,
+  raw: RawDelivery,
   now: Instant,
 ): Promise<Result<AccessChange>> {
   const familyId = row.parent_user_id as FamilyId;
   const before = accessStateFromRow(row, now);
   const transition = dispatchPurchaseEvent(row, event, now);
+  // **One RPC, one transaction (ADR-127).** The ledger insert, the spine update, the access-window recompute
+  // and the `processed_at` stamp are `apply_payment_event`'s (`0019`), so a failure rolls all four back and
+  // the provider retries a delivery that was neither applied nor half-applied. An `ignored` transition still
+  // goes through it — the ledger row is what 03 §5.4.3 wants written whether or not the money moves — and
+  // carries no patch, which is how the function is told to stamp and write nothing else.
+  const applied = await deps.store.applyEvent({
+    ...raw,
+    familyId,
+    ...(transition.handled === "ignored"
+      ? {}
+      : {
+          spinePatch: transition.patch,
+          accessAgeYears: PRICES.accessAgeYears,
+        }),
+  });
+  if (!applied.ok) return applied;
+  if (applied.value.outcome === "duplicate")
+    return ok({ ...ignored(familyId, before), handled: "skipped-duplicate" });
+  if (applied.value.outcome === "unresolved")
+    return fail(
+      "E_EVENT_UNRESOLVED",
+      "The spine row this delivery belongs to is gone",
+      deps.provider.name,
+    );
   if (transition.handled === "ignored") return ok(ignored(familyId, before));
-  const written = await deps.store.updateSpine(
-    row.id as Uuid,
-    transition.patch,
-  );
-  if (!written.ok) return written;
-  if (transition.patch.status !== undefined)
-    await deps.store.setAccessWindow(familyId, PRICES.accessAgeYears);
+  // What the transaction wrote, without a second round trip to read it back: the patch is the columns
+  // `0019` assigns by name, and `access_until` is the one column it does NOT take from the patch — the
+  // function returns `set_access_window`'s answer instead, which is why it is merged separately here.
+  const after: SpineRow = {
+    ...row,
+    ...transition.patch,
+    ...(applied.value.accessUntil === null
+      ? {}
+      : { access_until: applied.value.accessUntil }),
+  };
   const events = await emitMoneyEvents(deps.events, {
     names: transition.events,
     familyId,
@@ -106,7 +147,7 @@ async function applyTransition(
     Object.freeze({
       familyId,
       before,
-      after: accessStateFromRow(written.value, now),
+      after: accessStateFromRow(after, now),
       events: events as ReadonlyArray<EventName>,
       handled: "handled" as const,
     }),
@@ -118,17 +159,27 @@ const purchasePath = (event: MoneyEvent): "payment-link" | "self-serve" =>
     ? "self-serve"
     : "payment-link";
 
-async function stamp(
+/**
+ * A delivery that needed nothing: an event type we do not handle, or a `LinkRef` we never minted. The ledger
+ * row is written (03 §5.4.3 — the record is the point) and then stamped `processed_at`, because
+ * `apply_payment_event` has no way to say "seen, and nothing to do": a null family is `unresolved` there,
+ * which stamps `processing_error` and leaves the row on the runbook's `processed_at IS NULL` index for ever.
+ * **Two statements, and the only path in this file that is not one transaction — there is no money in it to
+ * be atomic with.** Recorded rather than hidden; closing it needs a fourth outcome in `0019`.
+ */
+async function recordWithNothingToDo(
   deps: PaymentsDeps,
-  ledgerId: Uuid,
-  familyId: FamilyId | null,
-  outcome: Result<AccessChange>,
+  raw: RawDelivery,
   now: Instant,
 ): Promise<void> {
-  const patch = outcome.ok
-    ? { processed_at: now, parent_user_id: familyId }
-    : { processing_error: outcome.error.code, parent_user_id: familyId };
-  const stamped = await deps.store.stampEvent(ledgerId, patch);
+  const applied = await deps.store.applyEvent(raw);
+  if (!applied.ok || applied.value.outcome !== "unresolved") return;
+  const eventId = applied.value.eventId;
+  if (eventId === null) return;
+  const stamped = await deps.store.stampEvent(eventId, {
+    processed_at: now,
+    processing_error: null,
+  });
   if (!stamped.ok)
     log.error("payment event ledger not stamped", {
       module: "payments",
@@ -152,29 +203,23 @@ export function webhookMethod(
         );
       const event = parsed.value;
       const now = deps.now();
-      const ledger = await deps.store.insertEvent({
+      const delivery: RawDelivery = {
         provider: deps.provider.name,
-        provider_event_id: event.eventId,
-        event_type: event.kind,
+        providerEventId: event.eventId,
+        eventType: event.kind,
         payload: JSON.parse(raw.rawBody) as Json,
-        received_at: raw.receivedAt,
-      });
-      if (!ledger.ok) return carryStoreError(ledger.error);
-      if (ledger.value.kind === "duplicate")
-        return ok({
-          ...ignored(UNRESOLVED_FAMILY, NONE),
-          handled: "skipped-duplicate" as const,
-        });
+        receivedAt: raw.receivedAt,
+      };
+      // An event type we do not handle needs no family and no transition, so it never reaches the fold.
       if (event.kind === "ignored") {
-        await stamp(
-          deps,
-          ledger.value.id,
-          null,
-          ok(ignored(UNRESOLVED_FAMILY, NONE)),
-          now,
-        );
+        await recordWithNothingToDo(deps, delivery, now);
         return ok(ignored(UNRESOLVED_FAMILY, NONE));
       }
+      // **The family is resolved BEFORE the ledger row exists, and that is the reordering ADR-127 forces.**
+      // 03 §5.4.3's "insert before dispatch" is honoured more strictly than it was, not less: the insert is
+      // now the first statement *inside the transaction that dispatches*. Resolution is a read — it decides
+      // nothing and writes nothing — so a replay that reaches it costs one keyed read and is then answered
+      // `duplicate` by the function without touching money.
       const row = await resolveFamily(deps, event);
       if (row.ok && row.value === null) {
         log.warn("payment event unresolved: no link we minted", {
@@ -182,28 +227,14 @@ export function webhookMethod(
           action: "webhook",
           provider: deps.provider.name,
         });
-        await stamp(
-          deps,
-          ledger.value.id,
-          null,
-          ok(ignored(UNRESOLVED_FAMILY, NONE)),
-          now,
-        );
+        await recordWithNothingToDo(deps, delivery, now);
         return ok(ignored(UNRESOLVED_FAMILY, NONE));
       }
-      if (!row.ok) {
-        await stamp(deps, ledger.value.id, null, row, now);
-        return carryStoreError(row.error);
-      }
+      // The spine could not be read at all: nothing is recorded, because recording a delivery we have not
+      // decided would stamp it as seen. A 5xx is the provider's cue to send it again.
+      if (!row.ok) return carryStoreError(row.error);
       const found = row.value as SpineRow;
-      const outcome = await applyTransition(deps, found, event, now);
-      await stamp(
-        deps,
-        ledger.value.id,
-        found.parent_user_id as FamilyId,
-        outcome,
-        now,
-      );
+      const outcome = await applyTransition(deps, found, event, delivery, now);
       return outcome.ok ? outcome : carryStoreError(outcome.error);
     },
   };
