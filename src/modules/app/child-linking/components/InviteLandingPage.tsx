@@ -5,6 +5,7 @@
 // The page is `noindex` and `no-referrer` (set on the route's `metadata`): a token in a `Referer` header is a
 // token in somebody else's server log, and 07 §8 row 7's whole defence is that tokens do not travel.
 import Link from "next/link";
+import { BRAND } from "@/modules/config";
 import type { InviteLandingView } from "../lib/invite-landing-view";
 import { ClaimInviteForm } from "./ClaimInviteForm";
 
@@ -17,7 +18,7 @@ export function InviteLandingPage({ view, token }: InviteLandingPageProps) {
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-lg flex-col justify-center px-4 py-12">
       <p className="text-xs font-semibold uppercase [letter-spacing:0.14em] text-violet-700">
-        Baby Bloom
+        {BRAND.name}
       </p>
       <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
         {view.heading}

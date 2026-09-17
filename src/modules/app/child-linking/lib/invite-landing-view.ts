@@ -7,10 +7,11 @@
 // tell a stranger "this one was claimed" and "this one never existed" apart, a script could walk the token
 // space for live families. "That link is no longer open" is what both say, and it is also true.
 //
-// Copy (ADR-124; 00-glossary §6 + P-4). The parent is the hero; BabyBloom is the guide holding the door. There
+// Copy (ADR-124; 00-glossary §6 + P-4). The parent is the hero and we are the guide holding the door. There
 // is no *free*, no *offer*, no *upgrade*, no *information*, no *continue* — the actions say what they do
 // ("Join {child}'s app", "Sign in to join"). The inviter is named because a link from a stranger is a link
 // nobody clicks, and `get_invite_preview` returns a first name and nothing else for exactly that reason.
+import { BRAND } from "@/modules/config";
 import type { InviteDirection, InvitePreview } from "../types";
 
 export type InviteLandingView =
@@ -61,7 +62,9 @@ export type InviteLandingInput = {
   readonly signInHref: string;
 };
 
-const HOME = { label: "Go to Baby Bloom", href: "/" } as const;
+// The brand name is `config`'s, never a literal on a screen (L4) — this page is the one surface a visitor
+// reaches with no header above it, so it is also the only place the name has to be said out loud.
+const HOME = { label: `Go to ${BRAND.name}`, href: "/" } as const;
 
 /** Which role fills which side (02 §3 `invite_direction`): the direction names who is being invited. */
 const wantedRole = (direction: InviteDirection): "parent" | "nanny" =>

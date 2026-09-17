@@ -11,6 +11,7 @@
 //
 // Roles are handed in rather than read, because there is no `user_roles` table in memory and inventing one
 // would be a second source of truth for the thing the RPC actually checks.
+import { BRAND } from "@/modules/config";
 import { err, ok } from "@/modules/platform";
 import type {
   ChildId,
@@ -158,7 +159,9 @@ export function memoryChildLinkingStore(seed: Seed = {}): ChildLinkingStore & {
         child_first_name: child.first_name,
         direction: invite.direction,
         invited_by:
-          names[invite.created_by_user_id ?? ""] ?? "A Baby Bloom member",
+          // `get_invite_preview`'s own fallback for an inviter with no profile name (0012 §9), in config's
+          // words rather than the migration's literal.
+          names[invite.created_by_user_id ?? ""] ?? `A ${BRAND.name} member`,
       });
     },
     pendingInvites: async () => ok([]),
