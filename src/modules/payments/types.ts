@@ -9,6 +9,7 @@ import type {
   Price,
   PricePreset,
 } from "@/modules/purchase-paths";
+import type { MoneyPageView } from "./lib/money-page-view";
 import type {
   Actor,
   AdminId,
@@ -78,6 +79,10 @@ export type AccessStanding =
       readonly nextPaymentAt: Instant | null;
       readonly standing: "good" | "past-due";
       readonly graceUntil?: Instant;
+      /** Set when the schedule was cancelled inside a paid period: access runs to `nextPaymentAt`'s period end,
+       * then lapses `cancelled` (03 §5.4.3 / §5.4.5). Additive to 03 §5.2's shape — S-P-12's "cancelled in period"
+       * state has no other home; recorded for the 03 owner in the L-007 1h entry. */
+      readonly cancelledAt?: Instant;
     }
   | {
       readonly state: "paid-in-full";
@@ -129,6 +134,16 @@ export type PaymentsErrorReason =
   | "E_TEST_USER"
   | "E_DFY_FAMILY"
   | "E_PAYMENT_NOT_DUE"
+  /**
+   * 03 §5.3 names no reason for "the database refused the read or the write". The alternatives were to travel
+   * under a reason that means something else (`E_PROVIDER` says the provider failed; `E_FAMILY_NOT_FOUND` says
+   * the family does not exist) or to widen the details type to `string`. Both are worse on a money path, where
+   * the reason is what the runbook triages on — so the vocabulary gains one member, the same way
+   * `payments-not-configured` is already a module addition to the document's list. Its `ErrorCode` is
+   * `INTERNAL`, so a provider keeps retrying rather than dropping the event. Recorded for the 03 owner in the
+   * L-007 `1h` entry.
+   */
+  | "E_STORE"
   | "payments-not-configured";
 
 export type PaymentsErrorDetails = {
@@ -200,4 +215,41 @@ export interface PurchasePath {
   ): Promise<PaymentsResult<{ readonly url: Url }>>;
   /** The presets, from `config` — never a literal (03 §5.2; 01 §3.2 rule 1). */
   prices(): ReadonlyArray<Price>;
+}
+
+/**
+ * What the three money screens' one server read hands back (04 §6.2 S-P-10 / S-P-11 / S-P-12). `failed` is a
+ * state of its own rather than an empty standing: an outage must never render as "nothing to pay".
+ */
+export type MoneyPageLoad =
+  | { readonly kind: "signed-out" }
+  | { readonly kind: "failed" }
+  | {
+      readonly kind: "standing";
+      readonly familyId: FamilyId;
+      readonly state: AccessState;
+      readonly view: MoneyPageView;
+    };
+
+/** The five scheduled jobs `payments` owns (01 §4f; 02 §4.5 "jobs"); the cron shells call them by name. */
+export type PaymentJobName =
+  | "expire-trials"
+  | "trial-reminders"
+  | "expire-past-due"
+  | "expire-cancelled-subscriptions"
+  | "payment-due-sweep";
+
+/** What one sweep did — the cron run-summary line reads it (01 §4f). */
+export type PaymentJobRun = {
+  readonly job: PaymentJobName;
+  readonly handled: number;
+  readonly skipped: number;
+};
+
+/** The jobs binding beside `payments` (same inside, same store); fails closed until boot configures it. */
+export interface PaymentsJobs {
+  run(
+    job: PaymentJobName,
+    now: Instant,
+  ): Promise<PaymentsResult<PaymentJobRun>>;
 }

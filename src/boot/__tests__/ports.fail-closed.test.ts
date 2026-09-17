@@ -21,6 +21,8 @@ import { scheduling } from "@/modules/scheduling";
 import { scoring } from "@/modules/scoring";
 import type {
   Email,
+  FamilyId,
+  Instant,
   ParentId,
   PositionId,
   UnitOfWork,
@@ -31,6 +33,8 @@ const FOREIGN = {} as UnitOfWork;
 const DISTRICT = Object.freeze({ area: "Lambeth", district: "SW4" });
 const POSITION = "0f1e2d3c-0000-4000-8000-000000000001" as PositionId;
 const PARENT = "0a1b2c3d-0000-4000-8000-000000000011" as UserId;
+const FAMILY = "0a1b2c3d-0000-4000-8000-000000000031" as FamilyId;
+const NOW_INSTANT = "2026-09-17T09:00:00.000Z" as Instant;
 // The `ParentId` / `UserId` seam `1e` recorded: `findLive` is keyed by `ParentId` (03 §2.5 `JourneyOwner`) and
 // a session carries a `UserId`. The same id, two brands — spelled out here rather than cast at the call site.
 const PARENT_OWNER = PARENT as unknown as ParentId;
@@ -155,5 +159,42 @@ describe("every port fails closed until src/instrumentation.ts wires it", () => 
       uow: FOREIGN,
     });
     expect(reasonOf(moved)).toBe("E_SLICE_NOT_REGISTERED");
+  });
+
+  // `1h`. Money is the one place a defaulted answer is worse in **both** directions: a defaulted "no access"
+  // locks a paying family out of the product she paid for, and a defaulted "access" opens it to anyone. So
+  // every one of the three ports must refuse by name, and `access-gate` must carry `payments`' refusal rather
+  // than deciding for itself.
+  it("purchase-paths · payments — each answers its own not-configured reason (03 §5.2; 07 §5.5)", async () => {
+    const { purchaseProvider } = await import("@/modules/purchase-paths");
+    const { payments, paymentsJobs } = await import("@/modules/payments");
+    expect(
+      reasonOf(
+        await purchaseProvider.ensureCustomer({
+          id: FAMILY,
+          email: "p@example.test" as Email,
+          name: "Ada",
+        }),
+      ),
+    ).toBe("provider-not-configured");
+    expect(reasonOf(await payments.getAccess(FAMILY))).toBe(
+      "payments-not-configured",
+    );
+    expect(reasonOf(await paymentsJobs.run("expire-trials", NOW_INSTANT))).toBe(
+      "payments-not-configured",
+    );
+  });
+
+  it("payments.getAccess fails closed rather than answering `none` — the gate is never opened by an outage", async () => {
+    const { payments } = await import("@/modules/payments");
+    const state = await payments.getAccess(FAMILY);
+    expect(state.ok).toBe(false);
+  });
+
+  it("access-gate carries payments' refusal and never defaults to a decision (fix: A-3)", async () => {
+    const { accessGate } = await import("@/modules/access-gate");
+    const decision = await accessGate.hasAccess(FAMILY);
+    expect(decision.ok).toBe(false);
+    expect(reasonOf(decision)).toBe("payments-not-configured");
   });
 });

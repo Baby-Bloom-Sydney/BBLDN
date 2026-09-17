@@ -17,7 +17,9 @@ export type BootPort =
   | "positions"
   | "connections"
   | "placements"
-  | "parent-profile";
+  | "parent-profile"
+  | "purchase-paths"
+  | "payments";
 
 export type PortWiring = {
   readonly port: BootPort;

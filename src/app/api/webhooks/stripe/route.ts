@@ -7,6 +7,13 @@
 // called, and an unverified event is `E_EVENT_UNVERIFIED` → 400, never retried. A throwing handler returns 500
 // so the provider retries; an event whose `LinkRef` we never minted is `ignored` with a 200.
 //
+// **No rate limit, and that is the document's ruling, not an omission.** 07 §8 row 13: "Webhooks
+// (`/api/webhooks/stripe`) and crons — no rate limit (provider retries by design); signature + idempotency are
+// the control; edge rule blocks non-Stripe IP ranges for the webhook path if Vercel supports the list." A
+// limiter on this path would drop events a provider then stops retrying, which on a money spine loses a
+// payment. ADR-134's "every money route refuses on a limiter outage" governs routes that *have* a limit row;
+// this one has none. Pinned in `payments.webhook.test.ts` so the absence stays deliberate.
+//
 // This replaces the Sydney webhook, which handled Stripe's own event types directly against `parent_subscriptions`
 // and a `stripe_webhook_events` table — neither exists in the London data model (ADR-006, fresh).
 import { payments } from "@/modules/payments";

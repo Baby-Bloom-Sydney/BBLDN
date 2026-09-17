@@ -72,6 +72,17 @@ export const SECURITY = Object.freeze({
     }),
     nannyApplications: rateLimit({ key: "user", perDay: 10, note: "row 12" }),
     adminRoutes: rateLimit({ key: "admin", perMinute: 600, note: "row 14" }),
+    // 07 §8 has **no row** for a signed-in parent creating a checkout or a portal session, and `1h` needed one:
+    // both server actions call out to the purchase provider, so a parent in a tight loop is unbounded provider
+    // cost against a real account. Row 13's "no rate limit" is scoped to provider-retried, signature-verified
+    // paths (webhooks and crons) and does not reach these. Keyed on the family, because that is who is charged.
+    // Owner: 07 §8 — a row 16 to ratify the numbers (`security-reviewer`, `1h` MEDIUM-1).
+    purchaseActions: rateLimit({
+      key: "user",
+      perMinute: 5,
+      perHour: 20,
+      note: "checkout + portal session creation (1h; 07 §8 has no row)",
+    }),
   }),
   authLockoutMinutes: 15, // 07 §8 row 3
   inviteLookupBlock: Object.freeze({ failedPerHour: 5, blockMinutes: 60 }), // 07 §8 row 7
