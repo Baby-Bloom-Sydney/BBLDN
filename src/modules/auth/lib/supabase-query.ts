@@ -3,6 +3,7 @@
 // `INTERNAL` `Result`, so no call site can forget to check (01 §4a rule 1).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  KeyedRead,
   Query,
   TableName,
   TableQuery,
@@ -42,6 +43,44 @@ const unwrapRow = <R>(result: DriverResult): R => {
   return data as R;
 };
 
+/** A keyed `single()` legitimately answers `null` (no such row); two rows are PostgREST's error (`maybeSingle`). */
+const unwrapMaybeRow = <R>(result: DriverResult): R | null => {
+  const data = unwrap<unknown>(result);
+  return data === null || data === undefined ? null : (data as R);
+};
+
+const columnList = (columns: ReadonlyArray<string> | undefined): string =>
+  columns === undefined ? "*" : columns.join(",");
+
+/**
+ * ADR-131 (1): the keyed read is `.select(columns).eq(column, value)`; `single()` adds `.maybeSingle()`, which is
+ * where "a key matched two rows" becomes a thrown driver error rather than an arbitrary first row.
+ */
+function keyedRead<T extends TableName<AppDatabase>>(
+  client: () => Promise<SupabaseClient>,
+  table: T,
+  column: string,
+  value: unknown,
+): KeyedRead<TableRow<AppDatabase, T>> {
+  return {
+    select: async (columns) =>
+      unwrapRows<TableRow<AppDatabase, T>>(
+        await (await client())
+          .from(table)
+          .select(columnList(columns))
+          .eq(column, value),
+      ),
+    single: async () =>
+      unwrapMaybeRow<TableRow<AppDatabase, T>>(
+        await (await client())
+          .from(table)
+          .select("*")
+          .eq(column, value)
+          .maybeSingle(),
+      ),
+  };
+}
+
 export function supabaseQuery(
   client: () => Promise<SupabaseClient>,
 ): Query<AppDatabase> {
@@ -51,9 +90,7 @@ export function supabaseQuery(
     ): TableQuery<AppDatabase, T> => ({
       select: async (columns) =>
         unwrapRows<TableRow<AppDatabase, T>>(
-          await (await client())
-            .from(table)
-            .select(columns === undefined ? "*" : columns.join(",")),
+          await (await client()).from(table).select(columnList(columns)),
         ),
       insert: async (row) =>
         unwrapRow<TableRow<AppDatabase, T>>(
@@ -76,6 +113,7 @@ export function supabaseQuery(
             .select()
             .single(),
         ),
+      eq: (column, value) => keyedRead(client, table, column, value),
     }),
     rpc: async (name, args) =>
       unwrap(await (await client()).rpc(name, args as Record<string, unknown>)),

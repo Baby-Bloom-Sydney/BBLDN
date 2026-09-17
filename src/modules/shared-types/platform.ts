@@ -52,6 +52,24 @@ export type TableRow<
   T extends TableName<DB>,
 > = DB["Tables"][T]["Row"];
 
+/**
+ * ADR-131 (1) — the keyed read: `from(name).eq(column, value)` narrows to the rows where one column equals one
+ * value, then `select()` (the rows) or `single()` (the one row, `null` for none). It is **read-only by
+ * construction** — there is no `insert` / `update` on this handle, so a keyed write is a compile error whatever
+ * name it was reached through (a view's handle stays select-only under ADR-129). `single()` is a *key* read: two
+ * matching rows are a broken invariant and throw at the seam, which the port maps to `INTERNAL`; a caller that
+ * wants "the newest of several" uses `select()` and says so.
+ */
+export interface KeyedRead<Row> {
+  select(
+    columns?: ReadonlyArray<keyof Row & string>,
+  ): Promise<ReadonlyArray<Row>>;
+  single(): Promise<Row | null>;
+}
+
+/** The value a keyed read may be given: the column's own type, never `null` (`IS NULL` is not an equality). */
+export type KeyValue<Row, C extends keyof Row> = Exclude<Row[C], null>;
+
 /** A typed table query handle — the narrow surface `auth`'s port hands a `NamedOperation` (03 §1.4). */
 export interface TableQuery<DB extends DatabaseShape, T extends TableName<DB>> {
   select(
@@ -59,6 +77,11 @@ export interface TableQuery<DB extends DatabaseShape, T extends TableName<DB>> {
   ): Promise<ReadonlyArray<TableRow<DB, T>>>;
   insert(row: DB["Tables"][T]["Insert"]): Promise<TableRow<DB, T>>;
   update(id: Uuid, patch: DB["Tables"][T]["Update"]): Promise<TableRow<DB, T>>;
+  /** ADR-131 (1): one equality predicate on one typed column; the handle it returns is read-only. */
+  eq<C extends keyof TableRow<DB, T> & string>(
+    column: C,
+    value: KeyValue<TableRow<DB, T>, C>,
+  ): KeyedRead<TableRow<DB, T>>;
 }
 
 /**

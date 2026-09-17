@@ -1,6 +1,6 @@
 // The `event-log` store over `auth`'s port (03 §9.5; 02 §4.6): the insert is a named service-role use that
 // writes one `events` row shaped from the envelope, a `{ uow }` passes through to the port, and the two admin
-// read helpers fail closed with their own reason (the Query surface has no predicate — recorded, not hidden).
+// read helpers are keyed (ADR-131 (1) — `db-event-log-store.reads.test.ts`); a keyless query and every count refuse.
 import { describe, expect, it } from "vitest";
 import type { EventEnvelope } from "@/modules/platform";
 import type { UnitOfWork } from "@/modules/shared-types";
@@ -97,20 +97,20 @@ describe("dbEventLogStore.insert", () => {
 });
 
 describe("dbEventLogStore reads", () => {
-  it("fail closed with their own reason rather than scanning the table", async () => {
-    const fake = fakeDataPort({ events: [{ id: "x" }] });
+  it("query with no key refuses with its own reason (the keyed reads are db-event-log-store.reads.test.ts); countByName stays fail-closed", async () => {
+    const fake = fakeDataPort({ events: [] });
     const store = dbEventLogStore(fake.port);
     const page = await store.query({});
-    const counts = await store.countByName({
-      names: ["visit"],
-      from: "2026-01-01T00:00:00.000Z" as never,
-      to: "2026-12-31T00:00:00.000Z" as never,
-    });
     expect(!page.ok && page.error.details?.reason).toBe(
-      "event-log-read-not-available",
+      "event-log-read-requires-key",
     );
+    const counts = await store.countByName({
+      names: ["consent.updated"],
+      from: "2026-09-17T00:00:00.000Z" as never,
+      to: "2026-09-18T00:00:00.000Z" as never,
+    });
     expect(!counts.ok && counts.error.details?.reason).toBe(
-      "event-log-read-not-available",
+      "event-log-count-not-available",
     );
     expect(fake.calls).toEqual([]);
   });

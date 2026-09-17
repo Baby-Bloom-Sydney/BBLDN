@@ -163,19 +163,11 @@ describe("dbConsentStore — legal_documents", () => {
 });
 
 describe("dbConsentStore — the cookie half fails closed", () => {
-  it("refuses insertCookie and currentCookie with their own reason and never reaches the port", async () => {
+  it("insertCookie still refuses with its own reason until the record_cookie_consent RPC lands (0017); currentCookie is live (db-consent-store.cookie.test.ts)", async () => {
     const fake = fakeDataPort();
-    const store = dbConsentStore(fake.port);
-    const inserted = await store.insertCookie({} as never);
-    const current = await store.currentCookie({
-      kind: "visitor",
-      id: "v" as never,
-    });
-    expect(!inserted.ok && inserted.error.details?.reason).toBe(
-      "cookie-consent-not-available",
-    );
-    expect(!current.ok && current.error.details?.reason).toBe(
-      "cookie-consent-not-available",
+    const result = await dbConsentStore(fake.port).insertCookie({} as never);
+    expect(!result.ok && result.error.details?.reason).toBe(
+      "cookie-consent-write-not-available",
     );
     expect(fake.calls).toEqual([]);
   });

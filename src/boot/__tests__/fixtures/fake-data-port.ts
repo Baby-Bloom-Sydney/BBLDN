@@ -25,14 +25,38 @@ export type FakeDataPort = {
     readonly table: string;
     readonly row: Row;
   }>;
-  /** set to make every `run` answer this error without reaching the query */
-  readonly state: { failWith: AppError | undefined };
+  readonly updated: ReadonlyArray<{
+    readonly table: string;
+    readonly id: string;
+    readonly patch: Row;
+  }>;
+  readonly keyedReads: ReadonlyArray<{
+    readonly table: string;
+    readonly column: string;
+    readonly value: unknown;
+  }>;
+  readonly rpcs: ReadonlyArray<{
+    readonly name: string;
+    readonly args: unknown;
+  }>;
+  readonly state: {
+    /** set to make every `run` answer this error without reaching the query */
+    failWith: AppError | undefined;
+    /** what `rpc(name, args)` answers; `undefined` answers `undefined` */
+    rpcAnswer: ((name: string, args: unknown) => unknown) | undefined;
+  };
 };
 
 export function fakeDataPort(seed: FakeTables = {}): FakeDataPort {
   const calls: FakeDataPort["calls"][number][] = [];
   const inserted: FakeDataPort["inserted"][number][] = [];
-  const state: FakeDataPort["state"] = { failWith: undefined };
+  const updated: FakeDataPort["updated"][number][] = [];
+  const keyedReads: FakeDataPort["keyedReads"][number][] = [];
+  const rpcs: FakeDataPort["rpcs"][number][] = [];
+  const state: FakeDataPort["state"] = {
+    failWith: undefined,
+    rpcAnswer: undefined,
+  };
   const asRow = <T extends TableName<AppDatabase>>(row: Row) =>
     row as TableRow<AppDatabase, T>;
 
@@ -43,9 +67,32 @@ export function fakeDataPort(seed: FakeTables = {}): FakeDataPort {
         inserted.push({ table, row });
         return asRow<T>(row);
       },
-      update: async (_id: unknown, patch: Row) => asRow<T>(patch),
+      update: async (id: unknown, patch: Row) => {
+        updated.push({ table, id: String(id), patch });
+        return asRow<T>(patch);
+      },
+      // ADR-131 (1): the keyed read, with the memory driver's two rules (rows · one-or-null, two throw)
+      eq: (column: string, value: unknown) => {
+        const matching = () =>
+          (seed[table] ?? []).filter((row) => row[column] === value);
+        keyedReads.push({ table, column, value });
+        return {
+          select: async () => matching().map(asRow<T>),
+          single: async () => {
+            const rows = matching();
+            if (rows.length > 1)
+              throw new Error(`keyed read matched ${String(rows.length)} rows`);
+            return rows.length === 0 ? null : asRow<T>(rows[0]);
+          },
+        };
+      },
     }),
-    rpc: async () => undefined as never,
+    rpc: async (name, args) => {
+      rpcs.push({ name, args });
+      return (
+        state.rpcAnswer === undefined ? undefined : state.rpcAnswer(name, args)
+      ) as never;
+    },
   };
 
   const port: DataAccessPort = {
@@ -67,5 +114,5 @@ export function fakeDataPort(seed: FakeTables = {}): FakeDataPort {
       err("INTERNAL", "signUrl is not exercised by these specs"),
   };
 
-  return { port, calls, inserted, state };
+  return { port, calls, inserted, updated, keyedReads, rpcs, state };
 }

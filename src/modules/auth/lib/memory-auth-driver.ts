@@ -3,6 +3,7 @@
 // mapping and the password policy stay the module's own, so a stub can never quietly behave differently from the
 // real thing (05 §3 rule 2 — a behaviour the stub cannot honour is a connector defect, not a stub exception).
 import type {
+  KeyedRead,
   Query,
   TableName,
   TableQuery,
@@ -88,6 +89,29 @@ export function memoryAuthDriver(
     row: Readonly<Record<string, unknown>>,
   ): TableRow<AppDatabase, T> => row as TableRow<AppDatabase, T>;
 
+  // ADR-131 (1): the keyed read the real driver answers with `.eq(...)` / `.maybeSingle()`, honoured here with the
+  // same two rules — `select()` is every matching row, `single()` is the one row or `null`, and two matches throw
+  // (a key that is not a key is a broken invariant, and a stub that picked one would let a test pass on it).
+  const keyed = <T extends TableName<AppDatabase>>(
+    table: T,
+    column: string,
+    value: unknown,
+  ): KeyedRead<TableRow<AppDatabase, T>> => {
+    const matching = () =>
+      (tables.get(table) ?? []).filter((row) => row[column] === value);
+    return {
+      select: async () => matching().map(asRow<T>),
+      single: async () => {
+        const rows = matching();
+        if (rows.length > 1)
+          throw new Error(
+            `keyed read on ${table}.${column} matched ${String(rows.length)} rows`,
+          );
+        return rows.length === 0 ? null : asRow<T>(rows[0]);
+      },
+    };
+  };
+
   const query = (): Query<AppDatabase> => ({
     from: <T extends TableName<AppDatabase>>(
       table: T,
@@ -95,6 +119,7 @@ export function memoryAuthDriver(
       select: async () => (tables.get(table) ?? []).map(asRow<T>),
       insert: async (row) => asRow<T>(append(table, row)),
       update: async (_id, patch) => asRow<T>(append(table, patch)),
+      eq: (column, value) => keyed(table, column, value),
     }),
     rpc: async () => undefined,
   });

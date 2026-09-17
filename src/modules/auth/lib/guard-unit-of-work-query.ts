@@ -2,7 +2,7 @@
 // `rpc()` through — booked against the unit of work via the join, so a second is refused — and refuses every
 // table **write** (`insert` / `update`): under PostgREST each of those is its own implicit transaction, so a
 // write beside the RPC could never be atomic with it, and a seam that let it through would be lying about the
-// atomicity the caller asked for. Reads pass: a `select` inside a unit of work is harmless. A refused call
+// atomicity the caller asked for. Reads pass: a `select` (or a keyed `eq` read) inside a unit of work is harmless. A refused call
 // throws `UnitOfWorkRefusal`, which `DataAccessPort.run` turns back into the carried `Result`. Whether the token
 // is one the binding holds open is the port's check, made before this guard is built.
 import { err } from "@/modules/platform";
@@ -31,6 +31,8 @@ function guardedTable<T extends TableName<AppDatabase>>(
     select: (columns) => inner.select(columns),
     insert: async () => refuseWrite(),
     update: async () => refuseWrite(),
+    // ADR-131 (1): a keyed read is a read — it passes, and the handle it returns cannot write
+    eq: (column, value) => inner.eq(column, value),
   };
 }
 
