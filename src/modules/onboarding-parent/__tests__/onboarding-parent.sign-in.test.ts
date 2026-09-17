@@ -9,8 +9,15 @@
 // carrying the reassuring line to S-X-09, whose `auth.requestPasswordReset` emails the link that signs the
 // account in; the gate's step 3 then sends that session to set-password (01 §4d). Both halves are asserted below
 // and in `auth/__tests__/auth.password-recovery.test.ts`.
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { configureAuth, stubAuth } from "@/modules/auth";
+import { SECURITY } from "@/modules/config";
+import {
+  configureRateLimiter,
+  createRateLimiter,
+  err,
+  memoryRateLimitStore,
+} from "@/modules/platform";
 import type { Email } from "@/modules/shared-types";
 import { signInAction } from "../actions/sign-in-action";
 
@@ -113,5 +120,86 @@ describe("onboarding-parent — signInAction (S-X-08)", () => {
     if (result.ok) return;
     expect(result.error.message).toMatch(/never set a password/i);
     expect(result.error.message).not.toMatch(/no such account|does not exist/i);
+  });
+});
+
+// ── REVIEW-2 (security HIGH-2) — 07 §8 row 3's limit on sign-in ────────────────────────────────────────────
+//
+// Written RED first against the shipped action, which called `auth.signIn` straight after the zod parse: both
+// cases below failed, because there was no limiter on this path at all. `SECURITY.rateLimits.authPerEmail` had
+// exactly one call site (the reset request) and none here, so ADR-134's "auth fails closed on a limiter outage"
+// had nothing to be true of. The second case is the one that matters: fail **closed**, not open.
+describe("onboarding-parent — sign-in is rate limited (07 §8 row 3; REVIEW-2)", () => {
+  const freshLimiter = (): void => {
+    configureRateLimiter(
+      createRateLimiter({
+        store: memoryRateLimitStore(),
+        burstAlertMultiple: SECURITY.burstAlertMultiple,
+      }),
+    );
+  };
+
+  beforeEach(() => {
+    freshLimiter();
+  });
+
+  afterEach(() => {
+    freshLimiter();
+  });
+
+  it("stops guessing after the policy's burst, and refuses in the form's own words", async () => {
+    const answers = [];
+    for (let attempt = 0; attempt < 8; attempt += 1)
+      answers.push(
+        await signInAction(
+          null,
+          formDataOf({ email: PARENT.email, password: "wrong" }),
+        ),
+      );
+    expect(answers.every((answer) => !answer.ok)).toBe(true);
+    // Every answer is the same refusal, throttled or not — a throttle that spoke differently would be the
+    // enumeration oracle ADR-132 forbids, arriving through the side door.
+    const first = answers[0];
+    expect(
+      answers.every(
+        (answer) => JSON.stringify(answer) === JSON.stringify(first),
+      ),
+    ).toBe(true);
+    // The correct password no longer works once the burst is spent: the limit is ahead of the credential check.
+    const afterBurst = await signInAction(
+      null,
+      formDataOf({ email: PARENT.email, password: PARENT.password }),
+    );
+    expect(afterBurst.ok).toBe(false);
+  });
+
+  it("does not let one address's burst refuse another address's first attempt", async () => {
+    for (let attempt = 0; attempt < 8; attempt += 1)
+      await signInAction(
+        null,
+        formDataOf({ email: PARENT.email, password: "wrong" }),
+      );
+    const other = await signInAction(
+      null,
+      formDataOf({
+        email: PASSWORDLESS.email,
+        password: "whatever",
+      }),
+    );
+    // Still a refusal (that account has no password), but reached by the credential check rather than the
+    // limiter — the point is that the bucket is per address, not global.
+    expect(other.ok).toBe(false);
+  });
+
+  it("fails CLOSED when the limiter cannot answer — a limiter outage is not a free pass (ADR-134)", async () => {
+    configureRateLimiter(
+      { consume: async () => err("INTERNAL", "Rate limit unavailable") },
+      "shared",
+    );
+    const withGoodPassword = await signInAction(
+      null,
+      formDataOf({ email: PARENT.email, password: PARENT.password }),
+    );
+    expect(withGoodPassword.ok).toBe(false);
   });
 });

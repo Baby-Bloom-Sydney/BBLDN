@@ -113,12 +113,25 @@ export function Wizard({
   const onChange = (patch: Partial<WizardAnswers>): void => {
     const next = { ...answers, ...patch };
     setAnswers(next);
-    void save(next, false);
+    // ★ REVIEW-2 (typescript-review HIGH). This was `void save(next, false)`. `void` suppresses the lint signal
+    // without attaching a handler, so a rejected server-action transport became an **unhandled promise
+    // rejection** — which Next surfaces as an error overlay in development and, in some browsers, a console
+    // error the parent's session never recovers a reason for.
+    //
+    // The dropped `Result` is deliberate and now says so: an autosave refusal must NOT interrupt a parent
+    // mid-question, and it costs nothing, because `finish()` re-sends the whole `answers` object and its own
+    // refusal is what raises the banner. So the fix is to swallow the rejection *explicitly* — which is a
+    // different thing from never attaching a handler.
+    save(next, false).catch(() => {
+      // Intentionally ignored: `finish()` re-saves everything and owns the visible failure.
+    });
   };
 
   const finish = async (): Promise<void> => {
     setFinishing(true);
     setFailed(false);
+    // The final save carries every answer, so a failed autosave is recoverable here and is only worth
+    // surfacing if this one fails too — which is exactly what the branch below does.
     const saved = await save(answers, true);
     if (!saved.ok) {
       setFinishing(false);

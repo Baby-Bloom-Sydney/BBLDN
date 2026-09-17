@@ -468,3 +468,50 @@ describe("boot — the position store, and the write road 0019 added", () => {
     }
   });
 });
+
+// ── REVIEW-2 (code-review HIGH-1) — a port boot leaves closed must still SAY so ──────────────────────────────
+//
+// `wire-ports.ts`'s own header states the invariant: "a port left on its fail-closed default carries its reason
+// on the report, never silence." Four privileged ports broke it — `admin-on-behalf`, `verification`,
+// `vetting-providers` and `hire-docs` are never configured from `src/boot/`, and `BootPort` was a closed union
+// that could not even *name* them, so a row for them was not representable.
+//
+// The cost is operability, not safety: `src/app/admin/calls/page.tsx` renders four S-A-04 levers that all reach
+// `adminOnBehalf`, whose unconfigured default refuses every method — so every button on that page returns
+// INTERNAL forever and the boot log has no line explaining why. Fail-closed on safety, fail-silent on
+// operability. Written RED first: `BootPort` did not admit the names, so the report could not contain the rows.
+describe("boot — every port boot leaves closed is on the report (REVIEW-2)", () => {
+  const CLOSED_ON_PURPOSE = [
+    "admin-on-behalf",
+    "verification",
+    "vetting-providers",
+    "hire-docs",
+  ] as const;
+
+  it("names the four privileged ports boot does not configure, each with a reason", async () => {
+    const { wirePorts } = await import("@/boot/wire-ports");
+    const { env } = await import("@/modules/config/server");
+    const report = wirePorts(env);
+    for (const port of CLOSED_ON_PURPOSE) {
+      const row = report.find((entry) => entry.port === port);
+      expect(row, `no boot row for ${port}`).toBeDefined();
+      expect(row?.binding).toBe("unconfigured");
+      // A row with no reason is the silence the invariant forbids.
+      expect(row?.reason ?? "").not.toBe("");
+    }
+  });
+
+  it("gives every row on the report a binding, so no port is listed without one", async () => {
+    const { wirePorts } = await import("@/boot/wire-ports");
+    const { env } = await import("@/modules/config/server");
+    for (const row of wirePorts(env)) expect(row.binding).not.toBe("");
+  });
+
+  it("says nothing on the report that the report cannot carry — every row's port is a BootPort", async () => {
+    const { wirePorts } = await import("@/boot/wire-ports");
+    const { env } = await import("@/modules/config/server");
+    const report = wirePorts(env);
+    const ports = report.map((row) => row.port);
+    expect(new Set(ports).size).toBe(ports.length);
+  });
+});

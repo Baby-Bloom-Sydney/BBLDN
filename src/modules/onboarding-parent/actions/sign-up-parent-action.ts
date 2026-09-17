@@ -23,6 +23,7 @@ import type {
   ParentSignupOutcome,
   SignupErrorDetails,
 } from "../types";
+import { consumeSignupLimit } from "../lib/consume-signup-limit";
 import { parentSignupSchema } from "../lib/parent-signup-schema";
 import { parentProfileStore } from "../lib/default-parent-profile-store";
 import { recordSignupConsent } from "../lib/record-signup-consent";
@@ -86,6 +87,12 @@ function parse(
 async function createAccount(
   input: ParentSignupInput,
 ): Promise<Result<ParentSignupOutcome, SignupErrorDetails>> {
+  // 07 §8 row 2 (REVIEW-2, security HIGH-3). Ahead of every write, so a throttled request creates no account,
+  // no consent row, no profile row and sends no mail. It refuses through `refused()` — the same generic line
+  // every other failure here uses — so a throttle cannot be read as "that address already has an account"
+  // (ADR-132). The limiter outage path refuses too (ADR-134).
+  if (!(await consumeSignupLimit(input.email)))
+    return refused("account-not-created", { reason: "rate-limited" });
   const signedUp = await auth.signUp({
     email: input.email,
     password: input.password,

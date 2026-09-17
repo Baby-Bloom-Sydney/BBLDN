@@ -760,3 +760,84 @@ describe("scheduling inside — the five events 03 §3.6 names", () => {
     expect(eventNames()).toContain("availability.changed");
   });
 });
+
+// ── REVIEW-2 (typescript-review HIGH) — `book_slot` returns `Json`, so its shape is checked, not asserted ──
+//
+// `database.types.ts` declares `book_slot.Returns: Json` and `RpcResult` forwards that verbatim, so the answer
+// may be `null`, a scalar or an array. The module used to write `answer.value as unknown as BookSlotResult` and
+// dereference `result.booking` on the very next line: on any non-object answer that is
+// `bookingFromRow(undefined)` → a `TypeError` thrown out of a function whose declared type is
+// `Promise<Result<BookOutcome, SchedulingErrorDetails>>`. Every caller checks `if (!booked.ok)` and none wraps
+// in `try`, so the failure skipped the coded-error registry entirely and became a 500 — on the path that books
+// a family's introduction call.
+//
+// Verified RED first: against the shipped code each case below threw instead of returning.
+describe("scheduling inside — an unreadable book_slot answer is a Result, never a throw (REVIEW-2)", () => {
+  const unreadable: ReadonlyArray<readonly [string, unknown]> = Object.freeze([
+    ["null", null],
+    ["a scalar", 7],
+    ["an array", []],
+    ["an object with no booking", { displaced: null, replayed: false }],
+    ["a booking that is not an object", { booking: "bk-1", displaced: null }],
+    [
+      "a displaced that is neither an object nor null",
+      { booking: {}, displaced: "bk-2" },
+    ],
+  ]);
+
+  for (const [what, answer] of unreadable)
+    it(`refuses with a coded reason when book_slot answers ${what}`, async () => {
+      const { port, calendar } = calendarOf();
+      port.rpcAnswer = () => answer;
+      const booked = await calendar.book({
+        slotId: slotAt("09:30"),
+        kind: "matchmaking",
+        actor: parent,
+        subject: parentSubject,
+        idempotencyKey: `review2-${what.replace(/\s+/g, "-")}`,
+      });
+      expect(booked.ok).toBe(false);
+      if (booked.ok) return;
+      // `schedulingFailure`'s own rule: a failure this module cannot name is not one it may translate.
+      expect(booked.error.details?.reason).toBe("PROVIDER_ERROR");
+    });
+});
+
+// ── REVIEW-2 (typescript-review HIGH) — the empty-string sentinel, PINNED rather than invented ─────────────
+//
+// `booking-from-row.ts` reconstructs an absent booker as a **branded empty string**: `(row.booked_by_user_id ??
+// "") as AdminId` for an admin row, and `parentId: "" as UserId` for a position subject whose booker was not the
+// parent. A well-typed id belonging to nobody then travels into `schedulingEvents` and the admin call queue as
+// the acting party. This is the class-5 defect (a non-authority value typed as an authority) reached with a
+// value the type system approves of, so no cast and no `any` is involved and nothing catches it.
+//
+// **It is reachable, which is what makes it worth pinning.** `0009` declares `booked_by_user_id uuid references
+// auth.users (id) ON DELETE SET NULL`. So 07 §6's own account-deletion path turns every booking an admin made
+// into `booked_by_role = 'admin'` with a NULL user id — and every one of them reads back as an admin whose id is
+// `""`.
+//
+// **Not fixed here, deliberately.** 03 §3.2's `Actor` and `Subject` have no "booker absent" arm, so any value
+// this module chooses is an invention, and REVIEW-2's brief forbids contract changes. ADR-123 rule 2 says what
+// to do when code and document disagree: pin the documented behaviour as a failing test and record it. The owner
+// is 03 §3.2 (an optional / absent booker) together with 02 §4.4 (whether `parent_id` should be its own column,
+// which the sibling pin above already asks for).
+describe("scheduling inside — an absent booker is never a branded empty id (REVIEW-2)", () => {
+  it.fails(
+    'PINNED (03 §3.2): a deleted admin\'s booking reads back without minting `""` as an AdminId',
+    async () => {
+      const orphan = bookingRow({
+        booked_by_role: "admin",
+        booked_by_user_id: null,
+      });
+      const { calendar } = calendarOf({ bookings: [orphan] });
+      const read = await calendar.getBooking("bk-1" as BookingId, admin);
+      expect(read.ok).toBe(true);
+      if (!read.ok) return;
+      // Whatever the contract grows, it must not be an id that is a well-typed reference to nobody.
+      const bookedBy = read.value?.bookedBy;
+      expect(bookedBy?.kind === "admin" ? bookedBy.id : "not-admin").not.toBe(
+        "",
+      );
+    },
+  );
+});

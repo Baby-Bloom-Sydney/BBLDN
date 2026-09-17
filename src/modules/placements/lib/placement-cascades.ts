@@ -10,7 +10,7 @@
 //   half `1h` was told to expect.
 //   **L-2** — P-6 on the position (`ACTIVE → ENDED`, carrying the reason) and K-23 on the connection
 //   (`ACTIVE → FINISHED`). "clears pointers" is the store's, not a transition's.
-import { ok } from "@/modules/platform";
+import { log, ok } from "@/modules/platform";
 import type {
   Actor,
   Result,
@@ -55,13 +55,34 @@ export async function runPlacementCascades(input: {
     });
 
     // ADR-093 / 094. Outside the `uow` on purpose: opening access is another module's write, and a payments
-    // failure must not roll back the fact that the nanny started — that fact is the one the whole bundle
-    // hangs off. A refusal is left to `1h`'s own retry, not turned into a failed L-1b.
-    if (deps.openDfyAccess !== undefined)
-      await deps.openDfyAccess({
+    // failure must not roll back the fact that the nanny started — that fact is the one the whole bundle hangs
+    // off. So L-1b still lands on a refusal.
+    //
+    // ★ **But the refusal is recorded** (REVIEW-2, silent-failure CRITICAL). This used to `await` the call and
+    // drop the `Result`: no check, no log, no alert. The comment said the refusal was "left to `1h`'s own
+    // retry" — there is no retry. A done-for-you family whose access never opened looked, from every angle an
+    // operator has, exactly like one whose access did: the row landed, K-21 fired, `placement.started` was
+    // emitted, the request returned 200, and `hasAccess` answered `{ open: false }` for ever with nothing to
+    // correlate it to. Alerting is the whole remedy: the money is already taken by this point (ADR-097), so a
+    // human has to finish what the port could not.
+    if (deps.openDfyAccess !== undefined) {
+      const opened = await deps.openDfyAccess({
         parentId: record.parentId,
         placementId: record.placementId,
       });
+      if (!opened.ok)
+        log.error("L-1b: done-for-you access did not open; the app is off", {
+          module: "placements",
+          action: "runPlacementCascades",
+          // 01 §4b owns the alert list and has no name for "a downstream port refused a write we cannot retry";
+          // ALERT_PROVIDER_DOWN is the closest true one (the payments port did not answer). The missing name is
+          // recorded in docs/review-sweep-170926.md for the 01 §4b owner rather than added code-first.
+          alert: "ALERT_PROVIDER_DOWN",
+          transition: "L-1b",
+          placementId: record.placementId,
+          reason: opened.error.details?.reason ?? opened.error.code,
+        });
+    }
     return ok(Object.freeze(rows));
   }
 

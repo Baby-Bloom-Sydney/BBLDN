@@ -6,9 +6,10 @@
 // `placement.confirmed` is emitted by L-1 and never by K-20; **nothing is charged at placement** (ADR-094);
 // L-1b is where done-for-you access opens (ADR-093) and where `placement.started` — the event `1h` consumes —
 // is emitted; and L-2 takes the position and the connection with it.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   configureEvents,
+  configureLog,
   configureUnitOfWork,
   createEvents,
   createUnitOfWork,
@@ -391,5 +392,77 @@ describe("placements — the table", () => {
     expect(
       PLACEMENT_TRANSITIONS.every((spec) => spec.entity === "placement"),
     ).toBe(true);
+  });
+});
+
+// ── REVIEW-2 (silent-failure CRITICAL) — a refused `openDfyAccess` must not vanish ───────────────────────────
+//
+// `placement-cascades.ts` awaited `deps.openDfyAccess(...)` and threw the `Result` away: no `.ok` check, no log,
+// no alert. The file's comment said "a refusal is left to `1h`'s own retry" — there is no retry, and nothing
+// anywhere records that the call was made and refused.
+//
+// What that costs: L-1b lands, K-21 fires, `placement.started` is emitted, the caller gets a 200 — and the
+// family's `accessGate.hasAccess` answers `{ open: false }` for ever, with nothing in the logs to correlate. A
+// paid done-for-you family's app silently never opens. Written RED first: before the fix, no log line was
+// emitted at all, so `errors` was empty.
+describe("placements — a refused openDfyAccess is recorded, not swallowed (REVIEW-2)", () => {
+  const refusingWorld = (seed: ReadonlyArray<PlacementRecord>) => {
+    configureUnitOfWork(createUnitOfWork(memoryTransactionOpener()));
+    const store = memoryEventLogStore();
+    configureEvents(createEvents({ store, log }));
+    const others = otherSlices();
+    const bus = makeDispatcher();
+    bus.register(others.connection);
+    bus.register(others.position);
+    const placementStore = memoryPlacementStore(seed);
+    bus.register(
+      placementsSliceRegistration(
+        createPlacementsSlice({
+          store: placementStore,
+          advance: bus.dispatch,
+          clock: () => NOW,
+          openDfyAccess: async () =>
+            err("INTERNAL", "payments-not-configured", {
+              reason: "payments-not-configured",
+            }),
+        }),
+      ),
+    );
+    return { advance: bus.dispatch, store: placementStore };
+  };
+
+  it("logs the refusal with an alert, and still lands L-1b — the nanny's first day is the fact", async () => {
+    const errors: Array<Record<string, unknown>> = [];
+    // `console-sink.ts` sends `error` to `console.error`, `warn` to `console.warn` and the rest to `console.log`.
+    const out = vi
+      .spyOn(console, "error")
+      .mockImplementation((line: unknown) => {
+        const row = JSON.parse(String(line)) as Record<string, unknown>;
+        if (row.level === "error") errors.push(row);
+        return undefined;
+      });
+    configureLog({ format: "json", minLevel: "info" });
+    try {
+      const w = refusingWorld([record({ state: "CONFIRMED" })]);
+      const moved = await w.advance({
+        entity: { kind: "placement", id: PLACEMENT },
+        transition: "L-1b",
+        actor: sweep,
+        payload: {},
+        expectedFrom: "CONFIRMED",
+        idempotencyKey: "review2-l1b",
+      });
+      // The placement still starts: a payments failure must not roll back the nanny's first day.
+      expect(moved.ok).toBe(true);
+      const stored = await w.store.get(PLACEMENT);
+      expect(stored.ok && stored.value?.state).toBe("ACTIVE");
+      // …and the refusal is visible to an operator instead of being thrown on the floor.
+      expect(errors.length).toBeGreaterThan(0);
+      const row = errors.at(-1) ?? {};
+      expect(String(row.alert ?? "")).not.toBe("");
+      expect(String(row.module ?? "")).toBe("placements");
+    } finally {
+      out.mockRestore();
+    }
   });
 });

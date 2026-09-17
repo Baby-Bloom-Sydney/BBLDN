@@ -20,7 +20,14 @@ export type BootPort =
   | "parent-profile"
   | "purchase-paths"
   | "payments"
-  | "app/child-linking";
+  | "app/child-linking"
+  // Ports boot deliberately leaves on their fail-closed default. They are part of this union because the
+  // report's invariant is "a reason on a row is a recorded gap, never a silent stub" — a port that cannot be
+  // named cannot carry its reason, which is how four privileged modules went unmentioned (REVIEW-2).
+  | "admin-on-behalf"
+  | "verification"
+  | "vetting-providers"
+  | "hire-docs";
 
 export type PortWiring = {
   readonly port: BootPort;

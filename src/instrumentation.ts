@@ -9,10 +9,12 @@
 //      `areas` · `comms` · `scheduling` seams — each binding chosen by env, never by an import edit (05 §3 rule 1).
 //      One log line per port says what was bound and, where a port stays on its fail-closed default, why.
 //
-// Still deliberately NOT wired here — each with its reason on the boot report or in the L-007 P1-WIRE entry:
-//   · the rate limiter as `"shared"` — `rate_limit_buckets` has no specification (`wire-rate-limiter.ts`);
-//   · the stage-model slices and `admin-on-behalf` — their insides are Phase 1e's; a stub wired here would be a
-//     silent success against a stub (03 §2.1 registration lands with the insides).
+// **What boot leaves closed is on the report, not in this comment** (REVIEW-2, code-review HIGH-2). The list
+// that used to sit here had gone stale in both directions — it still named the `"shared"` rate limiter and the
+// stage-model slices, which `wire-rate-limiter.ts` and `wire-connections.ts` / `wire-placements.ts` now wire,
+// and it omitted three of the four ports that really are left closed. A hand-maintained list of open gaps is a
+// list that drifts the moment a gap closes, so the four are stated in `src/boot/unwired-ports.ts`, travel on the
+// boot report beside every bound port, and are pinned by `boot.test.ts`. Read the log, not this header.
 //
 // `configurePurchaseProvider` **is** wired now (`1h`, `src/boot/wire-purchase-paths.ts`). Its reason for not
 // being — `stub-stripe` reaching `node:crypto`, which this hook would have carried into the edge bundle — was
