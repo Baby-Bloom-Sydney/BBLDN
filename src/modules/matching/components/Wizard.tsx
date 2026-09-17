@@ -5,6 +5,11 @@
 // the T-1.8d landing header "Create your position to connect with nannies" (04 §8, ratified) when a guest
 // Connect brought the parent here; on the last answer → S-X-04 with the lead. A failed save never stops the
 // wizard: it keeps going in memory and retries at the end; only a failed **final** save shows an error + retry.
+//
+// `1e` — S-P-04 reuses the same component (04 §6.2 "same question bank as S-X-03"). A signed-in parent has no
+// lead to save and does not go to S-X-04: the route passes `onComplete` (the P-2 create action) and the header
+// the screen is ratified with, and the last answer goes wherever that action says. Everything else — the
+// questions, the progress list, the focus move, the error line — is shared, so the two roads cannot drift.
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ClientResult } from "@/modules/platform";
@@ -21,9 +26,16 @@ export type WizardProps = {
   readonly leadId: string;
   readonly source: string | null;
   readonly connectNannyId: string | null;
-  readonly saveAction: (
+  readonly saveAction?: (
     payload: SaveParentLeadPayload,
   ) => Promise<ClientResult<void>>;
+  /** S-P-04: where the last answer goes instead of S-X-04 — the action answers the destination. */
+  readonly onComplete?: (input: {
+    readonly answers: WizardAnswers;
+  }) => Promise<ClientResult<{ readonly destination: string }>>;
+  /** Shown above the questions when the screen is ratified with one (04 §8). */
+  readonly header?: string;
+  readonly submitLabel?: string;
 };
 
 const RATIFIED_T18D_HEADER = "Create your position to connect with nannies";
@@ -62,6 +74,9 @@ export function Wizard({
   source,
   connectNannyId,
   saveAction,
+  onComplete,
+  header,
+  submitLabel,
 }: WizardProps) {
   const router = useRouter();
   const [index, setIndex] = useState(0);
@@ -88,8 +103,10 @@ export function Wizard({
   const last = index === total - 1;
 
   const save = useCallback(
-    (next: WizardAnswers, completed: boolean) =>
-      saveAction({ leadId, answers: next, source, completed }),
+    async (next: WizardAnswers, completed: boolean) =>
+      saveAction === undefined
+        ? { ok: true as const, value: undefined }
+        : saveAction({ leadId, answers: next, source, completed }),
     [leadId, saveAction, source],
   );
 
@@ -102,15 +119,25 @@ export function Wizard({
   const finish = async (): Promise<void> => {
     setFinishing(true);
     setFailed(false);
-    const result = await save(answers, true);
-    if (!result.ok) {
+    const saved = await save(answers, true);
+    if (!saved.ok) {
       setFinishing(false);
       setFailed(true);
       return;
     }
-    router.push(
-      `${FUNNEL_PATHS.matches}?${FUNNEL_PATHS.query.lead}=${encodeURIComponent(leadId)}`,
-    );
+    if (onComplete === undefined) {
+      router.push(
+        `${FUNNEL_PATHS.matches}?${FUNNEL_PATHS.query.lead}=${encodeURIComponent(leadId)}`,
+      );
+      return;
+    }
+    const created = await onComplete({ answers });
+    if (!created.ok) {
+      setFinishing(false);
+      setFailed(true);
+      return;
+    }
+    router.push(created.value.destination);
   };
 
   if (question === undefined) return null;
@@ -118,9 +145,9 @@ export function Wizard({
 
   return (
     <div className="mx-auto max-w-2xl">
-      {connectNannyId !== null ? (
+      {(header ?? (connectNannyId === null ? null : RATIFIED_T18D_HEADER)) ? (
         <p className="mb-6 rounded-md border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-800">
-          {RATIFIED_T18D_HEADER}
+          {header ?? RATIFIED_T18D_HEADER}
         </p>
       ) : null}
       <ol aria-label="Your questions" className="flex flex-wrap gap-1.5">
@@ -186,7 +213,11 @@ export function Wizard({
           disabled={!canAdvance || finishing}
           className={primary}
         >
-          {last ? (failed ? "Try again" : "See my matches") : "Next"}
+          {last
+            ? failed
+              ? "Try again"
+              : (submitLabel ?? "See my matches")
+            : "Next"}
         </button>
       </div>
     </div>

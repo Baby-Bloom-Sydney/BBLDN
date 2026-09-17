@@ -14,6 +14,7 @@ const NOT_CONFIGURED = err(
 
 const unconfigured: ParentProfileStore = Object.freeze({
   create: async () => NOT_CONFIGURED,
+  get: async () => NOT_CONFIGURED,
 });
 
 const slot = { current: unconfigured };

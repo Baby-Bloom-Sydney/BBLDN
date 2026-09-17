@@ -30,6 +30,7 @@ import { ACTIVE_STATUSES } from "@/modules/shared-types";
 import type {
   BookInput,
   BookOutcome,
+  HeldFor,
   Scheduling,
   SchedulingErrorDetails,
   ScheduleFilter,
@@ -46,6 +47,9 @@ type Hold = {
   readonly id: HoldId;
   readonly slotId: SlotId;
   readonly actor: Actor;
+  /** 03 §3.2's `hold` amendment (see `types.ts`): a held row carries its subject and kind, like every row. */
+  readonly kind: BookInput["kind"];
+  readonly subjectId: string;
   readonly expiresAt: ISO;
 };
 
@@ -135,16 +139,39 @@ function holdSlot(
   clock: () => ISO,
   slotId: SlotId,
   actor: Actor,
+  held: HeldFor,
 ): Result<HoldId, SchedulingErrorDetails> {
   const start = startOf(slotId);
   if (!slotId.startsWith("default:"))
     return invalid("CALENDAR_UNKNOWN", "Unknown calendar");
   if (occupant(holder.current, start) !== undefined)
     return fail("SLOT_TAKEN", "That time has just been taken");
+  // I-10 reaches a held row too (`ACTIVE_STATUSES` includes `'held'`): a second hold for a subject that
+  // already has an active row is `ALREADY_BOOKED`, exactly as the partial unique index answers in Postgres.
+  const subjectId =
+    held.subject.kind === "nanny"
+      ? held.subject.nannyId
+      : held.subject.positionId;
+  const busy =
+    holder.current.holds.some(
+      (existing) =>
+        existing.subjectId === subjectId && existing.expiresAt >= clock(),
+    ) ||
+    holder.current.bookings.some(
+      (booking) =>
+        (booking.subject.kind === "nanny"
+          ? booking.subject.nannyId
+          : booking.subject.positionId) === subjectId &&
+        (ACTIVE_STATUSES as ReadonlyArray<string>).includes(booking.status),
+    );
+  if (busy)
+    return fail("ALREADY_BOOKED", "A time is already set for this call");
   const hold: Hold = {
     id: newId<HoldId>(),
     slotId,
     actor,
+    kind: held.kind,
+    subjectId,
     expiresAt: new Date(
       Date.parse(clock()) + SCHEDULING.holdTtlSeconds * 1000,
     ).toISOString() as ISO,
@@ -410,7 +437,8 @@ export function createSchedulingStub(
 
   return Object.freeze({
     getAvailableSlots: async (query) => availableSlots(holder, clock, query),
-    hold: async (slotId, actor) => holdSlot(holder, clock, slotId, actor),
+    hold: async (slotId, actor, held) =>
+      holdSlot(holder, clock, slotId, actor, held),
     release: async (holdId) => dropHold(holder, holdId),
     book: async (input) => bookSlot(holder, clock, input),
     reschedule: async (bookingId, slotId) =>

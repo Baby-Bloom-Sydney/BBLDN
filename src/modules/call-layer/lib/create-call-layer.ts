@@ -12,7 +12,6 @@ import type {
   Booking,
   BookingId,
   CallOutcome,
-  ISO,
   PositionId,
   Result,
   StateAfter,

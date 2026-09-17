@@ -6,9 +6,27 @@ import { auth, configureAuth, stubAuth } from "@/modules/auth";
 import { LOCALE, SECURITY } from "@/modules/config";
 import {
   configureConsent,
+  configureEvents,
+  configureUnitOfWork,
   createConsent,
+  createEvents,
+  createUnitOfWork,
+  log,
   memoryConsentStore,
+  memoryEventLogStore,
+  memoryTransactionOpener,
+  ok,
 } from "@/modules/platform";
+import { configureMatching, stubMatching } from "@/modules/matching";
+import {
+  configurePositions,
+  createPositions,
+  createPositionsSlice,
+  memoryPositionStore,
+  registerPositionsSlice,
+  registerSlice,
+} from "@/modules/positions";
+import type { Instant, LeadId } from "@/modules/shared-types";
 import { configureParentProfileStore } from "../lib/configure-parent-profile-store";
 import { memoryParentProfileStore } from "../lib/memory-parent-profile-store";
 import { PARENT_PROFILE_STORE_REGISTRY } from "../lib/parent-profile-store-registry";
@@ -192,20 +210,6 @@ describe("onboarding-parent — signUpParentAction with the profile store config
     },
   );
 
-  it.fails(
-    "PINNED (04 §3.1 step 5–6; 1e owns the P-2 slice): a one-go signup with a lead opens the position and lands on S-P-01",
-    async () => {
-      const result = await signUpParentAction(
-        null,
-        formDataOf({ ...VALID, source: "advanced_match", leadId: LEAD }),
-      );
-      expect(result.ok && result.value).toEqual({
-        destination: "/parent/call",
-        positionOpened: true,
-      });
-    },
-  );
-
   it("keeps the account and lands on S-P-03 state 0 when P-2 refuses (no slice registered)", async () => {
     const result = await signUpParentAction(
       null,
@@ -220,5 +224,97 @@ describe("onboarding-parent — signUpParentAction with the profile store config
 
   it("exposes the registry as a Registry (boot wiring reaches the binding)", () => {
     expect(PARENT_PROFILE_STORE_REGISTRY.get()).toBe(profiles);
+  });
+});
+
+/**
+ * `1e` — the pin `1c` left here, flipped. 04 §3.1 steps 5–6 (path B): one submit creates the account **and** the
+ * position, P-2's own cascade opens the call, and the parent lands on S-P-01. It needs the whole spine wired,
+ * which is exactly why `1c` could not assert it: the stage model, the P-row slice, a call slice to receive C-a,
+ * and the lead the wizard saved.
+ */
+describe("onboarding-parent — the one-go signup with a lead (04 §3.1 steps 5–6, path B)", () => {
+  const AREA = { area: "Islington", district: "N1" };
+
+  beforeEach(() => {
+    configureUnitOfWork(createUnitOfWork(memoryTransactionOpener()));
+    configureEvents(createEvents({ store: memoryEventLogStore(), log }));
+    configureParentProfileStore(memoryParentProfileStore());
+    configureMatching(
+      stubMatching({
+        leadRows: [
+          {
+            id: LEAD as LeadId,
+            answers: {
+              area: AREA,
+              children: [{ ageLabel: "1–2 years" }],
+              days: [0],
+              parts: ["morning"],
+              scheduleType: "Fixed",
+            },
+            area: AREA,
+            source: "adv",
+            completed: true,
+          },
+        ],
+      }),
+    );
+    const store = memoryPositionStore();
+    registerPositionsSlice(
+      createPositionsSlice({ store, isInServiceArea: async () => true }),
+    );
+    registerSlice({
+      entity: "call",
+      handlers: [
+        {
+          id: "C-a",
+          run: async (input) =>
+            ok({
+              entity: input.entity,
+              stage: "awaiting-slot" as const,
+              version: 1,
+              changedAt: "2026-01-09T08:00:00.000Z" as Instant,
+              cascaded: [],
+              events: [],
+            }),
+        },
+      ],
+    });
+    configurePositions(createPositions({ store }));
+  });
+
+  it("opens the position and lands on S-P-01", async () => {
+    const result = await signUpParentAction(
+      null,
+      formDataOf({ ...VALID, source: "advanced_match", leadId: LEAD }),
+    );
+    expect(result.ok && result.value).toEqual({
+      destination: "/parent/call",
+      positionOpened: true,
+    });
+  });
+
+  it("keeps the account and routes to S-P-03 state 0 when the lead has no London area", async () => {
+    configureMatching(
+      stubMatching({
+        leadRows: [
+          {
+            id: LEAD as LeadId,
+            answers: {},
+            area: null,
+            source: null,
+            completed: false,
+          },
+        ],
+      }),
+    );
+    const result = await signUpParentAction(
+      null,
+      formDataOf({ ...VALID, source: "advanced_match", leadId: LEAD }),
+    );
+    expect(result.ok && result.value).toEqual({
+      destination: "/parent",
+      positionOpened: false,
+    });
   });
 });

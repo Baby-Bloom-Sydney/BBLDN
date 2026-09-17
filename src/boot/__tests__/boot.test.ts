@@ -169,11 +169,16 @@ describe("after register() in a valid preview environment", () => {
     expect(reasonOf(sent)).toBe("renderer-not-configured");
   });
 
-  it("scheduling — the in-memory stub is installed on preview", async () => {
+  // `1f`: the db inside replaced the stub in every environment. Asserted on the REASON, not on a happy path —
+  // this boot has no database, so the calendar cannot answer; what it must not do is answer as the fail-closed
+  // default, because that would mean nothing had wired it at all.
+  it("scheduling — the db inside replaced the fail-closed default", async () => {
     const result = await m.scheduling.scheduling.expireHolds(
       "2026-09-17T09:00:00.000Z" as never,
     );
-    expect(result).toEqual({ ok: true, value: { expired: 0 } });
+    expect(
+      result.ok || result.error.details?.reason !== "SCHEDULING_NOT_CONFIGURED",
+    ).toBe(true);
   });
 
   it("the boot alert's env names survive the PII scrubber under their new key (E1 finding 4)", () => {

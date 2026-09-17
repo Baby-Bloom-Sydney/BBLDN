@@ -67,14 +67,29 @@ same entry point, so `public-site` never learns a second road.
   anonymous actor (03 §9.3); the client seam for `results.viewed` / `profile.viewed` / `quick-match.run` is
   `platform`'s `track` (`02.24`), not built.
 
+**What `1e` added.** `autofire` (03 §7.4): the position read through `positions.getForMatching`, the pool ranked
+by `scoring.topN` at `config.matching.precheckN`, the lever written through `positions.recordPrecheck` and
+`precheck.fired` emitted — the pre-check that makes the call promise level 2 (T-1.4, 04 §3.1 step 12).
+`positionDetailOf` converts the shared question bank's answers into the position P-2 opens, so the one-go signup
+and S-P-04 cannot drift; `Wizard` takes an optional `onComplete` + `header` + `submitLabel` so S-P-04 reuses the
+same component rather than a second copy.
+
+**`autofire` does not run the blast (recorded, `it.fails` in `matching.autofire.test.ts`).** §7.4 also has it
+notify each ranked nanny with `precheck-nanny`. A `comms` `Recipient` needs an `Email`; the only nanny read this
+module has is the marketplace-safe `nanny_public` (07 §5.2 — first name, no address), and no document authorises
+a service-scope read of nanny contact details. It wants a recipient port wired at boot.
+
 **Suites.** `__tests__/matching.swap.test.ts` (the connector swapped, `scoring` swapped underneath it) ·
 `matching.inside.test.ts` (the view read, the snapshot mapping, quick + pre-auth through `scoring`, the lead's
 progressive save, the Connect decisions, `not-built`) · `matching.screens.test.tsx` (S-X-02 / S-X-03 / S-X-04
 states and a11y claims) · `matching.copy.test.ts` (05 §5.2 over every surface, no allowlist) ·
-`matching.fail-closed.test.ts`.
+`matching.fail-closed.test.ts` · `matching.autofire.test.ts` (`1e`: the lever, the rail row, the `precheckN`
+cap, `precheck.failed`, and the blast pinned).
 
 <!-- audit
-Last edited: 2026-09-17T15:40+10:00 — BB-LDN-Planner-070926/1b
+Last edited: 2026-09-17T18:10+10:00 — BB-LDN-Planner-070926/1e
+Notes: 1e — `autofire` built (lever + ranking + `precheck.fired`; the blast pinned), `positionDetailOf`, the `Wizard` generalisation S-P-04 reuses.
+Prior: 2026-09-17T15:40+10:00 — BB-LDN-Planner-070926/1b
 Notes: 1b — the inside (`createMatching` over `nanny_public` + `parent_leads`), the five connector extensions raised for ratification, the ADR-126 entry point, S-X-02 / S-X-03 / S-X-04, the shared card / badge / combobox, the recorded gaps (keyed read, boot wiring, silent hold, client event seam).
 Prior: 2026-09-16T14:35+10:00 — BB-LDN-Planner-070926/F-a — initial authoring: the F-a connector, `stubMatching` and the swap test; recorded gap: three derived method signatures.
 -->

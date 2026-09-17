@@ -362,7 +362,93 @@ Import trace for requested module:
 
 **`build` is green on this branch and `main` is still red until this PR merges** — the trunk row in `../OPERATIONS/BRANCHES.md` carries the ★ until then.
 
+## Files created / modified in the current unit (1e — the parent position, the autofire pre-check, done-for-you re-framed; L-007 Phase 1)
+
+**`src/modules/positions/` — the inside.** New: `lib/position-transitions.ts` (the seven P rows of 03 §2.4 as
+`TransitionSpec`s) · `lib/create-positions-slice.ts` (the P-row `TransitionHandler`s: `from` + the §2.5 actor
+rule + the row's preconditions, the store write and the event under one `uow`, and the two cascades a P row owns
+— **P-2 → C-a**, **P-7 → C-4**, dispatched through `advance`, never by importing `call-layer`) ·
+`lib/memory-position-store.ts` · `lib/create-positions.ts` (the reads: `amend` · `getStage` · `getJourneySteps` ·
+`listAllowed` · `getForMatching` · `recordPrecheck` · `findLive`) · `lib/journey-steps.ts` (04 §7.1 rows 1, 2, 9;
+rows 4–8 `pending`, row 3 from the port) · `lib/allowed-transitions.ts` · `lib/register-positions-slice.ts` ·
+`lib/position-page-view.ts` · `lib/load-position-page.ts` · `actions/close-position-action.ts` ·
+`components/PositionPage.tsx` · `__tests__/positions.inside.test.ts` · `__tests__/positions.copy.test.ts`.
+Modified: `types.ts` · `index.ts` · `positions.stub.ts` · `lib/positions-registry.ts` ·
+`lib/default-positions.ts` · `README.md`.
+
+**`src/modules/matching/`.** New: `lib/autofire.ts` (03 §7.4 — position read, pool ranked at
+`config.matching.precheckN`, lever written, `precheck.fired` / `precheck.failed`) · `lib/position-detail-of.ts`
+(the one conversion from the shared question bank's answers to the position P-2 opens). Modified:
+`lib/create-matching.ts` (autofire wired over the same pool) · `components/Wizard.tsx` (three optional props so
+S-P-04 reuses S-X-03's component) · `index.ts` · `matching.stub.ts` (stale comment) · `README.md` ·
+`__tests__/matching.inside.test.ts` (the `not-built` claim split: `resultsFor` still is, `autofire` now forwards
+`positions`' refusal) · new `__tests__/matching.autofire.test.ts`.
+
+**`src/modules/onboarding-parent/`.** New: `actions/create-position-action.ts` (S-P-04's one action) ·
+`lib/parent-call-path.ts`. Modified: `lib/open-position-from-lead.ts` (reads the lead, converts it, opens the
+position with the real P-2 payload) · `actions/sign-up-parent-action.ts` (one argument) · the profile-store
+port's `get` half across `types.ts` · `lib/parent-profile-store-registry.ts` ·
+`lib/default-parent-profile-store.ts` · `lib/memory-parent-profile-store.ts` · `index.ts` · `README.md` ·
+`__tests__/onboarding-parent.signup.test.ts` (**1c's P-2 pin flipped from `it.fails` to a passing test**, plus
+the no-area degradation) · `__tests__/onboarding-parent.copy.test.ts` (owned-route list).
+
+**Elsewhere.** `src/modules/scoring/index.ts` (one added export: `leadFormToPosition`) ·
+`src/boot/db-parent-profile-store.ts` (the `get` half only — S5b's file, merged before this was written) ·
+`src/app/parent/request/page.tsx` (**S-P-04**, replacing the Sydney `TypeformFlow` mount; the legacy renderers
+stay, still imported by the Sydney hub) · `src/app/parent/position/page.tsx` (**S-P-05**, replacing the Sydney
+`PositionPageClient` mount) · `docs/build-progress.md` · the two ledgers.
+
+**Not touched:** `src/boot/wire-ports.ts` · `src/instrumentation.ts` · `shared-types/**` · `auth/**` ·
+`supabase/**` · `/api/health` (all S5b) · `scheduling/**` · `admin/**` · `call-layer/**` (1f) ·
+`payments` / `purchase-paths` / `access-gate` (1h) · `connections/**` · `placements/**` (1f / 1g) · `config/**` ·
+`platform/**` · `(public)` / `(funnel)` / `(auth)` route bodies · eslint config.
+
+**Gates on the merged tree** (`origin/main` `4e8a0ca` = BUILD-FIX #25 + S5b #24 merged down): `typecheck` 0 ·
+`lint` 0 (legacy warnings only, 0 on this unit's files) · `prettier --check .` 0 · `vitest` 0 —
+**3 091 passed + 8 expected-fail / 3 099 across 224 files** · `lint:boundaries` 0 · `check:allowed-imports` 0 ·
+`check:config-literals` 0 · `check:claude-md` 0 · `check:audit` 0 · **`npm run build` 0** (the new
+`client-server-boundary.test.ts` stays green; the build needs the placeholder environment —
+`set -a; . ./.env.test; set +a` plus a `RESEND_API_KEY` placeholder, both local-only, neither a code defect).
+`banned-literals` is the accepted red (ADR-124).
+
+## Files created / modified in the current unit (1f — the admin call queue, the calendar, and `scheduling`'s db inside; L-007 Phase 1)
+
+**Branch `p1f-call-queue-170926-1`** off `origin/main` `771c361` (BUILD-FIX), own worktree; `origin/s5b-port-0017-170926-1` merged down while PR #24 was still open (this unit's inside is built on ADR-131 (1)'s keyed read, which existed on no trunk), then `origin/main` merged down again once S5b and `1e` landed. ADR-123 build task with the brief's one exception: **`security-reviewer` only**, over the queue's gate and every admin action — admin authority. Registered in `../OPERATIONS/BRANCHES.md`.
+
+- **`src/modules/scheduling/`** — the real inside. `lib/create-scheduling.ts` composes three groups over `auth`'s data port: `scheduling-reads.ts` (the five reads, **service scope**, named), `scheduling-calendar-reads.ts` (`getAvailableSlots` · `listSchedule` · `listForSubject` · `getBooking`), `scheduling-booking-writes.ts` (`hold` · `release` · `book` · `reschedule` · `cancel` · `markDone` · `markNoAnswer` · `expireHolds`) and `scheduling-admin-writes.ts` (the four admin methods behind `auth.requireRole('admin')`). Supporting, one export each: `available-slots.ts` · `call-list-item.ts` · `booking-from-row.ts` · `rule-from-row.ts` · `actor-columns.ts` · `subject-columns.ts` · `book-slot-args.ts` · `displace-to.ts` · `patch-booking.ts` · `resolve-calendar.ts` · `slot-start.ts` · `scheduling-failure.ts`. `types.ts` gains the row aliases, `HeldFor`, `SchedulingReads`, `SchedulingContext`, `ResolvedCalendar`, `AvailableSlotsInput`, `BookSlotResult` and two reasons 03 §3.4 names as **codes** without a reason (`NOT_FOUND` · `FORBIDDEN`). `scheduling.stub.ts` takes the widened `hold` and enforces I-10 on a held row.
+- **`src/modules/admin/call-queue/` and `admin/calendar/`** — the two panels F-c left as descriptors. `call-queue`: `lib/{load-call-queue,call-state-of,queue-group-of,queue-headings,call-type-label,call-outcome-label,call-timeline-rows,on-behalf-actor,nanny-call-actor,party-actor,call-ref-of}.ts`, `actions/{record-call-outcome,move-call-slot,clear-call-slot,book-call-slot}-action.ts`, `components/{CallQueue,CallItemDrawer}.tsx`, a rewritten `types.ts`. `calendar`: `lib/{calendar-days,load-calendar-board}.ts`, `actions/block-range-action.ts`, `components/CalendarBoard.tsx`, a rewritten `types.ts`.
+- **`src/app/admin/calls/page.tsx`** — S-A-03 / S-A-04, thin: the `auth` gate, two reads, two components, an honest refusal line for each.
+- **`src/components/layout/admin-nav-items.ts`** (new) + `Sidebar.tsx` / `MobileNav.tsx` — `09.02`, **one** nav list where there were two that had already drifted; Call queue added, Positions reaches mobile.
+- **`src/boot/wire-scheduling.ts`** — the db inside in **every** environment, closing P1-WIRE's production hole; `wire-ports.ts` drops the environment argument; `boot.test.ts` and `wire-seams.test.ts` re-pointed to assert the **reason** rather than a happy path.
+- **`src/modules/call-layer/`** (four files) — `Scheduling.hold` gained the subject and kind it is for, so `types.ts`, `actions/hold-slot-action.ts`, `components/SlotPicker.tsx` and two suites pass what they already knew.
+- **Tests:** `scheduling/__tests__/{scheduling.inside.test.ts,fake-scheduling-port.ts}` (24 claims + 2 pins) · `admin/__tests__/{admin.call-queue.test.ts,admin.call-queue.screens.test.tsx}` (34 claims).
+- **Not touched:** `positions/**` · `matching/**` · `src/app/parent/request/**` · `onboarding-parent/**` (all `1e`) · `supabase/**` (**no migration in this unit**) · `shared-types/**` · `auth/**` · `config/**` · `payments` / `purchase-paths` / `access-gate` (`1h`) · any `(public)` / `(funnel)` route body · eslint config · `package.json`.
+
+**Contract corrections this unit made, each grounded rather than preferred.** (1) **`Scheduling.hold` carries `{ kind, subject }`.** 03 §3.2 writes `hold(slotId, actor)`, but §3.2's own `ACTIVE_STATUSES` includes `'held'` and §3.3 **I-10** says one active booking per subject — so a held row _has_ a subject by the contract's own words, and 02 §4.4 row 4 makes `subject_type`, `subject_id` and `kind` all NOT NULL while `book_slot()` refuses a hold whose subject or kind does not match (`HOLD_NOT_YOURS`). A two-argument `hold` can write no row at all; the invariant won over the signature. (2) **`SchedulingReason` gains `NOT_FOUND` and `FORBIDDEN`** — 03 §3.4 names both as codes with no reason beside them while 03 §1 rule 4 says a contract's failures close over a reason union; the reasons mirror the codes rather than borrowing `CALENDAR_UNKNOWN`, which would tell a caller the calendar is gone when one booking is simply absent. (3) **`removeAvailabilityRule` closes a rule with `effectiveTo`** rather than deleting it — 03 §1.4's `Query` has no `delete`, and `effectiveTo` is the field 03 §3.2 puts on `AvailabilityRule` for exactly "no longer in force"; the audit trail survives, which a delete would have thrown away.
+
+**Displacement landed, and the reason it could is worth recording.** S5 noted that a hold _is_ a `bookings` row and concluded sequence 1 "has no path"; `1d` pinned displacement `it.fails`. Both were about the **hold**, not the move. `book_slot()` (`0009`) already takes `p_displace_to` and does the whole of I-2 / I-3 / I-13 under the calendar lock — it simply does not _search_ for the free slot, deliberately, so that I-6 and I-7 keep one home in `lib/generate-slots.ts` and `lib/next-free-slot.ts`. So `lib/displace-to.ts` computes the target with the same pure function the stub uses and hands it in: **one RPC, one transaction, ADR-127**, no `displace_booking()` definer needed and **no migration written**. A parent taking a displaceable slot never holds it first (the partial unique index would refuse the hold), which is why the hold's absence never blocked the path.
+
 ## Next unit
+
+**`1g` must know (from `1f`).** (1) **`scheduling` has a db inside and boot wires it everywhere** — `createScheduling({ auth })`. Every read is service scope and named in the module; every write except `book` is a single `update`, and `book` is `book_slot()`. (2) **Displacement works, in one RPC** — see the paragraph above; `1d`'s `it.fails` pin is gone. (3) **Three things are pinned, not faked, and each names its owed fix.** `unblock` (no `delete` on 03 §1.4's `Query`, no revocation column on `availability_blocks` — a `TableQuery.delete()` or `revoked_at` in `0018`); the `parentId` of a position subject read back after an admin-on-behalf booking (`bookings` does not store it — a `parent_id` column on 02 §4.4 row 4, or the field optional on read-back); and 03 §1.4 having **no range predicate**, so `bookings` and `availability_blocks` are filtered by date in TypeScript. (4) **The awaiting-slot half of S-A-03 is missing and the screen says so.** 03 §3.6 says those calls "come from `call-layer`", 03 §2.7's `CallLayer` has no method that enumerates them, and **the call mirror has no table at all** (02 R-1 is `bookings`; `memoryCallMirrorStore` forgets on a cold start). A `no-answer` retry _is_ listed, because that call has a row. **The mirror's store is the single biggest thing `1g` can land.** (5) **`scheduling` emits no events yet** — `booking.held` · `booking.displaced` · `booking.displacement-failed` · `booking.blocked-over` · `availability.changed` (03 §3.6). `book_slot()` returns `displaced`, so the caller _can_ emit, and 03 §3.6 names the caller: `call-layer`. Without them a displaced nanny is never told, which is half of I-2. (6) **`callTimelineRows` is built and exported from `@/modules/admin`**, ready for S-A-06 where a position id is in hand; S-A-19 cannot use it until a connector answers "which positions does this parent have". (7) **The drawer shows no family name or number** — `admin` may not read a table (fix: A-11 / A-24) and neither `auth` nor `positions` exposes a person by id; 04 §6.4 asks for "parent + contact". (8) **`08.43`, the call-queue reminder to the admin, is not built** — `comms.schedule` is reachable but nothing schedules it; the `admin-call-due` / `ALERT_CALL_OVERDUE` sweep 03 §3.5 seq 5 puts in `send-delayed-emails` is `1g`'s or a cron unit's.
+
+**`1f` / `1g` must know (from `1e`).** (1) **`positions` has an inside.** The P rows register through
+`registerPositionsSlice(createPositionsSlice({ store, isInServiceArea }))` and the reads through
+`configurePositions(createPositions({ store, rows }))` — **neither is wired at boot** (`src/boot/**` was S5b's
+while this ran), so that is the owed wiring, the same shape `1d` left for P1-WIRE-2. (2) **A suite that opens a
+position needs a call slice registered**, because P-2 cascades into C-a from inside `advance` and P-7 into C-4;
+`positions.inside.test.ts` shows the shape — a fake slice handed to `registerSlice`, never an import of
+`call-layer`. (3) **The K-row side is yours.** P-3 / P-4 / P-5 / P-6 move the position and emit; their
+connection- and placement-side preconditions live with the row that fires the cascade, and P-7's K-24 cascade is
+pinned `it.fails` in this unit rather than left silent. (4) **Rail rows 4–8 read `pending`** and are yours
+(`journeySteps`); row 3 arrives whole from the `JourneyRowSource` port — pass `{ rows: { callRow } }` to
+`createPositions` and `call-layer`'s `callRailLine` composes it, which is how `positions` keeps its no-arrow to
+`call-layer`. (5) **`getForMatching.activeConnectionNannyIds` is empty** until the `connections` connector can
+answer it (03 §7.5); `scoring` re-checks the exclusion anyway. (6) **The store is in memory.** `PositionStore`
+over `nanny_positions` (migration `0006` + the four call columns) is owed with the RPC opener; `amend` moves the
+version and emits `position.amended` but does not yet apply `AmendableFields` to a row, because there is no
+column map without the table. (7) **`getJourneySteps` is keyed by `ParentId` while a session carries a `UserId`**
+— still a one-line pass-through, now in two places (`loadParentJourney`, `loadPositionPage`).
 
 **Whoever wires a port at boot next (from P1-WIRE-2).** `src/boot/wire-<port>.ts`, one export, returning a `PortWiring` row; add the name to `BootPort` and one line to `wire-ports.ts` in dependency order. Two rules the three new files show: a binding is chosen by the **resolved environment**, never by an import edit (05 §3 rule 1); and a port whose _store_ is per-instance is refused in production with its reason on the report rather than installed quietly — that is why `call-layer` is wired on preview and not in production, exactly as `scheduling` is. `registerSlice` is last-wins, so `1e` and `1g` join the same registry without tearing it down, and a slice over a real store needs no environment gate at all. **`matching.autofire` / `matching.resultsFor` now answer `not-built`** — a named gap, pinned in `boot.test.ts`, waiting on `1e`.
 
@@ -410,7 +496,12 @@ Superseded note — the S1 "next unit" text: **S2 — `shared-types` (types only
 ---
 
 <!-- audit
-Last edited: 2026-09-17T18:05+10:00 — BB-LDN-Planner-070926/S5b
+Last edited: 2026-09-17T18:30+10:00 — BB-LDN-Planner-070926/1e
+Notes: 1e — the positions inside (the P rows, the store port, the reads, the rail), matching.autofire, S-P-04
+and S-P-05, and the profile store's read half. A files section, a 1f / 1g handover, and three connector
+extensions raised for ratification in the L-007 PROGRESS entry. Build measured green on the merged tree with
+BUILD-FIX (#25) and S5b (#24) down.
+Prior: 2026-09-17T18:05+10:00 — BB-LDN-Planner-070926/S5b
 Notes: S5b — ADR-130 and ADR-131 closed; 07 §8 row 1 paid. Database row moves from 0000-0016 to 0000-0017
 (57 tables, 80 enums, 24 functions) with the four objects 0017 adds and the apply/rollback/re-apply against
 preview. Known bugs gains four S5b entries: the closure summary; the ★ fail-open-on-limiter-outage decision
