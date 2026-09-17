@@ -7,18 +7,28 @@
 //   · `db`   one real read through the data port (03 §1.4) — **fail-closed**: an unconfigured port, an unreachable
 //            Supabase or a driver error all answer `"failed"`, never `"ok"`. The read is `areas`, the one table
 //            anonymous RLS lets the app see (02 §4.1), so the probe proves the same road a page uses.
-// Unauthenticated by definition (06 §7.3), so it carries nothing the runbook does not ask for. Still owed to the
-// boot-file unit: the rate limit 06 §7.3 names (`configureRateLimiter` has no shared store yet).
+// Unauthenticated by definition (06 §7.3), so it carries nothing the runbook does not ask for.
+//
+// **ADR-130 — the status is the signal, the body is the report.** A failed probe answers **503** with the same
+// `{ data: { sha, env, db: "failed" } }` body. Uptime and readiness probes (Better Stack per ADR-106, Vercel's
+// own checks, 06 §7.1) alert on status codes, not on parsing a body: a 200 carrying a dead dependency is a
+// monitor that never fires. The body is not narrowed to compensate — the runbook still reads which dependency
+// failed off `db`. The response is built here rather than through `toResponse` because 01 §4c's envelope pairs a
+// 5xx with an `error` body, and this is deliberately a **success body with a readiness status**; bending
+// `EnvelopeOptions` to admit 503 would let any route return a success envelope under a server error.
 import { auth } from "@/modules/auth";
 import type { NamedOperation } from "@/modules/auth";
 import { env } from "@/modules/config/server";
 import type { Environment } from "@/modules/config";
-import { log, ok, toResponse } from "@/modules/platform";
+import { envelopeOf, log, ok } from "@/modules/platform";
 import { requestIdOf } from "../_lib/request-id";
 
 export const dynamic = "force-dynamic";
 
 const UNKNOWN_SHA = "unknown";
+const OK_STATUS = 200;
+/** ADR-130: not "the server erred" but "do not send traffic here yet" — what a readiness probe reads. */
+const SERVICE_UNAVAILABLE = 503;
 
 type DbProbe = "ok" | "failed";
 
@@ -57,5 +67,9 @@ export async function GET(request: Request): Promise<Response> {
     env: env.environment,
     db,
   };
-  return toResponse(ok(report), { requestId });
+  const { body, headers } = envelopeOf(ok(report), { requestId });
+  return Response.json(body, {
+    status: db === "failed" ? SERVICE_UNAVAILABLE : OK_STATUS,
+    headers,
+  });
 }

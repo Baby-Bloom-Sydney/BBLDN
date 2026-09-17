@@ -79,16 +79,30 @@ describe("ADR-129 — a view is read-only through the port (half 2)", () => {
     );
     const view: object = q.from("nanny_public");
     const table: object = q.from("areas");
-    expect(Object.keys(view)).toEqual(["select"]);
-    expect(Object.keys(table).sort()).toEqual(["insert", "select", "update"]);
+    // ADR-131 (1) added the keyed read to both handles; what ADR-129 protects is the *absence of writes*
+    // on a view, which is what is asserted — a key-set equality, so a write cannot arrive unnoticed.
+    expect(Object.keys(view).sort()).toEqual(["eq", "select"]);
+    expect(Object.keys(table).sort()).toEqual([
+      "eq",
+      "insert",
+      "select",
+      "update",
+    ]);
   });
 
   it("gives a view no `insert` / `update` at run time — Supabase driver", () => {
     const q = supabaseQuery(async () => ({}) as unknown as SupabaseClient);
     const view: object = q.from("nanny_public");
     const table: object = q.from("areas");
-    expect(Object.keys(view)).toEqual(["select"]);
-    expect(Object.keys(table).sort()).toEqual(["insert", "select", "update"]);
+    // ADR-131 (1) added the keyed read to both handles; what ADR-129 protects is the *absence of writes*
+    // on a view, which is what is asserted — a key-set equality, so a write cannot arrive unnoticed.
+    expect(Object.keys(view).sort()).toEqual(["eq", "select"]);
+    expect(Object.keys(table).sort()).toEqual([
+      "eq",
+      "insert",
+      "select",
+      "update",
+    ]);
   });
 
   it("forbids `insert` / `update` on a view at the type level (tsc judges)", () => {

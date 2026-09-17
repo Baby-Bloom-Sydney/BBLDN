@@ -13,7 +13,8 @@ export type BootPort =
   | "scheduling"
   | "scoring"
   | "matching"
-  | "call-layer";
+  | "call-layer"
+  | "parent-profile";
 
 export type PortWiring = {
   readonly port: BootPort;

@@ -3,6 +3,7 @@
 // `INTERNAL` `Result`, so no call site can forget to check (01 §4a rule 1).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  KeyedRead,
   Query,
   QueryHandle,
   ReadableName,
@@ -43,6 +44,46 @@ const unwrapRow = <R>(result: DriverResult): R => {
   return data as R;
 };
 
+/** A keyed `single()` legitimately answers `null` (no such row); two rows are PostgREST's error (`maybeSingle`). */
+const unwrapMaybeRow = <R>(result: DriverResult): R | null => {
+  const data = unwrap<unknown>(result);
+  return data === null || data === undefined ? null : (data as R);
+};
+
+const columnList = (columns: ReadonlyArray<string> | undefined): string =>
+  columns === undefined ? "*" : columns.join(",");
+
+/**
+ * ADR-131 (1): the keyed read is `.select(columns).eq(column, value)`; `single()` adds `.maybeSingle()`, which is
+ * where "a key matched two rows" becomes a thrown driver error rather than an arbitrary first row. It is built
+ * for a **name**, not a table (ADR-129): a view is keyed-readable too, and read-only either way — `KeyedRead`
+ * carries no `insert` / `update` to omit.
+ */
+function keyedRead<N extends ReadableName<AppDatabase>>(
+  client: () => Promise<SupabaseClient>,
+  name: N,
+  column: string,
+  value: unknown,
+): KeyedRead<RowOf<AppDatabase, N>> {
+  return {
+    select: async (columns) =>
+      unwrapRows<RowOf<AppDatabase, N>>(
+        await (await client())
+          .from(name)
+          .select(columnList(columns))
+          .eq(column, value),
+      ),
+    single: async () =>
+      unwrapMaybeRow<RowOf<AppDatabase, N>>(
+        await (await client())
+          .from(name)
+          .select("*")
+          .eq(column, value)
+          .maybeSingle(),
+      ),
+  };
+}
+
 export function supabaseQuery(
   client: () => Promise<SupabaseClient>,
 ): Query<AppDatabase> {
@@ -51,24 +92,26 @@ export function supabaseQuery(
     columns: ReadonlyArray<string> | undefined,
   ): Promise<ReadonlyArray<RowOf<AppDatabase, N>>> =>
     unwrapRows<RowOf<AppDatabase, N>>(
-      await (await client())
-        .from(name)
-        .select(columns === undefined ? "*" : columns.join(",")),
+      await (await client()).from(name).select(columnList(columns)),
     );
 
-  // ADR-129: a view's handle carries `select` only. The `as` on the return is the same single seam as the row
+  // ADR-129 / ADR-131 (1): a view's handle carries reads only — `select` and the keyed `eq`. The `as` on the return is the same single seam as the row
   // casts above — `QueryHandle` is a conditional type over the name, which an object literal cannot satisfy
   // without one; the table / view split itself is decided by `isViewName`, never by the caller.
   const from = <N extends ReadableName<AppDatabase>>(
     name: N,
   ): QueryHandle<AppDatabase, N> => {
+    const eq = (column: string, value: unknown) =>
+      keyedRead(client, name, column, value);
     if (isViewName(name)) {
       return {
         select: (columns?: ReadonlyArray<string>) => select(name, columns),
+        eq,
       } as unknown as QueryHandle<AppDatabase, N>;
     }
     return {
       select: (columns?: ReadonlyArray<string>) => select(name, columns),
+      eq,
       insert: async (row: Readonly<Record<string, unknown>>) =>
         unwrapRow<RowOf<AppDatabase, N>>(
           await (await client()).from(name).insert(row).select().single(),

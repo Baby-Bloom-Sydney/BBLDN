@@ -1,15 +1,14 @@
 // `POST /api/public/quick-match` (03 §6.3; `02.09`) — the inline widget's contract: the front door's three fields
-// as JSON → count + the top cards. No auth, no write; the envelope of 01 §4c. Rate limit (07 §8 row 1) owed with
-// the shared store.
-// **P1-WIRE-2 looked at this and did not build it, on purpose.** `assertSharedStore` denies every `consume`
-// whenever `NODE_ENV === "production"` — on Vercel that is **preview and production both** — until boot calls
-// `configureRateLimiter(limiter, "shared")`. The shared store is `rate_limit_buckets`, which S5b creates in
-// migration `0017`; `main` stops at `0016` and S5b is not merged. So wiring `consume` here today would deny
-// every request to this route on every deployed environment. Declaring the per-instance memory store
-// "shared" instead is the exact failure that assertion exists to catch. Land it with S5b, not before.
+// as JSON → count + the top cards. No auth, no write; the envelope of 01 §4c. Rate limited on 07 §8 row 1
+// (`publicRead`, keyed by the hashed caller address) over the shared `rate_limit_buckets` store of `0017` —
+// **before the body is parsed**, so a burst cannot spend a match run, or even a JSON parse, per request.
+// P1-WIRE-2 correctly refused to build this before the store existed: `assertSharedStore` denies every
+// `consume` wherever `NODE_ENV === "production"` (on Vercel, preview **and** production) until boot declares a
+// shared store, so wiring it early would have denied every request to this route on every deployment.
 import { z } from "zod";
 import { err, ok, toResponse } from "@/modules/platform";
 import { buildQuickMatchPage } from "@/modules/matching";
+import { consumePublicReadLimit } from "../../_lib/consume-public-read-limit";
 import { requestIdOf } from "../../_lib/request-id";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +24,12 @@ const BODY = z
   })
   .strict();
 
+const SURFACE = "quick-match";
+
 export async function POST(request: Request): Promise<Response> {
   const requestId = requestIdOf(request);
+  const limited = await consumePublicReadLimit(request, requestId, SURFACE);
+  if (limited !== null) return toResponse(limited, { requestId });
   const parsed = BODY.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
     return toResponse(

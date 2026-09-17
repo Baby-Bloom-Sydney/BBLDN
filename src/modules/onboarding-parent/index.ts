@@ -3,9 +3,13 @@
 // service modules; it never imports `scheduling` (03 §3.6 R3) — the slot picker is `call-layer`'s.
 export type * from "./types";
 
-// Boot hooks: the `user_profiles` write (02 §4.1) behind a fail-closed registry until the ADR-127 definer exists.
+// Boot hooks: the `user_profiles` + `user_roles` write (02 §4.1) behind a registry that fails closed until the
+// boot installs an adapter over `0017`'s `create_parent_profile`. `parentProfileStore` is the binding itself —
+// exported like every other module-level binding so the composition root's own suite can assert what it bound,
+// rather than reaching past the connector into `lib/`.
 export { configureParentProfileStore } from "./lib/configure-parent-profile-store";
 export { memoryParentProfileStore } from "./lib/memory-parent-profile-store";
+export { parentProfileStore } from "./lib/default-parent-profile-store";
 
 // The three actions the `(auth)` + `(funnel)` route files pass to their forms (01 §2.5 "route files are thin").
 export { signUpParentAction } from "./actions/sign-up-parent-action";

@@ -37,8 +37,8 @@ afterAll(async () => {
 const names = Object.keys(ENUMS) as EnumName[];
 
 describe("enum ordinals — the database and shared-types are one register", () => {
-  it("shared-types holds the 79 enums of 02 §3", () => {
-    expect(names).toHaveLength(79);
+  it("shared-types holds the 80 enums of 02 §3 (79 + `consent_purpose`, 0017)", () => {
+    expect(names).toHaveLength(80);
   });
 
   it("the database holds exactly the same enum names — no more, no fewer", () => {

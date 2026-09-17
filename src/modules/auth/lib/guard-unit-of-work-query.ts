@@ -2,7 +2,7 @@
 // `rpc()` through — booked against the unit of work via the join, so a second is refused — and refuses every
 // table **write** (`insert` / `update`): under PostgREST each of those is its own implicit transaction, so a
 // write beside the RPC could never be atomic with it, and a seam that let it through would be lying about the
-// atomicity the caller asked for. Reads pass: a `select` inside a unit of work is harmless. A refused call
+// atomicity the caller asked for. Reads pass: a `select` (or a keyed `eq` read) inside a unit of work is harmless. A refused call
 // throws `UnitOfWorkRefusal`, which `DataAccessPort.run` turns back into the carried `Result`. Whether the token
 // is one the binding holds open is the port's check, made before this guard is built.
 import { err } from "@/modules/platform";
@@ -25,8 +25,9 @@ const refuseWrite = (): never => {
 };
 
 /**
- * ADR-129: `from()` hands back a table handle or a view's select-only handle. A view has no write to refuse, so
- * its handle passes through with `select` alone; a table's `insert` / `update` are replaced by the refusal.
+ * ADR-129 / ADR-131 (1): `from()` hands back a table handle or a view's read-only handle. A view has no write to
+ * refuse, so its handle passes through with its reads alone; a table's `insert` / `update` are replaced by the
+ * refusal, and both keep `eq`.
  * The `as` is the same conditional-type seam the two drivers carry (`QueryHandle` is conditional over the name).
  */
 function guarded<N extends ReadableName<AppDatabase>>(
@@ -34,13 +35,18 @@ function guarded<N extends ReadableName<AppDatabase>>(
 ): QueryHandle<AppDatabase, N> {
   const handle = inner as {
     readonly select: (columns?: ReadonlyArray<string>) => Promise<unknown>;
+    readonly eq: (column: string, value: unknown) => unknown;
     readonly insert?: unknown;
   };
   const select = (columns?: ReadonlyArray<string>) => handle.select(columns);
+  // ADR-131 (1): a keyed read is a read — it passes through unguarded on either kind of handle, and what it
+  // returns carries no `insert` / `update` to refuse. There is nothing to wrap.
+  const eq = (column: string, value: unknown) => handle.eq(column, value);
   if (handle.insert === undefined)
-    return { select } as unknown as QueryHandle<AppDatabase, N>;
+    return { select, eq } as unknown as QueryHandle<AppDatabase, N>;
   return {
     select,
+    eq,
     insert: async () => refuseWrite(),
     update: async () => refuseWrite(),
   } as unknown as QueryHandle<AppDatabase, N>;

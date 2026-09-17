@@ -1,6 +1,7 @@
 // The consent store over `auth`'s port (02 R-4; 0004): the append-only inserts are session-scope self writes,
-// "latest for (user, purpose)" and "current document" are computed over the RLS-bounded rows, a row whose
-// purpose cannot be recovered (no document pair) is skipped — fail closed — and the cookie half refuses.
+// "latest for (user, purpose)" and "current document" are computed over the RLS-bounded rows, every row carries
+// its own `purpose` since `0017` (ADR-131 (2)) so a non-document consent round-trips, and the cookie half writes
+// through the `record_cookie_consent` definer.
 import { describe, expect, it } from "vitest";
 import type { ConsentRecord } from "@/modules/platform";
 import type { UnitOfWork } from "@/modules/shared-types";
@@ -15,6 +16,7 @@ const row = (over: Record<string, unknown>) => ({
   agreement_id: "AGR-01",
   checkpoint_id: "signup",
   checkpoint_text: "I agree",
+  purpose: "client-tos",
   document_id: "client-tos",
   document_version: 1,
   consent_given: true,
@@ -60,6 +62,7 @@ describe("dbConsentStore — consent_records", () => {
         agreement_id: "AGR-01",
         checkpoint_id: "signup",
         checkpoint_text: "I agree",
+        purpose: "client-tos",
         document_id: "client-tos",
         document_version: 1,
         consent_given: true,
@@ -81,7 +84,11 @@ describe("dbConsentStore — consent_records", () => {
           consent_given: false,
           created_at: "2026-09-02T00:00:00.000Z",
         }),
-        row({ id: "other-purpose", document_id: "privacy-policy" }),
+        row({
+          id: "other-purpose",
+          purpose: "privacy-policy",
+          document_id: "privacy-policy",
+        }),
         row({
           id: "other-user",
           user_id: "22222222-2222-4222-8222-222222222222",
@@ -101,15 +108,25 @@ describe("dbConsentStore — consent_records", () => {
     });
   });
 
-  it("skips a row whose purpose cannot be recovered (no document pair) — fail closed, recorded gap", async () => {
+  // Was "skips a row whose purpose cannot be recovered — fail closed, recorded gap". `0017` closed the gap:
+  // the row says what it is for, so a `vaccination-status` consent (ADR-103; 07 §2.7(a)) is evidence again
+  // instead of vanishing. Fail-closed was the right answer to a missing column, not a behaviour to keep.
+  it("reads back a row with no document pair on its own purpose (ADR-131 (2))", async () => {
     const fake = fakeDataPort({
-      consent_records: [row({ document_id: null, document_version: null })],
+      consent_records: [
+        row({
+          purpose: "vaccination-status",
+          document_id: null,
+          document_version: null,
+        }),
+      ],
     });
     const latest = await dbConsentStore(fake.port).latestConsent(
       USER as never,
       "vaccination-status",
     );
-    expect(latest).toEqual({ ok: true, value: null });
+    expect(latest.ok && latest.value?.purpose).toBe("vaccination-status");
+    expect(latest.ok && latest.value?.document).toBeUndefined();
   });
 });
 
@@ -162,21 +179,27 @@ describe("dbConsentStore — legal_documents", () => {
   });
 });
 
-describe("dbConsentStore — the cookie half fails closed", () => {
-  it("refuses insertCookie and currentCookie with their own reason and never reaches the port", async () => {
+describe("dbConsentStore — the cookie half writes through 0017's definer", () => {
+  // Was pinned refusing with `cookie-consent-write-not-available`: the new row and the `superseded_by` stamp
+  // cannot be two PostgREST statements, and until `record_cookie_consent` existed there was nothing honest to
+  // call. The full argument mapping is asserted in `db-0017-stores.test.ts`; this is the seam.
+  it("insertCookie goes through record_cookie_consent, under the service role", async () => {
     const fake = fakeDataPort();
-    const store = dbConsentStore(fake.port);
-    const inserted = await store.insertCookie({} as never);
-    const current = await store.currentCookie({
-      kind: "visitor",
-      id: "v" as never,
-    });
-    expect(!inserted.ok && inserted.error.details?.reason).toBe(
-      "cookie-consent-not-available",
-    );
-    expect(!current.ok && current.error.details?.reason).toBe(
-      "cookie-consent-not-available",
-    );
-    expect(fake.calls).toEqual([]);
+    fake.state.rpcAnswer = () => null;
+
+    const result = await dbConsentStore(fake.port).insertCookie({
+      id: "c-1",
+      visitorId: "v-1",
+      choice: "reject_non_essential",
+      analyticsEnabled: false,
+      marketingEnabled: false,
+      context: {},
+      expiryDate: "2027-09-17T00:00:00.000Z",
+      createdAt: "2026-09-17T00:00:00.000Z",
+    } as never);
+
+    expect(result.ok).toBe(true);
+    expect(fake.rpcs[0]?.name).toBe("record_cookie_consent");
+    expect(fake.calls[0]?.scope).toBe("service");
   });
 });

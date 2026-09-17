@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-09-17T06:23:17.893Z",
+  "generated_at": "2026-09-17T06:24:02.192Z",
   "summary": {
     "route_count": 59,
     "page_count": 88,
     "cron_count": 23,
-    "migration_count": 17,
+    "migration_count": 18,
     "server_action_file_count": 41
   },
   "routes": [
@@ -958,6 +958,11 @@
       "filename": "0016_rls.sql",
       "bytes": 26408,
       "modified_at": "2026-09-17T05:47:53.105Z"
+    },
+    {
+      "filename": "0017_consent-purpose-rate-limits-profile.sql",
+      "bytes": 28374,
+      "modified_at": "2026-09-17T06:23:51.395Z"
     }
   ],
   "server_actions": [

@@ -3,6 +3,7 @@
 // mapping and the password policy stay the module's own, so a stub can never quietly behave differently from the
 // real thing (05 §3 rule 2 — a behaviour the stub cannot honour is a connector defect, not a stub exception).
 import type {
+  KeyedRead,
   Query,
   QueryHandle,
   ReadableName,
@@ -89,16 +90,42 @@ export function memoryAuthDriver(
     row: Readonly<Record<string, unknown>>,
   ): RowOf<AppDatabase, N> => row as RowOf<AppDatabase, N>;
 
-  // ADR-129: a view's handle is select-only here too, so the stub cannot honour a write the real driver refuses
-  // (05 §3 rule 2). The `as` is the same seam as `asRow` — `QueryHandle` is conditional over the name.
+  // ADR-131 (1): the keyed read the real driver answers with `.eq(...)` / `.maybeSingle()`, honoured here with
+  // the same two rules — `select()` is every matching row, `single()` is the one row or `null`, and two matches
+  // throw (a key that is not a key is a broken invariant, and a stub that picked one would let a test pass on it).
+  const keyed = <N extends ReadableName<AppDatabase>>(
+    name: N,
+    column: string,
+    value: unknown,
+  ): KeyedRead<RowOf<AppDatabase, N>> => {
+    const matching = () =>
+      (tables.get(name) ?? []).filter((row) => row[column] === value);
+    return {
+      select: async () => matching().map(asRow<N>),
+      single: async () => {
+        const rows = matching();
+        if (rows.length > 1)
+          throw new Error(
+            `keyed read on ${name}.${column} matched ${String(rows.length)} rows`,
+          );
+        return rows.length === 0 ? null : asRow<N>(rows[0]);
+      },
+    };
+  };
+
+  // ADR-129 / ADR-131 (1): a view's handle carries the reads and no write here either, so the stub cannot honour
+  // a write the real driver refuses (05 §3 rule 2). The `as` is the same seam as `asRow` — `QueryHandle` is
+  // conditional over the name.
   const from = <N extends ReadableName<AppDatabase>>(
     name: N,
   ): QueryHandle<AppDatabase, N> => {
     const select = async () => (tables.get(name) ?? []).map(asRow<N>);
+    const eq = (column: string, value: unknown) => keyed(name, column, value);
     if (isViewName(name))
-      return { select } as unknown as QueryHandle<AppDatabase, N>;
+      return { select, eq } as unknown as QueryHandle<AppDatabase, N>;
     return {
       select,
+      eq,
       insert: async (row: Readonly<Record<string, unknown>>) =>
         asRow<N>(append(name, row)),
       update: async (_id: string, patch: Readonly<Record<string, unknown>>) =>
