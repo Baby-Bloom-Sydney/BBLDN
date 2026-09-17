@@ -48,7 +48,7 @@ export function wirePorts(env: ParsedEnv): BootReport {
     // `positions` first, then the two slices whose cascades dispatch into its P rows (03 §2.1). The order is
     // not load-bearing — `registerSlice` is last-wins and `positionFacts` is read at run time, not at wire
     // time — but the file reads in dependency order and there is no reason to be the exception.
-    wirePositions(env.environment),
+    wirePositions(),
     wirePlacements(),
     wireConnections(),
     wireParentProfileStore(),

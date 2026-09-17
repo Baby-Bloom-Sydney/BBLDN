@@ -85,6 +85,8 @@ export function stubMatching(seed: StubMatchingSeed = {}): Matching {
         providerKind: "stub",
         firedAt: nowInstant(),
         wave: 1,
+        // the stub sends nothing, and says so rather than reporting a blast it did not make (05 §3 rule 2)
+        notified: 0,
       });
     },
   });

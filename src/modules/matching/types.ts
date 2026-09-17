@@ -54,7 +54,28 @@ export type AutofireOutcome = {
   readonly providerKind: string;
   readonly firedAt: Instant;
   readonly wave: number;
+  /** 03 §7.4's blast — how many of the ranked nannies were sent `precheck-nanny`. `0` when no port is wired. */
+  readonly notified: number;
 };
+
+/**
+ * 03 §7.4's blast, as a **port**.
+ *
+ * §7.4 says autofire "notifies each nanny (`precheck-nanny` batch via `comms.sendMany`)", and 01 §2.3 gives
+ * `matching` no arrow to `comms` — its allowed imports are `positions` · `scoring` · `areas` · `platform`,
+ * enforced by `lint:boundaries`. So the send is **handed in at boot**, the same inversion `connections` uses for
+ * its `AdvanceFn` and `registerSlice` uses in the other direction; the shape is declared structurally here
+ * because a `comms` type may not be imported either.
+ *
+ * Under ADR-136 what crosses this seam is **ids**: the caller names the nannies and `comms` resolves each
+ * address inside its own send. `1e` pinned this blast `it.fails` because no module could obtain a nanny's
+ * address; that reason is gone, and the port is what carries the fix without widening 01 §2.3.
+ */
+export type PrecheckBlast = (input: {
+  readonly positionId: PositionId;
+  readonly nannyIds: ReadonlyArray<NannyId>;
+  readonly wave: number;
+}) => Promise<Result<{ readonly notified: number }>>;
 
 // ── The marketplace-safe nanny (07 §5.2 `nanny_public`; 02 §4.2 read models) ──
 

@@ -108,6 +108,8 @@ const fakeCallSlice = () =>
 
 beforeEach(async () => {
   emitted = [];
+  blasted = [];
+  blastRefuses = false;
   configureUnitOfWork(createUnitOfWork(memoryTransactionOpener()));
   configureEvents(
     createEvents({
@@ -151,11 +153,23 @@ beforeEach(async () => {
   });
 });
 
+/** ADR-136 — the blast port boot composes. Here it records the ids it was given and holds no address. */
+let blasted: Array<{ nannyIds: ReadonlyArray<NannyId>; wave: number }>;
+let blastRefuses: boolean;
+
 const run = (entries: ReadonlyArray<Candidate> = POOL) =>
-  autofire({ pool: async () => ok(entries), clock: () => NOW })(
-    POSITION,
-    convert,
-  );
+  autofire({
+    pool: async () => ok(entries),
+    clock: () => NOW,
+    blast: async (input) => {
+      if (blastRefuses)
+        return err("PROVIDER_ERROR", "the provider is down", {
+          reason: "provider-rejected",
+        });
+      blasted.push({ nannyIds: input.nannyIds, wave: input.wave });
+      return ok({ notified: input.nannyIds.length });
+    },
+  })(POSITION, convert);
 
 describe("autofire — the pre-check that makes the call promise level 2 (03 §7.4; T-1.4)", () => {
   it("ranks the pool, writes the lever and emits precheck.fired", async () => {
@@ -210,15 +224,44 @@ describe("autofire — the pre-check that makes the call promise level 2 (03 §7
     expect(!result.ok && result.error.code).toBe("NOT_FOUND");
   });
 
-  it.fails(
-    "PINNED (03 §7.4 — the blast): autofire notifies each ranked nanny with `precheck-nanny`",
-    async () => {
-      // Not built. A `comms` `Recipient` needs an `Email`; the only nanny read this module has is the
-      // marketplace-safe `nanny_public` (07 §5.2 — first name, no address), and no document authorises a
-      // service-scope read of nanny contact details. The lever, the ranking and `precheck.fired` ship; the
-      // blast waits for a recipient port. Recorded in the L-007 `1e` PROGRESS entry.
-      const result = await run();
-      expect(result.ok && "notified" in result.value).toBe(true);
-    },
-  );
+  /**
+   * `1e`'s pin, flipped by ADR-136 (P1-STORES). It was red because a `comms` `Recipient` needed an `Email` and
+   * the only nanny read this module has is the marketplace-safe `nanny_public` (07 §5.2 — first name, no
+   * address). The ruling removed the requirement rather than the rule: the message names her by id and `comms`
+   * resolves the address inside its own send, so `matching` still cannot obtain one — which the second claim
+   * below is the guard for.
+   */
+  it("notifies each ranked nanny with `precheck-nanny` (03 §7.4 — the blast)", async () => {
+    const result = await run();
+    expect(result.ok && result.value.notified).toBe(POOL.length);
+    expect(blasted).toHaveLength(1);
+    // the ranking's order, not the pool's — every ranked nanny and no one else
+    expect([...(blasted[0]?.nannyIds ?? [])].sort()).toEqual(
+      POOL.map((entry) => entry.nannyId as string).sort(),
+    );
+    expect(blasted[0]?.wave).toBe(1);
+  });
+
+  it("★ hands the blast ids and nothing else — no address crosses the port", () => {
+    expect(JSON.stringify(blasted)).not.toContain("@");
+  });
+
+  it("a blast that fails does not fail the pre-check — the lever and the ranking stand (03 §7.4)", async () => {
+    blastRefuses = true;
+    const result = await run();
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.notified).toBe(0);
+    expect(result.ok && result.value.rankedCount).toBe(POOL.length);
+    expect(emitted).toContain("precheck.fired");
+    const steps = await positions.getJourneySteps(PARENT as string as ParentId);
+    expect(steps.ok && steps.value[1]?.state).toBe("in-motion");
+  });
+
+  it("reports `notified: 0` honestly when no blast port is wired", async () => {
+    const result = await autofire({
+      pool: async () => ok(POOL),
+      clock: () => NOW,
+    })(POSITION, convert);
+    expect(result.ok && result.value.notified).toBe(0);
+  });
 });

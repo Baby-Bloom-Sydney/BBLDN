@@ -5,8 +5,14 @@
 // the welcome email (best effort), `signup.completed` (03 §9.3), and the destination (`03.36`). A step that
 // refuses returns its refusal as a `ClientResult` — never a thrown error, never a success the database cannot
 // show. Every provider text and every INTERNAL reason stays server-side (03 §1 rule 4; 01 §4a): the form gets the
-// generic line and its standing "Sign in" link. `auth.signUp` cannot tell a duplicate email from an outage, so
-// 04 §6.1's "duplicate email → S-X-08" is pinned as a failing test, not guessed at.
+// generic line and its standing "Sign in" link — **for every failure alike**, a duplicate email included.
+//
+// `1c` pinned "duplicate email → S-X-08 naming the field" as a failing test because `auth.signUp` cannot tell a
+// duplicate from an outage. **ADR-132 / ADR-137 superseded it:** a form that answers a taken address differently
+// from an unavailable provider has told an attacker which addresses have accounts, which is exactly the
+// enumeration oracle 07 §4 forbids — so the pin asked for a defect. The promise behind it survives in the one
+// refusal line, which carries the standing "Sign in" link that takes a returning parent where she meant to go.
+// Deleted rather than built (P1-STORES), as ADR-137 directs.
 import { URLS } from "@/modules/config";
 import { auth } from "@/modules/auth";
 import { Events, err, log, ok, toActionResult } from "@/modules/platform";

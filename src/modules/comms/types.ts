@@ -33,10 +33,31 @@ export type MessageStatus =
   | "deduped"
   | "dry-run";
 
-/** Resolved by the caller (03 §8.1) — comms never looks a person up. */
-export type Recipient = {
-  readonly userId?: Uuid;
+/**
+ * 03 §8.1 as ADR-136 amends it: **a caller names a person, it does not carry an address.**
+ *
+ * `{ userId }` is the normal form — `comms` resolves the address inside the send, from its own store, at
+ * service scope. `{ email }` is for someone who is **not a user yet** (a lead, a public contact form), where
+ * there is no id to name.
+ *
+ * The rule this replaces said "resolved by the caller", and the cost of it was measured twice: `1e` could not
+ * send `precheck-nanny` and `1g` could not send `connection-requested`, because 07 §5.2 keeps a nanny's address
+ * out of `nanny_public` and **no document authorises a business module to read her contact details**. Moving the
+ * read to `comms` — the one owner of sends (01 §2.4), which already writes `email_logs` under service scope —
+ * is stricter than the old rule, not looser: a business module can no longer obtain an address at all.
+ */
+export type Recipient =
+  | { readonly userId: Uuid; readonly name?: string }
+  | { readonly email: Email; readonly name?: string };
+
+/**
+ * What a `Recipient` becomes once the send has resolved it. It exists **inside a send** and nowhere else: it is
+ * never a parameter, never returned by the connector, and the only place it comes to rest is the `email_logs`
+ * row (`recipient_email` / `recipient_user_id`), which is where 07 §6.1's deletion job expects to find it.
+ */
+export type ResolvedRecipient = {
   readonly email: Email;
+  readonly userId?: Uuid;
   readonly name?: string;
 };
 
@@ -121,6 +142,15 @@ export type Message<Id extends TemplateId = TemplateId> = {
   readonly attachments?: ReadonlyArray<Attachment>;
 };
 
+/**
+ * The same message with its recipient resolved — what the renderer and the provider see, and the only shape in
+ * which an address exists inside this module. A template that wants to greet someone reads `to.name`.
+ */
+export type ResolvedMessage<Id extends TemplateId = TemplateId> = Omit<
+  Message<Id>,
+  "to"
+> & { readonly to: ResolvedRecipient };
+
 /** 02 §3 leaves `inbox_messages.type` deliberately **text, open set** — so does this. */
 export type InboxType = string;
 
@@ -185,7 +215,7 @@ export type Comms = {
 /** What a provider is handed: already rendered, already resolved, no template knowledge. */
 export type RenderedEmail = {
   readonly messageId: MessageId;
-  readonly to: Recipient;
+  readonly to: ResolvedRecipient;
   readonly from: SenderKey;
   readonly replyTo?: Email;
   readonly subject: string;
@@ -218,7 +248,7 @@ export type SmsProvider = {
 /** The template seam. No template is written by this unit, so the default renderer fails closed. */
 export type TemplateRenderer = {
   render(
-    message: Message,
+    message: ResolvedMessage,
     messageId: MessageId,
   ): Promise<Result<RenderedEmail, CommsErrorDetails>>;
 };
@@ -228,6 +258,18 @@ export type TemplateRenderer = {
  * exist yet — boot installs it over `auth`'s data-access port once the tables are on `main`.
  */
 export type CommsStore = {
+  /**
+   * ADR-136 — the one read that makes `{ userId }` sendable: `user_profiles` keyed on `user_id` (ADR-131 (1)),
+   * at **service scope**, inside the store that already writes `email_logs` under it. Used only by a send; the
+   * address it answers is written onto the `email_logs` row and **never returned to the caller**, which is what
+   * keeps a business module unable to obtain one.
+   *
+   * A user id nothing resolves is `invalid-recipient` — the same refusal a malformed address gets, deliberately:
+   * a caller must not be able to tell "no such user" from "a bad address" (07 §4).
+   */
+  resolveRecipient(
+    userId: Uuid,
+  ): Promise<Result<ResolvedRecipient, CommsErrorDetails>>;
   findLiveByDedupeKey(
     dedupeKey: string,
   ): Promise<Result<MessageId | null, CommsErrorDetails>>;

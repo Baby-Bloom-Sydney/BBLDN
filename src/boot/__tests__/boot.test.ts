@@ -260,11 +260,14 @@ describe("after register() in a valid preview environment", () => {
   });
 
   // AUTH-2 — the wiring `1e` left owed, in the same shape and asserted the same way: against the *named*
-  // fail-closed reason, never a happy path.
-  it("positions — the reads are installed; `positions-not-configured` is gone and a parent with no position gets an answer, not a refusal", async () => {
+  // fail-closed reason, never a happy path. **P1-STORES re-pointed it**, exactly as `1g` re-pointed the C-row
+  // probe above and for the same reason: the read now reaches `nanny_positions` through `auth`'s port, so in an
+  // environment with no reachable database it fails as the **store** rather than answering `null` out of memory.
+  // The claim boot owes is that the seam is bound, and `positions-not-configured` is what "not bound" says.
+  it("positions — the reads are installed over the schema; `positions-not-configured` is gone and a failure is the store's, not an unwired seam's", async () => {
     const live = await m.positions.positions.findLive(PARENT_OWNER);
     expect(reasonOf(live)).not.toBe("positions-not-configured");
-    expect(live).toEqual({ ok: true, value: null });
+    expect(live.ok).toBe(false);
     const stage = await m.positions.positions.getStage({
       kind: "position",
       id: POSITION,
@@ -273,11 +276,12 @@ describe("after register() in a valid preview environment", () => {
   });
 
   it("positions — the P rows are registered with the stage model, so advance dispatches into the slice (03 §2.1 / §2.5)", async () => {
-    // Same deliberate refusal the C-row probe uses: `P-2` names exactly one system job
-    // (`signup-convert-lead`, 03 §2.4), so `autofire` — a real `SystemJobName` and not that one — is turned away
-    // by the **handler's own** actor rule. That is the whole claim boot owes: the row reached the registered
-    // slice. A probe that passed the gate would write the position row and emit `position.opened` through the
-    // event-log store, i.e. need a database this environment does not have.
+    // Same deliberate refusal the C-row probe uses. `P-2` names exactly one system job (`signup-convert-lead`,
+    // 03 §2.4), so `autofire` — a real `SystemJobName` and not that one — would be turned away by the handler's
+    // own actor rule. **Since P1-STORES the handler reads the position from the database before it reaches that
+    // gate**, so in an environment with no database the probe is refused by the store instead — the same move
+    // `1g` made on the C-row probe when the mirror became a db store. Either way it never reaches a write, and
+    // `E_SLICE_NOT_REGISTERED` is the answer that would mean boot had registered nothing.
     const moved = await m.positions.advance({
       transition: "P-2",
       entity: { kind: "position", id: POSITION },
@@ -290,8 +294,9 @@ describe("after register() in a valid preview environment", () => {
       expectedFrom: null,
       idempotencyKey: "boot-probe-p2",
     } as never);
+    expect(moved.ok).toBe(false);
     expect(reasonOf(moved)).not.toBe("E_SLICE_NOT_REGISTERED");
-    expect(reasonOf(moved)).toBe("E_ACTOR_FORBIDDEN");
+    expect(reasonOf(moved)).not.toBe("E_TRANSITION_UNKNOWN");
   });
 
   // `1h`. P1-WIRE left `configurePurchaseProvider` unwired because reaching `stub-stripe` from the boot file
@@ -341,30 +346,62 @@ describe("after register() in a valid preview environment", () => {
 });
 
 /**
- * ★ The one thing `1g` finished that boot cannot yet run end to end, pinned rather than written down.
+ * ★ `1g`'s pin, flipped — and the one that takes its place, measured on the real wired port.
  *
- * `call-layer`'s mirror is now a **db** store (`0018`), and `connections` / `placements` are db stores too — so
- * all three are installed in every environment. `positions` is not: `wire-positions.ts` (AUTH-2) installs
- * `memoryPositionStore` and refuses in production, because the store over `nanny_positions` is still owed from
- * `1e`. The two halves therefore disagree about where a position lives: `positions.advance(P-2)` writes a
- * position to memory, and the C-row mirror that P-2 cascades into looks for it in `nanny_positions` — where it
- * is not.
+ * `1g` pinned that `positions` and the call mirror disagreed about where a position lives: the mirror,
+ * `connections` and `placements` were db stores while `wire-positions.ts` installed `memoryPositionStore` and
+ * refused in production. `dbPositionStore` closes that, in every environment, so the first claim below is a
+ * plain `it` — the binding is the db store and the two halves now look in the same table.
  *
- * Nothing is broken by this that was not already: production refuses `positions` outright, so the chain is
- * refused as a whole rather than half-running. But it is the **last** thing between this unit and a parent
- * journey that runs against the schema, and it is one file: a `dbPositionStore` over `0006`, wired where
- * `memoryPositionStore` is now. Pinned here so the unit that writes it flips this test rather than discovering
- * the seam.
+ * What remains is one database object, and it is pinned rather than written down. ADR-127 makes one unit of work
+ * one RPC: `guard-unit-of-work-query.ts` replaces `insert` / `update` with a refusal for every table reached
+ * under a `{ uow }`, and **every** position write runs inside the caller's unit of work
+ * (`create-positions-slice.ts` `commit`; `create-positions.ts` `amend` / `recordPrecheck`). `0006` / `0017` /
+ * `0018` define no `SECURITY DEFINER` function for `nanny_positions`, so there is nothing to call instead.
+ *
+ * **What `0019` owes, exactly:**
+ *   `public.upsert_position(p_id uuid, p_parent_id uuid, p_source position_source, p_stage position_stage,
+ *    p_columns jsonb, p_details jsonb, p_schedule jsonb, p_expected_version integer) returns integer`
+ *   — `SECURITY DEFINER`, `search_path` pinned, `EXECUTE` revoked from `public` and granted to `service_role`
+ *   only, the owner-bypasses-RLS assertion S5b's review added, writing `nanny_positions` **and**
+ *   `position_schedule` in one transaction with the compare-and-set on `version` that `advance` already sends,
+ *   and returning the new version. Modelled on `upsert_call_mirror()` (`0018`) — the same shape, for the same
+ *   reason — with the same `int.rpc-00NN` functional suite beside it, because S5b's lesson was that metadata
+ *   assertions pass over a function that cannot write.
+ *
+ * **The same gap sits under `connections` and `placements`.** `db-connection-store.ts` and
+ * `db-placement-store.ts` (`1g`) write their tables as table writes and pass the caller's `uow` through too, so
+ * `0019` owes `connection_requests` and `nanny_placements` the same treatment. Measured here on the seam they
+ * all share rather than claimed, so one test failing is the whole family reported.
+ *
+ * Red on purpose. The unit that writes `0019` flips it; it is never bent to match the code.
  */
-describe("boot — what 1g left for the position store", () => {
+describe("boot — the position store, and what 0019 still owes", () => {
+  it("positions and the call mirror agree about where a position lives", async () => {
+    const { wirePorts } = await import("@/boot/wire-ports");
+    const { env } = await import("@/modules/config/server");
+    const report = wirePorts(env);
+    const positions = report.find((row) => row.port === "positions");
+    expect(positions?.binding).not.toContain("memory");
+    expect(positions?.binding).not.toBe("unconfigured");
+  });
+
   it.fails(
-    "positions and the call mirror agree about where a position lives",
+    "PINNED (ADR-127): a write to nanny_positions inside a unit of work is not refused",
     async () => {
-      const { wirePorts } = await import("@/boot/wire-ports");
-      const { env } = await import("@/modules/config/server");
-      const report = wirePorts(env);
-      const positions = report.find((row) => row.port === "positions");
-      expect(positions?.binding).not.toContain("memory");
+      const refused = await m.platform.withUnitOfWork((uow: UnitOfWork) =>
+        m.auth.auth.data.run(
+          {
+            name: "positions.probeWrite",
+            exec: async (q) =>
+              q
+                .from("nanny_positions")
+                .insert({ id: POSITION, parent_id: PARENT } as never),
+          },
+          { scope: "service", uow },
+        ),
+      );
+      expect(reasonOf(refused)).not.toBe("write-outside-rpc");
     },
   );
 });
