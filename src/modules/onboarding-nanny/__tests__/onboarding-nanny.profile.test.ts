@@ -155,6 +155,24 @@ describe("onboarding-nanny — saveNannyProfileStepAction (S-N-18)", () => {
     });
   });
 
+  it("07 §8 row 16 — over the per-user profile-step limit the write is refused with the generic line (security pass HIGH)", async () => {
+    const perMinute = SECURITY.rateLimits.profileSteps.perMinute ?? 0;
+    expect(perMinute).toBeGreaterThan(0);
+    const step = { step: "1", dateOfBirth: "1990-04-12" };
+    for (let i = 0; i < perMinute; i += 1)
+      expect(
+        (await saveNannyProfileStepAction(null, formDataOf(step))).ok,
+      ).toBe(true);
+    const over = await saveNannyProfileStepAction(
+      null,
+      formDataOf({ ...step, dateOfBirth: "1991-01-01" }),
+    );
+    expect(over.ok).toBe(false);
+    if (over.ok) return;
+    expect(over.error.code).toBe("INTERNAL");
+    expect(accounts.rows()[0]?.dateOfBirth).toBe("1990-04-12");
+  });
+
   it("a visitor is refused", async () => {
     configureAuth(stubAuth({ users }));
     const result = await saveNannyProfileStepAction(

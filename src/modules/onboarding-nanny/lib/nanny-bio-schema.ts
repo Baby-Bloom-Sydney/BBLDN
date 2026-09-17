@@ -9,5 +9,6 @@ export const nannyBioSchema = z.object({
     .min(
       FUNNEL_OPTIONS.bioMinLength,
       "Please write a few sentences about yourself.",
-    ),
+    )
+    .max(FUNNEL_OPTIONS.bioMaxLength, "Please keep it under a page."),
 });

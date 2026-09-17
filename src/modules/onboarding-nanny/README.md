@@ -28,7 +28,9 @@ one of `0021`'s definers at **session** scope (`create_nanny_account` · `update
 `src/boot/wire-nanny-onboarding.ts`.
 
 **Rate limits consumed** (07 §8): row 2 — `funnelStep` on every anonymous funnel step and on S-N-19,
-`signupPerEmail` + `signupPerIp` on both signup roads. All fail closed on a limiter outage (ADR-134).
+`signupPerEmail` + `signupPerIp` on both signup roads; row 16 — `funnelLeadPerEmail` on the N1 capture (the
+"sign in instead" answer bounded per address) and `profileSteps` on every S-N-18 write (per user). All fail
+closed on a limiter outage (ADR-134).
 
 **Isolation (ADR-147).** `nannies.is_isolated` records _not having applied_: `/apply` creates the row with `false`,
 S-X-07 (with or without an invite) with `true`; only `lift_nanny_isolation()` clears it, called by
@@ -45,7 +47,11 @@ reads or writes the level.
    (`loadChildrenCard` answers only a parent); 04 §8's "{family}" waits on that read (`2d` / Phase 5). Draft ☐ (B-25).
 5. **The nanny-mint pin** (`app/__tests__/child-linking.pins.test.ts`) stays RED and named: S-N-01 (the mint
    surface) is `2g`'s, so `2a` did not own it.
-6. Three copies of the hashed rate-limit key helpers now exist (`api/_lib/ip-key.ts`, `onboarding-parent`, here) —
+6. `start-invite-signup-action.ts` (`app`) sets the invite cookie by hand rather than through `carriedTokenCookie` —
+   01 §2.3 gives `app` no arrow to `onboarding-nanny`; the helper belongs in `platform` when a third caller appears.
+7. The N1 capture's "has-account" branch returns after one query where the write branches run two — a timing
+   side-channel narrower than the per-address budget already bounds; recorded, not padded.
+8. Three copies of the hashed rate-limit key helpers now exist (`api/_lib/ip-key.ts`, `onboarding-parent`, here) —
    the M-10 shape; one `platform/rate-limit` helper then a mechanical pass, for the checkpoint.
 
 <!-- audit

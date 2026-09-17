@@ -62,4 +62,5 @@ export const FUNNEL_OPTIONS = Object.freeze({
   rate: Object.freeze({ minPerHour: 10, maxPerHour: 60 }),
   yearsExperience: Object.freeze({ min: 0, max: 60 }),
   bioMinLength: 40,
+  bioMaxLength: 2000,
 });

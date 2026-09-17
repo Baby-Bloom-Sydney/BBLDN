@@ -138,12 +138,7 @@ async function createAccount(
     actor,
     props: {
       role: "nanny",
-      signupSource:
-        person.inviteToken === null
-          ? path === "apply"
-            ? "cold"
-            : "cold"
-          : "invite",
+      signupSource: person.inviteToken === null ? "cold" : "invite",
     },
   });
   if (path === "apply")

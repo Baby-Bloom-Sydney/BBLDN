@@ -86,6 +86,20 @@ const RATE_LIMITS = declarePolicies({
   },
   nannyApplications: { key: "user", perDay: 10, note: "row 12" },
   adminRoutes: { key: "admin", perMinute: 600, note: "row 14" },
+  // 07 §8 row 16 (2a's ADR-142 pass): N1's "sign in instead" answer is a deliberate reveal (04 §4.1 row 5), so the
+  // lead capture is bounded per **address** as well as per caller — a rotated User-Agent buys nothing against a
+  // target list; and S-N-18's authenticated one-write-per-step action carries a per-user ceiling of its own.
+  funnelLeadPerEmail: {
+    key: "email-hash",
+    perDay: 10,
+    note: "S-X-15 lead capture per address (row 16)",
+  },
+  profileSteps: {
+    key: "user",
+    perMinute: 30,
+    perDay: 300,
+    note: "S-N-18 profile steps per user (row 16)",
+  },
   // 07 §8 has **no row** for a signed-in parent creating a checkout or a portal session, and `1h` needed one:
   // both server actions call out to the purchase provider, so a parent in a tight loop is unbounded provider
   // cost against a real account. Row 13's "no rate limit" is scoped to provider-retried, signature-verified

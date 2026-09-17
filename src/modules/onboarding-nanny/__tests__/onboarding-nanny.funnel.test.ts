@@ -137,6 +137,29 @@ describe("onboarding-nanny — saveNannyApplicationAction (S-X-15 page 8: the le
     expect(JSON.stringify(result)).not.toContain("not-configured");
   });
 
+  it("07 §8 row 16 — the same address cannot be asked about more than perDay times, whoever asks (security pass MEDIUM)", async () => {
+    leads = memoryNannyLeadStore({ accounts: ["amara@example.test"] });
+    configureNannyLeadStore(leads);
+    const perDay = SECURITY.rateLimits.funnelLeadPerEmail.perDay ?? 0;
+    expect(perDay).toBeGreaterThan(0);
+    for (let i = 0; i < perDay; i += 1) {
+      const asked = await saveNannyApplicationAction(
+        null,
+        formDataOf(APPLICATION),
+      );
+      expect(asked).toEqual({ ok: true, value: { next: "sign-in" } });
+    }
+    const over = await saveNannyApplicationAction(
+      null,
+      formDataOf(APPLICATION),
+    );
+    expect(over.ok).toBe(false);
+    if (over.ok) return;
+    // the refusal is the generic line — a throttle that read differently would be the oracle back through the side door
+    expect(over.error.code).toBe("INTERNAL");
+    expect(over.error.message).not.toMatch(/sign in|account/i);
+  });
+
   it("07 §8 row 2 — over the funnelStep limit the refusal is the same generic line, and no lead is written", async () => {
     const generic = await (async () => {
       NANNY_LEAD_STORE_REGISTRY.set(UNCONFIGURED);

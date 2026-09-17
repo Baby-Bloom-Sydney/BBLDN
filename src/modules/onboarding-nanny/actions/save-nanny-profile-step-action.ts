@@ -5,6 +5,7 @@
 import { auth } from "@/modules/auth";
 import { err, ok, toActionResult } from "@/modules/platform";
 import type { NannyFunnelErrorDetails, NannyProfileStepAction } from "../types";
+import { consumeProfileStepLimit } from "../lib/consume-profile-step-limit";
 import { nannyAccountStore } from "../lib/default-nanny-account-store";
 import { nannyProfileStepSchemas } from "../lib/nanny-profile-step-schemas";
 import { parseForm } from "../lib/parse-form";
@@ -37,6 +38,11 @@ export const saveNannyProfileStepAction: NannyProfileStepAction = async (
   const { schema, toPatch } = nannyProfileStepSchemas[step.id];
   const parsed = parseForm(schema, formData, step.fields, LIST_FIELDS);
   if (!parsed.ok) return toActionResult(parsed);
+  // 07 §8 row 16 (security pass HIGH): one authenticated write per step, bounded per user before it runs.
+  if (!(await consumeProfileStepLimit(session.value.userId)))
+    return toActionResult(
+      refuseFunnel(ACTION, "rate-limited", { reason: "rate-limited" }),
+    );
   const written = await nannyAccountStore.updateProfile(
     toPatch(parsed.value as never),
   );

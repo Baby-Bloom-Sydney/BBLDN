@@ -14,6 +14,7 @@ import type {
 } from "../types";
 import { carriedTokenCookie } from "../lib/carried-token-cookie";
 import { consumeFunnelStepLimit } from "../lib/consume-funnel-step-limit";
+import { consumeLeadCaptureLimit } from "../lib/consume-lead-capture-limit";
 import { nannyApplicationSchema } from "../lib/nanny-application-schema";
 import { nannyLeadStore } from "../lib/default-nanny-lead-store";
 import { parseForm } from "../lib/parse-form";
@@ -36,8 +37,14 @@ const ACTION = "saveNannyApplication";
 async function capture(
   input: NannyApplicationInput,
 ): Promise<Result<NannyApplicationOutcome, NannyFunnelErrorDetails>> {
+  // Row 2's per-caller budget and row 16's per-address budget, both before any read or write: the second is
+  // what keeps the "sign in instead" answer from being walked over a list of addresses (security pass MEDIUM).
   if (!(await consumeFunnelStepLimit("S-X-15")))
     return refuseFunnel(ACTION, "rate-limited", { reason: "rate-limited" });
+  if (!(await consumeLeadCaptureLimit(input.email)))
+    return refuseFunnel(ACTION, "rate-limited-address", {
+      reason: "rate-limited",
+    });
   const captured = await nannyLeadStore.capture({ ...input, source: "apply" });
   if (!captured.ok)
     return refuseFunnel(ACTION, "lead-not-captured", captured.error);
