@@ -14,6 +14,7 @@ import type {
   PasswordResetRequestAction,
   PasswordResetRequestErrorDetails,
 } from "../types";
+import { consumeResetRequestLimit } from "../lib/consume-reset-request-limit";
 
 const schema = z.object({ email: z.string().trim().toLowerCase().email() });
 
@@ -30,7 +31,20 @@ export const requestPasswordResetAction: PasswordResetRequestAction = async (
         { reason: "invalid-input" },
       ),
     );
-  const requested = await auth.requestPasswordReset(parsed.data.email as Email);
+  // 07 §8 row 3, before any send (see `consume-reset-request-limit.ts`): over the limit answers ok and sends
+  // nothing, so the throttle cannot be read off the response; a limiter that cannot answer refuses rather than
+  // sending, which is the opposite of the public *read* surfaces and deliberately so.
+  const email = parsed.data.email as Email;
+  const verdict = await consumeResetRequestLimit(email);
+  if (verdict === "hold") return toActionResult(ok(undefined));
+  if (verdict === "unavailable")
+    return toActionResult(
+      err<PasswordResetRequestErrorDetails>(
+        "INTERNAL",
+        "We can't send that email just yet.",
+      ),
+    );
+  const requested = await auth.requestPasswordReset(email);
   // By contract `requestPasswordReset` answers ok for every address, an outage included — so this branch is the
   // guard, not the path. It is kept because the form must never be the thing that changes if that contract does:
   // one generic line, no `details`, and nothing about the address that was typed.
