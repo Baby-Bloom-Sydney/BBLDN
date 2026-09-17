@@ -5,8 +5,9 @@
 // `scoring` re-checks them (03 §7.4). Here the caller supplies the list, so the **filtering rule is not
 // duplicated** — the stub delegates every exclusion to `scoring`, exactly as the real loader must.
 //
-// `autofire` reports what it ranked and writes nothing: the lever (`positions.recordPrecheck`) and the
-// `precheck-nanny` blast are Phase 1e.
+// `autofire` here reports what it ranked and writes nothing — the real one (`1e`) writes the lever through
+// `positions.recordPrecheck` and emits `precheck.fired`; a stub that wrote would hide which of the two a
+// consumer's test actually exercised.
 import { MATCHING as MATCHING_CONFIG } from "@/modules/config";
 import { err, nowInstant, ok } from "@/modules/platform";
 import { scoring } from "@/modules/scoring";

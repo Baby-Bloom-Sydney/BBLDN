@@ -19,6 +19,8 @@ const OWNED_ROUTE_FILES = [
   "src/app/(auth)/reset-password/page.tsx",
   "src/app/(funnel)/matchmaking/signup/page.tsx",
   "src/app/api/auth/callback/route.ts",
+  // `1e` — S-P-04's route composes this module's create action (ADR-124: owned routes join the list).
+  "src/app/parent/request/page.tsx",
 ];
 
 function listFiles(dir: string): string[] {

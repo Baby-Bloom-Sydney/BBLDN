@@ -362,7 +362,74 @@ Import trace for requested module:
 
 **`build` is green on this branch and `main` is still red until this PR merges** — the trunk row in `../OPERATIONS/BRANCHES.md` carries the ★ until then.
 
+## Files created / modified in the current unit (1e — the parent position, the autofire pre-check, done-for-you re-framed; L-007 Phase 1)
+
+**`src/modules/positions/` — the inside.** New: `lib/position-transitions.ts` (the seven P rows of 03 §2.4 as
+`TransitionSpec`s) · `lib/create-positions-slice.ts` (the P-row `TransitionHandler`s: `from` + the §2.5 actor
+rule + the row's preconditions, the store write and the event under one `uow`, and the two cascades a P row owns
+— **P-2 → C-a**, **P-7 → C-4**, dispatched through `advance`, never by importing `call-layer`) ·
+`lib/memory-position-store.ts` · `lib/create-positions.ts` (the reads: `amend` · `getStage` · `getJourneySteps` ·
+`listAllowed` · `getForMatching` · `recordPrecheck` · `findLive`) · `lib/journey-steps.ts` (04 §7.1 rows 1, 2, 9;
+rows 4–8 `pending`, row 3 from the port) · `lib/allowed-transitions.ts` · `lib/register-positions-slice.ts` ·
+`lib/position-page-view.ts` · `lib/load-position-page.ts` · `actions/close-position-action.ts` ·
+`components/PositionPage.tsx` · `__tests__/positions.inside.test.ts` · `__tests__/positions.copy.test.ts`.
+Modified: `types.ts` · `index.ts` · `positions.stub.ts` · `lib/positions-registry.ts` ·
+`lib/default-positions.ts` · `README.md`.
+
+**`src/modules/matching/`.** New: `lib/autofire.ts` (03 §7.4 — position read, pool ranked at
+`config.matching.precheckN`, lever written, `precheck.fired` / `precheck.failed`) · `lib/position-detail-of.ts`
+(the one conversion from the shared question bank's answers to the position P-2 opens). Modified:
+`lib/create-matching.ts` (autofire wired over the same pool) · `components/Wizard.tsx` (three optional props so
+S-P-04 reuses S-X-03's component) · `index.ts` · `matching.stub.ts` (stale comment) · `README.md` ·
+`__tests__/matching.inside.test.ts` (the `not-built` claim split: `resultsFor` still is, `autofire` now forwards
+`positions`' refusal) · new `__tests__/matching.autofire.test.ts`.
+
+**`src/modules/onboarding-parent/`.** New: `actions/create-position-action.ts` (S-P-04's one action) ·
+`lib/parent-call-path.ts`. Modified: `lib/open-position-from-lead.ts` (reads the lead, converts it, opens the
+position with the real P-2 payload) · `actions/sign-up-parent-action.ts` (one argument) · the profile-store
+port's `get` half across `types.ts` · `lib/parent-profile-store-registry.ts` ·
+`lib/default-parent-profile-store.ts` · `lib/memory-parent-profile-store.ts` · `index.ts` · `README.md` ·
+`__tests__/onboarding-parent.signup.test.ts` (**1c's P-2 pin flipped from `it.fails` to a passing test**, plus
+the no-area degradation) · `__tests__/onboarding-parent.copy.test.ts` (owned-route list).
+
+**Elsewhere.** `src/modules/scoring/index.ts` (one added export: `leadFormToPosition`) ·
+`src/boot/db-parent-profile-store.ts` (the `get` half only — S5b's file, merged before this was written) ·
+`src/app/parent/request/page.tsx` (**S-P-04**, replacing the Sydney `TypeformFlow` mount; the legacy renderers
+stay, still imported by the Sydney hub) · `src/app/parent/position/page.tsx` (**S-P-05**, replacing the Sydney
+`PositionPageClient` mount) · `docs/build-progress.md` · the two ledgers.
+
+**Not touched:** `src/boot/wire-ports.ts` · `src/instrumentation.ts` · `shared-types/**` · `auth/**` ·
+`supabase/**` · `/api/health` (all S5b) · `scheduling/**` · `admin/**` · `call-layer/**` (1f) ·
+`payments` / `purchase-paths` / `access-gate` (1h) · `connections/**` · `placements/**` (1f / 1g) · `config/**` ·
+`platform/**` · `(public)` / `(funnel)` / `(auth)` route bodies · eslint config.
+
+**Gates on the merged tree** (`origin/main` `4e8a0ca` = BUILD-FIX #25 + S5b #24 merged down): `typecheck` 0 ·
+`lint` 0 (legacy warnings only, 0 on this unit's files) · `prettier --check .` 0 · `vitest` 0 —
+**3 091 passed + 8 expected-fail / 3 099 across 224 files** · `lint:boundaries` 0 · `check:allowed-imports` 0 ·
+`check:config-literals` 0 · `check:claude-md` 0 · `check:audit` 0 · **`npm run build` 0** (the new
+`client-server-boundary.test.ts` stays green; the build needs the placeholder environment —
+`set -a; . ./.env.test; set +a` plus a `RESEND_API_KEY` placeholder, both local-only, neither a code defect).
+`banned-literals` is the accepted red (ADR-124).
+
 ## Next unit
+
+**`1f` / `1g` must know (from `1e`).** (1) **`positions` has an inside.** The P rows register through
+`registerPositionsSlice(createPositionsSlice({ store, isInServiceArea }))` and the reads through
+`configurePositions(createPositions({ store, rows }))` — **neither is wired at boot** (`src/boot/**` was S5b's
+while this ran), so that is the owed wiring, the same shape `1d` left for P1-WIRE-2. (2) **A suite that opens a
+position needs a call slice registered**, because P-2 cascades into C-a from inside `advance` and P-7 into C-4;
+`positions.inside.test.ts` shows the shape — a fake slice handed to `registerSlice`, never an import of
+`call-layer`. (3) **The K-row side is yours.** P-3 / P-4 / P-5 / P-6 move the position and emit; their
+connection- and placement-side preconditions live with the row that fires the cascade, and P-7's K-24 cascade is
+pinned `it.fails` in this unit rather than left silent. (4) **Rail rows 4–8 read `pending`** and are yours
+(`journeySteps`); row 3 arrives whole from the `JourneyRowSource` port — pass `{ rows: { callRow } }` to
+`createPositions` and `call-layer`'s `callRailLine` composes it, which is how `positions` keeps its no-arrow to
+`call-layer`. (5) **`getForMatching.activeConnectionNannyIds` is empty** until the `connections` connector can
+answer it (03 §7.5); `scoring` re-checks the exclusion anyway. (6) **The store is in memory.** `PositionStore`
+over `nanny_positions` (migration `0006` + the four call columns) is owed with the RPC opener; `amend` moves the
+version and emits `position.amended` but does not yet apply `AmendableFields` to a row, because there is no
+column map without the table. (7) **`getJourneySteps` is keyed by `ParentId` while a session carries a `UserId`**
+— still a one-line pass-through, now in two places (`loadParentJourney`, `loadPositionPage`).
 
 **Whoever wires a port at boot next (from P1-WIRE-2).** `src/boot/wire-<port>.ts`, one export, returning a `PortWiring` row; add the name to `BootPort` and one line to `wire-ports.ts` in dependency order. Two rules the three new files show: a binding is chosen by the **resolved environment**, never by an import edit (05 §3 rule 1); and a port whose _store_ is per-instance is refused in production with its reason on the report rather than installed quietly — that is why `call-layer` is wired on preview and not in production, exactly as `scheduling` is. `registerSlice` is last-wins, so `1e` and `1g` join the same registry without tearing it down, and a slice over a real store needs no environment gate at all. **`matching.autofire` / `matching.resultsFor` now answer `not-built`** — a named gap, pinned in `boot.test.ts`, waiting on `1e`.
 
@@ -410,7 +477,12 @@ Superseded note — the S1 "next unit" text: **S2 — `shared-types` (types only
 ---
 
 <!-- audit
-Last edited: 2026-09-17T18:05+10:00 — BB-LDN-Planner-070926/S5b
+Last edited: 2026-09-17T18:30+10:00 — BB-LDN-Planner-070926/1e
+Notes: 1e — the positions inside (the P rows, the store port, the reads, the rail), matching.autofire, S-P-04
+and S-P-05, and the profile store's read half. A files section, a 1f / 1g handover, and three connector
+extensions raised for ratification in the L-007 PROGRESS entry. Build measured green on the merged tree with
+BUILD-FIX (#25) and S5b (#24) down.
+Prior: 2026-09-17T18:05+10:00 — BB-LDN-Planner-070926/S5b
 Notes: S5b — ADR-130 and ADR-131 closed; 07 §8 row 1 paid. Database row moves from 0000-0016 to 0000-0017
 (57 tables, 80 enums, 24 functions) with the four objects 0017 adds and the apply/rollback/re-apply against
 preview. Known bugs gains four S5b entries: the closure summary; the ★ fail-open-on-limiter-outage decision

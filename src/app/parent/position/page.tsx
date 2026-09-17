@@ -1,82 +1,46 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
-import { getPosition, PositionWithChildren } from "@/lib/actions/parent";
+// S-P-05 — `/parent/position` (04 §2.2, §6.2): what the family asked for, where it stands (`04.09` status codes
+// v2), and the one lever a parent holds on her own position (P-7). Thin by rule (05 §7 rule 5): one connector,
+// one read, render.
+//
+// Signed out → login (defence in depth behind the middleware gate); no position yet → the dashboard, where the
+// "create your position" card lives (04 §7.1 state 0). The confirmed connections, the meetings and the
+// placement card 04 §6.2 also names read the K and L stages and land with `1f` / `1g` — recorded, not faked.
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { ROUTE_MAP, loginRedirectUrl } from "@/modules/auth";
 import {
-  getParentPlacement,
-  getConfirmedConnections,
-  getParentUpcomingIntros,
-} from "@/lib/actions/position-funnel";
-import { getDfyStatus } from "@/lib/actions/matching";
-import { POSITION_STAGE } from "@/lib/position/constants";
-import { PositionPageClient } from "./PositionPageClient";
+  PositionPage,
+  closePositionAction,
+  loadPositionPage,
+} from "@/modules/positions";
+import type { PositionId, PositionStage } from "@/modules/shared-types";
 
-const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
+export const metadata: Metadata = {
+  title: "What you asked for",
+  robots: { index: false, follow: false },
+};
+
+export const dynamic = "force-dynamic";
+
+const ROUTE = "/parent/position";
 
 export default async function ParentPositionPage() {
-  let position: PositionWithChildren | null = null;
-  let error: string | null = null;
+  const load = await loadPositionPage();
+  if (load.kind === "signed-out") redirect(loginRedirectUrl(ROUTE));
+  if (load.kind === "no-position") redirect(ROUTE_MAP.dashboards.parent);
+  if (load.kind === "failed") redirect(ROUTE_MAP.dashboards.parent);
 
-  if (!isDevMode) {
-    const result = await getPosition();
-    position = result.data ?? null;
-    error = result.error ?? null;
-  }
-
-  // Fetch placement + confirmed connections for Path B + upcoming intros
-  const [placementResult, connectionsResult, introsResult, dfyStatusResult] =
-    await Promise.all([
-      getParentPlacement(),
-      position?.id
-        ? getConfirmedConnections(position.id)
-        : Promise.resolve({ data: [], error: null }),
-      getParentUpcomingIntros(),
-      getDfyStatus(),
-    ]);
-
-  const placement = placementResult.data;
-  const confirmedNannies = connectionsResult.data;
-  const upcomingIntros = introsResult.data;
-  const dfyTier = dfyStatusResult.tier;
-  const dfyExpiresAt = dfyStatusResult.expiresAt;
-  const dfyActivated = dfyStatusResult.activated;
-  const showFillButton =
-    position &&
-    !placement &&
-    (position as PositionWithChildren & { stage?: number }).stage ===
-      POSITION_STAGE.CONNECTING &&
-    confirmedNannies.length > 0;
-
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">My Childcare</h1>
-          <p className="mt-1 text-slate-500">
-            Create and manage your childcare position
-          </p>
-        </div>
-        <Card>
-          <CardContent className="flex items-center gap-3 py-6">
-            <AlertCircle className="h-5 w-5 text-red-500" />
-            <p className="text-red-600">{error}</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  const positionId: PositionId = load.positionId;
+  async function close(formData: FormData): Promise<void> {
+    "use server";
+    await closePositionAction({
+      positionId,
+      expectedFrom: String(formData.get("expectedFrom")) as PositionStage,
+    });
+    redirect(ROUTE_MAP.dashboards.parent);
   }
 
   return (
-    <div className="space-y-6">
-      <PositionPageClient
-        position={position}
-        placement={placement}
-        confirmedNannies={confirmedNannies}
-        showFillButton={!!showFillButton}
-        upcomingIntros={upcomingIntros}
-        dfyTier={dfyTier}
-        dfyExpiresAt={dfyExpiresAt}
-        dfyActivated={dfyActivated}
-      />
-    </div>
+    <PositionPage view={load.view} stage={load.stage} closeAction={close} />
   );
 }

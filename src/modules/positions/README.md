@@ -39,26 +39,58 @@ passed, otherwise one opened here, so 01 §4a rule 5 ("a stage never advances on
 caller. Everything else in 03 §2.4 — preconditions, cascades, invariants I-1…I-7, idempotency (`noop` / `reject`
 / `key`), the events row, the inbox row, the email enqueue — belongs to the slices and is Phase 1e–1g.
 
-**What this module does _not_ do yet (F-a boundaries, all recorded in the L-005 F-a PROGRESS entry).**
+**What `1e` added (the inside).** The seven P rows of 03 §2.4 as `TransitionHandler`s (`createPositionsSlice`)
+over a store port (`PositionStore`; `memoryPositionStore` ships, the one over `nanny_positions` is owed with the
+marketplace migration set), the read models over the same port (`createPositions`), the parent rail as a read
+model (`journeySteps`), and S-P-05 (`loadPositionPage` · `positionPageView` · `PositionPage` ·
+`closePositionAction`). The P rows register through `registerPositionsSlice` — the same one mechanism every
+other slice uses (§12 item 35), so boot has no special case for the module that owns `advance`.
 
-- **No `TRANSITIONS` table.** The 44 rows of 03 §2.4 as `ReadonlyArray<TransitionSpec>` are Phase 1e, so the swap
-  test's table test (every `TransitionId` ↔ §2.4, every `TemplateId` ∈ §8.2, every event name ∈ §9.3) cannot run
-  yet. `TRANSITION_IDS` from `shared-types` is what `advance` validates against meanwhile.
-- **No boot call.** `configurePositions` and `registerSlice` belong in `src/instrumentation.ts`, which this repo
-  still does not have (S4's recorded gap, blocked on the transaction-opener ADR).
-- **`TransitionHandler` / `registerSlice` live here, not in `shared-types`.** 03 §2.5 puts them in
-  `shared-types/stage-model.ts`; they are not there yet, and adding them was not this unit's surface. The
-  consequence is real and is recorded: `connections` and `placements`, which 01 §2.3 gives **no** arrow to
-  `positions`, declare a structurally identical handler type locally and let the boot file do the registering.
-- **`getForMatching` / `recordPrecheck` shapes are provisional** — 03 §12 item 36 still owes them to 01 §2.4 and
-  to `02`'s writers column.
+**Two cascades are a P row's own** and run here through `advance`, never by importing the slice that owns them:
+**P-2 → C-a** (the call the parent lands on — 04 §3.3 triggers a / b) and **P-7 → C-4**. A position with no call
+mirror is not an error; only `NOT_FOUND` from the call slice is tolerated.
 
-**Suites.** `src/modules/positions/__tests__/positions.swap.test.ts` — the part of swap test 1 this unit can
-prove: dispatch into a registered slice, the unit-of-work handling both ways, the two refusals, re-registration
-as the swap itself, and the read half over `stubPositions`.
+**Connector extensions raised for ratification (L-007 `1e` PROGRESS entry).**
+
+- `PositionForMatching.detail` (`PositionMatchDetail`) — without it 03 §7.4's sentence cannot be executed:
+  `matching` has no other road to a position row, and `positions` may not import `scoring` to spell
+  `PositionInput`, so the shape is declared structurally here.
+- `findLive(parentId)` — "the position this parent holds", which S-P-05 needs and §2.5 does not name. It answers
+  a `PositionSummary`, never the row: the recipient and the lead id stay inside the module.
+- The connector's methods answer a plain `Result`, not `StageResult` — the inside forwards the store's, the unit
+  of work's and the slices' failures unchanged, the reading `matching` recorded for `MatchingResult`.
+
+**What this module still does _not_ do (recorded, not faked).**
+
+- **No full `TRANSITIONS` table.** `POSITION_TRANSITIONS` is the P third; the C rows are `call-layer`'s and the
+  25 K + 3 L rows are `1f` / `1g`'s. The §2.5 table test is pinned `it.fails` in `positions.inside.test.ts`.
+- **No boot call.** `configurePositions` + `registerPositionsSlice` belong in `src/boot/wire-ports.ts`, which
+  `S5b` held while this unit ran; the wiring is owed (`1e` PROGRESS entry), exactly as `1d`'s was before
+  `P1-WIRE-2`.
+- **Rail rows 4–8 read `pending`.** They need the connection stages, the placement, `payments.getAccess` and the
+  child-linking read model — `1f` / `1g` / `1h`. Row 3 arrives whole from the `JourneyRowSource` port, because
+  its words are `call-layer`'s. Row 2's ✓ is K-2's.
+- **P-3 / P-4 / P-5 / P-6 preconditions on the _other_ entity** (live connections, one `CONFIRMED`, a placement)
+  belong to the K / L row that fires the cascade; P-7's K-24 cascade is pinned `it.fails`.
+- **`getJourneySteps` is keyed by `ParentId` while a session carries a `UserId`** — the seam `1d` opened is still
+  a one-line pass-through in two places (`loadParentJourney`, `loadPositionPage`).
+- **No `user_profiles` / migration work.** `amend` moves the version and emits `position.amended`; it does not
+  yet apply `AmendableFields` to the row (no column map without the table).
+
+**Suites.** `positions.swap.test.ts` — the part of swap test 1 F-a could prove (dispatch, unit-of-work handling
+both ways, the two refusals, re-registration as the swap, the read half over `stubPositions`).
+`positions.inside.test.ts` (`1e`) — the P rows end to end: the table against §2.4, P-2's preconditions (I-1, the
+areas table, the mobile) and its C-a cascade, P-7 and its C-4 cascade, the actor rule, the two idempotency
+behaviours, and the read models including the rail. `positions.copy.test.ts` — the 05 §5.2 word list over
+`components/` and the two owned route files; `lib/` and `types.ts` carry the stage contract's own vocabulary
+(`job-not-named`, `close-no-candidates`, `no_candidates`) and are reported under the accepted `banned-literals`
+red (ADR-124).
 
 <!-- audit
-Last edited: 2026-09-16T14:35+10:00 — BB-LDN-Planner-070926/F-a
+Last edited: 2026-09-17T18:05+10:00 — BB-LDN-Planner-070926/1e
+Notes: the inside — the P-row slice, the store port, the reads, the rail read model, S-P-05, and the three
+connector extensions raised for ratification. Boot wiring still owed.
+Previously: 2026-09-16T14:35+10:00 — BB-LDN-Planner-070926/F-a
 Notes: initial authoring — the F-a connector, the slice-registration seam (`registerSlice` + `advance` dispatch),
 `stubPositions` and the swap-test-1 subset. Four recorded boundaries: no `TRANSITIONS`, no boot call, the
 handler-type home, and the provisional `getForMatching` / `recordPrecheck` shapes.

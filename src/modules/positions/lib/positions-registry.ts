@@ -20,6 +20,7 @@ const unconfigured: PositionsReads = Object.freeze({
   listAllowed: async () => Object.freeze([]),
   getForMatching: async () => NOT_CONFIGURED,
   recordPrecheck: async () => NOT_CONFIGURED,
+  findLive: async () => NOT_CONFIGURED,
 });
 
 const slot = { current: unconfigured };
