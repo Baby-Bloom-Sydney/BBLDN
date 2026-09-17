@@ -38,6 +38,7 @@ type Modules = {
   readonly matching: typeof import("@/modules/matching");
   readonly callLayer: typeof import("@/modules/call-layer");
   readonly positions: typeof import("@/modules/positions");
+  readonly onboardingParent: typeof import("@/modules/onboarding-parent");
 };
 
 const DISTRICT = Object.freeze({ area: "Lambeth", district: "SW4" });
@@ -78,6 +79,7 @@ beforeAll(async () => {
     matching: await import("@/modules/matching"),
     callLayer: await import("@/modules/call-layer"),
     positions: await import("@/modules/positions"),
+    onboardingParent: await import("@/modules/onboarding-parent"),
   };
 });
 
@@ -109,25 +111,48 @@ describe("after register() in a valid preview environment", () => {
     expect(reasonOf(foreign)).toBe("unit-of-work-unknown");
   });
 
-  it("events — the db event-log store is installed; its reads fail closed with their own reason", async () => {
+  it("events — the db event-log store is installed and its reads are live; only an unkeyed query is refused", async () => {
+    // ADR-131 (1): `queryEvents` now answers on the two indexed access paths. A query with no key is not a read
+    // model — the refusal is the store's own, not the dark `event-log-read-not-available` P1-WIRE had to install.
     const page = await m.platform.Events.queryEvents({});
-    expect(reasonOf(page)).toBe("event-log-read-not-available");
+    expect(reasonOf(page)).toBe("event-log-read-requires-key");
   });
 
-  it("consent — the db consent store is installed; the cookie half fails closed with its own reason", async () => {
+  it("consent — the db consent store is installed and its cookie half reads instead of refusing", async () => {
+    // ADR-131 (1): `currentCookie` is a keyed read on `visitor_id`, so `hasMarketing` answers from the record.
+    // The boot's claim is that the dark binding is gone; that one row round-trips is proved deterministically in
+    // `db-consent-store.cookie.test.ts` against a fake port, not against whatever this environment can reach.
     const marketing = await m.platform.consent.hasMarketing({
       kind: "visitor",
       id: "v" as never,
     });
-    expect(reasonOf(marketing)).toBe("cookie-consent-not-available");
+    expect(reasonOf(marketing)).not.toBe("cookie-consent-not-available");
   });
 
-  it("rate limiter — still denies in a production-resolved runtime: no shared store exists to declare (07 §8)", async () => {
+  it("rate limiter — a shared store is declared, so assertSharedStore no longer denies (07 §8; 0017)", async () => {
+    // P1-WIRE pinned the opposite: with no `rate_limit_buckets` table there was nothing to declare, so every
+    // consume denied. `0017` created it and `wire-rate-limiter.ts` declares it — the denial that remains, if
+    // any, comes from the limit or from the database, never from the assertion refusing an undeclared store.
     const policy = Object.values(m.config.SECURITY.rateLimits)[0];
     expect(policy).toBeDefined();
-    const result = await m.platform.rateLimiter.consume("k", policy as never);
-    expect(result.ok).toBe(false);
-    expect(!result.ok && result.error.code).toBe("INTERNAL");
+    const result = await m.platform.rateLimiter.consume(
+      "boot-probe",
+      policy as never,
+    );
+    expect(reasonOf(result)).not.toBe("rate-limit-store-not-shared");
+  });
+
+  it("parent profile — the signup pair store is installed, so signup no longer fails closed (02 §4.1; 1c)", async () => {
+    // `1c` shipped `parentProfileStore` fail-closed because 0000–0016 had no definer to write through. 0017
+    // has one; the claim here is only that boot replaced the default — the row it writes is proved against
+    // the port seam in `db-0017-stores.test.ts`.
+    const created = await m.onboardingParent.parentProfileStore.create({
+      userId: "00000000-0000-4000-8000-000000000000" as never,
+      firstName: "Boot",
+      lastName: "Probe",
+      mobile: `${m.config.LOCALE.phonePrefix}7700900123` as never,
+    });
+    expect(reasonOf(created)).not.toBe("profile-store-not-configured");
   });
 
   it("areas — the provider AREAS_SOURCE names answers (stub in .env.test)", async () => {

@@ -1025,6 +1025,7 @@ export type Database = {
           id: string
           ip_address: unknown
           party: Database["public"]["Enums"]["user_role"]
+          purpose: Database["public"]["Enums"]["consent_purpose"]
           related_entity_id: string | null
           session_id: string | null
           user_agent: string | null
@@ -1041,6 +1042,7 @@ export type Database = {
           id?: string
           ip_address?: unknown
           party: Database["public"]["Enums"]["user_role"]
+          purpose: Database["public"]["Enums"]["consent_purpose"]
           related_entity_id?: string | null
           session_id?: string | null
           user_agent?: string | null
@@ -1057,6 +1059,7 @@ export type Database = {
           id?: string
           ip_address?: unknown
           party?: Database["public"]["Enums"]["user_role"]
+          purpose?: Database["public"]["Enums"]["consent_purpose"]
           related_entity_id?: string | null
           session_id?: string | null
           user_agent?: string | null
@@ -3180,6 +3183,27 @@ export type Database = {
           },
         ]
       }
+      rate_limit_buckets: {
+        Row: {
+          bucket: string
+          count: number
+          reset_at: string
+          updated_at: string
+        }
+        Insert: {
+          bucket: string
+          count: number
+          reset_at: string
+          updated_at?: string
+        }
+        Update: {
+          bucket?: string
+          count?: number
+          reset_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       refund_requests: {
         Row: {
           admin_notes: string | null
@@ -4057,6 +4081,17 @@ export type Database = {
         Args: { p_token: string; p_user_id: string }
         Returns: string
       }
+      consume_rate_limit: {
+        Args: { p_bucket: string; p_now: string; p_window_seconds: number }
+        Returns: {
+          count: number
+          reset_at: string
+        }[]
+      }
+      create_parent_profile: {
+        Args: { p_first_name: string; p_last_name: string; p_mobile: string }
+        Returns: undefined
+      }
       current_nanny_id: { Args: never; Returns: string }
       current_parent_id: { Args: never; Returns: string }
       end_child_link: {
@@ -4207,6 +4242,21 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      record_cookie_consent: {
+        Args: {
+          p_analytics: boolean
+          p_choice: Database["public"]["Enums"]["cookie_choice"]
+          p_created_at: string
+          p_expiry_date: string
+          p_id: string
+          p_ip?: unknown
+          p_marketing: boolean
+          p_user_agent?: string
+          p_user_id?: string
+          p_visitor_id: string
+        }
+        Returns: string
       }
       remove_nanny_from_child: {
         Args: { p_child_id: string; p_reason: string }
@@ -4370,6 +4420,21 @@ export type Database = {
         | "FINISHED"
         | "CANCELLED_BY_PARENT"
         | "CANCELLED_BY_NANNY"
+      consent_purpose:
+        | "client-tos"
+        | "professional-tos"
+        | "privacy-policy"
+        | "biometric-notice"
+        | "code-of-conduct"
+        | "cookie-policy"
+        | "disclaimer"
+        | "parent-app-consent"
+        | "nanny-attestation"
+        | "media-consent"
+        | "agr14_nanny_child_add"
+        | "vaccination-status"
+        | "marketing"
+        | "cookie"
       contact_category: "refund" | "billing" | "technical" | "general"
       contact_direction: "outbound" | "inbound"
       contact_message_status: "unread" | "replied" | "closed" | "spam"
@@ -4783,6 +4848,22 @@ export const Constants = {
         "FINISHED",
         "CANCELLED_BY_PARENT",
         "CANCELLED_BY_NANNY",
+      ],
+      consent_purpose: [
+        "client-tos",
+        "professional-tos",
+        "privacy-policy",
+        "biometric-notice",
+        "code-of-conduct",
+        "cookie-policy",
+        "disclaimer",
+        "parent-app-consent",
+        "nanny-attestation",
+        "media-consent",
+        "agr14_nanny_child_add",
+        "vaccination-status",
+        "marketing",
+        "cookie",
       ],
       contact_category: ["refund", "billing", "technical", "general"],
       contact_direction: ["outbound", "inbound"],

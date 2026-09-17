@@ -14,8 +14,8 @@ import {
 import { dbEventLogStore } from "./db-event-log-store";
 import type { PortWiring } from "./types";
 
-const READS_CLOSED =
-  "the two admin read helpers (queryEvents · countByName) fail closed — the Query surface has no predicate or aggregate; they belong over 02 §7's views";
+const READS_KEYED =
+  "queryEvents is live on the two indexed access paths (position · subject) through the keyed read (ADR-131 (1)); an unkeyed query is refused (event-log-read-requires-key) and countByName stays closed — an aggregate has no key and belongs over 02 §7's views";
 
 export function wireEvents(environment: Environment): PortWiring {
   configureEvents(
@@ -28,7 +28,7 @@ export function wireEvents(environment: Environment): PortWiring {
   );
   return {
     port: "events",
-    binding: "db-event-log (events table, service scope; insert only)",
-    reason: READS_CLOSED,
+    binding: "db-event-log (events table, service scope; insert + keyed query)",
+    reason: READS_KEYED,
   };
 }

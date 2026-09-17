@@ -146,7 +146,9 @@ export type CommsReason =
   | "provider-rejected"
   | "comms-not-configured"
   | "store-not-configured"
-  | "renderer-not-configured";
+  | "renderer-not-configured"
+  /** `status(messageId)` for an id no `email_logs` row carries (S5b: the real store answers NOT_FOUND, never a made-up status) */
+  | "unknown-message";
 
 export type CommsErrorDetails = {
   readonly reason: CommsReason;

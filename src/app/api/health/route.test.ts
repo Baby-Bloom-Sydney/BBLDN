@@ -1,5 +1,6 @@
-// ADR-121 — `/api/health` answers what 06 §7.3 specifies: `{ data: { sha, env, db } }` in the 01 §4c envelope, with
-// `db` a **real** read through the data port that fails closed. The happy half is pinned here against `stub-auth`
+// ADR-121 / ADR-130 — `/api/health` answers what 06 §7.3 specifies: `{ data: { sha, env, db } }` in the 01 §4c
+// envelope, with `db` a **real** read through the data port that fails closed, **200 when it is ok and 503 when
+// it is not** — the body is the report, the status is what an uptime probe alerts on. The happy half is pinned here against `stub-auth`
 // (a reachable in-memory port); the fail-closed half both here (a port that answers an error) and in the shell
 // smoke, where Supabase is unreachable by construction (`scripts/ci/lib/smoke-env.sh`).
 //
@@ -69,7 +70,7 @@ describe("GET /api/health — 06 §7.3 shape in the 01 §4c envelope (ADR-121)",
     expect(response.headers.get("x-request-id")).toBe(supplied);
   });
 
-  it("reports db: 'failed' — never 'ok' — when the data port answers an error (fail-closed)", async () => {
+  it("answers 503 with db: 'failed' — never 'ok', never 200 — when the data port answers an error (ADR-130)", async () => {
     const { GET, configureAuth, stubAuth } = await load();
     const base = stubAuth();
     const run = vi.fn(async () =>
@@ -87,8 +88,11 @@ describe("GET /api/health — 06 §7.3 shape in the 01 §4c envelope (ADR-121)",
     const body = (await response.json()) as HealthBody;
 
     expect(run).toHaveBeenCalledTimes(1);
-    expect(response.status).toBe(200);
+    // ADR-130: the status is what a monitor reads; a 200 here is a watch that never fires.
+    expect(response.status).toBe(503);
+    // and the body is unchanged — the runbook still learns *which* dependency failed
     expect(body.data).toEqual({ sha: SHA, env: "development", db: "failed" });
+    expect(body.error).toBeUndefined();
     expect(UUID.test(String(body.requestId))).toBe(true);
   });
 
