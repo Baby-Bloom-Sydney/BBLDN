@@ -19,6 +19,10 @@
 
 begin;
 
+drop function if exists public.upsert_call_mirror(
+  uuid, public.call_state, integer, integer, public.call_type, timestamptz,
+  uuid, public.call_outcome, text, text);
+
 drop policy if exists position_call_mirror_select_admin on public.position_call_mirror;
 drop policy if exists position_call_mirror_select_own on public.position_call_mirror;
 drop trigger if exists set_updated_at on public.position_call_mirror;
@@ -41,6 +45,12 @@ begin
   end if;
   if to_regclass('public.availability_blocks_in_force_idx') is not null then
     raise exception '0018 rollback: availability_blocks_in_force_idx still exists';
+  end if;
+  if exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'upsert_call_mirror'
+  ) then
+    raise exception '0018 rollback: upsert_call_mirror() still exists';
   end if;
 end
 $$;

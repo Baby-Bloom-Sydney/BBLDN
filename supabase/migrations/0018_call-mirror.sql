@@ -50,12 +50,18 @@ create table if not exists public.position_call_mirror (
   notes            text,
   no_answer_count  integer     not null default 0,
   about_nanny      text,
+  version          integer     not null default 1,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now(),
 
   -- R5 / C-5: only a no-answer bumps the count, and it never goes backwards.
   constraint position_call_mirror_no_answer_count_check
     check (no_answer_count >= 0),
+  -- The CALL's own version, not the position's. `nanny_positions.version` counts the position's
+  -- stage moves (P rows); a C row moves the call without moving the position, so the two counters
+  -- cannot be the same column — `StateAfter.version` for a C row is this one.
+  constraint position_call_mirror_version_check
+    check (version >= 1),
   -- 03 §2.7: a note is a note *about an outcome*. A note with no outcome is an admin write that
   -- never reached C-3 / C-4, which is the shape a half-applied transaction leaves behind.
   constraint position_call_mirror_notes_need_outcome_check
@@ -106,7 +112,90 @@ create policy position_call_mirror_select_admin
   using (public.is_admin());
 
 -- ---------------------------------------------------------------------------
--- 2. `availability_blocks.revoked_at` (02 §4.4 row 3; 03 §3.2 `unblock`)
+-- 2. `upsert_call_mirror()` — the one write, because it is two tables (ADR-127)
+--
+--    A C row moves the call's STATE (`nanny_positions.call_*`) and its DETAIL
+--    (`position_call_mirror`) together. ADR-127 settled that one unit of work is
+--    one RPC, so two `update`s through 03 §1.4's `Query` would be two
+--    transactions: a crash between them leaves `call_state = 'slot-chosen'` with
+--    no recorded outcome, or an outcome on a call the mirror still calls open.
+--    One definer, one transaction, both rows.
+--
+--    It is deliberately NOT an upsert of the position: `nanny_positions` must
+--    already exist (C-a's precondition is "position live"), so a missing row is
+--    an error the caller must see, not a row this function invents.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.upsert_call_mirror(
+  p_position_id       uuid,
+  p_call_state        public.call_state,
+  p_no_answer_count   integer,
+  p_version           integer,
+  -- The nullable half carries `default null` so the generated `Args` type marks each one
+  -- optional: 03 §1.4's `Query.rpc` is typed from `database.types.ts`, and the generator has
+  -- no way to say "this argument may be null", so a required argument would force every
+  -- caller to pass a `null` the type rejects. Omitting the argument IS the null.
+  p_call_type         public.call_type   default null,
+  p_call_requested_at timestamptz        default null,
+  p_call_booking_id   uuid               default null,
+  p_outcome           public.call_outcome default null,
+  p_notes             text               default null,
+  p_about_nanny       text               default null
+)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_version integer;
+begin
+  update public.nanny_positions
+     set call_state        = p_call_state,
+         call_type         = p_call_type,
+         call_requested_at = p_call_requested_at,
+         call_booking_id   = p_call_booking_id
+   where id = p_position_id;
+
+  if not found then
+    raise exception 'upsert_call_mirror: no position %', p_position_id
+      using errcode = 'no_data_found';
+  end if;
+
+  insert into public.position_call_mirror as m
+    (position_id, outcome, notes, no_answer_count, about_nanny, version)
+  values
+    (p_position_id, p_outcome, p_notes, coalesce(p_no_answer_count, 0), p_about_nanny,
+     greatest(coalesce(p_version, 1), 1))
+  on conflict (position_id) do update
+    set outcome         = excluded.outcome,
+        notes           = excluded.notes,
+        no_answer_count = excluded.no_answer_count,
+        about_nanny     = excluded.about_nanny,
+        -- the caller computes the next version from the one it read; a caller that
+        -- hands back a stale number must not be able to wind the counter backwards
+        version         = greatest(excluded.version, m.version + 1)
+  returning m.version into v_version;
+
+  return v_version;
+end;
+$$;
+
+comment on function public.upsert_call_mirror is
+  '03 §2.7 / ADR-127: the C rows'' one write. Moves the call state on nanny_positions and the call detail on position_call_mirror in a single transaction, because 03 §1.4 Query cannot make two updates atomic. service_role only.';
+
+revoke all on function public.upsert_call_mirror(
+  uuid, public.call_state, integer, integer, public.call_type, timestamptz,
+  uuid, public.call_outcome, text, text) from public;
+revoke all on function public.upsert_call_mirror(
+  uuid, public.call_state, integer, integer, public.call_type, timestamptz,
+  uuid, public.call_outcome, text, text) from anon, authenticated;
+grant execute on function public.upsert_call_mirror(
+  uuid, public.call_state, integer, integer, public.call_type, timestamptz,
+  uuid, public.call_outcome, text, text) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- 3. `availability_blocks.revoked_at` (02 §4.4 row 3; 03 §3.2 `unblock`)
 -- ---------------------------------------------------------------------------
 
 alter table public.availability_blocks
@@ -121,7 +210,7 @@ create index if not exists availability_blocks_in_force_idx
   where revoked_at is null;
 
 -- ---------------------------------------------------------------------------
--- 3. Verify — the migration asserts its own result (02 §6; 0017's pattern)
+-- 4. Verify — the migration asserts its own result (02 §6; 0017's pattern)
 -- ---------------------------------------------------------------------------
 
 do $$
@@ -196,6 +285,42 @@ begin
     where tgrelid = 'public.position_call_mirror'::regclass and tgname = 'set_updated_at'
   ) then
     raise exception '0018: position_call_mirror needs the set_updated_at trigger (02 §2)';
+  end if;
+
+  -- the one write, and only the service role may make it (07 §5.1 rule 5)
+  if to_regprocedure('public.upsert_call_mirror(uuid, public.call_state, integer, integer, public.call_type, timestamptz, uuid, public.call_outcome, text, text)') is null then
+    raise exception '0018: upsert_call_mirror() missing';
+  end if;
+
+  select count(*) into v_bad
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'upsert_call_mirror';
+  if v_bad <> 1 then
+    raise exception '0018: expected exactly 1 upsert_call_mirror overload, found % (a leftover overload is a definer nobody granted on purpose)', v_bad;
+  end if;
+
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'upsert_call_mirror'
+      and p.prosecdef and p.proconfig is not null and 'search_path=""' = any(p.proconfig)
+  ) then
+    raise exception '0018: upsert_call_mirror() must be SECURITY DEFINER with search_path pinned (02 §7)';
+  end if;
+
+  -- 0017's database-reviewer M-1: a definer over a FORCE RLS table reaches it only because the owner
+  -- has BYPASSRLS. If ownership ever differed this function would write nothing, silently.
+  if exists (
+    select 1 from pg_proc p join pg_roles r on r.oid = p.proowner
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'upsert_call_mirror'
+      and not (r.rolbypassrls or r.rolsuper)
+  ) then
+    raise exception '0018: upsert_call_mirror() is owned by a role without BYPASSRLS; FORCE RLS would make it write nothing, silently (0002''s rule)';
+  end if;
+
+  if has_function_privilege('anon', 'public.upsert_call_mirror(uuid, public.call_state, integer, integer, public.call_type, timestamptz, uuid, public.call_outcome, text, text)', 'execute')
+     or has_function_privilege('authenticated', 'public.upsert_call_mirror(uuid, public.call_state, integer, integer, public.call_type, timestamptz, uuid, public.call_outcome, text, text)', 'execute') then
+    raise exception '0018: upsert_call_mirror() must be service_role only (07 §5.1 rule 5)';
   end if;
 
   if not exists (
