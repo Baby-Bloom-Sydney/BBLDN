@@ -101,12 +101,16 @@ describe("★ PIN — 07 §5.2: 'links and invites are written only by the RPCs'
       // `revoke_child_invite(p_invite_id, p_reason)`, both SECURITY DEFINER with `search_path` pinned,
       // asserting the same two rules in SQL. This unit may not write a migration, so the claim is pinned and
       // the functions are named in `child-linking-store.ts`'s header.
-      const functions = await import("../../shared-types/database.types");
-      const names = Object.keys(
-        (functions as { Database?: never }).Database ?? {},
+      // Read the migration set itself rather than the generated types: the claim is about what `supabase/`
+      // ships, and reaching into another module's inside for it would break the boundary lint (correctly).
+      const { readFileSync } = await import("node:fs");
+      const { resolve } = await import("node:path");
+      const sql = readFileSync(
+        resolve(__dirname, "../../../../supabase/migrations/0012_app.sql"),
+        "utf8",
       );
 
-      expect(names).toContain("create_child_invite");
+      expect(sql).toContain("function public.create_child_invite");
     },
   );
 
