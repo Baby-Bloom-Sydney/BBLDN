@@ -5,9 +5,9 @@
 import type {
   KeyedRead,
   Query,
-  TableName,
-  TableQuery,
-  TableRow,
+  QueryHandle,
+  ReadableName,
+  RowOf,
 } from "@/modules/shared-types";
 import type {
   AppDatabase,
@@ -20,6 +20,7 @@ import type {
   StubAuthOptions,
   StubUser,
 } from "../types";
+import { isViewName } from "./is-view-name";
 
 const STUB_EXPIRY_EPOCH_SECONDS = 1_800_000_000;
 
@@ -82,45 +83,58 @@ export function memoryAuthDriver(
   // The stub's rows are whatever a test put in the map, so they become the generated row type at
   // the same single seam the real driver uses (`supabase-query.ts`) and for the same reason: a
   // per-table validator here would be `database.types.ts` written twice. Table and column **names**
-  // are still checked at compile time - `T` is constrained to `TableName<AppDatabase>`, which is why
+  // are still checked at compile time - `N` is constrained to `ReadableName<AppDatabase>`, which is why
   // the S5 swap found a fixture in `auth.binding` that was writing a `user_roles` row with no
   // `user_id`.
-  const asRow = <T extends TableName<AppDatabase>>(
+  const asRow = <N extends ReadableName<AppDatabase>>(
     row: Readonly<Record<string, unknown>>,
-  ): TableRow<AppDatabase, T> => row as TableRow<AppDatabase, T>;
+  ): RowOf<AppDatabase, N> => row as RowOf<AppDatabase, N>;
 
-  // ADR-131 (1): the keyed read the real driver answers with `.eq(...)` / `.maybeSingle()`, honoured here with the
-  // same two rules — `select()` is every matching row, `single()` is the one row or `null`, and two matches throw
-  // (a key that is not a key is a broken invariant, and a stub that picked one would let a test pass on it).
-  const keyed = <T extends TableName<AppDatabase>>(
-    table: T,
+  // ADR-131 (1): the keyed read the real driver answers with `.eq(...)` / `.maybeSingle()`, honoured here with
+  // the same two rules — `select()` is every matching row, `single()` is the one row or `null`, and two matches
+  // throw (a key that is not a key is a broken invariant, and a stub that picked one would let a test pass on it).
+  const keyed = <N extends ReadableName<AppDatabase>>(
+    name: N,
     column: string,
     value: unknown,
-  ): KeyedRead<TableRow<AppDatabase, T>> => {
+  ): KeyedRead<RowOf<AppDatabase, N>> => {
     const matching = () =>
-      (tables.get(table) ?? []).filter((row) => row[column] === value);
+      (tables.get(name) ?? []).filter((row) => row[column] === value);
     return {
-      select: async () => matching().map(asRow<T>),
+      select: async () => matching().map(asRow<N>),
       single: async () => {
         const rows = matching();
         if (rows.length > 1)
           throw new Error(
-            `keyed read on ${table}.${column} matched ${String(rows.length)} rows`,
+            `keyed read on ${name}.${column} matched ${String(rows.length)} rows`,
           );
-        return rows.length === 0 ? null : asRow<T>(rows[0]);
+        return rows.length === 0 ? null : asRow<N>(rows[0]);
       },
     };
   };
 
+  // ADR-129 / ADR-131 (1): a view's handle carries the reads and no write here either, so the stub cannot honour
+  // a write the real driver refuses (05 §3 rule 2). The `as` is the same seam as `asRow` — `QueryHandle` is
+  // conditional over the name.
+  const from = <N extends ReadableName<AppDatabase>>(
+    name: N,
+  ): QueryHandle<AppDatabase, N> => {
+    const select = async () => (tables.get(name) ?? []).map(asRow<N>);
+    const eq = (column: string, value: unknown) => keyed(name, column, value);
+    if (isViewName(name))
+      return { select, eq } as unknown as QueryHandle<AppDatabase, N>;
+    return {
+      select,
+      eq,
+      insert: async (row: Readonly<Record<string, unknown>>) =>
+        asRow<N>(append(name, row)),
+      update: async (_id: string, patch: Readonly<Record<string, unknown>>) =>
+        asRow<N>(append(name, patch)),
+    } as unknown as QueryHandle<AppDatabase, N>;
+  };
+
   const query = (): Query<AppDatabase> => ({
-    from: <T extends TableName<AppDatabase>>(
-      table: T,
-    ): TableQuery<AppDatabase, T> => ({
-      select: async () => (tables.get(table) ?? []).map(asRow<T>),
-      insert: async (row) => asRow<T>(append(table, row)),
-      update: async (_id, patch) => asRow<T>(append(table, patch)),
-      eq: (column, value) => keyed(table, column, value),
-    }),
+    from,
     rpc: async () => undefined,
   });
 

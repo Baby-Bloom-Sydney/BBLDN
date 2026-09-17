@@ -11,4 +11,9 @@ export const matching: Matching = Object.freeze({
   preAuthMatch: (leadForm) => MATCHING_REGISTRY.get().preAuthMatch(leadForm),
   resultsFor: (positionId, actor) =>
     MATCHING_REGISTRY.get().resultsFor(positionId, actor),
+  listPublicNannies: () => MATCHING_REGISTRY.get().listPublicNannies(),
+  getPublicNanny: (nannyId) => MATCHING_REGISTRY.get().getPublicNanny(nannyId),
+  saveLead: (input) => MATCHING_REGISTRY.get().saveLead(input),
+  getLead: (leadId) => MATCHING_REGISTRY.get().getLead(leadId),
+  connect: (input) => MATCHING_REGISTRY.get().connect(input),
 });

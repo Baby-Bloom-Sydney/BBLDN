@@ -8,3 +8,4 @@ export { TRANSITION_IDS } from "./transition-ids";
 export { EVENT_NAMES } from "./events";
 export { CLIENT_EVENT_NAMES } from "./client-event-names";
 export { ACTIVE_STATUSES } from "./scheduling";
+export { VIEW_NAMES } from "./view-names";

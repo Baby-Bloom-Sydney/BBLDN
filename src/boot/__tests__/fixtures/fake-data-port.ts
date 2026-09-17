@@ -6,9 +6,10 @@ import { err, fromThrown, ok } from "@/modules/platform";
 import type {
   AppError,
   Query,
-  TableName,
-  TableRow,
   UnitOfWork,
+  QueryHandle,
+  ReadableName,
+  RowOf,
 } from "@/modules/shared-types";
 
 type Row = Readonly<Record<string, unknown>>;
@@ -57,36 +58,43 @@ export function fakeDataPort(seed: FakeTables = {}): FakeDataPort {
     failWith: undefined,
     rpcAnswer: undefined,
   };
-  const asRow = <T extends TableName<AppDatabase>>(row: Row) =>
-    row as TableRow<AppDatabase, T>;
+  const asRow = <N extends ReadableName<AppDatabase>>(row: Row) =>
+    row as RowOf<AppDatabase, N>;
 
+  // ADR-129: `from()` is typed over tables **and** views; this double hands every name the table shape (a
+  // fixture, not the driver — the select-only view handle is the drivers' rule, pinned in auth.views.test.ts).
   const query: Query<AppDatabase> = {
-    from: <T extends TableName<AppDatabase>>(table: T) => ({
-      select: async () => (seed[table] ?? []).map(asRow<T>),
-      insert: async (row: Row) => {
-        inserted.push({ table, row });
-        return asRow<T>(row);
-      },
-      update: async (id: unknown, patch: Row) => {
-        updated.push({ table, id: String(id), patch });
-        return asRow<T>(patch);
-      },
-      // ADR-131 (1): the keyed read, with the memory driver's two rules (rows · one-or-null, two throw)
-      eq: (column: string, value: unknown) => {
-        const matching = () =>
-          (seed[table] ?? []).filter((row) => row[column] === value);
-        keyedReads.push({ table, column, value });
-        return {
-          select: async () => matching().map(asRow<T>),
-          single: async () => {
-            const rows = matching();
-            if (rows.length > 1)
-              throw new Error(`keyed read matched ${String(rows.length)} rows`);
-            return rows.length === 0 ? null : asRow<T>(rows[0]);
-          },
-        };
-      },
-    }),
+    // ADR-129: `from()` takes a table or a view; a view has no `insert` / `update` to record, and the `as`
+    // is the same conditional-type seam both real drivers carry.
+    from: <N extends ReadableName<AppDatabase>>(table: N) =>
+      ({
+        select: async () => (seed[table] ?? []).map(asRow<N>),
+        insert: async (row: Row) => {
+          inserted.push({ table, row });
+          return asRow<N>(row);
+        },
+        update: async (id: unknown, patch: Row) => {
+          updated.push({ table, id: String(id), patch });
+          return asRow<N>(patch);
+        },
+        // ADR-131 (1): the keyed read, with the memory driver's two rules (rows · one-or-null, two throw)
+        eq: (column: string, value: unknown) => {
+          const matching = () =>
+            (seed[table] ?? []).filter((row) => row[column] === value);
+          keyedReads.push({ table, column, value });
+          return {
+            select: async () => matching().map(asRow<N>),
+            single: async () => {
+              const rows = matching();
+              if (rows.length > 1)
+                throw new Error(
+                  `keyed read matched ${String(rows.length)} rows`,
+                );
+              return rows.length === 0 ? null : asRow<N>(rows[0]);
+            },
+          };
+        },
+      }) as unknown as QueryHandle<AppDatabase, N>,
     rpc: async (name, args) => {
       rpcs.push({ name, args });
       return (

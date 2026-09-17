@@ -1,5 +1,7 @@
 // The front door (01.10; 04 §3.1 step 1) and its query contract with S-X-02: a plain GET to `/results` with
-// `day` (0–6, Mon = 0 — 02 §4.4 / ADR-118 (c)), `part`, `area`, `district`; parsed back by one function.
+// `day` (0–6, Mon = 0 — 02 §4.4 / ADR-118 (c)), `part`, `area`, `district`; parsed back by one function. Since
+// `1b` the area is the ARIA combobox (04 §6.1), which writes `area` + `district` as hidden fields — the four
+// named fields are unchanged.
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { HomeHero } from "../components/HomeHero";
@@ -25,8 +27,11 @@ describe("public-site — HomeHero front door", () => {
       "name",
       "part",
     );
-    expect(screen.getByLabelText("Your area")).toHaveAttribute("name", "area");
-    expect(screen.getByLabelText("Postcode district")).toBeRequired();
+    expect(screen.getByRole("combobox", { name: "Your area" })).toBeRequired();
+    expect(container.querySelector("input[name='area']")).toBeInTheDocument();
+    expect(
+      container.querySelector("input[name='district']"),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Show my matches" }),
     ).toHaveAttribute("type", "submit");

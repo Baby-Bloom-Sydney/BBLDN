@@ -1,6 +1,6 @@
 // public-site connector (01 §2.3) — the public surface. It may import `matching`, `connections` and the
-// service modules; it never imports `scheduling` (03 §3.6 R3), and it reaches K-1 through the `connections`
-// stage-model connector rather than writing a stage itself (B-39 open — the Connect action is not built).
+// service modules; it never imports `scheduling` (03 §3.6 R3). A Connect from any public surface goes through
+// `matching`'s one entry point (ADR-126: `public-site → matching → positions.advance`), never deeper.
 //
 // Client-safe by construction: no file here imports `@/modules/config/server` except the `"use server"` action,
 // so a client component (the legacy MiniFooter) may import this barrel for `isPublicSitePath`.
@@ -19,8 +19,11 @@ export { organizationJsonLd } from "./lib/organization-json-ld";
 export { websiteJsonLd } from "./lib/website-json-ld";
 export { servicesFaqJsonLd } from "./lib/services-faq-json-ld";
 
-// The S-X-01 → S-X-02 query contract (04 §3.1 steps 1 → 2), read by `1b`.
+// The S-X-01 → S-X-02 query contract (04 §3.1 steps 1 → 2), the 02.13 funnel-source contract, `/api/areas`.
 export { parseQuickMatchQuery } from "./lib/parse-quick-match-query";
+export { parseFunnelQuery } from "./lib/parse-funnel-query";
+export { parseAreaQuery } from "./lib/parse-area-query";
+export { nannyOgImage } from "./lib/nanny-og-image";
 
 // S-X-23.
 export { sendContactMessageAction } from "./actions/send-contact-message-action";
@@ -36,3 +39,5 @@ export { AboutContent } from "./components/AboutContent";
 export { HowItWorksStub } from "./components/HowItWorksStub";
 export { ServicesContent } from "./components/ServicesContent";
 export { ContactContent } from "./components/ContactContent";
+export { BrowseNannies } from "./components/BrowseNannies";
+export { NannyProfile } from "./components/NannyProfile";
