@@ -8,6 +8,7 @@ import type {
   Auth,
   DataAccessPort,
   NamedOperation,
+  PutObjectOptions,
   Role,
   RunOptions,
   Session,
@@ -35,6 +36,9 @@ const data: DataAccessPort<AppDatabase> = Object.freeze({
     resolve().data.run(op, opts),
   signUrl: (ref: StorageRef, ttlSeconds: number) =>
     resolve().data.signUrl(ref, ttlSeconds),
+  putObject: (ref: StorageRef, body: Uint8Array, opts: PutObjectOptions) =>
+    resolve().data.putObject(ref, body, opts),
+  removeObject: (ref: StorageRef) => resolve().data.removeObject(ref),
 });
 
 export const auth: Auth<AppDatabase> = Object.freeze({

@@ -19,6 +19,14 @@ export type FakeDriverState = {
   roles: Array<{ readonly userId: string; readonly role: Role }>;
   scopes: DataScope[];
   signedUrls: Array<{ readonly ref: StorageRef; readonly ttlSeconds: number }>;
+  puts: Array<{
+    readonly ref: StorageRef;
+    readonly bytes: number;
+    readonly contentType: string;
+    readonly metadata?: Readonly<Record<string, string>>;
+    readonly scope: DataScope;
+  }>;
+  removes: Array<{ readonly ref: StorageRef; readonly scope: DataScope }>;
   recoveryEmails: Array<{
     readonly email: string;
     readonly redirectTo: string;
@@ -49,6 +57,8 @@ export function fakeDriver(over: Partial<FakeDriverState> = {}): FakeDriver {
     roles: [],
     scopes: [],
     signedUrls: [],
+    puts: [],
+    removes: [],
     recoveryEmails: [],
     queryResult: { ok: true },
     ...over,
@@ -120,6 +130,23 @@ export function fakeDriver(over: Partial<FakeDriverState> = {}): FakeDriver {
       boom("createSignedUrl");
       state.signedUrls = [...state.signedUrls, { ref, ttlSeconds }];
       return `https://storage.test/${ref.bucket}/${ref.path}?ttl=${ttlSeconds}`;
+    },
+    putObject: async (ref, body, opts, scope) => {
+      boom("putObject");
+      state.puts = [
+        ...state.puts,
+        {
+          ref,
+          bytes: body.byteLength,
+          contentType: opts.contentType,
+          ...(opts.metadata === undefined ? {} : { metadata: opts.metadata }),
+          scope,
+        },
+      ];
+    },
+    removeObject: async (ref, scope) => {
+      boom("removeObject");
+      state.removes = [...state.removes, { ref, scope }];
     },
   };
 
