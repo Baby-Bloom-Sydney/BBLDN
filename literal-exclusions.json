@@ -1,6 +1,8 @@
 [
   "src/app/(auth)/**",
-  "src/app/(funnel)/**",
+  "src/app/(funnel)/apply/**",
+  "src/app/(funnel)/matchmaking/signup/**",
+  "src/app/(public)/nannies/[id]/NannyProfileView.tsx",
   "src/app/admin/**",
   "src/app/api/**",
   "src/app/invite/**",
@@ -23,8 +25,6 @@
   "src/app/subscribe-for/**",
   "src/app/(public)/childcare-professionals/**",
   "src/app/(public)/legal/**",
-  "src/app/(public)/matchmaking/**",
-  "src/app/(public)/nannies/**",
   "src/app/(public)/nanny/**",
   "src/app/(public)/position/**",
   "src/components/**",

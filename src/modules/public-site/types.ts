@@ -51,6 +51,36 @@ export type QuickMatchQuery = {
   readonly district: string;
 };
 
+/** 02.13 — the funnel-source contract's two query keys, parsed once (`parseFunnelQuery`). */
+export type FunnelQuery = {
+  readonly src: "std" | "adv" | null;
+  readonly lead: import("@/modules/shared-types").LeadId | null;
+};
+
+/** `GET /api/areas` — the one query parameter (03 §6.3). */
+export type AreaQuery = {
+  readonly q: string | null;
+};
+
+/** S-X-10 — who is looking decides where a card links (04 §6.1 states: guest · signed-in parent). */
+export type PublicViewer = "guest" | "parent";
+
+export type BrowseNanniesProps = {
+  readonly nannies: ReadonlyArray<import("@/modules/matching").PublicNanny>;
+  readonly viewer: PublicViewer;
+  readonly serviceAreaName: string;
+  readonly matchmakingHref: string;
+  readonly failed?: boolean;
+};
+
+export type NannyProfileProps = {
+  readonly nanny: import("@/modules/matching").PublicNanny;
+  readonly viewer: PublicViewer;
+  readonly connectAction: (formData: FormData) => Promise<never>;
+  readonly leadId: import("@/modules/shared-types").LeadId | null;
+  readonly src: string | null;
+};
+
 /** Who is writing to us on S-X-23 — routed the same way, kept so the reply can be addressed. */
 export type ContactRole = "parent" | "nanny" | "other";
 

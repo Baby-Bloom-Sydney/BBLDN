@@ -9,8 +9,8 @@ import { err } from "@/modules/platform";
 import type { UnitOfWorkJoin } from "@/modules/platform";
 import type {
   Query,
-  TableName,
-  TableQuery,
+  QueryHandle,
+  ReadableName,
   UnitOfWork,
 } from "@/modules/shared-types";
 import type { AppDatabase } from "../types";
@@ -24,14 +24,26 @@ const refuseWrite = (): never => {
   );
 };
 
-function guardedTable<T extends TableName<AppDatabase>>(
-  inner: TableQuery<AppDatabase, T>,
-): TableQuery<AppDatabase, T> {
+/**
+ * ADR-129: `from()` hands back a table handle or a view's select-only handle. A view has no write to refuse, so
+ * its handle passes through with `select` alone; a table's `insert` / `update` are replaced by the refusal.
+ * The `as` is the same conditional-type seam the two drivers carry (`QueryHandle` is conditional over the name).
+ */
+function guarded<N extends ReadableName<AppDatabase>>(
+  inner: QueryHandle<AppDatabase, N>,
+): QueryHandle<AppDatabase, N> {
+  const handle = inner as {
+    readonly select: (columns?: ReadonlyArray<string>) => Promise<unknown>;
+    readonly insert?: unknown;
+  };
+  const select = (columns?: ReadonlyArray<string>) => handle.select(columns);
+  if (handle.insert === undefined)
+    return { select } as unknown as QueryHandle<AppDatabase, N>;
   return {
-    select: (columns) => inner.select(columns),
+    select,
     insert: async () => refuseWrite(),
     update: async () => refuseWrite(),
-  };
+  } as unknown as QueryHandle<AppDatabase, N>;
 }
 
 /** The guarded surface for one open unit of work: one `rpc()`, reads, no table writes. */
@@ -41,7 +53,7 @@ export function guardUnitOfWorkQuery(
   join: UnitOfWorkJoin,
 ): Query<AppDatabase> {
   return {
-    from: (table) => guardedTable(query.from(table)),
+    from: (name) => guarded(query.from(name)),
     rpc: async (name, args) => {
       const claimed = join.claimRpc(uow);
       if (!claimed.ok) throw new UnitOfWorkRefusal(claimed);

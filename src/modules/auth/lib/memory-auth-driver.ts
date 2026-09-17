@@ -4,9 +4,9 @@
 // real thing (05 §3 rule 2 — a behaviour the stub cannot honour is a connector defect, not a stub exception).
 import type {
   Query,
-  TableName,
-  TableQuery,
-  TableRow,
+  QueryHandle,
+  ReadableName,
+  RowOf,
 } from "@/modules/shared-types";
 import type {
   AppDatabase,
@@ -19,6 +19,7 @@ import type {
   StubAuthOptions,
   StubUser,
 } from "../types";
+import { isViewName } from "./is-view-name";
 
 const STUB_EXPIRY_EPOCH_SECONDS = 1_800_000_000;
 
@@ -81,21 +82,32 @@ export function memoryAuthDriver(
   // The stub's rows are whatever a test put in the map, so they become the generated row type at
   // the same single seam the real driver uses (`supabase-query.ts`) and for the same reason: a
   // per-table validator here would be `database.types.ts` written twice. Table and column **names**
-  // are still checked at compile time - `T` is constrained to `TableName<AppDatabase>`, which is why
+  // are still checked at compile time - `N` is constrained to `ReadableName<AppDatabase>`, which is why
   // the S5 swap found a fixture in `auth.binding` that was writing a `user_roles` row with no
   // `user_id`.
-  const asRow = <T extends TableName<AppDatabase>>(
+  const asRow = <N extends ReadableName<AppDatabase>>(
     row: Readonly<Record<string, unknown>>,
-  ): TableRow<AppDatabase, T> => row as TableRow<AppDatabase, T>;
+  ): RowOf<AppDatabase, N> => row as RowOf<AppDatabase, N>;
+
+  // ADR-129: a view's handle is select-only here too, so the stub cannot honour a write the real driver refuses
+  // (05 §3 rule 2). The `as` is the same seam as `asRow` — `QueryHandle` is conditional over the name.
+  const from = <N extends ReadableName<AppDatabase>>(
+    name: N,
+  ): QueryHandle<AppDatabase, N> => {
+    const select = async () => (tables.get(name) ?? []).map(asRow<N>);
+    if (isViewName(name))
+      return { select } as unknown as QueryHandle<AppDatabase, N>;
+    return {
+      select,
+      insert: async (row: Readonly<Record<string, unknown>>) =>
+        asRow<N>(append(name, row)),
+      update: async (_id: string, patch: Readonly<Record<string, unknown>>) =>
+        asRow<N>(append(name, patch)),
+    } as unknown as QueryHandle<AppDatabase, N>;
+  };
 
   const query = (): Query<AppDatabase> => ({
-    from: <T extends TableName<AppDatabase>>(
-      table: T,
-    ): TableQuery<AppDatabase, T> => ({
-      select: async () => (tables.get(table) ?? []).map(asRow<T>),
-      insert: async (row) => asRow<T>(append(table, row)),
-      update: async (_id, patch) => asRow<T>(append(table, patch)),
-    }),
+    from,
     rpc: async () => undefined,
   });
 
