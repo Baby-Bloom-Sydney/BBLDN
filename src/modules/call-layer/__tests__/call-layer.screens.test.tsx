@@ -111,7 +111,7 @@ describe("SlotPicker (S-P-02)", () => {
       }),
     );
     await waitFor(() =>
-      expect(actions.hold).toHaveBeenCalledWith(`default:${START}`),
+      expect(actions.hold).toHaveBeenCalledWith(`default:${START}`, POSITION),
     );
     await userEvent.click(screen.getByRole("button", { name: "Book my call" }));
 

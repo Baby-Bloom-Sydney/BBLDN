@@ -133,7 +133,7 @@ afterEach(() => {
 describe("signed out", () => {
   it("every action and the page read fail closed, never throw", async () => {
     signIn(undefined);
-    const held = await holdSlotAction(await aSlot());
+    const held = await holdSlotAction(await aSlot(), POSITION);
     expect(!held.ok && held.error.code).toBe("UNAUTHENTICATED");
     const chosen = await chooseSlotAction({
       positionId: POSITION,
@@ -158,7 +158,7 @@ describe("signed in as the parent", () => {
 
   it("holds a slot, then the button books it on her position", async () => {
     const slotId = await aSlot();
-    const held = await holdSlotAction(slotId);
+    const held = await holdSlotAction(slotId, POSITION);
     expect(held.ok).toBe(true);
     if (!held.ok) return;
 

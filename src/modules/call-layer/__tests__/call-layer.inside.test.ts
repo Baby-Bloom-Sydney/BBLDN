@@ -59,6 +59,15 @@ const NOW = "2026-01-09T08:00:00.000Z" as ISO;
 const POSITION = "0f1e2d3c-0000-4000-8000-000000000001" as PositionId;
 const OTHER_POSITION = "0f1e2d3c-0000-4000-8000-000000000002" as PositionId;
 const PARENT = "0a1b2c3d-0000-4000-8000-000000000011" as UserId;
+/** 03 §3.2's amended `hold` (see `scheduling/types.ts`): a held row says whose call it is and of what kind. */
+const heldFor = {
+  kind: "matchmaking" as const,
+  subject: {
+    kind: "position" as const,
+    positionId: POSITION,
+    parentId: PARENT,
+  },
+};
 const OTHER_PARENT = "0a1b2c3d-0000-4000-8000-000000000012" as UserId;
 const NANNY = "0a1b2c3d-0000-4000-8000-000000000021" as UserId;
 
@@ -218,7 +227,7 @@ describe("chooseSlot — book, then advance(C-1), then the messages (03 §2.7; 0
 
   it("books through a hold, and refuses a hold that has run out with HOLD_EXPIRED", async () => {
     const slot = await firstSlot();
-    const held = await scheduling.hold(slot.id, parent);
+    const held = await scheduling.hold(slot.id, parent, heldFor);
     expect(held.ok).toBe(true);
     if (!held.ok) return;
     const early = await callLayer.chooseSlot(
@@ -231,7 +240,11 @@ describe("chooseSlot — book, then advance(C-1), then the messages (03 §2.7; 0
     expect(early.ok).toBe(true);
 
     wire([mirrorOf(POSITION, PARENT)]);
-    const stale = await scheduling.hold((await firstSlot()).id, parent);
+    const stale = await scheduling.hold(
+      (await firstSlot()).id,
+      parent,
+      heldFor,
+    );
     if (!stale.ok) return;
     scheduling = createSchedulingStub({
       clock: () => "2026-01-09T09:00:00.000Z" as ISO,

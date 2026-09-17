@@ -233,8 +233,13 @@ export type SlotDay = {
   readonly slots: ReadonlyArray<SlotOption>;
 };
 
+/**
+ * S-P-02's tap. The position travels with the slot because 03 §3.2's amended `hold` carries the subject (I-10:
+ * a held row is an active row, so it has one) — the picker already knows which position it is picking for.
+ */
 export type HoldSlotAction = (
   slotId: SlotId,
+  positionId: PositionId,
 ) => Promise<ClientResult<{ readonly holdId: HoldId }>>;
 
 export type ChooseSlotAction = (input: {
