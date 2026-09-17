@@ -75,59 +75,6 @@ $$;
 comment on type public.consent_purpose is
   '02 §3 / 07 §2.7(a) / ADR-131 (2): what a consent_records row is for. The eleven legal_documents slugs plus the three non-document purposes. Ordinals are frozen and mirrored by shared-types/enums/shared.ts (02 C-1).';
 
--- ---------------------------------------------------------------------------
--- 2. `consent_records.purpose` (02 §4.1 row 5).
---
---    Added nullable, backfilled from `document_id`, then made NOT NULL — the
---    only order that is safe on a table that may already hold rows. The
---    backfill raises rather than guessing if a row cannot be attributed: an
---    un-attributable consent row is a data-protection problem, not a column
---    default. On a fresh database (02 §1) there are none.
---
---    Adding a column does **not** trip `prevent_row_modification()` (0000): that
---    trigger fires on row UPDATE/DELETE, and ALTER TABLE is neither.
--- ---------------------------------------------------------------------------
-
-alter table public.consent_records
-  add column if not exists purpose public.consent_purpose;
-
-do $$
-declare
-  v_orphans int;
-begin
-  update public.consent_records
-     set purpose = document_id::public.consent_purpose
-   where purpose is null
-     and document_id is not null;
-
-  select count(*) into v_orphans from public.consent_records where purpose is null;
-  if v_orphans <> 0 then
-    raise exception
-      '0017: % consent_records row(s) carry neither a purpose nor a document_id and cannot be attributed (ADR-131 (2)); attribute them by hand before applying', v_orphans;
-  end if;
-end
-$$;
-
-alter table public.consent_records
-  alter column purpose set not null;
-
-comment on column public.consent_records.purpose is
-  '07 §2.7(a) / ADR-131 (2): what this consent is for. A document purpose repeats document_id (the CHECK enforces it); vaccination-status / marketing / cookie carry no document. Without this column a non-document consent could not be read back and hasConsent answered false for it.';
-
--- The purpose and the document pair cannot disagree. Deliberately **not** a rule that every
--- non-document purpose is one of the three: 02 §4.1 makes (document_id, document_version) "nullable
--- for informed actions", and forbidding that here would narrow the table beyond what 02 allows.
-alter table public.consent_records
-  drop constraint if exists consent_records_purpose_document_check;
-alter table public.consent_records
-  add constraint consent_records_purpose_document_check
-  check (document_id is null or document_id = purpose::text);
-
--- The `latestConsent(userId, purpose)` read (03 §9.5; ADR-131 (1)) is keyed on user_id and then
--- filtered by purpose; this index is what keeps it from degrading into a per-user scan as the trail
--- grows. It does not replace the (user_id, agreement_id, created_at desc) index 0004 created.
-create index if not exists consent_records_user_purpose_idx
-  on public.consent_records (user_id, purpose, created_at desc);
 
 -- ---------------------------------------------------------------------------
 -- 3a. The three function names below belong to `0017` alone — no earlier migration defines any of
@@ -292,7 +239,22 @@ grant execute on function public.create_parent_profile(text, text, text) to auth
 --    old one — "the one permitted UPDATE, service role". Those cannot be two
 --    PostgREST statements: between them the table would show two current rows
 --    for one visitor, which is what `currentCookie` reads. One transaction.
+--
+--    **Order matters, and the FK has to give.** `cookie_consent_records_current_idx`
+--    (0004) is a *unique* index on `(visitor_id) WHERE superseded_by IS NULL`, and an
+--    index cannot be deferred — so inserting the new row while the old one is still
+--    current fails immediately with a 23505. Stamping first and inserting second is
+--    the only order that never has two current rows, and it needs the old row to point
+--    at an id that does not exist yet. Hence the FK below is made DEFERRABLE and this
+--    function defers it: the unique index is satisfied at every statement, the FK at
+--    commit. Caught by `int.rpc-0017`, which is the suite the `database-reviewer` asked
+--    for; the metadata tests could not have seen it.
 -- ---------------------------------------------------------------------------
+
+-- 0004 created this FK NOT DEFERRABLE. Making it deferrable widens nothing: a deferred check is still
+-- a check, and every write to this table goes through the function below (no client policy allows one).
+alter table public.cookie_consent_records
+  alter constraint cookie_consent_records_superseded_by_fkey deferrable initially immediate;
 
 create or replace function public.record_cookie_consent(
   p_id          uuid,
@@ -317,6 +279,18 @@ as $$
 declare
   v_superseded uuid;
 begin
+  -- fix: database-reviewer H-1. `FOR UPDATE` alone does not serialise this. Under READ COMMITTED a
+  -- second caller for the same visitor blocks on the first, and when the first commits Postgres
+  -- re-checks `superseded_by is null` against the *updated* row, finds it no longer matches and drops
+  -- it — so the second caller supersedes nothing and inserts a row that collides with the first's on
+  -- `cookie_consent_records_current_idx` (0004). A double-click on the cookie banner, or one client
+  -- retry, is enough. The advisory lock makes the whole read-insert-stamp sequence one critical
+  -- section per visitor: the second caller waits, then its `select` (a new command, a new snapshot)
+  -- sees the first caller's new row and supersedes *that*. One lock, one direction — no deadlock.
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtext('cookie_consent_records:' || p_visitor_id)
+  );
+
   select c.id into v_superseded
     from public.cookie_consent_records c
    where c.visitor_id = p_visitor_id
@@ -325,18 +299,20 @@ begin
    limit 1
    for update;
 
+  if v_superseded is not null then
+    -- the stamp names a row that does not exist yet; the FK is checked at commit instead
+    set constraints public.cookie_consent_records_superseded_by_fkey deferred;
+    update public.cookie_consent_records
+       set superseded_by = p_id
+     where id = v_superseded;
+  end if;
+
   insert into public.cookie_consent_records
     (id, visitor_id, user_id, consent_choice, analytics_enabled, marketing_enabled,
      ip_address, user_agent, expiry_date, created_at)
   values
     (p_id, p_visitor_id, p_user_id, p_choice, p_analytics, p_marketing,
      p_ip, p_user_agent, p_expiry_date, p_created_at);
-
-  if v_superseded is not null then
-    update public.cookie_consent_records
-       set superseded_by = p_id
-     where id = v_superseded;
-  end if;
 
   return v_superseded;
 end
@@ -348,6 +324,87 @@ comment on function public.record_cookie_consent(uuid, text, public.cookie_choic
 revoke all on function public.record_cookie_consent(uuid, text, public.cookie_choice, boolean, boolean, timestamptz, timestamptz, uuid, inet, text) from public, anon, authenticated;
 grant execute on function public.record_cookie_consent(uuid, text, public.cookie_choice, boolean, boolean, timestamptz, timestamptz, uuid, inet, text) to service_role;
 
+-- ---------------------------------------------------------------------------
+-- 6a. `consent_records.purpose` — **last on purpose** (fix: database-reviewer M-2).
+--
+--     `SET NOT NULL` and the CHECK each take an ACCESS EXCLUSIVE lock and scan the
+--     table, and this file is one transaction, so the lock is held until COMMIT.
+--     Running these statements last means nothing else in the migration happens while
+--     `consent_records` — an append-only, indefinitely-growing consent log — is locked.
+--     It does not make the scan free: before this table has real volume, these three
+--     statements want their own migration with `NOT VALID` + `VALIDATE CONSTRAINT` and a
+--     `CREATE INDEX CONCURRENTLY` outside a transaction. Recorded, not pretended away.
+--
+--    Added nullable, backfilled from `document_id`, then made NOT NULL — the
+--    only order that is safe on a table that may already hold rows. The
+--    backfill raises rather than guessing if a row cannot be attributed: an
+--    un-attributable consent row is a data-protection problem, not a column
+--    default. On a fresh database (02 §1) there are none.
+--
+--    Adding a column does **not** trip `prevent_row_modification()` (0000): that
+--    trigger fires on row UPDATE/DELETE, and ALTER TABLE is neither.
+-- ---------------------------------------------------------------------------
+
+alter table public.consent_records
+  add column if not exists purpose public.consent_purpose;
+
+do $$
+declare
+  v_orphans int;
+  v_unknown text;
+begin
+  -- fix: database-reviewer M-3. A `document_id` that is not one of the fourteen labels would fail the
+  -- cast below with a raw `invalid input value for enum`. That is the same failure class the orphan
+  -- check handles by name, so it is named here too.
+  select string_agg(distinct c.document_id, ', ') into v_unknown
+    from public.consent_records c
+   where c.purpose is null
+     and c.document_id is not null
+     and not exists (
+       select 1 from pg_catalog.pg_enum e
+       join pg_catalog.pg_type t on t.oid = e.enumtypid
+       join pg_catalog.pg_namespace n on n.oid = t.typnamespace
+       where n.nspname = 'public' and t.typname = 'consent_purpose'
+         and e.enumlabel = c.document_id
+     );
+  if v_unknown is not null then
+    raise exception
+      '0017: consent_records rows carry document_id value(s) that are not consent_purpose labels (%); add the label or attribute the rows by hand before applying', v_unknown;
+  end if;
+
+  update public.consent_records
+     set purpose = document_id::public.consent_purpose
+   where purpose is null
+     and document_id is not null;
+
+  select count(*) into v_orphans from public.consent_records where purpose is null;
+  if v_orphans <> 0 then
+    raise exception
+      '0017: % consent_records row(s) carry neither a purpose nor a document_id and cannot be attributed (ADR-131 (2)); attribute them by hand before applying', v_orphans;
+  end if;
+end
+$$;
+
+alter table public.consent_records
+  alter column purpose set not null;
+
+comment on column public.consent_records.purpose is
+  '07 §2.7(a) / ADR-131 (2): what this consent is for. A document purpose repeats document_id (the CHECK enforces it); vaccination-status / marketing / cookie carry no document. Without this column a non-document consent could not be read back and hasConsent answered false for it.';
+
+-- The purpose and the document pair cannot disagree. Deliberately **not** a rule that every
+-- non-document purpose is one of the three: 02 §4.1 makes (document_id, document_version) "nullable
+-- for informed actions", and forbidding that here would narrow the table beyond what 02 allows.
+alter table public.consent_records
+  drop constraint if exists consent_records_purpose_document_check;
+alter table public.consent_records
+  add constraint consent_records_purpose_document_check
+  check (document_id is null or document_id = purpose::text);
+
+-- The `latestConsent(userId, purpose)` read (03 §9.5; ADR-131 (1)) is keyed on user_id and then
+-- filtered by purpose; this index is what keeps it from degrading into a per-user scan as the trail
+-- grows. It does not replace the (user_id, agreement_id, created_at desc) index 0004 created.
+create index if not exists consent_records_user_purpose_idx
+  on public.consent_records (user_id, purpose, created_at desc);
 -- ---------------------------------------------------------------------------
 -- 7. Verify — the migration asserts its own claims (the 0000–0016 convention).
 -- ---------------------------------------------------------------------------
@@ -434,6 +491,13 @@ begin
     raise exception '0017: % of the three functions is not SECURITY DEFINER with search_path pinned (02 §7)', v_bad;
   end if;
 
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'cookie_consent_records_superseded_by_fkey' and condeferrable
+  ) then
+    raise exception '0017: cookie_consent_records_superseded_by_fkey must be DEFERRABLE, or record_cookie_consent() cannot stamp before it inserts';
+  end if;
+
   -- exactly one overload of each: see 3a — a leftover overload is a definer nobody granted on purpose
   select count(*) into v_bad
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -441,6 +505,20 @@ begin
      and p.proname in ('consume_rate_limit', 'create_parent_profile', 'record_cookie_consent');
   if v_bad <> 3 then
     raise exception '0017: expected exactly 3 functions across the three names, found %', v_bad;
+  end if;
+
+  -- fix: database-reviewer M-1. Every table these three write is FORCE RLS with no policy covering the
+  -- write, so they reach it only because the owner has BYPASSRLS — FORCE RLS applies to a non-bypassing
+  -- owner too. If ownership ever differed, signup, cookie consent and rate limiting would each stop
+  -- writing *silently*. It is a property of the owner, so the owner is asserted (0002's pattern).
+  select count(*) into v_bad
+    from pg_proc p join pg_roles r on r.oid = p.proowner
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname in ('consume_rate_limit', 'create_parent_profile', 'record_cookie_consent')
+     and not (r.rolbypassrls or r.rolsuper);
+  if v_bad <> 0 then
+    raise exception '0017: % of the three functions is owned by a role without BYPASSRLS; FORCE RLS would make it write nothing, silently (0002''s rule)', v_bad;
   end if;
 
   -- 07 §5.2: anon may execute none of them; authenticated only create_parent_profile

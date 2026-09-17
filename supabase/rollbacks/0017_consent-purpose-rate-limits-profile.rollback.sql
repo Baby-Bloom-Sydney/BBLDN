@@ -31,6 +31,11 @@ $$;
 
 drop table if exists public.rate_limit_buckets;
 
+-- back to 0004's shape: NOT DEFERRABLE (0017 widened it so record_cookie_consent could stamp the old
+-- row before the new one existed; with the function gone there is nothing left that needs it).
+alter table public.cookie_consent_records
+  alter constraint cookie_consent_records_superseded_by_fkey not deferrable;
+
 drop index if exists public.consent_records_user_purpose_idx;
 alter table public.consent_records
   drop constraint if exists consent_records_purpose_document_check;
@@ -67,6 +72,12 @@ begin
   -- what 0004 built must be untouched
   if to_regclass('public.consent_records') is null then
     raise exception '0017 rollback: consent_records was dropped — 0017 never created it';
+  end if;
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'cookie_consent_records_superseded_by_fkey' and condeferrable
+  ) then
+    raise exception '0017 rollback: the superseded_by FK is still DEFERRABLE (0004 made it not)';
   end if;
 end
 $$;
