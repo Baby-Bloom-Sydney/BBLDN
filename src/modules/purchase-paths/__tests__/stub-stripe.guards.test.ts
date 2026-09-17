@@ -31,16 +31,19 @@ describe("constantTimeEquals", () => {
     const long = "x".repeat(300);
     expect(constantTimeEquals(long, long)).toBe(false);
     // Two strings that agree on the first 256 characters and differ after must never compare equal.
-    expect(constantTimeEquals(`${"x".repeat(256)}a`, `${"x".repeat(256)}b`)).toBe(
-      false,
-    );
+    expect(
+      constantTimeEquals(`${"x".repeat(256)}a`, `${"x".repeat(256)}b`),
+    ).toBe(false);
   });
 
   it("touches no Node builtin — that is what let the provider be wired at boot", async () => {
     const { readFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
     const source = readFileSync(
-      resolve(__dirname, "../providers/stub-stripe/lib/constant-time-equals.ts"),
+      resolve(
+        __dirname,
+        "../providers/stub-stripe/lib/constant-time-equals.ts",
+      ),
       "utf8",
     );
     expect(source).not.toMatch(/from "node:/u);
@@ -81,7 +84,7 @@ describe("layer 3 — parseEvent fails closed on the shared secret", () => {
     linkKind: "checkout",
     preset: "self-serve-app",
     shape: { kind: "upfront" },
-    paid: { pence: 200_000, currency: "GBP" },
+    paid: { pence: 200_000, currency: "GBP" }, // config-literal-ok: a provider-event fixture; 03 §5.2 types the currency as this literal
     at: "2026-03-01T09:00:00.000Z",
   };
 
@@ -133,12 +136,14 @@ describe("the stub takes no money", () => {
   it("hands back in-app URLs keyed by the LinkRef payments minted, never a provider URL", async () => {
     const link = await provider.createPaymentLink(
       "cus" as never,
-      { pence: 15_000, currency: "GBP" },
+      { pence: 15_000, currency: "GBP" }, // config-literal-ok: the amount payments computed and handed the provider, not a config read
       "deposit",
       { kind: "upfront" },
       "ref-1" as never,
       "2026-04-01T09:00:00.000Z" as never,
     );
-    expect(link.ok && link.value.url).toBe("https://app/parent/bundle?ref=ref-1");
+    expect(link.ok && link.value.url).toBe(
+      "https://app/parent/bundle?ref=ref-1",
+    );
   });
 });

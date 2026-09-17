@@ -171,7 +171,7 @@ describe("createPaymentLink — path (a), admin only (03 §5.4.1)", () => {
       placements: {
         [PLACEMENT]: {
           weeklyHours: 40,
-          hourlyRatePence: 2_000,
+          hourlyRatePence: 2_000, // config-literal-ok: the placement's own contracted rate, deliberately over the ADR-100 cap read from OFFER below
           startedAt: NOW,
         },
       },
@@ -298,7 +298,8 @@ describe("openDfyAccess — the placement switch (ADR-093 / 094)", () => {
   const seed: MemorySpineSeed = {
     contacts: CONTACTS,
     placements: {
-      [PLACEMENT]: { weeklyHours: 40, hourlyRatePence: 1_500, startedAt: NOW },
+      // config-literal-ok: a `nanny_placements` ROW fixture — the contracted hours and rate live on the placement (ADR-100), never in PRICES
+      [PLACEMENT]: { weeklyHours: 40, hourlyRatePence: 1_500, startedAt: NOW }, // config-literal-ok: a `nanny_placements` ROW fixture — contracted terms live on the placement (ADR-100), never in PRICES
     },
     childrenDob: { [FAMILY]: ["2025-01-15"] },
   };
@@ -447,7 +448,7 @@ describe("comms failing does not fail the money (03 §5.4.3)", () => {
       placements: {
         [PLACEMENT]: {
           weeklyHours: 40,
-          hourlyRatePence: 1_500,
+          hourlyRatePence: 1_500, // config-literal-ok: the placement's own contracted rate, not a config value
           startedAt: NOW,
         },
       },

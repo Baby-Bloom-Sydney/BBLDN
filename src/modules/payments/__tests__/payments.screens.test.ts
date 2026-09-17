@@ -22,8 +22,8 @@ describe("what each standing offers the parent", () => {
       accessUntil: LATER,
       startedAt: AT,
       paymentDueAt: LATER,
-      balance: { pence: 75_000, currency: "GBP" },
-      firstWeekWages: { pence: 60_000, currency: "GBP" },
+      balance: { pence: 75_000, currency: "GBP" }, // config-literal-ok: an AccessState fixture — 03 §5.2 types `Money.currency` as this literal and the amount is what a row held
+      firstWeekWages: { pence: 60_000, currency: "GBP" }, // config-literal-ok: same fixture
       satisfactionWindowEndsAt: LATER,
     };
     expect(moneyPageView(state).action.kind).toBe("ask-matchmaker");
@@ -108,8 +108,11 @@ describe("the routes are thin and land where they should (05 §7 rule 5)", () =>
   // `PurchasePath` carries no cancel method — the document names a behaviour the contract gives no road to. The
   // Sydney `/parent/subscription/cancel` page is gone (it wrote Sydney columns), and rather than invent a
   // connector method on a money path, the claim is pinned. Owner: 03 §5.2.
-  it.fails("S-P-12 cancels in-app rather than through the hosted portal (03 §5.2)", async () => {
-    const { payments } = await import("../lib/default-payments");
-    expect(payments).toHaveProperty("cancel");
-  });
+  it.fails(
+    "S-P-12 cancels in-app rather than through the hosted portal (03 §5.2)",
+    async () => {
+      const { payments } = await import("../lib/default-payments");
+      expect(payments).toHaveProperty("cancel");
+    },
+  );
 });

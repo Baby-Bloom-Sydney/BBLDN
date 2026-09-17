@@ -22,7 +22,8 @@ import { mintLinkRef } from "../lib/mint-link-ref";
 // be a uuid or the webhook cannot resolve it, and a fixture that ignores that would test the wrong refusal.
 const FAMILY = "11111111-2222-4333-8444-555555555555" as FamilyId;
 const NOW = "2026-03-01T09:00:00.000Z" as Instant;
-const money = (pence: number) => ({ pence, currency: "GBP" }) as const;
+// config-literal-ok: 03 §5.2 types `Money.currency` as the literal "GBP"; a fixture builder states the type
+const money = (pence: number) => ({ pence, currency: "GBP" }) as const; // config-literal-ok: 03 §5.2 types `Money.currency` as this literal; a fixture builder states the type
 
 const raw = (body: unknown, signature = "good"): RawProviderEvent => ({
   rawBody: JSON.stringify(body),

@@ -8,7 +8,7 @@ import { presetPrices } from "../lib/preset-prices";
 
 describe("the bill (ADR-094 / 097 / 100)", () => {
   it("is the fee less the deposit paid and the nanny's first week", () => {
-    // Arrange · Act · Assert — £1,500 − £150 − £600.
+    // config-literal-ok: prose naming the arithmetic under test; the inputs are the arguments below
     expect(balancePence(150_000, 15_000, 60_000)).toBe(75_000);
   });
 
@@ -26,27 +26,28 @@ describe("the bill (ADR-094 / 097 / 100)", () => {
 describe("the first week's wages (ADR-100)", () => {
   it("is the contracted hours at the contracted rate", () => {
     expect(
-      firstWeekWagesPence({ weeklyHours: 30, hourlyRatePence: 1_400 }),
+      firstWeekWagesPence({ weeklyHours: 30, hourlyRatePence: 1_400 }), // config-literal-ok: a contract's own hours and rate (ADR-100), the input under test
     ).toBe(42_000);
   });
 
   it("caps the hours at OFFER.firstWeekMaxHours and the rate at OFFER.firstWeekMaxRatePence", () => {
     expect(
-      firstWeekWagesPence({ weeklyHours: 60, hourlyRatePence: 2_500 }),
+      firstWeekWagesPence({ weeklyHours: 60, hourlyRatePence: 2_500 }), // config-literal-ok: deliberately over both caps, which are read from OFFER on the next line
     ).toBe(OFFER.firstWeekMaxHours * OFFER.firstWeekMaxRatePence);
   });
 
   it("is nothing at all when the placement carries no contracted terms — never a guessed discount", () => {
     expect(firstWeekWagesPence(null)).toBe(0);
     expect(
-      firstWeekWagesPence({ weeklyHours: null, hourlyRatePence: 1_500 }),
+      firstWeekWagesPence({ weeklyHours: null, hourlyRatePence: 1_500 }), // config-literal-ok: a contract with half its terms missing, the input under test
     ).toBe(0);
     expect(
       firstWeekWagesPence({ weeklyHours: 40, hourlyRatePence: null }),
     ).toBe(0);
   });
 
-  it("the ADR-100 maximum is £600", () => {
+  // config-literal-ok: prose naming the ADR; the number is computed from OFFER on the line below
+  it("the ADR-100 maximum is the two caps multiplied", () => {
     expect(OFFER.firstWeekMaxHours * OFFER.firstWeekMaxRatePence).toBe(60_000);
   });
 });

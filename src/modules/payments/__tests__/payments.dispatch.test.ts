@@ -13,7 +13,7 @@ import type { FamilyId, Instant, LinkRef } from "@/modules/shared-types";
 const FAMILY = "family-1" as FamilyId;
 const NOW = "2026-03-01T09:00:00.000Z" as Instant;
 const REF = "ref-1" as LinkRef;
-const money = (pence: number) => ({ pence, currency: "GBP" }) as const;
+const money = (pence: number) => ({ pence, currency: "GBP" }) as const; // config-literal-ok: 03 §5.2 types `Money.currency` as this literal; a fixture builder states the type
 
 const row = (patch: Partial<SpineRow> = {}): SpineRow => ({
   ...blankSpineRow(FAMILY, NOW),
