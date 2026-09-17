@@ -1,9 +1,11 @@
 // `POST /api/public/quick-match` (03 §6.3; `02.09`) — the inline widget's contract: the front door's three fields
-// as JSON → count + the top cards. No auth, no write; the envelope of 01 §4c. Rate limit (07 §8 row 1) owed with
-// the shared store.
+// as JSON → count + the top cards. No auth, no write; the envelope of 01 §4c. Rate limited on 07 §8 row 1
+// (`publicRead`, keyed by the hashed caller address) over the shared `rate_limit_buckets` store of `0017` —
+// **before the body is parsed**, so a burst cannot spend a match run, or even a JSON parse, per request.
 import { z } from "zod";
 import { err, ok, toResponse } from "@/modules/platform";
 import { buildQuickMatchPage } from "@/modules/matching";
+import { consumePublicReadLimit } from "../../_lib/consume-public-read-limit";
 import { requestIdOf } from "../../_lib/request-id";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +21,12 @@ const BODY = z
   })
   .strict();
 
+const SURFACE = "quick-match";
+
 export async function POST(request: Request): Promise<Response> {
   const requestId = requestIdOf(request);
+  const limited = await consumePublicReadLimit(request, requestId, SURFACE);
+  if (limited !== null) return toResponse(limited, { requestId });
   const parsed = BODY.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
     return toResponse(
