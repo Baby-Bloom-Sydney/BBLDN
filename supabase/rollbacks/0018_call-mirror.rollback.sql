@@ -25,8 +25,10 @@ drop function if exists public.upsert_call_mirror(
 
 drop policy if exists position_call_mirror_select_admin on public.position_call_mirror;
 drop policy if exists position_call_mirror_select_own on public.position_call_mirror;
-drop trigger if exists set_updated_at on public.position_call_mirror;
+drop trigger if exists position_call_mirror_no_answer_count_guard on public.position_call_mirror;
+drop trigger if exists position_call_mirror_set_updated_at on public.position_call_mirror;
 drop table if exists public.position_call_mirror;
+drop function if exists public.position_call_mirror_no_answer_count_never_falls();
 
 drop index if exists public.availability_blocks_in_force_idx;
 alter table public.availability_blocks drop column if exists revoked_at;
@@ -51,6 +53,12 @@ begin
     where n.nspname = 'public' and p.proname = 'upsert_call_mirror'
   ) then
     raise exception '0018 rollback: upsert_call_mirror() still exists';
+  end if;
+  if exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'position_call_mirror_no_answer_count_never_falls'
+  ) then
+    raise exception '0018 rollback: the no_answer_count guard function still exists';
   end if;
 end
 $$;

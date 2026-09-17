@@ -128,6 +128,14 @@ export type CallLayer = {
   readonly getCallState: (
     ref: CallRef,
   ) => Promise<CallLayerResult<CallStateRead>>;
+  /**
+   * Connector extension (`1g`): every call that is not `done`, for the admin queue's awaiting-slot half.
+   * 03 §3.6 names `call-layer` as the source of those calls but 03 §2.7 gives `CallLayer` no method that
+   * enumerates them — raised for ratification with `findOpenCall`, amend-first.
+   */
+  readonly listOpenCalls: () => Promise<
+    CallLayerResult<ReadonlyArray<OpenCallSummary>>
+  >;
   /** Connector extension (file header): the one open matchmaking / onboarding call of a parent, or `null`. */
   readonly findOpenCall: (
     parentId: UserId,
@@ -164,6 +172,27 @@ export type CallMirrorStore = {
   get(positionId: PositionId): Promise<Result<CallMirror | null>>;
   findOpenForParent(parentId: UserId): Promise<Result<CallMirror | null>>;
   put(mirror: CallMirror, uow?: UnitOfWork): Promise<Result<void>>;
+  /**
+   * `1g` — every call that is not `done`. 03 §3.6 says the awaiting-slot half of the admin queue "comes from
+   * `call-layer`", and until the mirror had a table there was nothing to enumerate: `1f` shipped S-A-03 with
+   * that half missing and said so on the screen. This is the read behind `CallLayer.listOpenCalls`.
+   */
+  listOpen(): Promise<Result<ReadonlyArray<OpenCallSummary>>>;
+};
+
+/**
+ * One row of 03 §3.6's "awaiting-slot calls come from `call-layer`". Ids and facts only — `admin` decorates
+ * (03 §3.6: "`scheduling` returns ids, `admin` decorates"), and the same rule holds for this list.
+ */
+export type OpenCallSummary = {
+  readonly positionId: PositionId;
+  readonly parentId: UserId;
+  readonly type: Exclude<CallType, "nanny-commission">;
+  readonly state: CallState;
+  readonly bookingId: BookingId | null;
+  readonly requestedAt: ISO;
+  readonly noAnswerCount: number;
+  readonly aboutNanny?: string;
 };
 
 export type CallLayerDeps = {

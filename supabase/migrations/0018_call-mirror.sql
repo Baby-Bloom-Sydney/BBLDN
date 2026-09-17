@@ -38,6 +38,11 @@
 --      blocked > open > rule, so an `open` row *adds* availability instead of removing a block.
 --      The column is the fix `1f` named for `0018`; the partial index is what keeps the
 --      slot-generation read (which now filters `revoked_at is null`) from scanning revoked rows.
+--      **Recorded overlap (database-reviewer M-2):** `0009`'s `availability_blocks_calendar_range_idx`
+--      covers the same three columns without the predicate. Both are kept in this migration because
+--      dropping an earlier migration's index from a later one makes the set no longer describe itself
+--      when read in order. The unfiltered one becomes dead weight once every block read filters on
+--      `revoked_at`; retiring it belongs to whichever unit next re-opens `scheduling`'s reads.
 
 -- ---------------------------------------------------------------------------
 -- 1. `position_call_mirror` (02 §4.2)
@@ -75,14 +80,39 @@ comment on column public.position_call_mirror.no_answer_count is
 comment on column public.position_call_mirror.about_nanny is
   '04 §3.3 trigger (c) / path E: the nanny this call is about, by the first name already released to this parent through nanny_public (07 §5.2). Never a surname, never an id a parent has not been given.';
 
-drop trigger if exists set_updated_at on public.position_call_mirror;
-create trigger set_updated_at
+drop trigger if exists position_call_mirror_set_updated_at on public.position_call_mirror;
+create trigger position_call_mirror_set_updated_at
   before update on public.position_call_mirror
   for each row execute function public.set_updated_at();
 
 -- D-12's sibling: the admin call queue reads every position whose call is not finished (0006's
 -- `nanny_positions_open_call_idx`) and then decorates it from here, one row at a time by PK. No
 -- second index is needed on this table - the PK is the access path.
+
+-- fix: database-reviewer M-4. The comment claimed the count never goes backwards and only a CHECK
+-- of `>= 0` stood behind it, which an UPDATE can satisfy while decrementing. R5 makes the count a
+-- tally of events that already happened, so a decrement is always a bug - and the one caller computes
+-- the next value from the one it read, which is exactly the read that can go stale.
+create or replace function public.position_call_mirror_no_answer_count_never_falls()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.no_answer_count < old.no_answer_count then
+    raise exception 'position_call_mirror: no_answer_count may not fall (% -> %)',
+      old.no_answer_count, new.no_answer_count
+      using errcode = 'integrity_constraint_violation';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists position_call_mirror_no_answer_count_guard on public.position_call_mirror;
+create trigger position_call_mirror_no_answer_count_guard
+  before update on public.position_call_mirror
+  for each row execute function public.position_call_mirror_no_answer_count_never_falls();
 
 alter table public.position_call_mirror enable row level security;
 alter table public.position_call_mirror force row level security;
@@ -95,12 +125,16 @@ create policy position_call_mirror_select_own
   for select
   to authenticated
   using (
+    -- fix: database-reviewer H-1. `current_parent_id()` is the STABLE SECURITY DEFINER helper 0002
+    -- created so that a client-role policy never has to route through another FORCE RLS table's own
+    -- policy. Joining `parents` here would have been a second, independent implementation of "is this
+    -- my parent record" that can drift from the one every other table uses - and this migration's own
+    -- header argues for one writer per column for exactly that reason.
     exists (
       select 1
         from public.nanny_positions p
-        join public.parents pa on pa.id = p.parent_id
        where p.id = position_call_mirror.position_id
-         and pa.user_id = (select auth.uid())
+         and p.parent_id = (select public.current_parent_id())
     )
   );
 
@@ -109,7 +143,7 @@ create policy position_call_mirror_select_admin
   on public.position_call_mirror
   for select
   to authenticated
-  using (public.is_admin());
+  using ((select public.is_admin()));
 
 -- ---------------------------------------------------------------------------
 -- 2. `upsert_call_mirror()` — the one write, because it is two tables (ADR-127)
@@ -282,9 +316,10 @@ begin
 
   if not exists (
     select 1 from pg_trigger
-    where tgrelid = 'public.position_call_mirror'::regclass and tgname = 'set_updated_at'
+    where tgrelid = 'public.position_call_mirror'::regclass
+      and tgname = 'position_call_mirror_set_updated_at'
   ) then
-    raise exception '0018: position_call_mirror needs the set_updated_at trigger (02 §2)';
+    raise exception '0018: position_call_mirror needs its <table>_set_updated_at trigger (02 §2)';
   end if;
 
   -- the one write, and only the service role may make it (07 §5.1 rule 5)
@@ -331,8 +366,24 @@ begin
     raise exception '0018: availability_blocks.revoked_at missing';
   end if;
 
-  if to_regclass('public.availability_blocks_in_force_idx') is null then
-    raise exception '0018: availability_blocks_in_force_idx missing';
+  -- fix: database-reviewer L-2. The name alone is not the assertion: without the partial predicate
+  -- this index is a plain duplicate of 0009's `availability_blocks_calendar_range_idx`, and an edit
+  -- that dropped the WHERE clause would have passed a name-only check.
+  if not exists (
+    select 1 from pg_indexes
+    where schemaname = 'public' and indexname = 'availability_blocks_in_force_idx'
+      and indexdef like '%revoked_at IS NULL%'
+      and indexdef like '%calendar_id%' and indexdef like '%start_at%'
+  ) then
+    raise exception '0018: availability_blocks_in_force_idx must be the partial index on (calendar_id, start_at, end_at) WHERE revoked_at IS NULL';
+  end if;
+
+  if not exists (
+    select 1 from pg_trigger
+    where tgrelid = 'public.position_call_mirror'::regclass
+      and tgname = 'position_call_mirror_no_answer_count_guard'
+  ) then
+    raise exception '0018: the no_answer_count guard trigger is missing (R5 - the tally never falls)';
   end if;
 end
 $$;
