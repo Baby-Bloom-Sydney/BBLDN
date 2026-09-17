@@ -351,6 +351,10 @@ Exit codes, in this sweep's own worktree, all local (B-42 — GitHub Actions was
 
 `banned-literals` was not chased, per the brief and ADR-124.
 
+**CI came back mid-run (B-42 closed, ADR-138), so the three red checks are measured rather than assumed. All three are red on `main` itself; this branch adds none.** Job-for-job against `main`'s own run at `ce82ffe` (`35205654691`) vs this PR (`35210019968`): `typecheck` · `lint` · `allowed-imports` · `types-drift` · `gitleaks` pass on both; `banned-literals` fails on both (ADR-124); `test` fails on both with **the same three files and only those three** — `components/bapp/ConnectExistingChildSheet.test.tsx`, `components/payments/CancelledInPeriodBanner.test.tsx`, `components/payments/PastDueBanner.test.tsx`, all legacy `src/components/**`, all green locally — with 249 passing here against `main`'s 246, the difference being this sweep's new suites.
+
+`build` fails on both, and the reason is worth recording because **it is not the same reason it fails locally**. Locally a bare build dies on `/api/verification-status` constructing a Resend client at module scope; in CI it dies on `Dynamic server usage: no-store fetch https://placeholder.supabase.co/...` from the legacy `/nanny/team` route at page-data collection. **Two independent legacy Sydney routes each break the build on their own**, which is why "is `main` build-green?" has had different answers depending on who measured it and how. Both belong to REVIEW-1's H-4 and want one decommission-or-gate decision, not three. Neither is in this sweep's scoped files.
+
 ---
 
 ## 10. What this sweep changed
