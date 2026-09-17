@@ -80,7 +80,9 @@ describe("S-X-13 — the public preview (04 §6.1)", () => {
     // is free of it, including the sign-in return path, which names the claim route and not the token twice.
     for (const link of screen.getAllByRole("link"))
       expect(link.getAttribute("href")).not.toContain(`invite=${TOKEN}`);
-    expect(screen.getByRole("button", { name: /Join Amara's app/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Join Amara's app/ }),
+    ).toBeInTheDocument();
   });
 
   it("★ the claim button posts a form — the token is a hidden field, never an href", () => {

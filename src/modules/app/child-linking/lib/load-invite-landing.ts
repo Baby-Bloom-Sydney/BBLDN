@@ -79,7 +79,9 @@ export async function loadInviteLanding(rawToken: string): Promise<{
   // (01 §4d's name; the invite cluster built a `redirect` parameter that S-X-08 never read, so the return was
   // silently dropped — HARDEN-B debt 10) pointing at the **claim** route, which 04 §2.3 addresses by token
   // anyway. `URLS.invite` is config's; the path is built from it rather than from a literal (L4).
-  const back = encodeURIComponent(`${new URL(URLS.invite).pathname}/connect/${token}`);
+  const back = encodeURIComponent(
+    `${new URL(URLS.invite).pathname}/connect/${token}`,
+  );
   return {
     token,
     view: inviteLandingView({
