@@ -206,10 +206,14 @@ describe("scheduling — booking invariants", () => {
     );
   });
 
-  it("says displacement is not built rather than quietly refusing the parent (I-2 gap)", async () => {
+  // REVIEW-2 §6.2 row 4. This used to assert `NOT_IMPLEMENTED` — an honest claim while the stub refused I-2,
+  // and a false one once the real inside built it (`displace-to.ts` + `book_slot()`'s `p_displace_to`). The stub
+  // now does the same move with the same pure `nextFreeSlot`, so the claim the swap rests on is the behaviour
+  // itself: the parent gets the slot and the nanny is moved, not cancelled and not silently refused.
+  it("moves the nanny rather than refusing the parent (I-2)", async () => {
     const calendar = stub();
     const slotId = slotOn(GMT_FRIDAY, "10:00");
-    await calendar.book({
+    const hers = await calendar.book({
       slotId,
       kind: "nanny-commission",
       actor: parent,
@@ -223,8 +227,12 @@ describe("scheduling — booking invariants", () => {
       subject: parentSubject,
       idempotencyKey: "parent",
     });
-    expect(!overriding.ok && overriding.error.details?.reason).toBe(
-      "NOT_IMPLEMENTED",
+    expect(overriding.ok).toBe(true);
+    if (!overriding.ok || !hers.ok) return;
+    expect(overriding.value.displaced?.id).toBe(hers.value.booking.id);
+    expect(overriding.value.displaced?.status).toBe("rescheduled");
+    expect(overriding.value.displaced?.start).not.toBe(
+      hers.value.booking.start,
     );
   });
 });

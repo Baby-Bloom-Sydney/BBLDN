@@ -729,39 +729,53 @@ describe("the C-row slice through advance (C-a · C-c) and the nanny call (§2.7
     ).toBe(false);
   });
 
-  // 03 §3.5 seq 3 / I-2: a parent books a `displaceable` slot and the nanny is moved to the next free slot.
-  // NOT BUILT — the scheduling stub answers `NOT_IMPLEMENTED` (F-b's recorded gap; `hold` cannot displace
-  // because a hold *is* a bookings row). Pinned as the documented behaviour so the day it is built this
-  // `it.fails` turns red and the pin is removed on purpose — the test never bends to the code.
-  it.fails(
-    "a parent books over a nanny's slot and the nanny is moved (03 §3.5 seq 3 — not built)",
-    async () => {
-      const slot = await firstSlot("nanny-commission");
-      await callLayer.openNannyCall({
-        nannyId: NANNY,
-        slotId: slot.id,
-        actor: nannyActor,
-        idempotencyKey: "n-1",
-      });
-      const displaceable = await callLayer.listSlots("matchmaking", {
-        from: NOW,
-        to: "2026-01-23T00:00:00.000Z" as ISO,
-      });
-      expect(
-        displaceable.ok &&
-          displaceable.value.find((each) => each.id === slot.id)?.displaceable,
-      ).toBe(true);
+  // 03 §3.5 seq 3 / I-2: a parent books a `displaceable` slot and the nanny is moved to the next free one.
+  //
+  // **This was an `it.fails` whose reason had expired** (REVIEW-2 §6.2 row 4). Displacement *is* built —
+  // `scheduling-booking-writes.ts` computes `displaceTo` and hands `book_slot()` its `p_displace_to`, and
+  // `scheduling.inside.test.ts` pins that it is one RPC — but this suite wires `createSchedulingStub`, which
+  // answered `NOT_IMPLEMENTED`, so the pin had stopped pinning a doc/code disagreement and started pinning test
+  // scaffolding. Its own promise ("the day it is built this `it.fails` turns red") was already false.
+  //
+  // Closed the way ADR-123 rule 2 asks: by making the claim true of real behaviour. The stub now implements
+  // I-2 / I-3 with the same pure `nextFreeSlot` the real inside uses, so the two implementations agree about
+  // what "next free" means — which is what 03 §11 row 2's swap rests on.
+  it("a parent books over a nanny's slot and the nanny is moved (03 §3.5 seq 3)", async () => {
+    const slot = await firstSlot("nanny-commission");
+    const nannyCall = await callLayer.openNannyCall({
+      nannyId: NANNY,
+      slotId: slot.id,
+      actor: nannyActor,
+      idempotencyKey: "n-1",
+    });
+    expect(nannyCall.ok).toBe(true);
+    if (!nannyCall.ok) return;
+    const displaceable = await callLayer.listSlots("matchmaking", {
+      from: NOW,
+      to: "2026-01-23T00:00:00.000Z" as ISO,
+    });
+    expect(
+      displaceable.ok &&
+        displaceable.value.find((each) => each.id === slot.id)?.displaceable,
+    ).toBe(true);
 
-      const result = await callLayer.chooseSlot(
-        POSITION,
-        slot.id as SlotId,
-        undefined,
-        parent,
-        "k-displace",
-      );
-      expect(result.ok).toBe(true);
-    },
-  );
+    const result = await callLayer.chooseSlot(
+      POSITION,
+      slot.id as SlotId,
+      undefined,
+      parent,
+      "k-displace",
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // I-2: her call is not cancelled, it is moved — to a later start, carrying where it came from.
+    const hers = await scheduling.getBooking(nannyCall.value.id, admin);
+    expect(hers.ok).toBe(true);
+    if (!hers.ok) return;
+    expect(hers.value.status).toBe("rescheduled");
+    expect(hers.value.start > slot.start).toBe(true);
+    expect(hers.value.displacedFrom).toBe(slot.start);
+  });
 });
 
 describe("platform — the event id schema (03 §9.3 'ids only'; owned by platform, pinned here because 1d hit it)", () => {

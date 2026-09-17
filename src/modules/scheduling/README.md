@@ -51,11 +51,11 @@ moves her row and inserts the parent's in one transaction. If the target is take
    `open` row _adds_ availability and a block laid outside the rules would come back as new open time. The
    method refuses with `NOT_IMPLEMENTED` and the documented behaviour is pinned `it.fails`. **Owed:** a
    `delete` on `TableQuery` (the ADR-131 (1) class) or `availability_blocks.revoked_at` in `0018`.
-2. **A position subject read back does not always carry its parent.** 03 §3.2's `Subject` has `parentId`;
-   `bookings` stores only `subject_type` + `subject_id`, so after an **admin-on-behalf** booking the parent is
-   not in the row (`booked_by_user_id` is the admin). Pinned `it.fails`. **Owed:** a `parent_id` column on
-   02 §4.4 row 4, or the field optional on read-back in 03 §3.2. 03 §3.6 already says `admin` decorates the
-   subject from `positions`, which is what the call queue does today.
+2. **CLOSED by ADR-143.** A position subject read back now carries its parent, joined from
+   `nanny_positions.parent_id` at read (`scheduling-reads.ts`'s sixth read) — no `bookings` column was added.
+   In the same ruling `Booking.bookedBy` became `Actor | null`, so a booking whose booker's account has been
+   deleted (`0009`'s `on delete set null`) reads back as `null` instead of a branded empty id. A booking whose
+   position row is gone refuses `NOT_FOUND` on `getBooking`, and is dropped with a log line from a list.
 3. **`hold` carries its subject and kind, amending 03 §3.2** — see `types.ts` on `HeldFor`. §3.2 writes
    `hold(slotId, actor)`, but its own `ACTIVE_STATUSES` includes `'held'` and I-10 says one active booking per
    subject, so a held row _has_ a subject; 02 §4.4 row 4 makes all three columns NOT NULL and `book_slot()`
@@ -68,9 +68,10 @@ moves her row and inserts the parent's in one transaction. If the target is take
    **Mon = 0**; `config/scheduling.ts` comments its seed array `0 = Sunday`. `generateSlots` and
    `rule-from-row.ts` follow 02 (the document that owns the column) and both say so. `0009` seeds `0..4` under
    02's convention, so the database and the inside agree; `config`'s comment is the side that gets corrected.
-6. **The stub still does not do I-2 / I-3 / I-13.** It returns `NOT_IMPLEMENTED` for a parent booking onto a
-   nanny's slot rather than a quiet `SLOT_TAKEN`, and it does not flag `blocked-over` (I-4). Those are the real
-   inside's, and are pinned there.
+6. **The stub now does I-2 / I-3 / I-13** (REVIEW-2 §6.2 row 4): it moves the nanny to her next free start with
+   the same pure `nextFreeSlot` the real inside hands to `book_slot()` as `p_displace_to`, cancels
+   `displaced-no-slot` when there is nowhere to go, and refuses `NOT_DISPLACEABLE` at the daily cap. It still
+   does not flag `blocked-over` (I-4), which is the real inside's.
 7. **No events yet.** `booking.held` · `booking.displaced` · `booking.displacement-failed` ·
    `booking.blocked-over` · `availability.changed` (03 §3.6) are not emitted. `book_slot()` returns `displaced`
    so the caller _can_ emit; `call-layer` is the caller 03 §3.6 names ("scheduling writes the row, the caller
