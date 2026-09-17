@@ -87,9 +87,9 @@ export function CallQueue({
       </p>
 
       <p>
-        Calls that have never had a time booked are not listed here yet — the
-        call state has no store of its own. Open the family from Positions to
-        book one on her behalf.
+        Calls that have never had a time set are not listed here yet — the call
+        state has no store of its own. Open the family from Positions to set one
+        on her behalf.
       </p>
 
       {groups.map((group) => (

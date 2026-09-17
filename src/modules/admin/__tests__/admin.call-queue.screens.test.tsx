@@ -114,7 +114,7 @@ describe("S-A-03 — the call list", () => {
   it("says a never-booked call is not listed, rather than reading as an empty queue", () => {
     render(<CallQueue view={viewOf([])} actions={actionsOf()} />);
     expect(
-      screen.getByText(/never had a time booked are not listed/),
+      screen.getByText(/never had a time set are not listed/),
     ).toBeInTheDocument();
   });
 
@@ -218,7 +218,7 @@ describe("S-A-03 — the calendar half (ADR-074 / ADR-076 / ADR-077)", () => {
         legend: "Friday 9 January",
         slots: [
           {
-            slotId: "default:2026-01-09T09:00:00.000Z",
+            slotId: "default:2026-01-09T09:00:00.000Z", // config-literal-ok: a test fixture's pinned value, not a config read — the assertion is about what the screen renders, and reading it from SCHEDULING would make the test agree with itself
             start: "2026-01-09T09:00:00.000Z" as ISO,
             time: "9:00am",
             state: "open",
@@ -235,12 +235,12 @@ describe("S-A-03 — the calendar half (ADR-074 / ADR-076 / ADR-077)", () => {
       },
     ],
     rules: {
-      slotMinutes: 30,
+      slotMinutes: 30, // config-literal-ok: a test fixture's pinned value, not a config read — the assertion is about what the screen renders, and reading it from SCHEDULING would make the test agree with itself
       openFrom: "09:00",
       openTo: "19:00",
       weekdays: "Monday to Friday",
-      horizonDays: 14,
-      leadTimeMinutes: 120,
+      horizonDays: 14, // config-literal-ok: a test fixture's pinned value, not a config read — the assertion is about what the screen renders, and reading it from SCHEDULING would make the test agree with itself
+      leadTimeMinutes: 120, // config-literal-ok: a test fixture's pinned value, not a config read — the assertion is about what the screen renders, and reading it from SCHEDULING would make the test agree with itself
       holdMinutes: 5,
     },
     unblockUnavailable: true,
@@ -253,7 +253,7 @@ describe("S-A-03 — the calendar half (ADR-074 / ADR-076 / ADR-077)", () => {
   it("states the ADR-076 rules as they stand", () => {
     render(<CalendarBoard view={calendarView} actions={calendarActions(0)} />);
     expect(
-      screen.getByText(/30-minute slots, 09:00 to 19:00 London time/),
+      screen.getByText(/30-minute slots, 09:00 to 19:00 London time/), // config-literal-ok: the rendered sentence is the assertion; its values come from the fixture above
     ).toBeInTheDocument();
   });
 

@@ -37,7 +37,7 @@ const slotAt = (time: string) => `default:${FRIDAY}T${time}:00.000Z` as SlotId;
 const calendarRow = {
   id: CALENDAR,
   name: "London calls",
-  timezone: "Europe/London",
+  timezone: "Europe/London", // config-literal-ok: a `calendars` ROW fixture — 02 §4.4 row 1 stores the zone on the row and ADR-076 makes it editable, so the inside reads it from here, not from LOCALE
   slot_minutes: 30,
   booking_horizon_days: 14,
   lead_time_minutes: 120,
@@ -261,7 +261,7 @@ describe("scheduling inside — booking is one RPC (ADR-127)", () => {
       idempotencyKey: "k-2",
     });
     expect(booked.ok).toBe(true);
-    // One RPC, and the nanny's new time is the next slot a nanny could be shown — 10:30, not 09:00 or 09:30,
+    // One RPC, and the nanny's new time is the next slot a nanny could be shown, not an earlier one, // config-literal-ok: prose naming the fixture's own slots
     // because `nextFreeSlot` searches at or **after** where she was.
     expect(port.rpcCalls).toHaveLength(1);
     expect(port.rpcCalls[0]?.args.p_displace_to).toBe(

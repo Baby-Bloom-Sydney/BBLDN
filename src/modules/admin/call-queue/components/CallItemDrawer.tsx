@@ -81,7 +81,7 @@ export function CallItemDrawer({
           ...(notes.trim() === "" ? {} : { notes: notes.trim() }),
         }),
       outcome === "no-answer"
-        ? "No answer recorded. The call is back to waiting for a time — book the next attempt below."
+        ? "No answer recorded. The call is back to waiting for a time — set the next attempt below."
         : `Recorded: ${CALL_OUTCOME_LABEL[outcome]}.`,
     );
   }, [actions, notes, outcome, ref, run]);
@@ -103,7 +103,7 @@ export function CallItemDrawer({
           parentId: ref.parentId,
           slotId: slot.trim() as SlotId,
         }),
-      "Time booked on her behalf.",
+      "Time set on her behalf.",
     );
   }, [actions, ref, run, slot]);
 
