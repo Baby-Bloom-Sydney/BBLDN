@@ -209,38 +209,43 @@ describe("ADR-127 — the ledger row, the spine and the stamp are one transactio
     at: NOW,
   };
 
-  /** A store that records the order the spine asked for things, so "one write" is observable. */
+  /**
+   * A store that records the order the spine asked for things, so "one write" is observable.
+   *
+   * **Every method that is not a read is wrapped, by name rather than one at a time.** The earlier version
+   * listed the writes it knew about, which made `expect(order).toEqual(["applyEvent"])` true for two different
+   * reasons — one write, or a write nobody was recording. `stampEvent`'s deletion (ADR-146) is exactly the case
+   * that would have passed silently, so the recorder now derives its list from the store the module is handed.
+   */
   const recording = (rows: Parameters<typeof memorySpineStore>[0] = {}) => {
     const inner = memorySpineStore({ now: () => NOW, ...rows });
     const order: string[] = [];
-    const store = {
-      ...inner,
-      applyEvent: async (delivery: Parameters<typeof inner.applyEvent>[0]) => {
-        order.push("applyEvent");
-        return inner.applyEvent(delivery);
-      },
-      updateSpine: async (
-        id: Parameters<typeof inner.updateSpine>[0],
-        patch: Parameters<typeof inner.updateSpine>[1],
-      ) => {
-        order.push("updateSpine");
-        return inner.updateSpine(id, patch);
-      },
-      setAccessWindow: async (
-        familyId: Parameters<typeof inner.setAccessWindow>[0],
-        years: Parameters<typeof inner.setAccessWindow>[1],
-      ) => {
-        order.push("setAccessWindow");
-        return inner.setAccessWindow(familyId, years);
-      },
-      stampEvent: async (
-        id: Parameters<typeof inner.stampEvent>[0],
-        patch: Parameters<typeof inner.stampEvent>[1],
-      ) => {
-        order.push("stampEvent");
-        return inner.stampEvent(id, patch);
-      },
-    };
+    const READS = new Set([
+      "readByFamily",
+      "listSpine",
+      "familyContact",
+      "placementTerms",
+      "rows",
+      "events",
+    ]);
+    const entries = Object.entries(inner) as ReadonlyArray<
+      readonly [string, unknown]
+    >;
+    const store = Object.fromEntries(
+      entries.map(([name, value]) =>
+        typeof value !== "function" || READS.has(name)
+          ? [name, value]
+          : [
+              name,
+              async (...args: ReadonlyArray<unknown>) => {
+                order.push(name);
+                return (value as (...a: ReadonlyArray<unknown>) => unknown)(
+                  ...args,
+                );
+              },
+            ],
+      ),
+    );
     return { inner, store, order };
   };
 
@@ -322,22 +327,153 @@ describe("ADR-127 — the ledger row, the spine and the stamp are one transactio
     expect(inner.events()[0]?.processing_error).toBe("E_SPINE_MISSING");
   });
 
-  it("an event type we do not handle is recorded and stamped — the one path that is still two statements", async () => {
-    // `apply_payment_event` has no "seen, nothing to do" outcome: a null family is `unresolved` there, which
-    // would leave a payout notification on the `processed_at IS NULL` index for ever. There is no money in
-    // this path to be atomic with, and the second statement is stated in `webhook-method.ts` rather than hidden.
+  // ── ADR-146 (1) — `ignored` closes the last two-statement path in this file ──────────────────────────────
+  //
+  // S5d recorded the gap rather than papering over it: `apply_payment_event` could not say "seen, and nothing
+  // to do". A null family was `unresolved` there, which stamps `processing_error` and leaves the row on the
+  // runbook's `processed_at IS NULL` index for ever, so the module had to stamp it with a **second statement**.
+  // `0020` gives the function a fourth outcome, and these two paths become one RPC like the money paths.
+  it("an event type we do not handle is ONE store write, recorded and stamped by the same transaction", async () => {
     const { store, inner, order } = recording();
     const ignoredEvent: PurchaseEvent = {
       kind: "ignored",
       eventId: "evt-payout-2",
       providerType: "payout.paid",
     };
-    await pathOver(store, ignoredEvent).handleWebhook(
+    const out = await pathOver(store, ignoredEvent).handleWebhook(
       raw({ t: "payout.paid" }),
     );
 
-    expect(order).toEqual(["applyEvent", "stampEvent"]);
+    expect(out.ok && out.value.handled).toBe("ignored");
+    expect(order).toEqual(["applyEvent"]);
     expect(inner.events()[0]?.processed_at).toBe(NOW);
     expect(inner.events()[0]?.processing_error).toBeNull();
+  });
+
+  it("a LinkRef we never minted is the same one write — recorded, stamped, no money", async () => {
+    // The other half of the same gap: `resolveFamily` answers `null` for a ref nothing on the spine carries,
+    // and 03 §5.4.3 wants the delivery recorded either way. One statement, no `processing_error`, and the
+    // ledger row does not join the unprocessed queue.
+    const { store, inner, order } = recording();
+    const strangerEvent: PurchaseEvent = {
+      ...paid,
+      eventId: "evt-not-ours",
+      ref: mintLinkRef(
+        "88888888-8888-4888-8888-888888888888" as typeof FAMILY,
+        "checkout",
+      ),
+    };
+    const out = await pathOver(store, strangerEvent).handleWebhook(
+      raw(strangerEvent),
+    );
+
+    expect(out.ok && out.value.handled).toBe("ignored");
+    expect(order).toEqual(["applyEvent"]);
+    expect(inner.events()[0]?.processed_at).toBe(NOW);
+    expect(inner.events()[0]?.processing_error).toBeNull();
+    expect(inner.rows()).toHaveLength(0);
+  });
+
+  it("refuses when the function answers `ignored` to a delivery that carried a patch", async () => {
+    // The two sides must agree. `ignored` means no patch reached the function, so hearing it back after sending
+    // one is the database contradicting the transition this spine decided — a 5xx and a provider retry, never a
+    // standing reported as moved when the row was not written.
+    const { inner, store } = recording();
+    await inner.insertSpine({
+      parent_user_id: FAMILY as string,
+      status: "lapsed",
+    });
+    const disagreeing = {
+      ...store,
+      applyEvent: async () => ({
+        ok: true as const,
+        value: { outcome: "ignored" as const, eventId: null },
+      }),
+    };
+    const out = await pathOver(disagreeing, paid).handleWebhook(raw(paid));
+
+    expect(out.ok).toBe(false);
+    expect(inner.rows()[0]?.status).toBe("lapsed");
+  });
+
+  it("a resolved family whose transition moves no money is `ignored`, not `applied`", async () => {
+    // The third shape of the same rule, and the one that is not about a stranger: the family is known, the
+    // spine row is there, and the standing simply does not act on this delivery. No patch crosses the seam, so
+    // the function has no money to move and says so — the outcome is what the ledger row's stamp rests on.
+    const { inner, store, order } = recording();
+    await inner.insertSpine({
+      parent_user_id: FAMILY as string,
+      status: "lapsed",
+    });
+    // `instalment.failed` on a `lapsed` family: the dispatch table's own "does not fit the row it lands on"
+    // arm (`PAYING` does not hold `lapsed`), so the transition is `ignored` with no patch at all.
+    const noMove: PurchaseEvent = {
+      kind: "instalment.failed",
+      eventId: "evt-failed-on-lapsed",
+      ref,
+      index: 2,
+      at: NOW,
+    };
+    const out = await pathOver(store, noMove).handleWebhook(raw(noMove));
+
+    expect(out.ok && out.value.handled).toBe("ignored");
+    expect(order).toEqual(["applyEvent"]);
+    expect(inner.rows()[0]?.status).toBe("lapsed");
+    expect(inner.events()[0]?.processed_at).toBe(NOW);
+    expect(inner.events()[0]?.processing_error).toBeNull();
+    expect(inner.events()[0]?.parent_user_id).toBe(FAMILY);
+  });
+});
+
+// ── ADR-146 (1) — the four outcomes, on the double that mirrors `apply_payment_event` ────────────────────────
+//
+// `memorySpineStore.applyEvent` is written out statement for statement against the function rather than composed
+// from the other methods, so the outcome vocabulary is testable without a database (the behavioural claims
+// against the applied migration are `int.rpc-0020`'s). What `0020` changes is one distinction: **no patch = no
+// money**, which is `ignored` and is stamped processed; a patch that cannot be applied stays `unresolved` with
+// its `processing_error`, because that is work that failed and the runbook reconciles from it.
+describe("apply_payment_event's outcomes, mirrored (ADR-146 (1))", () => {
+  const delivery = (over: Record<string, unknown> = {}) => ({
+    provider: "stub-stripe",
+    providerEventId: "evt-outcome",
+    eventType: "checkout.session.expired",
+    payload: {} as never,
+    receivedAt: NOW,
+    ...over,
+  });
+
+  it("no patch and no family is `ignored`, recorded and stamped processed with no error", async () => {
+    const store = memorySpineStore({ now: () => NOW });
+    const out = await store.applyEvent(delivery() as never);
+
+    expect(out.ok && out.value.outcome).toBe("ignored");
+    expect(store.events()[0]?.processed_at).toBe(NOW);
+    expect(store.events()[0]?.processing_error).toBeNull();
+    expect(store.events()[0]?.parent_user_id).toBeNull();
+  });
+
+  it("no patch but a known family is `ignored` too, and the family is kept on the ledger row", async () => {
+    const store = memorySpineStore({ now: () => NOW });
+    await store.insertSpine({
+      parent_user_id: FAMILY as string,
+      status: "lapsed",
+    } as never);
+    const out = await store.applyEvent(delivery({ familyId: FAMILY }) as never);
+
+    expect(out.ok && out.value.outcome).toBe("ignored");
+    expect(store.events()[0]?.processed_at).toBe(NOW);
+    expect(store.events()[0]?.parent_user_id).toBe(FAMILY);
+    expect(store.rows()[0]?.status).toBe("lapsed");
+  });
+
+  it("a patch with no family stays `unresolved`, unstamped and on the runbook's index", async () => {
+    const store = memorySpineStore({ now: () => NOW });
+    const out = await store.applyEvent(
+      delivery({ spinePatch: { status: "cancelled" } }) as never,
+    );
+
+    expect(out.ok && out.value.outcome).toBe("unresolved");
+    expect(store.events()[0]?.processed_at).toBeNull();
+    expect(store.events()[0]?.processing_error).toBe("E_EVENT_UNRESOLVED");
   });
 });

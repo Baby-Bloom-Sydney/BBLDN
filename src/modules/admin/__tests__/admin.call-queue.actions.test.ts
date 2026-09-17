@@ -248,4 +248,31 @@ describe("booking on behalf verifies the position belongs to the named parent (A
     expect(refused.ok).toBe(false);
     expect(levers.chooseSlot).not.toHaveBeenCalled();
   });
+
+  // ADR-145's scope note, ruled as ADR-146 (3): `clear-call-slot-action` carries the same caller-supplied pair
+  // as the booking action and had no membership check at all. Cancelling another family's call is a
+  // **destructive** on-behalf move — the parent is sent `call-cancelled` (03 §3.5 seq 4) and the slot goes back
+  // — so a forgeable audit subject matters here at least as much as it does on the booking road.
+  it("clearing refuses E_SUBJECT_MISMATCH when the parent does not own the position, and never clears", async () => {
+    const refused = await clearCallSlotAction({
+      positionId: "pos-1",
+      parentId: "someone-else",
+    } as never);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) {
+      expect(refused.error.code).toBe("FORBIDDEN");
+      expect(refused.error.details?.reason).toBe("E_SUBJECT_MISMATCH");
+    }
+    expect(levers.clearSlot).not.toHaveBeenCalled();
+  });
+
+  it("clearing refuses rather than clears when the position cannot be read at all", async () => {
+    configurePositions(stubPositions({}));
+    const refused = await clearCallSlotAction({
+      positionId: "pos-1",
+      parentId: "parent-1",
+    } as never);
+    expect(refused.ok).toBe(false);
+    expect(levers.clearSlot).not.toHaveBeenCalled();
+  });
 });

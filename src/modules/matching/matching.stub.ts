@@ -62,6 +62,11 @@ export function stubMatching(seed: StubMatchingSeed = {}): Matching {
         // A lead the stub has just saved has not been converted by anyone (ADR-145 (2)); a seeded `leadRows`
         // fixture says so for itself.
         claimed: false,
+        // ADR-146 (2): folded here the way `to-lead-row.ts` folds it for the real row, so a consumer's test
+        // measures the same value either side of the seam. Blank is absent.
+        email: ((input.email ?? "").trim().toLowerCase() || null) as
+          | string
+          | null,
       });
       return ok(undefined);
     },

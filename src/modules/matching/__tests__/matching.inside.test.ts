@@ -252,6 +252,50 @@ describe("matching inside — the wizard lead (02 §4.7 parent_leads)", () => {
     const lead = await m.getLead(LEAD);
     expect(lead).toEqual({ ok: true, value: null });
   });
+
+  // ── ADR-146 (2) — `parent_leads.email` (`0020`) ───────────────────────────────────────────────────────────
+  //
+  // The column exists so ADR-145 (2)'s case-insensitive match has something to compare. These claims are about
+  // the **writer**: the column's `citext` type protects the comparison, and the fold protects the stored value,
+  // so the operator's CRM never shows two spellings of one family and a reader that is not `citext`-aware
+  // still compares like with like.
+  it("stores a captured email folded and trimmed, and reads it back on the lead", async () => {
+    const m = matchingOver([]);
+    await m.saveLead({
+      id: LEAD,
+      answers: { area: { area: "Clapham", district: "SW4" } },
+      source: "adv",
+      completed: false,
+      email: "  ADA@Example.TEST  ",
+    });
+    const lead = await m.getLead(LEAD);
+    expect(lead.ok && lead.value?.email).toBe("ada@example.test");
+  });
+
+  it("a wizard-only lead carries no email — null, never an empty string", async () => {
+    const m = matchingOver([]);
+    await m.saveLead({
+      id: LEAD,
+      answers: { area: { area: "Clapham", district: "SW4" } },
+      source: "adv",
+      completed: false,
+    });
+    const lead = await m.getLead(LEAD);
+    expect(lead.ok && lead.value?.email).toBeNull();
+  });
+
+  it("a blank captured email is stored as null, so `carries an email` stays a real question", async () => {
+    const m = matchingOver([]);
+    await m.saveLead({
+      id: LEAD,
+      answers: { area: { area: "Clapham", district: "SW4" } },
+      source: "adv",
+      completed: false,
+      email: "   ",
+    });
+    const lead = await m.getLead(LEAD);
+    expect(lead.ok && lead.value?.email).toBeNull();
+  });
 });
 
 describe("matching — the Connect entry point (ADR-126; 04 §3.3 (d))", () => {
