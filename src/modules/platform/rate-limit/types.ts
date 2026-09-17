@@ -62,4 +62,11 @@ export type RateLimiterDeps = {
   readonly log?: Log;
   /** `SECURITY.burstAlertMultiple`: a key that trips ≥ this many times in an hour logs `ALERT_RATE_LIMIT_BURST` */
   readonly burstAlertMultiple: number;
+  /**
+   * `SECURITY.failOpenOnLimiterOutage` (ADR-134 / ADR-140) — the **declared policy names** that continue when
+   * the store cannot answer, raising `ALERT_PROVIDER_DOWN`. Every other policy refuses. Injected rather than
+   * imported so the decision is one list in `config`, taken here on the consume path, and never a property a
+   * route file claims for itself. Absent means "nothing fails open", which is the closed default.
+   */
+  readonly failOpenOnLimiterOutage?: ReadonlyArray<string>;
 };

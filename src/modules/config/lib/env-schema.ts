@@ -173,7 +173,8 @@ const SERVER_ENV_ENTRIES = {
     scope: "server",
     kind: "enum",
     values: ["resend", "stub-email"],
-    purpose: "resend | stub-email (03 §8.1)",
+    purpose:
+      "resend | stub-email (03 §8.1) — the stub is refused in production (ADR-141)",
     dev: "●",
     preview: "●",
     prod: "●",
@@ -193,7 +194,8 @@ const SERVER_ENV_ENTRIES = {
     scope: "server",
     kind: "enum",
     values: ["db", "stub"],
-    purpose: "db | stub — the areas connector binding (03 §6.3)",
+    purpose:
+      "db | stub — the areas connector binding (03 §6.3); the stub is refused in production (ADR-141)",
     dev: "●",
     preview: "●",
     prod: "●",

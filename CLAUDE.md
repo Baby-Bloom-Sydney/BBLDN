@@ -73,6 +73,7 @@ ECC is a **project** standard applied at **checkpoints**, not a battery rerun on
 | | What a unit does |
 |---|---|
 | **Build task** | **No review agents.** Build it, pass the fast gates, merge. At most **one** skill, named in your brief. Cite `doc §x.y`, don't read whole documents. Target 20–30 minutes. |
+| **Build task that adds a server action or a route** | As above, **plus one `security-reviewer` pass over the new surface before the PR opens** — one reviewer, not the battery; CRITICAL / HIGH closed in-unit (ADR-142). A control declared in config with no call site fails `check:limiter-call-sites` (ADR-140). |
 | **Fast gates** | `typecheck` · `lint` · `prettier --check .` · `vitest run` · `lint:boundaries` · `check:allowed-imports` · `check:config-literals` · `check:claude-md`. CI runs the slow ones. Never chase a red that exists on `main` by construction. |
 | **Checkpoint** | Once a day, overnight: the **full battery over the whole diff since the last checkpoint**. Findings come back as one fix unit, not seven interruptions. |
 | **Model split** | Fable builds while BAI is present; Opus runs the checkpoint and its fixes. |
@@ -243,7 +244,7 @@ Sydney's `website/` CLAUDE.md chain is reference only; it does not govern this r
 ---
 
 <!-- audit
-Last edited: 2026-09-16T18:37+10:00 — BB-LDN-Planner-070926
+Last edited: 2026-09-18T00:40+10:00 — BB-LDN-Planner-070926
 Notes (F9, review fix pass): preamble bootstrap moment → 08 §2.1 step 0 / gate A0; linked-vs-vendored ADR governs ALL ../ paths (foundations + OPERATIONS), default linked; §5 reduced to pointers only (01 §2.3–2.5 / §4a / §6.3; 03 §1.4 / §2.1 / §3; 05 §7), restated rules + unratified slice-registration default removed; §6 BRANCHES.md created at bootstrap, else stop + create from Sydney pattern; §9 seed build-progress / CHANGELOG from _project-template shape before first commit; §4 fallback keeps README §2 as authority.
-Previous: Notes: initial authoring (L-004 wave 4) — code-repo CLAUDE.md seed: pointers + process only; five laws as merge blocks + five-question test; ECC hard rules; pointer table mirroring README §2 with real section numbers from 00–08 + DECISIONS + build-standard; module rules (folder shape, boundary lint, service leaves, auth no-client, UnitOfWork token, slice registration default pending 03 §12 item 35 / 01 §10 O-12, scheduling importers); branch/deploy/promote condensed from 06 §3–§4 with Sydney origin; efficiency + compaction (portable half of Sydney's nanny-platform CLAUDE.md); three build ledgers; never-list; precedence. Bootstrap decisions flagged: linked vs vendored foundations; slice-registration shape.
+Previous: Notes: §3 checkpoint table gains the ADR-142 row (action/route units carry one security-reviewer pass; declared-and-uncalled controls fail a gate). Earlier: initial authoring (L-004 wave 4) — code-repo CLAUDE.md seed: pointers + process only; five laws as merge blocks + five-question test; ECC hard rules; pointer table mirroring README §2 with real section numbers from 00–08 + DECISIONS + build-standard; module rules (folder shape, boundary lint, service leaves, auth no-client, UnitOfWork token, slice registration default pending 03 §12 item 35 / 01 §10 O-12, scheduling importers); branch/deploy/promote condensed from 06 §3–§4 with Sydney origin; efficiency + compaction (portable half of Sydney's nanny-platform CLAUDE.md); three build ledgers; never-list; precedence. Bootstrap decisions flagged: linked vs vendored foundations; slice-registration shape.
 -->

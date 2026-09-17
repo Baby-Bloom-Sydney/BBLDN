@@ -5,7 +5,7 @@
 //
 // **It fails CLOSED, and that is ADR-134, not a preference.** When the shared store cannot answer, only
 // unauthenticated public *reads* carry on — "every authenticated, mutating, money or admin route refuses". So
-// this deliberately does **not** copy `src/app/api/_lib/consume-public-read-limit.ts`, whose whole point is the
+// this policy is deliberately **not** on `SECURITY.failOpenOnLimiterOutage` (ADR-134 / ADR-140), whose point is the
 // opposite choice; the refusal is logged with its own alert so an outage is visible rather than silent.
 //
 // The key is the family id — who is charged — never an address: these actions are behind the session gate, so

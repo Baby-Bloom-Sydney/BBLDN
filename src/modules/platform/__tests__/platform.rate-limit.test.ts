@@ -104,6 +104,65 @@ describe("platform/rate-limit — consume", () => {
     expect(JSON.stringify(alerts[0])).not.toContain("noisy");
   });
 
+  // M-14 (REVIEW-2 §4): the burst counter used `===`, so a single increment the store never returned disarmed
+  // `ALERT_RATE_LIMIT_BURST` for that key for the rest of the hour — the alert is armed by `>=` instead.
+  it("still alerts when an increment is lost — the burst counter is >=, not ===", async () => {
+    const lines: LogLine[] = [];
+    const inner = memoryRateLimitStore();
+    const skipped = { done: false };
+    const losesOneBurstIncrement: RateLimitStore = {
+      increment: async (bucket, windowSeconds, now) => {
+        const counted = await inner.increment(bucket, windowSeconds, now);
+        if (!bucket.startsWith("burst:") || !counted.ok) return counted;
+        // The store answered, but one increment never landed: the count steps straight past the multiple.
+        if (counted.value.count === 2 && !skipped.done) {
+          skipped.done = true;
+          await inner.increment(bucket, windowSeconds, now);
+          return inner.increment(bucket, windowSeconds, now);
+        }
+        return counted;
+      },
+    };
+    const limiter = createRateLimiter({
+      store: losesOneBurstIncrement,
+      log: createLogger({ sink: (line) => void lines.push(line) }),
+      burstAlertMultiple: 3,
+    });
+    const policy = { key: "ip", perMinute: 1 };
+    await limiter.consume("noisy", policy);
+    for (let i = 0; i < 4; i += 1) await limiter.consume("noisy", policy);
+    expect(
+      lines.filter((line) => line.alert === "ALERT_RATE_LIMIT_BURST").length,
+    ).toBeGreaterThan(0);
+  });
+
+  // M-14, second half: a burst bucket the store cannot write meant the alert silently never fired.
+  it("logs when the burst counter itself fails, and still returns the refusal", async () => {
+    const lines: LogLine[] = [];
+    const inner = memoryRateLimitStore();
+    const brokenBurstBucket: RateLimitStore = {
+      increment: async (bucket, windowSeconds, now) =>
+        bucket.startsWith("burst:")
+          ? { ok: false, error: { code: "INTERNAL", message: "db down" } }
+          : inner.increment(bucket, windowSeconds, now),
+    };
+    const limiter = createRateLimiter({
+      store: brokenBurstBucket,
+      log: createLogger({ sink: (line) => void lines.push(line) }),
+      burstAlertMultiple: 3,
+    });
+    const policy = { key: "ip", perMinute: 1 };
+    await limiter.consume("noisy", policy);
+    const tripped = await limiter.consume("noisy", policy);
+    expect(tripped.ok).toBe(false);
+    if (!tripped.ok) expect(tripped.error.code).toBe("RATE_LIMITED");
+    const failures = lines.filter(
+      (line) => line.level === "error" && line.reason === "burst-count-failed",
+    );
+    expect(failures).toHaveLength(1);
+    expect(JSON.stringify(failures[0])).not.toContain("noisy");
+  });
+
   it("denies (INTERNAL) when the store fails — fail closed, logged", async () => {
     const lines: LogLine[] = [];
     const broken: RateLimitStore = {
@@ -121,6 +180,82 @@ describe("platform/rate-limit — consume", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INTERNAL");
     expect(lines.some((line) => line.level === "error")).toBe(true);
+  });
+
+  // ADR-134 / ADR-140 — the fail-open decision is the limiter's, taken from the allow-list it was built with,
+  // and never a property a route file claims by importing a helper (REVIEW-2 M-2).
+  describe("the fail-open allow-list (ADR-140)", () => {
+    const brokenStore: RateLimitStore = {
+      increment: async () => ({
+        ok: false,
+        error: { code: "INTERNAL", message: "db down" },
+      }),
+    };
+    const outage = (failOpenOnLimiterOutage: ReadonlyArray<string>) => {
+      const lines: LogLine[] = [];
+      const limiter = createRateLimiter({
+        store: brokenStore,
+        log: createLogger({ sink: (line) => void lines.push(line) }),
+        burstAlertMultiple: 10,
+        failOpenOnLimiterOutage,
+      });
+      return { limiter, lines };
+    };
+
+    it("a policy NOT on the list fails closed when the store cannot answer", async () => {
+      const { limiter, lines } = outage(["publicRead"]);
+      const denied = await limiter.consume("k", {
+        name: "authPerEmail",
+        key: "email-hash+ip",
+        perMinute: 5,
+      });
+      expect(denied.ok).toBe(false);
+      if (!denied.ok) expect(denied.error.code).toBe("INTERNAL");
+      expect(lines.some((line) => line.alert === "ALERT_PROVIDER_DOWN")).toBe(
+        false,
+      );
+    });
+
+    it("a policy ON the list continues, loudly (ALERT_PROVIDER_DOWN)", async () => {
+      const { limiter, lines } = outage(["publicRead"]);
+      const allowed = await limiter.consume("k", {
+        name: "publicRead",
+        key: "ip",
+        perMinute: 30,
+      });
+      expect(allowed.ok).toBe(true);
+      const alerts = lines.filter(
+        (line) => line.alert === "ALERT_PROVIDER_DOWN",
+      );
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0]).toMatchObject({ policy: "ip" });
+      expect(JSON.stringify(alerts[0])).not.toContain("k");
+    });
+
+    it("a policy with no declared name is never on the list", async () => {
+      const { limiter } = outage(["publicRead"]);
+      const denied = await limiter.consume("k", { key: "ip", perMinute: 30 });
+      expect(denied.ok).toBe(false);
+    });
+
+    it("with no allow-list at all, every policy fails closed", async () => {
+      const { limiter } = outage([]);
+      const denied = await limiter.consume("k", {
+        name: "publicRead",
+        key: "ip",
+        perMinute: 30,
+      });
+      expect(denied.ok).toBe(false);
+    });
+
+    it("the configured list is exactly ['publicRead']", () => {
+      expect(SECURITY.failOpenOnLimiterOutage).toEqual(["publicRead"]);
+    });
+
+    it("every name on the list is a declared policy", () => {
+      for (const name of SECURITY.failOpenOnLimiterOutage)
+        expect(SECURITY.rateLimits[name]?.name).toBe(name);
+    });
   });
 
   it("the module-level limiter runs on the memory store until configured", async () => {

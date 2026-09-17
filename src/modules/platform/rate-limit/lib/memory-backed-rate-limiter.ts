@@ -12,4 +12,5 @@ export const MEMORY_BACKED_RATE_LIMITER: RateLimiter = createRateLimiter({
   store: memoryRateLimitStore(),
   log,
   burstAlertMultiple: SECURITY.burstAlertMultiple,
+  failOpenOnLimiterOutage: SECURITY.failOpenOnLimiterOutage,
 });

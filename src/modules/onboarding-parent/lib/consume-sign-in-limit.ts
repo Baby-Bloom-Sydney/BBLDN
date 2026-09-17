@@ -17,13 +17,23 @@
 import { SECURITY } from "@/modules/config";
 import { log, rateLimiter } from "@/modules/platform";
 import type { Email } from "@/modules/shared-types";
+import { callerIpKey } from "./caller-ip-key";
 import { emailRateKey } from "./email-rate-key";
 
 export async function consumeSignInLimit(email: Email): Promise<boolean> {
-  const consumed = await rateLimiter.consume(
-    await emailRateKey(email),
-    SECURITY.rateLimits.authPerEmail,
-  );
+  // Both halves of row 3's key (ADR-140 (2)): `authPerEmail` stops one address being guessed at, `authPerIp`
+  // stops one machine working through a list of them — the road the address half leaves wide open.
+  const results = [
+    await rateLimiter.consume(
+      await emailRateKey(email),
+      SECURITY.rateLimits.authPerEmail,
+    ),
+    await rateLimiter.consume(
+      `auth-ip:${await callerIpKey()}`,
+      SECURITY.rateLimits.authPerIp,
+    ),
+  ];
+  const consumed = results.find((result) => !result.ok) ?? results[0];
   if (consumed.ok) return true;
   if (consumed.error.code === "RATE_LIMITED") {
     // The key is never logged (07 §8) — it is derived from an address; the count is what 06 §7 acts on.
