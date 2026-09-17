@@ -12,7 +12,13 @@ const NOT_CONFIGURED = err("INTERNAL", "Child linking is not configured", {
 
 const refuse = async () => NOT_CONFIGURED;
 
-const unconfigured = Object.freeze({
+/** ★ REVIEW-2 (typescript-review HIGH): **annotated, never cast.** This used to end `}) as unknown as
+ *  ChildLinking`, which removes the missing-property check — so a twelfth method added to the connector would
+ *  compile here and answer `TypeError: x is not a function` at the unconfigured slot instead of refusing, which
+ *  is the exact opposite of this file's first paragraph. `admin-on-behalf-registry.ts` annotates and gets the
+ *  guarantee free; so does this now. `ports.fail-closed.test.ts` and `app.fail-closed.test.ts` are the run-time
+ *  half — the compiler is the half that catches the method nobody remembered. */
+const unconfigured: ChildLinking = Object.freeze({
   linkedChildren: refuse,
   youngestChildDateOfBirth: refuse,
   childrenOfFamily: refuse,
@@ -24,7 +30,7 @@ const unconfigured = Object.freeze({
   createInvite: refuse,
   revokeInvite: refuse,
   claimInvite: refuse,
-}) as unknown as ChildLinking;
+});
 
 const slot = { current: unconfigured };
 

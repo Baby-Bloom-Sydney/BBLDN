@@ -44,5 +44,5 @@ export function stubApp(seed: StubAppSeed = {}): ChildLinking {
     createInvite: refuse,
     revokeInvite: refuse,
     claimInvite: refuse,
-  }) as unknown as ChildLinking;
+  });
 }

@@ -31,6 +31,7 @@ import type {
   SchedulingErrorDetails,
 } from "../types";
 import { actorColumns } from "./actor-columns";
+import { bookSlotResultOf } from "./book-slot-result-of";
 import { bookingFromRow } from "./booking-from-row";
 import { bookSlotArgs } from "./book-slot-args";
 import { canMoveStatus } from "./status-lattice";
@@ -137,7 +138,15 @@ export function schedulingBookingWrites(
       service,
     );
     if (!answer.ok) return schedulingFailure(answer.error);
-    const result = answer.value as unknown as BookSlotResult;
+    // ★ REVIEW-2: `book_slot` is typed `Returns: Json`, so the answer may be null, a scalar or an array. This
+    // used to be a bare `as unknown as BookSlotResult`, and the next line's `bookingFromRow(result.booking)`
+    // then threw a TypeError out of a function that promises a `Result` — a 500 that skipped the whole coded
+    // error registry, on the path that books a family's introduction call.
+    const result = bookSlotResultOf(answer.value);
+    // `schedulingFailure` already owns this module's reason mapping and defaults to `PROVIDER_ERROR` — "a
+    // failure this module cannot name is not one it may translate" (its own header). An unreadable answer is
+    // exactly that, so it goes through the same door as every other provider fault.
+    if (result === null) return schedulingFailure(undefined);
     const booking = bookingFromRow(result.booking);
     const displaced =
       result.displaced === null ? undefined : bookingFromRow(result.displaced);
