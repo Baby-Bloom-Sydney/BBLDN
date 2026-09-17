@@ -41,9 +41,9 @@ describe("the first week's wages (ADR-100)", () => {
     expect(
       firstWeekWagesPence({ weeklyHours: null, hourlyRatePence: 1_500 }),
     ).toBe(0);
-    expect(firstWeekWagesPence({ weeklyHours: 40, hourlyRatePence: null })).toBe(
-      0,
-    );
+    expect(
+      firstWeekWagesPence({ weeklyHours: 40, hourlyRatePence: null }),
+    ).toBe(0);
   });
 
   it("the ADR-100 maximum is £600", () => {

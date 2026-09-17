@@ -129,7 +129,14 @@ describe("instalment.paid / instalment.failed", () => {
   it("moves the count and stays active until the last one", () => {
     const out = dispatchPurchaseEvent(
       paying,
-      { kind: "instalment.paid", eventId: "e", ref: REF, index: 2, paid: money(7_500), at: NOW },
+      {
+        kind: "instalment.paid",
+        eventId: "e",
+        ref: REF,
+        index: 2,
+        paid: money(7_500),
+        at: NOW,
+      },
       NOW,
     );
     expect(out.patch.instalments_paid).toBe(2);
@@ -139,7 +146,14 @@ describe("instalment.paid / instalment.failed", () => {
   it("the last one completes the bundle", () => {
     const out = dispatchPurchaseEvent(
       paying,
-      { kind: "instalment.paid", eventId: "e", ref: REF, index: 12, paid: money(7_500), at: NOW },
+      {
+        kind: "instalment.paid",
+        eventId: "e",
+        ref: REF,
+        index: 12,
+        paid: money(7_500),
+        at: NOW,
+      },
       NOW,
     );
     expect(out.patch.status).toBe("paid_in_full");
@@ -161,7 +175,14 @@ describe("instalment.paid / instalment.failed", () => {
   it("an instalment for a family with no schedule is IGNORED, never a guessed standing", () => {
     const out = dispatchPurchaseEvent(
       row(),
-      { kind: "instalment.paid", eventId: "e", ref: REF, index: 1, paid: money(7_500), at: NOW },
+      {
+        kind: "instalment.paid",
+        eventId: "e",
+        ref: REF,
+        index: 1,
+        paid: money(7_500),
+        at: NOW,
+      },
       NOW,
     );
     expect(out.handled).toBe("ignored");
@@ -172,7 +193,13 @@ describe("schedule.cancelled and refunded", () => {
   it("cancelling keeps the count and stamps the date — access runs to the period end (§5.4.5)", () => {
     const out = dispatchPurchaseEvent(
       row({ status: "active", instalments_total: 12, instalments_paid: 3 }),
-      { kind: "schedule.cancelled", eventId: "e", ref: REF, at: NOW, paidCount: 3 },
+      {
+        kind: "schedule.cancelled",
+        eventId: "e",
+        ref: REF,
+        at: NOW,
+        paidCount: 3,
+      },
       NOW,
     );
     expect(out.patch.status).toBe("cancelled");
@@ -183,7 +210,13 @@ describe("schedule.cancelled and refunded", () => {
   it("a refund against the deposit ref stamps the refund and says deposit.refunded", () => {
     const out = dispatchPurchaseEvent(
       row({ deposit_link_ref: REF, deposit_paid_at: NOW }),
-      { kind: "refunded", eventId: "e", ref: REF, amount: money(15_000), at: NOW },
+      {
+        kind: "refunded",
+        eventId: "e",
+        ref: REF,
+        amount: money(15_000),
+        at: NOW,
+      },
       NOW,
     );
     expect(out.patch.deposit_refunded_at).toBe(NOW);
@@ -193,7 +226,13 @@ describe("schedule.cancelled and refunded", () => {
   it("any other refund is a ledger row only — no standing moves (refunds are by hand)", () => {
     const out = dispatchPurchaseEvent(
       row({ status: "paid_in_full" }),
-      { kind: "refunded", eventId: "e", ref: REF, amount: money(75_000), at: NOW },
+      {
+        kind: "refunded",
+        eventId: "e",
+        ref: REF,
+        amount: money(75_000),
+        at: NOW,
+      },
       NOW,
     );
     expect(out.patch).toEqual({});

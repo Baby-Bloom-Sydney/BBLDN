@@ -10,6 +10,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type {
   Email,
+  FamilyId,
   NannyId,
   PositionId,
   UnitOfWork,
@@ -39,12 +40,16 @@ type Modules = {
   readonly callLayer: typeof import("@/modules/call-layer");
   readonly positions: typeof import("@/modules/positions");
   readonly onboardingParent: typeof import("@/modules/onboarding-parent");
+  readonly payments: typeof import("@/modules/payments");
+  readonly purchasePaths: typeof import("@/modules/purchase-paths");
+  readonly accessGate: typeof import("@/modules/access-gate");
 };
 
 const DISTRICT = Object.freeze({ area: "Lambeth", district: "SW4" });
 const POSITION = "0f1e2d3c-0000-4000-8000-000000000001" as PositionId;
 const PARENT = "0a1b2c3d-0000-4000-8000-000000000011" as UserId;
 const NANNY = "0a1b2c3d-0000-4000-8000-000000000021" as NannyId;
+const FAMILY = "0a1b2c3d-0000-4000-8000-000000000031" as FamilyId;
 
 const reasonOf = (result: { ok: boolean }): unknown =>
   "error" in result
@@ -80,6 +85,9 @@ beforeAll(async () => {
     callLayer: await import("@/modules/call-layer"),
     positions: await import("@/modules/positions"),
     onboardingParent: await import("@/modules/onboarding-parent"),
+    payments: await import("@/modules/payments"),
+    purchasePaths: await import("@/modules/purchase-paths"),
+    accessGate: await import("@/modules/access-gate"),
   };
 });
 
@@ -240,5 +248,50 @@ describe("after register() in a valid preview environment", () => {
     });
     expect(reasonOf(moved)).not.toBe("E_SLICE_NOT_REGISTERED");
     expect(reasonOf(moved)).toBe("E_ACTOR_FORBIDDEN");
+  });
+
+  // `1h`. P1-WIRE left `configurePurchaseProvider` unwired because reaching `stub-stripe` from the boot file
+  // put `node:crypto` in the edge instrumentation bundle. That is fixed at the source (the compare is pure
+  // arithmetic now), so both ports must actually be installed here — and each is asserted on the **named**
+  // fail-closed reason it replaced, never on a happy path, so a port that answered by accident cannot pass.
+  it("purchase-paths — stub-stripe replaced provider-not-configured (07 §5.5)", async () => {
+    const minted = await m.purchasePaths.purchaseProvider.ensureCustomer({
+      id: FAMILY,
+      email: "p@example.test" as Email,
+      name: "Ada",
+    });
+    expect(reasonOf(minted)).not.toBe("provider-not-configured");
+    expect(minted.ok).toBe(true);
+  });
+
+  it("payments — the db inside replaced payments-not-configured, on a read that must not open a gate", async () => {
+    // `getAccess` is the read every paywall in the app stands on. Unconfigured it is `payments-not-configured`;
+    // wired, it reaches the database, which this environment does not have — so it is `E_STORE`, the store's
+    // own reason. Either answer closes the gate; only one of them proves the wiring.
+    const state = await m.payments.payments.getAccess(FAMILY);
+    expect(reasonOf(state)).not.toBe("payments-not-configured");
+    expect(reasonOf(state)).toBe("E_STORE");
+  });
+
+  it("payments — prices() renders the config presets, which the unconfigured registry cannot", async () => {
+    const presets = m.payments.payments.prices();
+    expect(presets.length).toBeGreaterThan(0);
+    expect(presets.map((preset) => preset.preset)).toContain("deposit");
+  });
+
+  it("payments — the five cron jobs have a binding, so a cron shell no longer answers no-handler", async () => {
+    const run = await m.payments.paymentsJobs.run(
+      "payment-due-sweep",
+      "2026-09-17T09:00:00.000Z" as never,
+    );
+    expect(reasonOf(run)).not.toBe("payments-not-configured");
+  });
+
+  it("access-gate — it derives from payments and therefore fails closed with payments' reason (fix: A-3)", async () => {
+    const decision = await m.accessGate.accessGate.hasAccess(FAMILY);
+    // The gate never invents an answer: `payments` could not read, so the gate could not decide. A defaulted
+    // `open: false` here would be indistinguishable from a real closed gate and would hide the outage.
+    expect(decision.ok).toBe(false);
+    expect(reasonOf(decision)).toBe("E_STORE");
   });
 });

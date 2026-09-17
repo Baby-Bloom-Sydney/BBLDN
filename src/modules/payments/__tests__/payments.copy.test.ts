@@ -18,6 +18,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LOCALE, PRICES } from "@/modules/config";
+import type { Instant } from "@/modules/shared-types";
 import type { AccessState } from "../types";
 import { moneyPageView } from "../lib/money-page-view";
 
@@ -31,9 +32,10 @@ const OWNED_ROUTE_FILES = [
   "src/app/parent/subscription/page.tsx",
 ];
 
-const AT = "2026-03-01T09:00:00.000Z";
-const LATER = "2026-04-01T09:00:00.000Z";
-const money = (pence: number) => ({ pence, currency: LOCALE.currency }) as const;
+const AT = "2026-03-01T09:00:00.000Z" as Instant;
+const LATER = "2026-04-01T09:00:00.000Z" as Instant;
+const money = (pence: number) =>
+  ({ pence, currency: LOCALE.currency }) as const;
 
 /** One of every standing in 03 §5.2, so no branch of the view escapes the word list. */
 const EVERY_STANDING: ReadonlyArray<AccessState> = [
@@ -104,10 +106,13 @@ const EVERY_STANDING: ReadonlyArray<AccessState> = [
   { state: "lapsed", lapsedAt: AT, reason: "past-due" },
   { state: "lapsed", lapsedAt: AT, reason: "cancelled" },
   { state: "lapsed", lapsedAt: AT, reason: "access-ended" },
-].map((state) => ({
-  ...(state as AccessState),
-  deposit: { paidAt: AT, pence: PRICES.depositPence },
-}));
+].map(
+  (state) =>
+    ({
+      ...state,
+      deposit: { paidAt: AT, pence: PRICES.depositPence },
+    }) as AccessState,
+);
 
 function listFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -148,7 +153,8 @@ const pattern = new RegExp(
 const CONTRACT_NAMES =
   /\/parent\/subscriptions?|\bPrice\b|\bprices\b|"instalments"|'instalments'/gu;
 
-const withoutPaths = (text: string): string => text.replace(CONTRACT_NAMES, "_");
+const withoutPaths = (text: string): string =>
+  text.replace(CONTRACT_NAMES, "_");
 
 const hitsIn = (file: string): string[] =>
   withoutPaths(readFileSync(file, "utf8"))
@@ -190,7 +196,11 @@ describe("payments — the words a parent reads (00-glossary §6 / §8; 05 §5.2
   });
 
   it("never promises lifetime or forever, and says the third birthday instead (ADR-083 / 084)", () => {
-    const open = wordsOf({ state: "trial", accessUntil: null, trialEndsAt: AT });
+    const open = wordsOf({
+      state: "trial",
+      accessUntil: null,
+      trialEndsAt: AT,
+    });
     expect(open).not.toMatch(/lifetime|forever|unlimited/iu);
     expect(open).toContain(`turns ${PRICES.accessAgeYears}`);
     expect(open).toContain("every child you have");

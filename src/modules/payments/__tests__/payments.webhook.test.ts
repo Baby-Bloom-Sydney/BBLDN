@@ -7,7 +7,12 @@
 //   · a failed transition stamps `processing_error` so the provider retries and the runbook can see it.
 import { describe, expect, it } from "vitest";
 import { PRICES } from "@/modules/config";
-import type { FamilyId, Instant, LinkRef, RawProviderEvent } from "@/modules/shared-types";
+import type {
+  FamilyId,
+  Instant,
+  LinkRef,
+  RawProviderEvent,
+} from "@/modules/shared-types";
 import type { PurchaseEvent, PurchaseProvider } from "@/modules/purchase-paths";
 import { createPayments } from "../lib/create-payments";
 import { memorySpineStore } from "../lib/memory-spine-store";
@@ -61,14 +66,17 @@ function fakeProvider(next: () => PurchaseEvent | null) {
   return { provider, seen };
 }
 
-function build(event: PurchaseEvent | null, rows: Parameters<typeof memorySpineStore>[0] = {}) {
+function build(
+  event: PurchaseEvent | null,
+  rows: Parameters<typeof memorySpineStore>[0] = {},
+) {
   const store = memorySpineStore({ now: () => NOW, ...rows });
   const { provider, seen } = fakeProvider(() => event);
   const path = createPayments({
     store,
     provider,
     comms: {
-      send: async () => ({ ok: true, value: { id: "m" as never, status: "sent" as never } }),
+      send: async () => ({ ok: true, value: "m" as never }),
     },
     events: { emit: async () => ({ ok: true, value: { id: "e" as never } }) },
     now: () => NOW,
@@ -84,7 +92,9 @@ describe("verification comes first (07 §10.1)", () => {
     const { store, path } = build(null);
     const out = await path.handleWebhook(raw({ anything: true }, "forged"));
     expect(out.ok).toBe(false);
-    expect(out.ok ? null : out.error.details?.reason).toBe("E_EVENT_UNVERIFIED");
+    expect(out.ok ? null : out.error.details?.reason).toBe(
+      "E_EVENT_UNVERIFIED",
+    );
     expect(store.events()).toEqual([]);
     expect(store.rows()).toEqual([]);
   });
@@ -111,7 +121,10 @@ describe("idempotency — the ledger insert precedes dispatch (AC-P-54)", () => 
 
   it("the first delivery is handled and moves the standing", async () => {
     const { store, path } = build(event);
-    await store.insertSpine({ parent_user_id: FAMILY });
+    await store.insertSpine({
+      parent_user_id: FAMILY as string,
+      status: "lapsed",
+    });
     const out = await path.handleWebhook(raw(event));
     expect(out.ok && out.value.handled).toBe("handled");
     expect(store.rows()[0]?.status).toBe("paid_in_full");
@@ -119,7 +132,10 @@ describe("idempotency — the ledger insert precedes dispatch (AC-P-54)", () => 
 
   it("a replay of the same eventId is skipped-duplicate and changes NOTHING", async () => {
     const { store, path } = build(event);
-    await store.insertSpine({ parent_user_id: FAMILY });
+    await store.insertSpine({
+      parent_user_id: FAMILY as string,
+      status: "lapsed",
+    });
     await path.handleWebhook(raw(event));
     const before = store.rows()[0];
     const again = await path.handleWebhook(raw(event));

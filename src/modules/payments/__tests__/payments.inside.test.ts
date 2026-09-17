@@ -5,15 +5,20 @@ import { describe, expect, it } from "vitest";
 import { OFFER, PRICES } from "@/modules/config";
 import type {
   Actor,
+  CustomerRef,
   FamilyId,
   Instant,
   PlacementId,
+  Url,
 } from "@/modules/shared-types";
 import { createPayments } from "../lib/create-payments";
 import type { PaymentsDeps } from "../lib/deps";
 import { memorySpineStore } from "../lib/memory-spine-store";
 import type { MemorySpineSeed } from "../lib/memory-spine-store";
-import type { PurchaseProvider } from "@/modules/purchase-paths";
+import type {
+  PurchaseProvider,
+  PurchaseResult,
+} from "@/modules/purchase-paths";
 
 const FAMILY = "family-1" as FamilyId;
 const OTHER = "family-2" as FamilyId;
@@ -29,23 +34,27 @@ const ADMIN: Actor = { kind: "admin", id: "admin-1" as never };
 const SYSTEM: Actor = { kind: "system", id: "placement-start-sweep" };
 
 const provider: PurchaseProvider = Object.freeze({
+  // A provider that always succeeds: these cases are about `payments`' rules, not the provider's.
   name: "stub-stripe",
-  ensureCustomer: async () => ({ ok: true, value: "cus_1" as never }),
-  createPaymentLink: async () => ({
+  ensureCustomer: async (): Promise<PurchaseResult<CustomerRef>> => ({
     ok: true,
-    value: { url: "https://app/link" as never },
+    value: "cus_1" as CustomerRef,
+  }),
+  createPaymentLink: async () => ({
+    ok: true as const,
+    value: { url: "https://app/link" as Url },
   }),
   createCheckout: async () => ({
-    ok: true,
-    value: { url: "https://app/checkout" as never },
+    ok: true as const,
+    value: { url: "https://app/checkout" as Url },
   }),
   parseEvent: () => ({
-    ok: true,
-    value: { kind: "ignored", eventId: "e", providerType: "x" },
+    ok: true as const,
+    value: { kind: "ignored" as const, eventId: "e", providerType: "x" },
   }),
   portal: async () => ({
-    ok: true,
-    value: { url: "https://app/portal" as never },
+    ok: true as const,
+    value: { url: "https://app/portal" as Url },
   }),
 });
 
@@ -73,10 +82,7 @@ function build(seed: MemorySpineSeed = {}, paymentsOn = true) {
     comms: {
       send: async (message) => {
         sent.push(message.templateId);
-        return {
-          ok: true,
-          value: { id: "m" as never, status: "sent" as never },
-        };
+        return { ok: true, value: "m" as never };
       },
     },
     events: {
@@ -123,7 +129,10 @@ describe("createPaymentLink — path (a), admin only (03 §5.4.1)", () => {
 
   it("mints the deposit link, writes the ref on the row BEFORE the provider is called, and emails it", async () => {
     const { store, path } = build();
-    await store.insertSpine({ parent_user_id: FAMILY });
+    await store.insertSpine({
+      parent_user_id: FAMILY as string,
+      status: "lapsed",
+    });
     sent.length = 0;
     emitted.length = 0;
     const out = await path.createPaymentLink(
@@ -143,7 +152,7 @@ describe("createPaymentLink — path (a), admin only (03 §5.4.1)", () => {
   it("refuses the balance link before the bill is due (ADR-094)", async () => {
     const { store, path } = build();
     await store.insertSpine({
-      parent_user_id: FAMILY,
+      parent_user_id: FAMILY as string,
       status: "placed",
       payment_due_at: "2026-04-01T09:00:00.000Z",
     });
@@ -168,7 +177,7 @@ describe("createPaymentLink — path (a), admin only (03 §5.4.1)", () => {
       },
     });
     await store.insertSpine({
-      parent_user_id: FAMILY,
+      parent_user_id: FAMILY as string,
       status: "placed",
       placement_id: PLACEMENT,
       payment_due_at: "2026-02-01T09:00:00.000Z",
@@ -192,7 +201,10 @@ describe("createPaymentLink — path (a), admin only (03 §5.4.1)", () => {
 
   it("refuses a custom link with no whole amount", async () => {
     const { store, path } = build();
-    await store.insertSpine({ parent_user_id: FAMILY });
+    await store.insertSpine({
+      parent_user_id: FAMILY as string,
+      status: "lapsed",
+    });
     const out = await path.createPaymentLink(
       FAMILY,
       "custom",
@@ -230,7 +242,10 @@ describe("createCheckout — path (b), the parent's own (03 §5.4.2)", () => {
 
   it("refuses a family who has already paid", async () => {
     const { store, path } = build();
-    await store.insertSpine({ parent_user_id: FAMILY, status: "paid_in_full" });
+    await store.insertSpine({
+      parent_user_id: FAMILY as string,
+      status: "paid_in_full",
+    });
     const out = await path.createCheckout(
       FAMILY,
       "self-serve-app",
@@ -245,7 +260,7 @@ describe("startTrial — self-serve only, once per family (03 §5.4.4; ADR-093)"
   it("refuses a done-for-you family outright", async () => {
     const { store, path } = build();
     await store.insertSpine({
-      parent_user_id: FAMILY,
+      parent_user_id: FAMILY as string,
       status: "placed",
       placement_id: PLACEMENT,
     });
@@ -363,7 +378,10 @@ describe("setAccess — the admin toggle that overrides everything (ADR-093; 02 
 
   it("the toggle wins over a paid standing, both ways", async () => {
     const { store, path } = build();
-    await store.insertSpine({ parent_user_id: FAMILY, status: "paid_in_full" });
+    await store.insertSpine({
+      parent_user_id: FAMILY as string,
+      status: "paid_in_full",
+    });
     await path.setAccess(FAMILY, false, "unpaid", ADMIN);
     const state = await path.getAccess(FAMILY);
     expect(state.ok && state.value.state).toBe("toggled");
@@ -383,7 +401,8 @@ describe("getAccess — the read every paywall stands on", () => {
   it("a deposit and nothing else reads as deposit-paid — the standing with no access (ADR-097)", async () => {
     const { store, path } = build();
     await store.insertSpine({
-      parent_user_id: FAMILY,
+      parent_user_id: FAMILY as string,
+      status: "lapsed",
       deposit_paid_at: NOW,
       deposit_pence: PRICES.depositPence,
     });
@@ -394,7 +413,7 @@ describe("getAccess — the read every paywall stands on", () => {
   it("a trial past its end reads as lapsed here, without waiting for the cron", async () => {
     const { store, path } = build();
     await store.insertSpine({
-      parent_user_id: FAMILY,
+      parent_user_id: FAMILY as string,
       status: "trial",
       trial_ends_at: "2026-01-01T00:00:00.000Z",
       has_used_trial: true,
@@ -409,7 +428,7 @@ describe("getAccess — the read every paywall stands on", () => {
   it("carries the deposit on every standing, because it is credited wherever it was paid", async () => {
     const { store, path } = build();
     await store.insertSpine({
-      parent_user_id: FAMILY,
+      parent_user_id: FAMILY as string,
       status: "paid_in_full",
       purchased_at: NOW,
       deposit_paid_at: NOW,
