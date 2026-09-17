@@ -100,7 +100,7 @@ function tableMethods(
  * out here rather than composed from the other methods so that a test which passes against the double is a
  * test of the **rule**, the way the three `0010` RPCs above already are.
  */
-function eventMethods(s: State): Pick<SpineStore, "applyEvent" | "stampEvent"> {
+function eventMethods(s: State): Pick<SpineStore, "applyEvent"> {
   const stampLedger = (
     eventId: string,
     patch: Readonly<Record<string, unknown>>,
@@ -132,40 +132,47 @@ function eventMethods(s: State): Pick<SpineStore, "applyEvent" | "stampEvent"> {
         },
       ];
       const familyId = delivery.familyId ?? null;
+      const patch = delivery.spinePatch ?? null;
+      // `ignored` (0020; ADR-146). No patch = no money in this delivery, whether because the caller could not
+      // place it or because the standing does not act on that type. 03 §5.4.3 wants the record either way, so
+      // the row stands stamped processed with no error - nothing is owed on it, and it does not join the
+      // runbook's unprocessed queue. The family is kept when we have one: an ignored delivery we COULD place
+      // is still that family's history.
+      if (patch === null) {
+        stampLedger(eventId, {
+          processed_at: s.now(),
+          parent_user_id: familyId,
+        });
+        return ok({ outcome: "ignored", eventId });
+      }
+      // A patch with no family is work that cannot be done, not work there is none of.
       if (familyId === null) {
         stampLedger(eventId, { processing_error: "E_EVENT_UNRESOLVED" });
         return ok({ outcome: "unresolved", eventId });
       }
-      const patch = delivery.spinePatch ?? null;
+      const current = find(s, familyId);
+      // I-M1: the spine row is minted before a purchase can be dispatched against it.
+      if (current === undefined) {
+        stampLedger(eventId, {
+          processing_error: "E_SPINE_MISSING",
+          parent_user_id: familyId,
+        });
+        return ok({ outcome: "unresolved", eventId });
+      }
+      // `access_until` is `set_access_window()`'s alone (ADR-083 / 084): the function strips it from the
+      // patch and calls that function instead, rather than letting a patch reach the column.
+      const { access_until: _ownedElsewhere, ...writable } = patch;
+      replace(s, { ...current, ...writable, updated_at: s.now() });
       let accessUntil: Instant | null = null;
-      if (patch !== null) {
-        const current = find(s, familyId);
-        // I-M1: the spine row is minted before a purchase can be dispatched against it.
-        if (current === undefined) {
-          stampLedger(eventId, {
-            processing_error: "E_SPINE_MISSING",
-            parent_user_id: familyId,
-          });
-          return ok({ outcome: "unresolved", eventId });
-        }
-        // `access_until` is `set_access_window()`'s alone (ADR-083 / 084): the function strips it from the
-        // patch and calls that function instead, rather than letting a patch reach the column.
-        const { access_until: _ownedElsewhere, ...writable } = patch;
-        replace(s, { ...current, ...writable, updated_at: s.now() });
-        if (patch.status !== undefined && delivery.accessAgeYears != null) {
-          const moved = await windowRpc(s).setAccessWindow(
-            familyId,
-            delivery.accessAgeYears,
-          );
-          accessUntil = moved.ok ? moved.value : null;
-        }
+      if (patch.status !== undefined && delivery.accessAgeYears != null) {
+        const moved = await windowRpc(s).setAccessWindow(
+          familyId,
+          delivery.accessAgeYears,
+        );
+        accessUntil = moved.ok ? moved.value : null;
       }
       stampLedger(eventId, { processed_at: s.now(), parent_user_id: familyId });
       return ok({ outcome: "applied", eventId, accessUntil });
-    },
-    stampEvent: async (id, patch) => {
-      s.events = s.events.map((e) => (e.id === id ? { ...e, ...patch } : e));
-      return ok(undefined);
     },
   };
 }

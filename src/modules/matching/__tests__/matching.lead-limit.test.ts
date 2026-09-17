@@ -97,3 +97,49 @@ describe("saveParentLeadAction — 07 §8 row 2 (M-5)", () => {
     expect((await saveParentLeadAction(payload())).ok).toBe(true);
   });
 });
+
+// ── ADR-146 (2) — the captured contact crosses the same boundary as the answers ──────────────────────────────
+//
+// `parent_leads.email` (`0020`) is written by this one action, because `saveLead` is the only writer of the row
+// (02 §4.7) and `form_data` travels with it. It is optional — a wizard-only lead has none — and it is validated
+// at the boundary like everything else here (01 §4a): it becomes the value ADR-145 (2)'s control compares
+// against, so a caller must not be able to put an arbitrary string in it.
+describe("saveParentLeadAction — the captured email (ADR-146 (2))", () => {
+  const captured = { value: "not-called" as unknown };
+
+  beforeEach(() => {
+    captured.value = "not-called";
+    configureMatching({
+      saveLead: async (input: { readonly email?: string | null }) => {
+        captured.value = input.email;
+        return ok(undefined);
+      },
+    } as never);
+  });
+
+  it("forwards a captured email to the store", async () => {
+    const result = await saveParentLeadAction({
+      ...payload(),
+      email: "Ada@Example.test",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(captured.value).toBe("Ada@Example.test");
+  });
+
+  it("omits it when the wizard captured none", async () => {
+    await saveParentLeadAction(payload());
+
+    expect(captured.value).toBeUndefined();
+  });
+
+  it("refuses a value that is not an address rather than storing it", async () => {
+    const refused = await saveParentLeadAction({
+      ...payload(),
+      email: "not-an-address",
+    });
+
+    expect(refused.ok).toBe(false);
+    expect(captured.value).toBe("not-called");
+  });
+});

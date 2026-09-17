@@ -182,6 +182,14 @@ export type ParentLead = {
    * `parent_leads_converted_together_check` is why one column answers for all three.
    */
   readonly claimed: boolean;
+  /**
+   * **ADR-146 (2)** — `parent_leads.email` (`0020`), the contact captured when the lead is held from a
+   * signup-form drop (S-X-05 / S-X-06; 04 §3.1 step 5, ADR-041). **`null` is the common case**: the advanced
+   * wizard is pre-auth and anonymous, so a wizard-only lead has no address at all. It is what ADR-145 (2)'s
+   * second half compares against — `onboarding-parent` converts a lead that carries one only to a signup at
+   * the same address, case-insensitively — and it is stored folded and trimmed by its one writer.
+   */
+  readonly email: string | null;
 };
 
 export type SaveLeadInput = {
@@ -190,6 +198,11 @@ export type SaveLeadInput = {
   readonly source: string | null;
   /** `true` once the last question is answered — emits `wizard.completed` (03 §9.3). */
   readonly completed: boolean;
+  /**
+   * ADR-146 (2) — the captured contact, when there is one (S-X-05 / S-X-06's drop). Optional because the
+   * wizard itself never asks for an address; blank is the same as absent, and the row's writer folds the case.
+   */
+  readonly email?: string | null;
 };
 
 /** S-X-04's states (04 §6.1): matches · missing lead → S-X-03 · error. */

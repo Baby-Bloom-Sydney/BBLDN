@@ -24,8 +24,6 @@ export type SpineInsert =
   AppDatabase["Tables"]["parent_subscriptions"]["Insert"];
 export type SpinePatch =
   AppDatabase["Tables"]["parent_subscriptions"]["Update"];
-export type PaymentEventPatch =
-  AppDatabase["Tables"]["payment_events"]["Update"];
 
 /**
  * One verified delivery, decided in TypeScript and applied in one transaction by `apply_payment_event`
@@ -49,11 +47,19 @@ export type PaymentDelivery = {
 };
 
 /**
- * `apply_payment_event`'s three outcomes (02 R-11). A duplicate is an outcome, never an error: the replay
- * costs one statement and touches no money.
+ * `apply_payment_event`'s four outcomes (02 §7; the fourth is `0020` / ADR-146). A duplicate is an outcome,
+ * never an error: the replay costs one statement and touches no money.
+ *
+ * `ignored` and `unresolved` are the same shape and a different fact, and the difference is the one the runbook
+ * reads. **No patch = no money**: the caller decided this delivery moves nothing — either it could not place it
+ * (a `LinkRef` we never minted) or the standing does not act on that type — so the ledger row is stamped
+ * `processed_at` with no error: seen, answered, nothing owed. A patch that could NOT be applied is
+ * `unresolved`: the row keeps its `processing_error` and stays on `payment_events_unprocessed_idx`, which is
+ * what that index exists to surface.
  */
 export type ApplyEventOutcome =
   | { readonly outcome: "duplicate" }
+  | { readonly outcome: "ignored"; readonly eventId: Uuid | null }
   | { readonly outcome: "unresolved"; readonly eventId: Uuid | null }
   | {
       readonly outcome: "applied";
@@ -85,18 +91,19 @@ export interface SpineStore {
   insertSpine(row: SpineInsert): Promise<Result<SpineRow>>;
   updateSpine(id: Uuid, patch: SpinePatch): Promise<Result<SpineRow>>;
   /**
-   * RPC `apply_payment_event` (`0019`; ADR-127) — the webhook's ledger insert, spine update and
-   * `processed_at` stamp in **one** transaction. Idempotent on `(provider, provider_event_id)`: the
-   * duplicate is an outcome, and a replay touches no money. Service scope; the caller is the provider.
+   * RPC `apply_payment_event` (`0019`; fourth outcome `0020`) — the webhook's ledger insert, spine update and
+   * `processed_at` stamp in **one** transaction, and since ADR-146 that is true of the no-money deliveries too:
+   * a delivery with no patch is recorded and stamped by the same call. Idempotent on
+   * `(provider, provider_event_id)`: the duplicate is an outcome, and a replay touches no money. Service scope;
+   * the caller is the provider.
+   *
+   * **This is the only write of `payment_events` in the module.** `stampEvent` stood beside it until `0020`
+   * gave the function an `ignored` outcome; it had exactly one caller, on the path that had to correct a
+   * `processing_error` the function had no way not to write. There is nothing left for a second statement to do,
+   * and leaving a live `from("payment_events").update()` road in the store is the thing the ADR-127 audit
+   * exists to remove.
    */
   applyEvent(delivery: PaymentDelivery): Promise<Result<ApplyEventOutcome>>;
-  /**
-   * The ledger row's `processed_at` for a delivery that needed **nothing** — an event type we do not handle,
-   * or a `LinkRef` we never minted. `apply_payment_event` cannot express "seen, and nothing to do": a null
-   * family is `unresolved` there, which stamps `processing_error` and leaves the row on the runbook's
-   * `processed_at IS NULL` index for ever. One statement, no money, and stated rather than hidden.
-   */
-  stampEvent(id: Uuid, patch: PaymentEventPatch): Promise<Result<void>>;
   /** RPC `start_family_trial_if_first` (02 §7) — the arguments come from `PRICES` / `FLAGS`, never a literal. */
   startTrial(
     familyId: FamilyId,

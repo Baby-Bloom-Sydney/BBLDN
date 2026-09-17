@@ -24,6 +24,9 @@ export function fromLeadRow(row: ParentLeadRow): ParentLead | null {
         : { area: row.area ?? row.district, district: row.district },
     source: row.source,
     completed: completed === true,
+    // ADR-146 (2). The column is `citext` and its writer folds the case, so what comes back is already
+    // canonical; `?? null` is the absent lead's answer, not a default.
+    email: row.email ?? null,
     // ADR-145 (2). One column answers for all three: 02 §4.7's `parent_leads_converted_together_check` makes
     // `converted_at`, `converted_to_user_id` and `position_id` move together or not at all.
     claimed: row.converted_at !== null,
