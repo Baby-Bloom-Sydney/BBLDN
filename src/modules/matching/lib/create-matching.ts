@@ -1,12 +1,14 @@
 // The inside (03 §7.4 / §10.1; Phase 1 `1b`): the candidate set loaded from `nanny_public` through `auth`'s port and
 // handed to `scoring`, which re-checks every exclusion; the lead saved and read through the same port at
 // service scope (`parent_leads` is service-role only — 02 §4.7; the named use is in the README); the Connect
-// entry point of ADR-126. `autofire` and `resultsFor` are `1e`'s and answer `not-built` rather than pretending.
+// entry point of ADR-126. `1e` added the `autofire` pre-check (03 §7.4) over the same candidate pool;
+// `resultsFor` stays `not-built` and answers so rather than pretending.
 import type { Auth } from "@/modules/auth";
 import { Events, err, ok } from "@/modules/platform";
 import { scoring } from "@/modules/scoring";
 import type { LeadId, NannyId, Result, Uuid } from "@/modules/shared-types";
 import type { Matching, ParentLead, SaveLeadInput } from "../types";
+import { autofire } from "./autofire";
 import { connectDecision } from "./connect-decision";
 import { fromLeadRow } from "./from-lead-row";
 import type { ParentLeadRow } from "./from-lead-row";
@@ -16,6 +18,8 @@ import { toCandidate } from "./to-candidate";
 
 export type MatchingDeps = {
   readonly auth: Auth;
+  /** 03 §7.5 — which distance provider boot wired, for `precheck.fired.providerKind`. */
+  readonly distanceKind?: Parameters<typeof autofire>[0]["distanceKind"];
 };
 
 const NOT_BUILT = err("INTERNAL", "Not available yet", {
@@ -94,7 +98,12 @@ export function createMatching(deps: MatchingDeps): Matching {
       return scoring.preAuthMatch(leadForm, list.value);
     },
     resultsFor: async () => NOT_BUILT,
-    autofire: async () => NOT_BUILT,
+    autofire: autofire({
+      candidates: pool,
+      ...(deps.distanceKind === undefined
+        ? {}
+        : { distanceKind: deps.distanceKind }),
+    }),
     listPublicNannies: () => loadPublicNannies(auth),
     getPublicNanny: async (nannyId: NannyId) => {
       const nannies = await loadPublicNannies(auth);

@@ -12,6 +12,10 @@ export { signUpParentAction } from "./actions/sign-up-parent-action";
 export { signInAction } from "./actions/sign-in-action";
 export { requestPasswordResetAction } from "./actions/request-password-reset-action";
 
+// `1e` — S-P-04's one action (04 §3.3 trigger b): the in-app position flow opens the position and answers S-P-01.
+export { createPositionAction } from "./actions/create-position-action";
+export { PARENT_CALL_PATH } from "./lib/parent-call-path";
+
 // Pure helpers other units read: where a parent lands after signup (`1d`), a safe `next=` (any route).
 export { postSignupDestination } from "./lib/post-signup-destination";
 export { safeNextPath } from "./lib/safe-next-path";
