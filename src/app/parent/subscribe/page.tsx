@@ -6,13 +6,16 @@
 //
 // A family whose bundle is already open is sent to S-P-12: this screen is for taking it, not for reading it.
 // `?refused=1` is how a declined card comes back — it names no provider and carries no id.
+//
+// ADR-144: an empty shape list is an outage. The judgement lives in `selfServeShapes()` so this file stays thin
+// (05 §7 rule 5) and so the log line is testable without standing a route up.
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ROUTE_MAP, loginRedirectUrl } from "@/modules/auth";
 import {
   SelfServePage,
   loadMoneyPage,
-  payments,
+  selfServeShapes,
   startCheckoutAction,
 } from "@/modules/payments";
 
@@ -40,9 +43,9 @@ export default async function ParentSubscribePage({
   if (load.kind === "failed") redirect(ROUTE_MAP.dashboards.parent);
   if (ALREADY_OPEN.has(load.view.state)) redirect("/parent/subscription");
 
-  const shapes = payments
-    .prices()
-    .filter((option) => option.preset === "self-serve-app");
+  // ADR-144 — the self-serve presets, and an empty answer treated as `E_PROVIDER` rather than as "nothing to
+  // pay": `selfServeShapes()` logs `ALERT_PROVIDER_DOWN` and the screen renders the unavailable state.
+  const shapes = selfServeShapes();
 
   async function choose(formData: FormData): Promise<void> {
     "use server";

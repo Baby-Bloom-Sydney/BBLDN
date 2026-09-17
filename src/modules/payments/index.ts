@@ -23,6 +23,8 @@ export { BundleStatusPage } from "./components/BundleStatusPage";
 export { SelfServePage } from "./components/SelfServePage";
 export { loadMoneyPage } from "./lib/load-money-page";
 export { moneyPageView } from "./lib/money-page-view";
+/** ADR-144 — S-P-11's shapes, with an empty answer treated as an outage rather than as "nothing to pay". */
+export { selfServeShapes } from "./lib/self-serve-shapes";
 export { startCheckoutAction } from "./actions/start-checkout-action";
 export { openPortalAction } from "./actions/open-portal-action";
 

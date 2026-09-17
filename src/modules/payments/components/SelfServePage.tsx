@@ -15,7 +15,10 @@ import type { Price } from "@/modules/purchase-paths";
 
 export type SelfServePageProps = {
   readonly view: MoneyPageView;
-  /** `payments.prices()` filtered to `self-serve-app` by the route; empty when the module is unconfigured. */
+  /**
+   * What `selfServeShapes()` answered. **ADR-144: empty is an outage, not an answer** — the module could not
+   * say what the two shapes are, so this screen says so instead of rendering a pay page with nothing on it.
+   */
   readonly shapes: ReadonlyArray<Price>;
   /** Posts the chosen shape; the route turns it into a checkout and redirects. */
   readonly chooseAction: (formData: FormData) => Promise<void>;
@@ -56,7 +59,18 @@ export function SelfServePage({
         </p>
       ) : null}
 
-      {shapes.length === 0 ? null : (
+      {shapes.length === 0 ? (
+        // ADR-144. Not `null`: a family who arrived here to pay must be told that the fault is ours and what to
+        // do next, and the log line raised alongside it (`self-serve-shapes.ts`) is what tells us.
+        <p
+          role="alert"
+          className="mt-8 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900"
+        >
+          We can&rsquo;t show your two ways to pay just now &mdash; nothing has
+          changed about your place. Try again shortly, or your matchmaker will
+          send you a link.
+        </p>
+      ) : (
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           {shapes.map((shape) => (
             <form
