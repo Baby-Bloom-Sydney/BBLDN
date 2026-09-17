@@ -332,6 +332,13 @@ describe("onboarding-parent — the one-go signup with a lead (04 §3.1 steps 5�
 // Written RED first against the shipped action, which ran `auth.signUp` -> consent rows -> profile row ->
 // welcome email with no ceiling on an anonymous `"use server"` POST. `SECURITY.rateLimits.signupPerEmail` was
 // declared in config with zero call sites. Both cases failed before the fix.
+/** A full `RateLimitAllowance`, so a hand-written limiter satisfies the port rather than a cast. */
+const allowed = () =>
+  ok({
+    remaining: 1,
+    resetAt: new Date(Date.now() + 60_000).toISOString() as Instant,
+  });
+
 describe("onboarding-parent — signup is rate limited (07 §8 row 2; REVIEW-2)", () => {
   const OTHER = { ...VALID, email: "grace@example.test" };
 
@@ -384,7 +391,7 @@ describe("onboarding-parent — signup is rate limited (07 §8 row 2; REVIEW-2)"
         consume: async (key: string) => {
           if (spent.has(key)) return err("RATE_LIMITED", "Too many");
           spent.add(key);
-          return ok({ count: 1 });
+          return allowed();
         },
       },
       "shared",

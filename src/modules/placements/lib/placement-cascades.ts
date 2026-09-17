@@ -74,7 +74,10 @@ export async function runPlacementCascades(input: {
         log.error("L-1b: done-for-you access did not open; the app is off", {
           module: "placements",
           action: "runPlacementCascades",
-          alert: "ALERT_DFY_ACCESS_NOT_OPENED",
+          // 01 §4b owns the alert list and has no name for "a downstream port refused a write we cannot retry";
+          // ALERT_PROVIDER_DOWN is the closest true one (the payments port did not answer). The missing name is
+          // recorded in docs/review-sweep-170926.md for the 01 §4b owner rather than added code-first.
+          alert: "ALERT_PROVIDER_DOWN",
           transition: "L-1b",
           placementId: record.placementId,
           reason: opened.error.details?.reason ?? opened.error.code,

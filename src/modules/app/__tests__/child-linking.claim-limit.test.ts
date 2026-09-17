@@ -20,6 +20,7 @@ import {
   memoryRateLimitStore,
   ok,
 } from "@/modules/platform";
+import type { Instant } from "@/modules/shared-types";
 
 const redirects: string[] = [];
 vi.mock("next/navigation", () => ({
@@ -47,9 +48,15 @@ vi.mock("../child-linking/lib/app-actor", () => ({
   appActor: async () => ({ kind: "user", id: "u-1", role: "parent" }),
 }));
 
-const { claimInviteAction } = await import(
-  "../child-linking/actions/claim-invite-action"
-);
+const { claimInviteAction } =
+  await import("../child-linking/actions/claim-invite-action");
+
+/** A full `RateLimitAllowance`, so a hand-written limiter satisfies the port rather than a cast. */
+const allowed = () =>
+  ok({
+    remaining: 1,
+    resetAt: new Date(Date.now() + 60_000).toISOString() as Instant,
+  });
 
 const formOf = (token: string): FormData => {
   const data = new FormData();
@@ -74,14 +81,17 @@ beforeEach(() => {
 
 describe("app/child-linking — the claim consumes 07 §8 row 7 (REVIEW-2)", () => {
   it("stops reaching the store once the IP's budget is spent — the walker runs out, not the token space", async () => {
-    const attempts = SECURITY.rateLimits.inviteLookup.perMinute + 4;
+    const perMinute = SECURITY.rateLimits.inviteLookup.perMinute ?? 0;
+    expect(perMinute).toBeGreaterThan(0);
+    const attempts = perMinute + 4;
     for (let n = 0; n < attempts; n += 1)
-      await claimInviteAction(null, formOf(`AAAA-${String(n).padStart(4, "0")}`));
+      await claimInviteAction(
+        null,
+        formOf(`AAAA-${String(n).padStart(4, "0")}`),
+      );
     // Every guess past the per-minute allowance is refused before `claimInvite` is called at all.
     expect(previews.mock.calls.length).toBeLessThan(attempts);
-    expect(previews.mock.calls.length).toBeLessThanOrEqual(
-      SECURITY.rateLimits.inviteLookup.perMinute,
-    );
+    expect(previews.mock.calls.length).toBeLessThanOrEqual(perMinute);
   });
 
   it("fails CLOSED when the limiter cannot answer — the same departure the landing page argues for", async () => {
@@ -113,7 +123,7 @@ describe("app/child-linking — the claim consumes 07 §8 row 7 (REVIEW-2)", () 
       {
         consume: async (key: string) => {
           keys.push(key);
-          return ok({ count: 1 });
+          return allowed();
         },
       },
       "shared",

@@ -15,6 +15,7 @@ import {
   memoryRateLimitStore,
   ok,
 } from "@/modules/platform";
+import type { Instant } from "@/modules/shared-types";
 
 vi.mock("next/headers", () => ({
   headers: () => ({ get: () => "198.51.100.9" }),
@@ -30,9 +31,8 @@ vi.mock("@/modules/comms", () => ({
   },
 }));
 
-const { sendContactMessageAction } = await import(
-  "../actions/send-contact-message-action"
-);
+const { sendContactMessageAction } =
+  await import("../actions/send-contact-message-action");
 
 const VALID = {
   name: "Ada Lovelace",
@@ -40,6 +40,13 @@ const VALID = {
   role: "parent",
   message: "Could someone call me about a nanny for two children, please?",
 };
+
+/** A full `RateLimitAllowance`, so a hand-written limiter satisfies the port rather than a cast. */
+const allowed = () =>
+  ok({
+    remaining: 1,
+    resetAt: new Date(Date.now() + 60_000).toISOString() as Instant,
+  });
 
 const formOf = (fields: Record<string, string>): FormData => {
   const data = new FormData();
@@ -63,10 +70,12 @@ beforeEach(() => {
 
 describe("public-site — the contact form is rate limited (07 §8 row 10; REVIEW-2)", () => {
   it("stops sending once the hour's allowance is spent", async () => {
-    const attempts = SECURITY.rateLimits.contactForm.perHour + 3;
+    const perHour = SECURITY.rateLimits.contactForm.perHour ?? 0;
+    expect(perHour).toBeGreaterThan(0);
+    const attempts = perHour + 3;
     for (let n = 0; n < attempts; n += 1)
       await sendContactMessageAction(null, formOf(VALID));
-    expect(sends.length).toBe(SECURITY.rateLimits.contactForm.perHour);
+    expect(sends.length).toBe(perHour);
     expect(sends.length).toBeLessThan(attempts);
   });
 
@@ -86,7 +95,7 @@ describe("public-site — the contact form is rate limited (07 §8 row 10; REVIE
       {
         consume: async (key: string) => {
           keys.push(key);
-          return ok({ count: 1 });
+          return allowed();
         },
       },
       "shared",
@@ -109,7 +118,7 @@ describe("public-site — the contact form is rate limited (07 §8 row 10; REVIE
       {
         consume: async (key: string) => {
           keys.push(key);
-          return ok({ count: 1 });
+          return allowed();
         },
       },
       "shared",

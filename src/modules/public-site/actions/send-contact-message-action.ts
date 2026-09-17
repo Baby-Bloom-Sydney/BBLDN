@@ -16,13 +16,20 @@ import { comms } from "@/modules/comms";
 import { err, ok, toActionResult } from "@/modules/platform";
 import type { Email } from "@/modules/shared-types";
 import type { ContactMessageAction } from "../types";
-import {
-  consumeContactFormLimit,
-  contactFormKey,
-} from "../lib/consume-contact-form-limit";
+import { consumeContactFormLimit } from "../lib/consume-contact-form-limit";
+import { contactFormKey } from "../lib/contact-form-key";
 import { contactMessageSchema } from "../lib/contact-message-schema";
 
 const FIELDS = ["name", "email", "role", "message"] as const;
+
+/** `x-forwarded-for`, or `null` when there is no request scope to read it from — never a throw (see below). */
+function forwardedForOrNull(): string | null {
+  try {
+    return headers().get("x-forwarded-for");
+  } catch {
+    return null;
+  }
+}
 
 export const sendContactMessageAction: ContactMessageAction = async (
   _previous: unknown,
@@ -42,10 +49,12 @@ export const sendContactMessageAction: ContactMessageAction = async (
     );
   }
   // After validation (so a malformed submission does not spend the caller's budget) and before the send.
-  const key = await contactFormKey(
-    headers().get("x-forwarded-for"),
-    parsed.data.email,
-  );
+  //
+  // `headers()` throws outside a request scope (a unit test that drives the action directly), and this action's
+  // standing contract is that it returns a `ClientResult` and **never throws**. A missing scope degrades to the
+  // shared no-address bucket, which is the strict answer rather than the lax one: one bucket for everyone, not
+  // no bucket at all.
+  const key = await contactFormKey(forwardedForOrNull(), parsed.data.email);
   if (!(await consumeContactFormLimit(key)))
     return toActionResult(
       err("RATE_LIMITED", "Too many messages just now. Try again shortly.", {

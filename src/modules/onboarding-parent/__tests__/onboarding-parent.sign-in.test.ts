@@ -160,7 +160,11 @@ describe("onboarding-parent — sign-in is rate limited (07 §8 row 3; REVIEW-2)
     // Every answer is the same refusal, throttled or not — a throttle that spoke differently would be the
     // enumeration oracle ADR-132 forbids, arriving through the side door.
     const first = answers[0];
-    expect(answers.every((answer) => JSON.stringify(answer) === JSON.stringify(first))).toBe(true);
+    expect(
+      answers.every(
+        (answer) => JSON.stringify(answer) === JSON.stringify(first),
+      ),
+    ).toBe(true);
     // The correct password no longer works once the burst is spent: the limit is ahead of the credential check.
     const afterBurst = await signInAction(
       null,

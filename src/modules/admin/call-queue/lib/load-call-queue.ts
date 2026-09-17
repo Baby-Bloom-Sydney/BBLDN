@@ -5,6 +5,7 @@
 // `scheduling.listSchedule` gates again on the session inside. This function passes the admin `Actor` through
 // because the connector's signature asks for one; it is not what grants anything.
 import { SCHEDULING } from "@/modules/config";
+import { log } from "@/modules/platform";
 import { positions } from "@/modules/positions";
 import { scheduling } from "@/modules/scheduling";
 import { callLayer, londonSlotWords } from "@/modules/call-layer";
@@ -83,7 +84,25 @@ async function aboutPosition(positionId: PositionId): Promise<string> {
  */
 async function awaitingRows(): Promise<ReadonlyArray<AwaitingCallRow>> {
   const open = await callLayer.listOpenCalls();
-  if (!open.ok) return Object.freeze([]);
+  if (!open.ok) {
+    // ★ REVIEW-2 (silent-failure HIGH). This used to return `[]` with no log, and `loadCallQueue` still
+    // answered `kind: "queue"` with a `total` that counted only the booked half — a *smaller number that looks
+    // real*. S-A-03 rendered normally with an empty "awaiting" section, so families who asked for a call were
+    // never called and no signal existed anywhere. The sibling failure path below distinguishes `forbidden`
+    // from `unavailable`; this one cannot, because the awaiting half is additive to a queue that has already
+    // loaded — so an alert is the honest remedy rather than failing the whole screen.
+    log.error(
+      "call queue: the open-call list did not answer; awaiting half is empty",
+      {
+        module: "admin",
+        action: "loadCallQueue",
+        alert: "ALERT_PROVIDER_DOWN",
+        surface: "S-A-03",
+        reason: open.error.details?.reason ?? open.error.code,
+      },
+    );
+    return Object.freeze([]);
+  }
   const neverBooked = open.value.filter((call) => call.bookingId === null);
   const rows = await Promise.all(
     neverBooked.map(async (call) =>

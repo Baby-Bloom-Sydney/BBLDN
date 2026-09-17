@@ -9,7 +9,7 @@
 // **ADR-134 is only meaningful if a limiter runs.** "Auth routes fail closed on a limiter outage" says nothing
 // about a route with no limiter, which is why this is a control gap rather than a policy one. On an outage this
 // refuses, exactly as `consume-reset-request-limit.ts` does and for the same reason: fail-open on an auth
-// surface hands back the unlimited guessing the limit exists to stop.
+// surface hands back the very guessing-with-no-ceiling the limit exists to stop.
 //
 // **The refusal is the sign-in form's own single refusal**, never a different one, so a throttle cannot become
 // the account-enumeration oracle ADR-132 forbids: the caller cannot tell "too many attempts against this

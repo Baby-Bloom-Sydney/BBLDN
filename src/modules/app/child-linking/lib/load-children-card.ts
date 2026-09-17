@@ -2,6 +2,7 @@
 // 01 §2.3 lets nothing but itself import `access-gate`, so the page asks the gate and hands the two fields
 // down. `null` means "we could not tell" and is carried through untouched — the whole point of `1h`'s
 // fail-closed-by-carrying-the-error is that this layer can still tell an outage from a closed account.
+import { log } from "@/modules/platform";
 import { childLinking } from "./default-child-linking";
 import { appActor } from "./app-actor";
 import type { AccessFacts } from "./app-access-view";
@@ -37,7 +38,30 @@ export async function loadChildrenCard(
   for (const child of rows) {
     const found = await childLinking.invitesForChild(child.id, actor);
     if (found.ok) invites.push(...found.value);
+    // ★ REVIEW-2 (silent-failure HIGH). The refusal used to be dropped per child, with the same care the
+    // `!children.ok` branch above takes simply not applied here. The cost is not cosmetic: a parent with a
+    // pending invite is shown "no invites" and prompted to invite again, and `child_invites` carries no expiry
+    // (02 §4.6), so the encouraged retry mints a second live token for the same child. The card still renders —
+    // a missing invite is not worth blanking the screen — but the read is no longer invisible.
+    else
+      log.error("children card: a child's invites did not answer", {
+        module: "app",
+        action: "loadChildrenCard",
+        alert: "ALERT_PROVIDER_DOWN",
+        surface: "S-P-13",
+        reason: found.error.details?.reason ?? found.error.code,
+      });
   }
+  if (!links.ok)
+    // Same class: a refused link read renders a linked child as unlinked, which is the state that offers the
+    // parent an invite she does not need.
+    log.error("children card: the linked-children read did not answer", {
+      module: "app",
+      action: "loadChildrenCard",
+      alert: "ALERT_PROVIDER_DOWN",
+      surface: "S-P-13",
+      reason: links.error.details?.reason ?? links.error.code,
+    });
 
   return childrenCardView({
     access,
