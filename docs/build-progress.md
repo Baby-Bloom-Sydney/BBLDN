@@ -591,8 +591,46 @@ Superseded note — the S1 "next unit" text: **S2 — `shared-types` (types only
 
 ---
 
+---
+
+## REVIEW-2 — the ADR-123 overnight checkpoint over the whole of Phase 1 (2026-09-17)
+
+**Branch** `review-170926-2`, off `main` `ce82ffe`. **Register: [`docs/review-sweep-170926.md`](./review-sweep-170926.md)** — read that, not this section, for any detail.
+
+Twelve units merged with **no review battery** (1a, 1b, 1c, 1d, 1e, 1g, P1-FIX, P1-WIRE, P1-WIRE-2, BUILD-FIX, S5b, P1-STORES) and four with one reviewer (AUTH-2, 1f, 1h, 1i). 654 files swept. **2 CRITICAL + 9 HIGH fixed in-unit, test-first**; 1 HIGH pinned; 3 HIGH + 17 MEDIUM + 6 LOW recorded.
+
+**What changed in the code**
+
+| Area                | Change                                                                                                                                                                                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `onboarding-parent` | **new** `lib/consume-sign-in-limit.ts` · `lib/consume-signup-limit.ts`; both actions now consume 07 §8 rows 3 and 2, ahead of every write, failing **closed**                                                                                                                        |
+| `public-site`       | **new** `lib/contact-form-key.ts` · `lib/consume-contact-form-limit.ts`; the contact action consumes row 10, fails closed; its header read no longer throws outside a request scope                                                                                                  |
+| `app/child-linking` | `claim-invite-action.ts` consumes row 7's two counters (the claim bypassed the enumeration defence entirely); `load-children-card.ts` alerts on the two reads it used to drop; the registry and the stub are **annotated, not cast**, so the fail-closed default is compiler-checked |
+| `boot`              | **new** `unwired-ports.ts` — `admin-on-behalf` · `verification` · `vetting-providers` · `hire-docs` now appear on the boot report with their reasons (`BootPort` widened); `instrumentation.ts`'s stale "NOT wired" list replaced by a pointer to the report                         |
+| `placements`        | a refused `openDfyAccess` is alerted instead of discarded; L-1b still lands                                                                                                                                                                                                          |
+| `admin/call-queue`  | `awaitingRows` alerts instead of returning a smaller total that looks real                                                                                                                                                                                                           |
+| `scheduling`        | **new** `lib/book-slot-result-of.ts` — `book_slot`'s `Json` answer is shape-checked, so an unreadable answer is a coded `Result` rather than a `TypeError` thrown out of a `Result`-returning function                                                                               |
+| `matching`          | `Wizard`'s autosave rejection is handled explicitly instead of `void`-ed                                                                                                                                                                                                             |
+
+**Known gaps this sweep found and did NOT close** (owners in the register): ADR-134's fail-open allow-list still does not exist and the edge-layer fallback it is argued on is not in the repo (M-2) · `EMAIL_PROVIDER=stub-email` and `AREAS_SOURCE=stub` are legal in production and `smoke-env.sh` certifies the first (H-11, M-9) · P-7 never cascades K-24 although `connections` has the receiving arm (H-12) · `payments.prices()` answers `[]` unconfigured, so the pay page renders with no way to pay (H-13) · an absent booker is still a branded empty id, **pinned** (H-10) · `platform` still does not export `createRegistry`, now 19 hand-rolled copies (M-10) · eleven components over the 50-line limit with no gate enforcing it (M-11).
+
+**Pins: eleven, all still red** (`3,540 passed | 11 expected fail`). None has become quietly false. **Two carry expired reasons** and should be re-argued by their owners: `call-layer.inside.test.ts:736` (displacement _is_ built; the pin is red only because the test wires the stub) and `positions.inside.test.ts:333` (names `1g`, which has landed).
+
+**Gates** — all local (B-42): `typecheck` · `lint` · `prettier --check .` · `vitest run` · `lint:boundaries` · `check:allowed-imports` · `check:config-literals` · `check:claude-md` · `check:boot-guard` (6/6) · `npm run build` — **all 0**. ★ **`build` and `check:boot-guard` need `scripts/ci/lib/smoke-env.sh` sourced**: a bare `npm run build` fails at page-data collection because the legacy Sydney `/api/verification-status` route constructs a Resend client at module scope, and boot-guard's two positive controls then fail for want of a complete `.next`. That is REVIEW-1's H-4 still open, and it is why `main` can look build-red when it is not.
+
 <!-- audit
-Last edited: 2026-09-17T19:35+10:00 — BB-LDN-Planner-070926/1i
+Last edited: 2026-09-17T23:55+10:00 — BB-LDN-Planner-070926/REVIEW-2
+Notes: REVIEW-2 — the ADR-123 overnight checkpoint over the whole of Phase 1 (62b3e36..ce82ffe, 654 files,
+twelve units merged with no review battery at all). One section added; nothing else in this ledger touched.
+2 CRITICAL + 9 HIGH fixed in-unit test-first, 1 HIGH pinned, 3 HIGH + 17 MEDIUM + 6 LOW recorded in
+docs/review-sweep-170926.md. The theme is controls DECLARED and never CALLED: config/security.ts names
+fifteen rate-limit policies and four of the surfaces they exist for had no limiter at all — sign-in, signup,
+the contact form, and the invite claim, which is the whole of the enumeration defence for a token with no
+expiry. Second theme: four privileged ports could not appear on the boot report because BootPort could not
+name them. Also recorded for whoever measures the gates next: `build` and `check:boot-guard` are green only
+with scripts/ci/lib/smoke-env.sh sourced — the legacy /api/verification-status route builds a Resend client
+at module scope (REVIEW-1 H-4, still open).
+Prior: Last edited: 2026-09-17T19:35+10:00 — BB-LDN-Planner-070926/1i
 Notes: 1i — app access + the child invite, Phase 1's last build unit. New 1i files section (36 created, 3
 Sydney files deleted: the [inviteId] route and the landing client + its test), with the five design decisions
 and the four pinned gaps. Next unit replaced: 1j is the only sub-phase of Phase 1 with no code and D0.5 is
