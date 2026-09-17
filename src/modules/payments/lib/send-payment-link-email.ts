@@ -4,6 +4,7 @@ import type { Comms } from "@/modules/comms";
 import { log } from "@/modules/platform";
 import type { Money } from "@/modules/purchase-paths";
 import type { FamilyId, Instant, Url } from "@/modules/shared-types";
+import { familyUuid } from "./family-uuid";
 import type { FamilyContact } from "./spine-store";
 
 export type PaymentLinkEmailInput = {
@@ -24,7 +25,7 @@ export async function sendPaymentLinkEmail(
     log.warn("bundle-payment-link not sent: no email on file", {
       module: "payments",
       action: "bundle-payment-link",
-      userId: input.familyId,
+      userId: familyUuid(input.familyId),
     });
     return;
   }
@@ -45,7 +46,7 @@ export async function sendPaymentLinkEmail(
     log.warn("bundle-payment-link not sent", {
       module: "payments",
       action: "bundle-payment-link",
-      userId: input.familyId,
+      userId: familyUuid(input.familyId),
       errorCode: sent.error.code,
       reason: sent.error.details?.reason,
     });

@@ -17,11 +17,13 @@ import type {
   EventName,
   FamilyId,
   Instant,
+  Json,
   Result,
   Uuid,
 } from "@/modules/shared-types";
 import type { AccessChange, AccessState, PurchasePath } from "../types";
 import { accessStateFromRow } from "./access-state-from-row";
+import { carryStoreError } from "./carry-store-error";
 import type { PaymentsDeps } from "./deps";
 import { dispatchPurchaseEvent } from "./dispatch-purchase-event";
 import { emitMoneyEvents } from "./emit-money-events";
@@ -72,7 +74,10 @@ async function applyTransition(
   const before = accessStateFromRow(row, now);
   const transition = dispatchPurchaseEvent(row, event, now);
   if (transition.handled === "ignored") return ok(ignored(familyId, before));
-  const written = await deps.store.updateSpine(row.id, transition.patch);
+  const written = await deps.store.updateSpine(
+    row.id as Uuid,
+    transition.patch,
+  );
   if (!written.ok) return written;
   if (transition.patch.status !== undefined)
     await deps.store.setAccessWindow(familyId, PRICES.accessAgeYears);
@@ -85,7 +90,11 @@ async function applyTransition(
       path: purchasePath(event),
       providerEventId: event.eventId,
       ...(event.kind === "purchase.completed"
-        ? { preset: event.preset, amountMinor: event.paid.pence, shape: event.shape.kind }
+        ? {
+            preset: event.preset,
+            amountMinor: event.paid.pence,
+            shape: event.shape.kind,
+          }
         : {}),
     },
   });
@@ -136,21 +145,34 @@ export function webhookMethod(
     handleWebhook: async (raw) => {
       const parsed = deps.provider.parseEvent(raw);
       if (!parsed.ok)
-        return fail("E_EVENT_UNVERIFIED", "The event is not verified", deps.provider.name);
+        return fail(
+          "E_EVENT_UNVERIFIED",
+          "The event is not verified",
+          deps.provider.name,
+        );
       const event = parsed.value;
       const now = deps.now();
       const ledger = await deps.store.insertEvent({
         provider: deps.provider.name,
         provider_event_id: event.eventId,
         event_type: event.kind,
-        payload: JSON.parse(raw.rawBody) as Record<string, unknown>,
+        payload: JSON.parse(raw.rawBody) as Json,
         received_at: raw.receivedAt,
       });
-      if (!ledger.ok) return ledger;
+      if (!ledger.ok) return carryStoreError(ledger.error);
       if (ledger.value.kind === "duplicate")
-        return ok({ ...ignored(UNRESOLVED_FAMILY, NONE), handled: "skipped-duplicate" as const });
+        return ok({
+          ...ignored(UNRESOLVED_FAMILY, NONE),
+          handled: "skipped-duplicate" as const,
+        });
       if (event.kind === "ignored") {
-        await stamp(deps, ledger.value.id, null, ok(ignored(UNRESOLVED_FAMILY, NONE)), now);
+        await stamp(
+          deps,
+          ledger.value.id,
+          null,
+          ok(ignored(UNRESOLVED_FAMILY, NONE)),
+          now,
+        );
         return ok(ignored(UNRESOLVED_FAMILY, NONE));
       }
       const row = await resolveFamily(deps, event);
@@ -160,12 +182,29 @@ export function webhookMethod(
           action: "webhook",
           provider: deps.provider.name,
         });
-        await stamp(deps, ledger.value.id, null, ok(ignored(UNRESOLVED_FAMILY, NONE)), now);
+        await stamp(
+          deps,
+          ledger.value.id,
+          null,
+          ok(ignored(UNRESOLVED_FAMILY, NONE)),
+          now,
+        );
         return ok(ignored(UNRESOLVED_FAMILY, NONE));
       }
-      const outcome = row.ok ? await applyTransition(deps, row.value as SpineRow, event, now) : row;
-      await stamp(deps, ledger.value.id, row.ok ? ((row.value as SpineRow).parent_user_id as FamilyId) : null, outcome, now);
-      return outcome;
+      if (!row.ok) {
+        await stamp(deps, ledger.value.id, null, row, now);
+        return carryStoreError(row.error);
+      }
+      const found = row.value as SpineRow;
+      const outcome = await applyTransition(deps, found, event, now);
+      await stamp(
+        deps,
+        ledger.value.id,
+        found.parent_user_id as FamilyId,
+        outcome,
+        now,
+      );
+      return outcome.ok ? outcome : carryStoreError(outcome.error);
     },
   };
 }

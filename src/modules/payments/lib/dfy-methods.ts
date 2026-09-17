@@ -7,6 +7,7 @@ import { ok } from "@/modules/platform";
 import type { Actor } from "@/modules/shared-types";
 import type { AccessChange, PurchasePath } from "../types";
 import { accessStateFromRow } from "./access-state-from-row";
+import { carryStoreError } from "./carry-store-error";
 import type { PaymentsDeps } from "./deps";
 import { emitMoneyEvents } from "./emit-money-events";
 import { fail } from "./fail";
@@ -15,14 +16,19 @@ import { sendAppReady } from "./send-app-ready";
 const mayOpen = (actor: Actor): boolean =>
   actor.kind === "admin" || actor.kind === "system";
 
-export function dfyMethods(deps: PaymentsDeps): Pick<PurchasePath, "openDfyAccess"> {
+export function dfyMethods(
+  deps: PaymentsDeps,
+): Pick<PurchasePath, "openDfyAccess"> {
   return {
     openDfyAccess: async (familyId, placementId, actor) => {
       if (!mayOpen(actor))
-        return fail("E_ACTOR_FORBIDDEN", "Only the placement flow opens access");
+        return fail(
+          "E_ACTOR_FORBIDDEN",
+          "Only the placement flow opens access",
+        );
       const at = deps.now();
       const before = await deps.store.readByFamily(familyId, "service");
-      if (!before.ok) return before;
+      if (!before.ok) return carryStoreError(before.error);
       const wasPlaced = before.value?.status === "placed";
       const after = await deps.store.openDfyAccess(
         familyId,
@@ -30,7 +36,7 @@ export function dfyMethods(deps: PaymentsDeps): Pick<PurchasePath, "openDfyAcces
         PRICES.paymentAfterStartDays,
         PRICES.satisfactionWindowDays,
       );
-      if (!after.ok) return after;
+      if (!after.ok) return carryStoreError(after.error);
       await deps.store.setAccessWindow(familyId, PRICES.accessAgeYears);
       const events = wasPlaced
         ? []
@@ -49,7 +55,11 @@ export function dfyMethods(deps: PaymentsDeps): Pick<PurchasePath, "openDfyAcces
           });
       if (!wasPlaced) {
         const contact = await deps.store.familyContact(familyId);
-        await sendAppReady(deps.comms, familyId, contact.ok ? contact.value : null);
+        await sendAppReady(
+          deps.comms,
+          familyId,
+          contact.ok ? contact.value : null,
+        );
       }
       const change: AccessChange = {
         familyId,

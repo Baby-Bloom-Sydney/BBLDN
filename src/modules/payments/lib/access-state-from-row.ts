@@ -70,7 +70,8 @@ function toggled(row: SpineRow, now: Instant): AccessState | null {
 }
 
 function placed(row: SpineRow): AccessState {
-  const depositPaid = row.deposit_paid_at === null ? 0 : (row.deposit_pence ?? 0);
+  const depositPaid =
+    row.deposit_paid_at === null ? 0 : (row.deposit_pence ?? 0);
   const wages = row.first_week_wages_pence ?? 0;
   return {
     state: "placed",
@@ -146,8 +147,12 @@ function holding(row: SpineRow): AccessState {
       pence: row.deposit_pence ?? 0,
     };
   const hadAccess =
-    row.has_used_trial || row.purchased_at !== null || row.cancelled_at !== null;
-  return hadAccess ? lapsed(row.updated_at, lapseReason(row)) : { state: "none" };
+    row.has_used_trial ||
+    row.purchased_at !== null ||
+    row.cancelled_at !== null;
+  return hadAccess
+    ? lapsed(row.updated_at, lapseReason(row))
+    : { state: "none" };
 }
 
 function standing(row: SpineRow, now: Instant): AccessState {

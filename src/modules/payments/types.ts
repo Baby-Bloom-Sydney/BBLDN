@@ -133,6 +133,16 @@ export type PaymentsErrorReason =
   | "E_TEST_USER"
   | "E_DFY_FAMILY"
   | "E_PAYMENT_NOT_DUE"
+  /**
+   * 03 §5.3 names no reason for "the database refused the read or the write". The alternatives were to travel
+   * under a reason that means something else (`E_PROVIDER` says the provider failed; `E_FAMILY_NOT_FOUND` says
+   * the family does not exist) or to widen the details type to `string`. Both are worse on a money path, where
+   * the reason is what the runbook triages on — so the vocabulary gains one member, the same way
+   * `payments-not-configured` is already a module addition to the document's list. Its `ErrorCode` is
+   * `INTERNAL`, so a provider keeps retrying rather than dropping the event. Recorded for the 03 owner in the
+   * L-007 `1h` entry.
+   */
+  | "E_STORE"
   | "payments-not-configured";
 
 export type PaymentsErrorDetails = {
@@ -223,5 +233,8 @@ export type PaymentJobRun = {
 
 /** The jobs binding beside `payments` (same inside, same store); fails closed until boot configures it. */
 export interface PaymentsJobs {
-  run(job: PaymentJobName, now: Instant): Promise<PaymentsResult<PaymentJobRun>>;
+  run(
+    job: PaymentJobName,
+    now: Instant,
+  ): Promise<PaymentsResult<PaymentJobRun>>;
 }

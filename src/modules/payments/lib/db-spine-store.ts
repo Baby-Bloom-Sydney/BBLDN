@@ -20,7 +20,9 @@ const byFamily =
   (row: SpineRow): boolean =>
     row.parent_user_id === familyId;
 
-function reads(port: DataAccessPort): Pick<
+function reads(
+  port: DataAccessPort,
+): Pick<
   SpineStore,
   "readByFamily" | "listSpine" | "familyContact" | "placementTerms"
 > {
@@ -90,7 +92,10 @@ function reads(port: DataAccessPort): Pick<
 
 function writes(
   port: DataAccessPort,
-): Pick<SpineStore, "insertSpine" | "updateSpine" | "insertEvent" | "stampEvent"> {
+): Pick<
+  SpineStore,
+  "insertSpine" | "updateSpine" | "insertEvent" | "stampEvent"
+> {
   return {
     insertSpine: (row) =>
       port.run(

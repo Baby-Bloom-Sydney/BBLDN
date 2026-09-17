@@ -19,8 +19,10 @@ import type {
 } from "@/modules/shared-types";
 
 export type SpineRow = TableRow<AppDatabase, "parent_subscriptions">;
-export type SpineInsert = AppDatabase["Tables"]["parent_subscriptions"]["Insert"];
-export type SpinePatch = AppDatabase["Tables"]["parent_subscriptions"]["Update"];
+export type SpineInsert =
+  AppDatabase["Tables"]["parent_subscriptions"]["Insert"];
+export type SpinePatch =
+  AppDatabase["Tables"]["parent_subscriptions"]["Update"];
 export type PaymentEventInsert =
   AppDatabase["Tables"]["payment_events"]["Insert"];
 export type PaymentEventPatch =

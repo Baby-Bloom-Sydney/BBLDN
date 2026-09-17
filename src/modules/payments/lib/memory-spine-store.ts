@@ -94,7 +94,9 @@ function tableMethods(
   };
 }
 
-function eventMethods(s: State): Pick<SpineStore, "insertEvent" | "stampEvent"> {
+function eventMethods(
+  s: State,
+): Pick<SpineStore, "insertEvent" | "stampEvent"> {
   return {
     insertEvent: async (row) => {
       const duplicate = s.events.some(
@@ -154,8 +156,7 @@ function dfyRpc(s: State): Pick<SpineStore, "openDfyAccess"> {
         dfy_access_opened_at: current?.dfy_access_opened_at ?? started,
         payment_due_at: current?.payment_due_at ?? addDays(started, afterDays),
         satisfaction_window_ends_at:
-          current?.satisfaction_window_ends_at ??
-          addDays(started, windowDays),
+          current?.satisfaction_window_ends_at ?? addDays(started, windowDays),
         trial_started_at: null,
         trial_ends_at: null,
       };
@@ -188,10 +189,11 @@ function windowRpc(s: State): Pick<SpineStore, "setAccessWindow"> {
   };
 }
 
-function lookups(s: State): Pick<SpineStore, "familyContact" | "placementTerms"> {
+function lookups(
+  s: State,
+): Pick<SpineStore, "familyContact" | "placementTerms"> {
   return {
-    familyContact: async (familyId) =>
-      ok(s.seed.contacts?.[familyId] ?? null),
+    familyContact: async (familyId) => ok(s.seed.contacts?.[familyId] ?? null),
     placementTerms: async (placementId) => {
       const p = s.seed.placements?.[placementId];
       return ok(

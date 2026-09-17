@@ -88,7 +88,8 @@ function purchase(
     purchased_at: event.at,
     price_pence: event.paid.pence,
     price_preset: event.preset,
-    purchase_path: event.linkKind === "checkout" ? "self_serve" : "payment_link",
+    purchase_path:
+      event.linkKind === "checkout" ? "self_serve" : "payment_link",
     past_due_grace_ends_at: null,
     cancelled_at: null,
   };

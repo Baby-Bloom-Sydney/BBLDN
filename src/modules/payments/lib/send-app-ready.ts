@@ -4,6 +4,7 @@
 import type { Comms } from "@/modules/comms";
 import { log } from "@/modules/platform";
 import type { FamilyId } from "@/modules/shared-types";
+import { familyUuid } from "./family-uuid";
 import type { FamilyContact } from "./spine-store";
 
 export async function sendAppReady(
@@ -15,7 +16,7 @@ export async function sendAppReady(
     log.warn("app-ready not sent: no email on file", {
       module: "payments",
       action: "app-ready",
-      userId: familyId,
+      userId: familyUuid(familyId),
     });
     return;
   }
@@ -30,7 +31,7 @@ export async function sendAppReady(
     log.warn("app-ready not sent", {
       module: "payments",
       action: "app-ready",
-      userId: familyId,
+      userId: familyUuid(familyId),
       errorCode: sent.error.code,
       reason: sent.error.details?.reason,
     });

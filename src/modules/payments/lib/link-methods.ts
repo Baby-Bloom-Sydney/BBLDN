@@ -20,10 +20,12 @@ import type {
   LinkRef,
   PlacementId,
   Url,
+  Uuid,
 } from "@/modules/shared-types";
-import type { PaymentsResult, PurchasePath } from "../types";
+import type { PaymentLink, PaymentsResult, PurchasePath } from "../types";
 import { addDays } from "./add-days";
 import { balancePence } from "./balance-pence";
+import { carryStoreError } from "./carry-store-error";
 import type { PaymentsDeps } from "./deps";
 import { emitMoneyEvents } from "./emit-money-events";
 import { fail } from "./fail";
@@ -41,7 +43,7 @@ type Customer = {
 };
 
 const ownFamily = (actor: Actor, familyId: FamilyId): boolean =>
-  actor.kind !== "user" || actor.id === familyId;
+  actor.kind !== "user" || (actor.id as string) === (familyId as string);
 
 const providerRefused = (deps: PaymentsDeps) =>
   fail("E_PROVIDER", "The payment provider refused", deps.provider.name);
@@ -89,7 +91,9 @@ async function amountFor(
     return ok({ amount: money(PRICES.depositPence), wages: 0 });
   if (kind === "custom") {
     const whole =
-      custom !== undefined && Number.isInteger(custom.pence) && custom.pence > 0;
+      custom !== undefined &&
+      Number.isInteger(custom.pence) &&
+      custom.pence > 0;
     if (!whole || custom === undefined)
       return fail("E_PLAN_INVALID", "A custom link needs a whole amount");
     return ok({ amount: custom, wages: 0 });
@@ -135,10 +139,10 @@ async function mintLink(
   const reference = mintLinkRef(familyId, kind);
   const expiresAt = addDays(deps.now(), PRICES.linkTtlDays);
   const written = await deps.store.updateSpine(
-    row.id,
+    row.id as Uuid,
     linkPatch(kind, reference, bill.value),
   );
-  if (!written.ok) return written;
+  if (!written.ok) return carryStoreError(written.error);
   const who = await customerFor(deps, familyId);
   if (!who.ok) return who;
   const link = await deps.provider.createPaymentLink(
@@ -166,13 +170,13 @@ async function createPaymentLink(
   plan: PlanShape,
   actor: Actor,
   custom?: Money,
-): Promise<ReturnType<PurchasePath["createPaymentLink"]>> {
+): Promise<PaymentsResult<PaymentLink>> {
   if (actor.kind !== "admin")
     return fail("E_ACTOR_FORBIDDEN", "Only an admin may send a link");
   if (!deps.paymentsEnabled())
     return fail("E_PAYMENTS_DISABLED", "Payments are switched off");
   const found = await deps.store.readByFamily(familyId, "service");
-  if (!found.ok) return found;
+  if (!found.ok) return carryStoreError(found.error);
   if (found.value === null) return fail("E_FAMILY_NOT_FOUND", "No family");
   const minted = await mintLink(deps, found.value, kind, plan, custom);
   if (!minted.ok) return minted;
@@ -211,7 +215,7 @@ async function createCheckout(
   preset: PricePreset,
   plan: PlanShape,
   actor: Actor,
-): Promise<ReturnType<PurchasePath["createCheckout"]>> {
+): Promise<PaymentsResult<{ readonly url: Url }>> {
   if (!ownFamily(actor, familyId))
     return fail("E_ACTOR_FORBIDDEN", "Not this family");
   if (!deps.paymentsEnabled())
@@ -219,7 +223,7 @@ async function createCheckout(
   if (preset === "deposit" || preset === "custom")
     return fail("E_PLAN_INVALID", "Not a checkout preset");
   const found = await deps.store.readByFamily(familyId, "service");
-  if (!found.ok) return found;
+  if (!found.ok) return carryStoreError(found.error);
   const row = found.value;
   if (row?.status === "active" || row?.status === "paid_in_full")
     return fail("E_ALREADY_PAID", "Already paid");

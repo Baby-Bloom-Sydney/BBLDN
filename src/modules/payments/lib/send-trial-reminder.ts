@@ -3,6 +3,7 @@
 import type { Comms } from "@/modules/comms";
 import { log } from "@/modules/platform";
 import type { FamilyId, Instant } from "@/modules/shared-types";
+import { familyUuid } from "./family-uuid";
 import type { FamilyContact } from "./spine-store";
 
 export async function sendTrialReminder(
@@ -15,7 +16,7 @@ export async function sendTrialReminder(
     log.warn("trial-reminder not sent: no email on file", {
       module: "payments",
       action: "trial-reminder",
-      userId: familyId,
+      userId: familyUuid(familyId),
     });
     return false;
   }
@@ -30,7 +31,7 @@ export async function sendTrialReminder(
     log.warn("trial-reminder not sent", {
       module: "payments",
       action: "trial-reminder",
-      userId: familyId,
+      userId: familyUuid(familyId),
       errorCode: sent.error.code,
       reason: sent.error.details?.reason,
     });

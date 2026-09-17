@@ -3,10 +3,11 @@
 // on an on-toggle. The toggle columns are written by this method and nothing else (02 I-M10).
 import { PRICES } from "@/modules/config";
 import { ok } from "@/modules/platform";
-import type { Actor, FamilyId, Instant } from "@/modules/shared-types";
+import type { Actor, FamilyId, Instant, Uuid } from "@/modules/shared-types";
 import type { AccessChange, AccessState, PurchasePath } from "../types";
 import { accessStateFromRow } from "./access-state-from-row";
 import { blankSpineRow } from "./blank-spine-row";
+import { carryStoreError } from "./carry-store-error";
 import type { PaymentsDeps } from "./deps";
 import { emitMoneyEvents } from "./emit-money-events";
 import { fail } from "./fail";
@@ -20,10 +21,12 @@ async function readOrHold(
 ): Promise<ReturnType<PaymentsDeps["store"]["readByFamily"]>> {
   const current = await deps.store.readByFamily(familyId, "service");
   if (!current.ok || current.value !== null) return current;
-  const { id: _id, created_at: _c, updated_at: _u, ...row } = blankSpineRow(
-    familyId,
-    deps.now(),
-  );
+  const {
+    id: _id,
+    created_at: _c,
+    updated_at: _u,
+    ...row
+  } = blankSpineRow(familyId, deps.now());
   return deps.store.insertSpine(row);
 }
 
@@ -36,17 +39,17 @@ async function toggle(
   until?: Instant,
 ): Promise<ReturnType<PurchasePath["setAccess"]>> {
   const before = await readOrHold(deps, familyId);
-  if (!before.ok) return before;
+  if (!before.ok) return carryStoreError(before.error);
   if (before.value === null) return fail("E_FAMILY_NOT_FOUND", "No family");
   const at = deps.now();
-  const after = await deps.store.updateSpine(before.value.id, {
+  const after = await deps.store.updateSpine(before.value.id as Uuid, {
     access_toggled_on: on,
     access_toggled_at: at,
     access_toggled_by: actor.id,
     access_toggle_reason: reason,
     access_toggle_until: until ?? null,
   });
-  if (!after.ok) return after;
+  if (!after.ok) return carryStoreError(after.error);
   const names = on
     ? (["access.toggled", "access.opened"] as const)
     : (["access.toggled", "access.lapsed"] as const);
@@ -81,8 +84,10 @@ export function accessMethods(
   return {
     getAccess: async (familyId) => {
       const row = await deps.store.readByFamily(familyId, "session");
-      if (!row.ok) return row;
-      return ok(row.value === null ? NONE : accessStateFromRow(row.value, deps.now()));
+      if (!row.ok) return carryStoreError(row.error);
+      return ok(
+        row.value === null ? NONE : accessStateFromRow(row.value, deps.now()),
+      );
     },
     setAccess: async (familyId, on, reason, actor, until) => {
       if (actor.kind !== "admin")
