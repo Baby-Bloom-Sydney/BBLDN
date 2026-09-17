@@ -126,26 +126,27 @@ describe("★ PIN — 07 §5.2: 'links and invites are written only by the RPCs'
     );
   });
 
-  it.fails(
-    "the module's store calls those definers instead of writing `child_invites` at service scope (owner: the unit that wires `0019`)",
-    async () => {
-      // The other half, still red and still for `1i`'s reason. `0019` put the two rules in Postgres; until
-      // `db-child-linking-store.ts` calls them, `invite-authorisation.ts` is STILL the only gate a request
-      // actually passes through, and the definers are a second gate nobody walks past. Wiring them is not a
-      // rename: both functions derive their authority from `auth.uid()` and refuse a null one, so the calls
-      // must move from `{ scope: "service" }` to the caller's session — which is a change to this module's
-      // store, not to the migration.
-      const { readFileSync } = await import("node:fs");
-      const { resolve } = await import("node:path");
-      const store = readFileSync(
-        resolve(__dirname, "../child-linking/lib/db-child-linking-store.ts"),
-        "utf8",
-      );
+  // **Flipped.** `db-child-linking-store.ts` calls both definers, under the caller's own session — so
+  // `invite-authorisation.ts` is no longer the only gate a request passes through, and a service-scope mint
+  // is now refused by Postgres (`INVITE_NO_SESSION`) rather than quietly succeeding. The behaviour that makes
+  // this green is asserted in `db-write-definers.test.ts` (the calls, the arguments, the scope, the
+  // idempotent second mint, the terminal revoke) and in `int.rpc-0019-app` against the applied migration;
+  // this read stays because the pin's claim was about the *file*, and a future edit that put the table write
+  // back would pass every behavioural test written against the double.
+  it("the module's store calls those definers instead of writing `child_invites` at service scope", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    const store = readFileSync(
+      resolve(__dirname, "../child-linking/lib/db-child-linking-store.ts"),
+      "utf8",
+    );
 
-      expect(store).toContain('rpc("create_child_invite"');
-      expect(store).toContain('rpc("revoke_child_invite"');
-    },
-  );
+    expect(store).toContain('rpc("create_child_invite"');
+    expect(store).toContain('rpc("revoke_child_invite"');
+    // and no table write of either is left behind
+    expect(store).not.toContain('from("child_invites").insert');
+    expect(store).not.toContain('from("child_invites").update');
+  });
 
   it("meanwhile the module's authorisation is real and is tested — it is the only gate", async () => {
     const inside = build();

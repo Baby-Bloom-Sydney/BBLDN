@@ -12,6 +12,7 @@ import type {
   Email,
   FamilyId,
   Instant,
+  Json,
   PlacementId,
   Result,
   TableRow,
@@ -23,15 +24,42 @@ export type SpineInsert =
   AppDatabase["Tables"]["parent_subscriptions"]["Insert"];
 export type SpinePatch =
   AppDatabase["Tables"]["parent_subscriptions"]["Update"];
-export type PaymentEventInsert =
-  AppDatabase["Tables"]["payment_events"]["Insert"];
 export type PaymentEventPatch =
   AppDatabase["Tables"]["payment_events"]["Update"];
 
-/** `insertEvent` is the idempotency gate (02 R-11): a duplicate is an outcome, never an error. */
-export type EventInsertOutcome =
-  | { readonly kind: "inserted"; readonly id: Uuid }
-  | { readonly kind: "duplicate" };
+/**
+ * One verified delivery, decided in TypeScript and applied in one transaction by `apply_payment_event`
+ * (`0019`; ADR-127). The signature check, the family resolution and the transition table stay above this
+ * seam — what crosses it is a decided patch, never a decision.
+ *
+ * `familyId: null` is a delivery we could not place (an unminted `LinkRef`, or an event type we do not
+ * handle): the ledger row is still written, because an unrecorded delivery is the one thing the runbook
+ * cannot reconcile from.
+ */
+export type PaymentDelivery = {
+  readonly provider: string;
+  readonly providerEventId: string;
+  readonly eventType: string;
+  readonly payload: Json;
+  readonly receivedAt: Instant;
+  readonly familyId?: FamilyId | null;
+  readonly spinePatch?: SpinePatch | null;
+  /** `PRICES.accessAgeYears` — a required-when-used number, never a literal (L4). */
+  readonly accessAgeYears?: number | null;
+};
+
+/**
+ * `apply_payment_event`'s three outcomes (02 R-11). A duplicate is an outcome, never an error: the replay
+ * costs one statement and touches no money.
+ */
+export type ApplyEventOutcome =
+  | { readonly outcome: "duplicate" }
+  | { readonly outcome: "unresolved"; readonly eventId: Uuid | null }
+  | {
+      readonly outcome: "applied";
+      readonly eventId: Uuid;
+      readonly accessUntil: Instant | null;
+    };
 
 /** What `app-ready` / `bundle-payment-link` need of a family — the email and a first name, nothing else. */
 export type FamilyContact = {
@@ -56,8 +84,18 @@ export interface SpineStore {
   listSpine(): Promise<Result<ReadonlyArray<SpineRow>>>;
   insertSpine(row: SpineInsert): Promise<Result<SpineRow>>;
   updateSpine(id: Uuid, patch: SpinePatch): Promise<Result<SpineRow>>;
-  /** Insert-before-dispatch on `(provider, provider_event_id)`; the unique violation is `duplicate`. */
-  insertEvent(row: PaymentEventInsert): Promise<Result<EventInsertOutcome>>;
+  /**
+   * RPC `apply_payment_event` (`0019`; ADR-127) — the webhook's ledger insert, spine update and
+   * `processed_at` stamp in **one** transaction. Idempotent on `(provider, provider_event_id)`: the
+   * duplicate is an outcome, and a replay touches no money. Service scope; the caller is the provider.
+   */
+  applyEvent(delivery: PaymentDelivery): Promise<Result<ApplyEventOutcome>>;
+  /**
+   * The ledger row's `processed_at` for a delivery that needed **nothing** — an event type we do not handle,
+   * or a `LinkRef` we never minted. `apply_payment_event` cannot express "seen, and nothing to do": a null
+   * family is `unresolved` there, which stamps `processing_error` and leaves the row on the runbook's
+   * `processed_at IS NULL` index for ever. One statement, no money, and stated rather than hidden.
+   */
   stampEvent(id: Uuid, patch: PaymentEventPatch): Promise<Result<void>>;
   /** RPC `start_family_trial_if_first` (02 §7) — the arguments come from `PRICES` / `FLAGS`, never a literal. */
   startTrial(

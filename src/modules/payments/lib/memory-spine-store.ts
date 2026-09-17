@@ -94,20 +94,74 @@ function tableMethods(
   };
 }
 
-function eventMethods(
-  s: State,
-): Pick<SpineStore, "insertEvent" | "stampEvent"> {
+/**
+ * `apply_payment_event` (`0019`) in memory, statement for statement — the ledger insert, the spine update and
+ * the `processed_at` stamp, in the order the function makes them and with the same three outcomes. Written
+ * out here rather than composed from the other methods so that a test which passes against the double is a
+ * test of the **rule**, the way the three `0010` RPCs above already are.
+ */
+function eventMethods(s: State): Pick<SpineStore, "applyEvent" | "stampEvent"> {
+  const stampLedger = (
+    eventId: string,
+    patch: Readonly<Record<string, unknown>>,
+  ): void => {
+    s.events = s.events.map((e) => (e.id === eventId ? { ...e, ...patch } : e));
+  };
   return {
-    insertEvent: async (row) => {
+    applyEvent: async (delivery) => {
+      // `on conflict … do nothing` returning nothing IS the duplicate: no spine write, no stamp, no money.
       const duplicate = s.events.some(
         (e) =>
-          e.provider === row.provider &&
-          e.provider_event_id === row.provider_event_id,
+          e.provider === delivery.provider &&
+          e.provider_event_id === delivery.providerEventId,
       );
-      if (duplicate) return ok({ kind: "duplicate" });
-      const id = crypto.randomUUID() as Uuid;
-      s.events = [...s.events, { ...row, id }];
-      return ok({ kind: "inserted", id });
+      if (duplicate) return ok({ outcome: "duplicate" });
+      const eventId = crypto.randomUUID() as Uuid;
+      s.events = [
+        ...s.events,
+        {
+          id: eventId,
+          provider: delivery.provider,
+          provider_event_id: delivery.providerEventId,
+          event_type: delivery.eventType,
+          payload: delivery.payload,
+          received_at: delivery.receivedAt,
+          parent_user_id: null,
+          processed_at: null,
+          processing_error: null,
+        },
+      ];
+      const familyId = delivery.familyId ?? null;
+      if (familyId === null) {
+        stampLedger(eventId, { processing_error: "E_EVENT_UNRESOLVED" });
+        return ok({ outcome: "unresolved", eventId });
+      }
+      const patch = delivery.spinePatch ?? null;
+      let accessUntil: Instant | null = null;
+      if (patch !== null) {
+        const current = find(s, familyId);
+        // I-M1: the spine row is minted before a purchase can be dispatched against it.
+        if (current === undefined) {
+          stampLedger(eventId, {
+            processing_error: "E_SPINE_MISSING",
+            parent_user_id: familyId,
+          });
+          return ok({ outcome: "unresolved", eventId });
+        }
+        // `access_until` is `set_access_window()`'s alone (ADR-083 / 084): the function strips it from the
+        // patch and calls that function instead, rather than letting a patch reach the column.
+        const { access_until: _ownedElsewhere, ...writable } = patch;
+        replace(s, { ...current, ...writable, updated_at: s.now() });
+        if (patch.status !== undefined && delivery.accessAgeYears != null) {
+          const moved = await windowRpc(s).setAccessWindow(
+            familyId,
+            delivery.accessAgeYears,
+          );
+          accessUntil = moved.ok ? moved.value : null;
+        }
+      }
+      stampLedger(eventId, { processed_at: s.now(), parent_user_id: familyId });
+      return ok({ outcome: "applied", eventId, accessUntil });
     },
     stampEvent: async (id, patch) => {
       s.events = s.events.map((e) => (e.id === id ? { ...e, ...patch } : e));
