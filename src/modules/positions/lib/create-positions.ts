@@ -25,6 +25,7 @@ import type {
   JourneyRowSource,
   PositionRecord,
   PositionStore,
+  PositionSummary,
   PositionsReads,
   PrecheckRecord,
 } from "../types";
@@ -42,6 +43,21 @@ const notFound = () =>
   err("NOT_FOUND", "No such position", {
     reason: "E_ENTITY_NOT_FOUND" as const,
     entity: "position" as const,
+  });
+
+/** The connector hands out a summary, never the row: the recipient and the lead id stay inside the module. */
+const summaryOf = (record: PositionRecord): PositionSummary =>
+  Object.freeze({
+    positionId: record.positionId,
+    parentId: record.parentId,
+    source: record.source,
+    stage: record.stage,
+    detail: record.detail,
+    precheck: record.precheck,
+    ...(record.endReason === undefined ? {} : { endReason: record.endReason }),
+    ...(record.closeReason === undefined
+      ? {}
+      : { closeReason: record.closeReason }),
   });
 
 const positionEntity = (entity: EntityRef): Result<PositionId> =>
@@ -162,6 +178,12 @@ export function createPositions(deps: PositionsDeps): PositionsReads {
         activeConnectionNannyIds: Object.freeze([]),
         detail: found.value.detail,
       });
+    },
+
+    findLive: async (parentId: ParentId) => {
+      const record = await liveFor(parentId);
+      if (!record.ok) return record;
+      return ok(record.value === null ? null : summaryOf(record.value));
     },
 
     recordPrecheck: async (positionId: PositionId, record: PrecheckRecord) => {

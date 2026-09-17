@@ -11,13 +11,18 @@ import type {
   Stage,
   TransitionId,
 } from "@/modules/shared-types";
-import type { PositionForMatching, PositionsReads } from "./types";
+import type {
+  PositionForMatching,
+  PositionSummary,
+  PositionsReads,
+} from "./types";
 
 export type StubStageSeed = {
   readonly stages?: Readonly<Record<string, Stage>>;
   readonly journey?: ReadonlyArray<JourneyStep>;
   readonly allowed?: ReadonlyArray<TransitionId>;
   readonly forMatching?: PositionForMatching;
+  readonly live?: PositionSummary;
 };
 
 const keyOf = (entity: EntityRef): string => `${entity.kind}:${entity.id}`;
@@ -69,5 +74,6 @@ export function stubPositions(seed: StubStageSeed = {}): PositionsReads {
           })
         : ok(seed.forMatching),
     recordPrecheck: async () => ok(undefined),
+    findLive: async () => ok(seed.live ?? null),
   });
 }

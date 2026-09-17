@@ -3,7 +3,7 @@
 // written, the ranking happened, and rail row 2 is in motion before anyone rings — so 04 §3.1 step 12's promise
 // is not a sentence on a screen with nothing behind it.
 import { beforeEach, describe, expect, it } from "vitest";
-import { MATCHING } from "@/modules/config";
+import { LOCALE, MATCHING } from "@/modules/config";
 import { autofire } from "@/modules/matching";
 import {
   configureEvents,
@@ -144,7 +144,7 @@ beforeEach(async () => {
       source: "results_signup",
       detail: DETAIL,
       recipient: { email: "ada@example.test" as Email, name: "Ada" },
-      mobile: "+447700900123",
+      mobile: `${LOCALE.phonePrefix}7700900123`,
     },
     expectedFrom: null,
     idempotencyKey: "open",

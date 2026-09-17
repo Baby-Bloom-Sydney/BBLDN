@@ -49,3 +49,9 @@ export { registerPositionsSlice } from "./lib/register-positions-slice";
 export { memoryPositionStore } from "./lib/memory-position-store";
 export { POSITION_TRANSITIONS } from "./lib/position-transitions";
 export { journeySteps } from "./lib/journey-steps";
+
+// S-P-05 — the read the route calls and the view it renders (01 §2.5 "thin").
+export { loadPositionPage } from "./lib/load-position-page";
+export { positionPageView } from "./lib/position-page-view";
+export { PositionPage } from "./components/PositionPage";
+export { closePositionAction } from "./actions/close-position-action";

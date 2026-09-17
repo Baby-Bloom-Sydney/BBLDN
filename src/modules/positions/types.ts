@@ -3,6 +3,7 @@
 // `call-layer`) register their handlers with it at boot. The stage-model vocabulary itself lives in
 // `shared-types/stage-model.ts` (03 §2.5) — the slice-registration types included (ADR-119) — and is re-exported
 // by `index.ts`; this file adds only what the `positions` connector needs.
+import type { PositionPageView } from "./lib/position-page-view";
 import type {
   AmendInput,
   Actor,
@@ -111,6 +112,10 @@ export type PositionsReads = {
     positionId: PositionId,
     record: PrecheckRecord,
   ) => Promise<Result<void>>;
+  /** `1e` connector extension — the position a parent holds, for her own screens (`PositionSummary`). */
+  readonly findLive: (
+    parentId: ParentId,
+  ) => Promise<Result<PositionSummary | null>>;
 };
 
 // ── The inside (Phase 1 `1e`) — the P rows, the store port and the payloads ──
@@ -231,3 +236,31 @@ export type JourneyRowSource = {
     positionId: PositionId,
   ) => Promise<Result<JourneyStep | null>>;
 };
+
+/**
+ * `1e` — what a parent's own screens read (S-P-05). A **summary**, not the row: the recipient and the lead id
+ * stay inside the module, because a screen has no use for them and a connector that hands them out invites a
+ * caller to route mail from a page.
+ *
+ * Connector extension — 03 §2.5 names `getStage` (which needs an id the screen does not have yet) but no
+ * "the position this parent holds" read. Recorded in the L-007 `1e` PROGRESS entry for ratification.
+ */
+export type PositionSummary = Pick<
+  PositionRecord,
+  "positionId" | "parentId" | "source" | "stage" | "detail" | "precheck"
+> & {
+  readonly endReason?: EndReason;
+  readonly closeReason?: CloseReason;
+};
+
+/** S-P-05's states (04 §6.2), as the route reads them. */
+export type PositionPageLoad =
+  | { readonly kind: "signed-out" }
+  | { readonly kind: "no-position" }
+  | { readonly kind: "failed" }
+  | {
+      readonly kind: "position";
+      readonly positionId: PositionId;
+      readonly stage: PositionStage;
+      readonly view: PositionPageView;
+    };

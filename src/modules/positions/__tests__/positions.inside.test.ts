@@ -4,6 +4,7 @@
 // a P row owns actually fire, and what the document has and this unit does not build is pinned `it.fails`
 // rather than quietly dropped.
 import { beforeEach, describe, expect, it } from "vitest";
+import { LOCALE } from "@/modules/config";
 import {
   POSITION_TRANSITIONS,
   advance,
@@ -72,7 +73,7 @@ const openPayload = (parentId: UserId = PARENT) => ({
   source: "results_signup" as const,
   detail: DETAIL,
   recipient: { email: "ada@example.test" as Email, name: "Ada" },
-  mobile: "+447700900123",
+  mobile: `${LOCALE.phonePrefix}7700900123`,
 });
 
 let store: PositionStore;
