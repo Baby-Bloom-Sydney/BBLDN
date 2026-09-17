@@ -137,6 +137,7 @@ describe("S-X-04 — PreAuthResults", () => {
     area: AREA,
     source: "adv",
     completed: true,
+    claimed: false,
   };
 
   it("shows three cards, blurs the fourth behind '+N more', and links S-X-05 with the lead", () => {
@@ -282,5 +283,53 @@ describe("S-X-03 — Wizard", () => {
     expect(failing).toHaveBeenLastCalledWith(
       expect.objectContaining({ completed: true }),
     );
+  });
+});
+
+// ── M-16 (REVIEW-2) — the wizard's `default:` was a lying cast ─────────────────────────────────────────────
+//
+// `QuestionBody`'s `default:` re-narrowed the discriminant to the two `single` ids and rendered `ChoiceChips`
+// with `options ?? []`. A sixth `kind` added to `WizardQuestion` therefore **compiled silently** and reached a
+// parent as a blank, unanswerable question. `const _exhaustive: never = question` makes that addition a compile
+// error instead; and at runtime an unknown kind renders nothing rather than something broken.
+describe("the wizard renders by kind, exhaustively (M-16)", () => {
+  it("renders a `single` question's options — the case `default:` used to swallow", async () => {
+    const { QuestionBody } = await import("../components/wizard/QuestionBody");
+    render(
+      <QuestionBody
+        question={{
+          id: "focus",
+          heading: "What matters most?",
+          kind: "single",
+          options: [
+            { value: "learning", label: "Learning" },
+            { value: "care", label: "Care" },
+          ],
+        }}
+        ageLabels={AGE_LABELS}
+        answers={{}}
+        onChange={() => undefined}
+      />,
+    );
+    expect(screen.getByText("Learning")).toBeTruthy();
+  });
+
+  it("renders nothing for a kind it does not know, rather than a blank question", async () => {
+    const { QuestionBody } = await import("../components/wizard/QuestionBody");
+    const { container } = render(
+      <QuestionBody
+        question={
+          {
+            id: "focus",
+            heading: "From a future migration",
+            kind: "not-a-kind",
+          } as never
+        }
+        ageLabels={AGE_LABELS}
+        answers={{}}
+        onChange={() => undefined}
+      />,
+    );
+    expect(container.textContent).toBe("");
   });
 });

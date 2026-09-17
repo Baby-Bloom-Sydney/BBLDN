@@ -107,24 +107,33 @@ export function dbCommsStore(
           service,
         ),
       ),
-    settle: async (messageId, state) =>
-      asComms(
-        await port.run(
-          {
-            name: "comms.settle",
-            exec: async (q) => {
-              // a MessageId is the `email_logs` row's uuid (02 §4.6 `id uuid`); the port's `update` keys on `Uuid`
-              await q
-                .from("email_logs")
-                .update(
-                  messageId as unknown as Uuid,
-                  settlePatch(state, clock()),
-                );
-            },
+    /**
+     * ★ M-13 (REVIEW-2). This discarded the update's result, so a patch matching **zero rows** was
+     * indistinguishable from one that matched and the caller was told `ok`. A provider callback carrying a
+     * message id we do not hold then reported success, and the send's real state was written nowhere.
+     *
+     * The row is read before it is patched rather than the write's answer being inspected, because the two
+     * drivers behind this port disagree about what a zero-row `update` does — Supabase's `.select().single()`
+     * raises, the memory driver appends — and a store must not depend on which one it is talking to.
+     */
+    settle: async (messageId, state) => {
+      const matched = await port.run(
+        {
+          name: "comms.settle",
+          exec: async (q) => {
+            // a MessageId is the `email_logs` row's uuid (02 §4.6 `id uuid`); `update` keys on `Uuid`
+            const id = messageId as unknown as Uuid;
+            const found = await q.from("email_logs").eq("id", id).single();
+            if (found === null) return false;
+            await q.from("email_logs").update(id, settlePatch(state, clock()));
+            return true;
           },
-          service,
-        ),
-      ),
+        },
+        service,
+      );
+      if (!matched.ok) return asComms(matched);
+      return matched.value ? ok(undefined) : unknownMessage();
+    },
     read: async (messageId) => {
       const row = await port.run(
         {

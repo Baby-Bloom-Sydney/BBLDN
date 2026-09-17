@@ -3,7 +3,7 @@
 //
 // I-12 is honoured by construction: nothing here writes, and `due` is computed from `now` at every read
 // (`call-list-item.ts`), so no sweep ever needs to change a status (ADR-070).
-import { ok } from "@/modules/platform";
+import { log, ok } from "@/modules/platform";
 import { SCHEDULING } from "@/modules/config";
 import { ACTIVE_STATUSES } from "@/modules/shared-types";
 import type {
@@ -15,6 +15,7 @@ import type {
   Result,
   Slot,
   Subject,
+  UserId,
   Uuid,
 } from "@/modules/shared-types";
 import type {
@@ -58,6 +59,51 @@ const occupancy = (
 
 export function schedulingCalendarReads(context: SchedulingContext) {
   const { reads, clock } = context;
+
+  /**
+   * ADR-143 — the position subject's parent, by join from `nanny_positions.parent_id`. One read per distinct
+   * position, run in parallel, never one per row: the admin queue holds several calls for the same family.
+   * A position that does not answer is not a parent this module may invent; the callers below say what that
+   * means for their own read.
+   */
+  const parentsOf = async (
+    rows: ReadonlyArray<BookingRow>,
+  ): Promise<Result<ReadonlyMap<string, UserId>, SchedulingErrorDetails>> => {
+    const ids = [
+      ...new Set(
+        rows
+          .filter((row) => row.subject_type === "position")
+          .map((row) => row.subject_id),
+      ),
+    ];
+    const read = await Promise.all(
+      ids.map(async (id) => reads.positionParent(id as Uuid)),
+    );
+    const pairs: Array<readonly [string, UserId]> = [];
+    for (const [at, answer] of read.entries()) {
+      if (!answer.ok) return schedulingFailure(answer.error);
+      const id = ids[at];
+      if (answer.value !== null && id !== undefined)
+        pairs.push([id, answer.value as string as UserId]);
+    }
+    return ok(new Map(pairs));
+  };
+
+  /**
+   * A booking whose position is gone is dropped from a **list** rather than failing the whole list: 07 §6's
+   * account deletion cascades `nanny_positions` away and leaves the `bookings` row behind (no FK on
+   * `subject_id`), so failing would take the entire admin call queue down for one deleted family. It is never
+   * dropped silently — 01 §4a rule 2 — and `getBooking` on that same row still refuses outright.
+   */
+  const dropped = (row: BookingRow, where: string): null => {
+    log.error("scheduling: a booking's position subject no longer exists", {
+      module: "scheduling",
+      action: where,
+      bookingId: row.id,
+      positionId: row.subject_id,
+    });
+    return null;
+  };
 
   const loadCalendar = async () => {
     const calendar = await resolveCalendar(reads);
@@ -119,14 +165,22 @@ export function schedulingCalendarReads(context: SchedulingContext) {
     const loaded = await loadCalendar();
     if (!loaded.ok) return loaded;
     const now = clock();
-    const items = loaded.value.bookings
+    const rows = loaded.value.bookings
       .filter((row) => row.start_at >= range.from && row.start_at <= range.to)
       .filter((row) => filter?.kind === undefined || row.kind === filter.kind)
       .filter(
         (row) => filter?.status === undefined || row.status === filter.status,
       )
-      .sort((left, right) => left.start_at.localeCompare(right.start_at))
-      .map((row) => callListItem(row, now));
+      .sort((left, right) => left.start_at.localeCompare(right.start_at));
+    const parents = await parentsOf(rows);
+    if (!parents.ok) return parents;
+    const items = rows
+      .map(
+        (row) =>
+          callListItem(row, now, parents.value.get(row.subject_id) ?? null) ??
+          dropped(row, "listSchedule"),
+      )
+      .filter((item): item is CallListItem => item !== null);
     return ok(Object.freeze(items));
   };
 
@@ -136,6 +190,8 @@ export function schedulingCalendarReads(context: SchedulingContext) {
     const loaded = await loadCalendar();
     if (!loaded.ok) return loaded;
     const id = subject.kind === "nanny" ? subject.nannyId : subject.positionId;
+    // The caller named the subject, so a position's parent is already known here and no join is needed.
+    const parentId = subject.kind === "nanny" ? null : subject.parentId;
     return ok(
       Object.freeze(
         loaded.value.bookings
@@ -143,7 +199,11 @@ export function schedulingCalendarReads(context: SchedulingContext) {
             (row) => row.subject_type === subject.kind && row.subject_id === id,
           )
           .sort((left, right) => right.start_at.localeCompare(left.start_at))
-          .map(bookingFromRow),
+          .map(
+            (row) =>
+              bookingFromRow(row, parentId) ?? dropped(row, "listForSubject"),
+          )
+          .filter((booking): booking is Booking => booking !== null),
       ),
     );
   };
@@ -154,7 +214,25 @@ export function schedulingCalendarReads(context: SchedulingContext) {
     const row = await reads.booking(bookingId as string as Uuid);
     if (!row.ok) return schedulingFailure(row.error);
     if (row.value === null) return schedulingFailure(undefined, "NOT_FOUND");
-    return ok(bookingFromRow(row.value));
+    const parents = await parentsOf([row.value]);
+    if (!parents.ok) return parents;
+    const booking = bookingFromRow(
+      row.value,
+      parents.value.get(row.value.subject_id) ?? null,
+    );
+    // ADR-143: the position the booking names is gone, so its subject cannot be answered. `NOT_FOUND` is the
+    // truth about the call, and inventing a parent to avoid saying so is the defect this ruling closed.
+    return booking === null
+      ? schedulingFailure(undefined, "NOT_FOUND")
+      : ok(booking);
+  };
+
+  /** The one-row form of `parentsOf`, for the write half, which maps the row it has just written. */
+  const parentFor = async (
+    row: BookingRow,
+  ): Promise<Result<UserId | null, SchedulingErrorDetails>> => {
+    const parents = await parentsOf([row]);
+    return parents.ok ? ok(parents.value.get(row.subject_id) ?? null) : parents;
   };
 
   return Object.freeze({
@@ -163,5 +241,6 @@ export function schedulingCalendarReads(context: SchedulingContext) {
     listSchedule,
     listForSubject,
     getBooking,
+    parentFor,
   });
 }

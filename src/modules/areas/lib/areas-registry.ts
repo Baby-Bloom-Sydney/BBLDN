@@ -6,7 +6,7 @@
 // `searchAreas` / `listAll` / `isInServiceArea` cannot report a failure (03 §6.2 — they never throw and have no
 // `Result`), so unconfigured they return the empty answer. That is the one place this seam is quiet, and the
 // README says so.
-import { err } from "@/modules/platform";
+import { createRegistry, err } from "@/modules/platform";
 import type { Registry } from "@/modules/platform";
 import type { AreasProvider } from "../types";
 
@@ -23,11 +23,5 @@ const unconfigured: AreasProvider = Object.freeze({
   listAll: async () => Object.freeze([]),
 });
 
-const slot = { current: unconfigured };
-
-export const AREAS_REGISTRY: Registry<AreasProvider> = Object.freeze({
-  get: () => slot.current,
-  set: (next: AreasProvider) => {
-    slot.current = next;
-  },
-});
+export const AREAS_REGISTRY: Registry<AreasProvider> =
+  createRegistry<AreasProvider>(unconfigured);

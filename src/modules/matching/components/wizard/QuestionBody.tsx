@@ -77,7 +77,7 @@ export function QuestionBody({
           multiple
         />
       );
-    default: {
+    case "single": {
       const raw = answers[question.id as "focus" | "minExperienceYears"];
       const current = raw === undefined ? [] : [String(raw)];
       return (
@@ -96,6 +96,15 @@ export function QuestionBody({
           }
         />
       );
+    }
+    default: {
+      // ★ M-16 (REVIEW-2). `default:` used to re-narrow the discriminant with a cast and render `ChoiceChips`
+      // with `options ?? []`, so a sixth `kind` compiled silently and reached a parent as a blank, unanswerable
+      // question. This makes that addition a compile error — and, if one ever arrives at runtime from a version
+      // skew, renders nothing rather than something broken.
+      const exhaustive: never = question.kind;
+      void exhaustive;
+      return null;
     }
   }
 }

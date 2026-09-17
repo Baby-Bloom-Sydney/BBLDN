@@ -2,7 +2,7 @@
 // `INTERNAL { reason: 'payments-not-configured' }` until the inside is installed. `getAccess` fails closed too —
 // answering "no access" from nowhere would be indistinguishable from a real closed gate and would quietly lock a
 // paying family out, while answering "access" would open the product to anyone.
-import { err } from "@/modules/platform";
+import { createRegistry, err } from "@/modules/platform";
 import type { Registry } from "@/modules/platform";
 import type { PurchasePath } from "../types";
 
@@ -22,11 +22,5 @@ const unconfigured: PurchasePath = Object.freeze({
   prices: () => [],
 });
 
-const slot = { current: unconfigured };
-
-export const PAYMENTS_REGISTRY: Registry<PurchasePath> = Object.freeze({
-  get: () => slot.current,
-  set: (next: PurchasePath) => {
-    slot.current = next;
-  },
-});
+export const PAYMENTS_REGISTRY: Registry<PurchasePath> =
+  createRegistry<PurchasePath>(unconfigured);

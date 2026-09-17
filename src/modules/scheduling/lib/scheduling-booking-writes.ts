@@ -18,6 +18,8 @@ import type {
   ISO,
   Result,
   SlotId,
+  Subject,
+  UserId,
   Uuid,
 } from "@/modules/shared-types";
 import type {
@@ -45,6 +47,10 @@ import { subjectColumns } from "./subject-columns";
 
 const MINUTE_MS = 60_000;
 
+/** ADR-143 — a subject the caller supplied already carries its parent; a nanny subject has none. */
+const parentOfSubject = (subject: Subject): UserId | null =>
+  subject.kind === "position" ? subject.parentId : null;
+
 export function schedulingBookingWrites(
   context: SchedulingContext,
   calendarReads: CalendarReads,
@@ -67,7 +73,14 @@ export function schedulingBookingWrites(
       ...patch,
       status: to,
     });
-    return written.ok ? ok(bookingFromRow(written.value)) : written;
+    if (!written.ok) return written;
+    // ADR-143: the row just written is mapped with its parent joined from `nanny_positions`, never invented.
+    const parentId = await calendarReads.parentFor(written.value);
+    if (!parentId.ok) return parentId;
+    const booking = bookingFromRow(written.value, parentId.value);
+    return booking === null
+      ? schedulingFailure(undefined, "NOT_FOUND")
+      : ok(booking);
   };
 
   const hold = async (
@@ -103,7 +116,12 @@ export function schedulingBookingWrites(
       service,
     );
     if (!written.ok) return schedulingFailure(written.error);
-    const holdRow = bookingFromRow(written.value);
+    // The caller named the subject, so a position hold already carries its parent: no join, no invention.
+    const holdRow = bookingFromRow(
+      written.value,
+      parentOfSubject(held.subject),
+    );
+    if (holdRow === null) return schedulingFailure(undefined, "NOT_FOUND");
     schedulingEvents.held(actor, holdRow); // 03 §3.6
     return ok(holdRow.id as string as HoldId);
   };
@@ -147,9 +165,17 @@ export function schedulingBookingWrites(
     // failure this module cannot name is not one it may translate" (its own header). An unreadable answer is
     // exactly that, so it goes through the same door as every other provider fault.
     if (result === null) return schedulingFailure(undefined);
-    const booking = bookingFromRow(result.booking);
+    // The booked row's subject is the caller's own (ADR-143: no join needed where the parent is already named);
+    // the displaced row is always a nanny's call, which has no parent at all.
+    const booking = bookingFromRow(
+      result.booking,
+      parentOfSubject(input.subject),
+    );
+    if (booking === null) return schedulingFailure(undefined, "NOT_FOUND");
     const displaced =
-      result.displaced === null ? undefined : bookingFromRow(result.displaced);
+      result.displaced === null
+        ? undefined
+        : (bookingFromRow(result.displaced, null) ?? undefined);
     // 03 §3.6 / §3.5 seq 3. `book_slot()` answers with the row it moved, and which of the two events this is
     // depends on what happened to her: I-2 moved her (the row is `rescheduled` at a new time) or I-3 could not
     // and cancelled it. Without one of these a displaced nanny is never told, which is half of I-2.

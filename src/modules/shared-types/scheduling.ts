@@ -55,7 +55,14 @@ export type Booking = {
   readonly subject: Subject;
   readonly start: ISO;
   readonly end: ISO;
-  readonly bookedBy: Actor;
+  /**
+   * **ADR-143 — an absent booker is a contract state, not an empty id.** `null` means the booker's account has
+   * been deleted: `0009` declares `booked_by_user_id … on delete set null`, so 07 §6's account-deletion path
+   * leaves a real booking behind with nobody on it. The row's `booked_by_role` still says what kind of party
+   * booked, and a reader that renders the booker renders by that role ("a former team member" / "the family")
+   * rather than minting an id for nobody. A `system` row is never null — it is a named job.
+   */
+  readonly bookedBy: Actor | null;
   readonly bookedAt: ISO;
   readonly version: number;
   readonly rescheduledFrom?: ISO;

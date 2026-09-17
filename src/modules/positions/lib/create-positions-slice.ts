@@ -35,6 +35,7 @@ import type {
   PositionStore,
   PositionsSlice,
 } from "../types";
+import { CANCELLABLE_STAGES, connections } from "@/modules/connections";
 import { advance } from "./advance";
 import { POSITION_TRANSITIONS } from "./position-transitions";
 
@@ -359,11 +360,63 @@ async function cascade(
     idempotencyKey: `${input.idempotencyKey}:${transition}`,
     uow,
   });
-  if (result.ok)
-    return ok([
-      { entity: call, transition, stage: result.value.stage } as const,
-    ]);
-  return result.error.code === "NOT_FOUND" ? ok([]) : result;
+  const callCascade: StateAfter["cascaded"] = result.ok
+    ? [{ entity: call, transition, stage: result.value.stage } as const]
+    : [];
+  if (!result.ok && result.error.code !== "NOT_FOUND") return result;
+  if (input.transition !== "P-7") return ok(callCascade);
+  const connectionCascades = await closeLiveConnections(input, record, uow);
+  return connectionCascades.ok
+    ? ok([...callCascade, ...connectionCascades.value])
+    : connectionCascades;
+}
+
+/**
+ * **H-12 / 03 §2.4 — P-7's other cascade: K-24 onto every live connection.**
+ *
+ * `connections` was already built to receive it — `runCascades` takes a `fromPositionClose` flag documented as
+ * K-24's "and not from P-7", and it is true exactly when the acting job is `cascade`, which is the actor used
+ * here — but no caller could ever set it, because this file dispatched only C-4. The consequence shipped: an
+ * admin closed a position and every live connection on it stayed in a live stage, both parties still pointing
+ * at a closed position and `liveCountForPosition` still counting them.
+ *
+ * Only `CANCELLABLE_STAGES` are cascaded onto, which is K-24's own `from`: a `CONFIRMED` or `ACTIVE` connection
+ * is a hire in progress and ends through L-2. Dispatched through `advance` on the caller's `uow`, exactly as the
+ * call cascade is, so the whole close is one transaction — and **fail closed**: if the connection list cannot be
+ * read, the close refuses rather than reporting a fan-out it did not do.
+ */
+async function closeLiveConnections(
+  input: Input,
+  record: PositionRecord,
+  uow: UnitOfWork,
+): Promise<Result<StateAfter["cascaded"]>> {
+  const all = await connections.forParent(record.parentId);
+  if (!all.ok) return all;
+  const live = all.value.filter(
+    (row) =>
+      (row.positionId as string) === (record.positionId as string) &&
+      CANCELLABLE_STAGES.includes(row.stage),
+  );
+  const cascaded: Array<StateAfter["cascaded"][number]> = [];
+  for (const row of live) {
+    const entity = { kind: "connection" as const, id: row.connectionId };
+    const moved = await advance({
+      entity,
+      transition: "K-24",
+      actor: { kind: "system" as const, id: "cascade" as const },
+      payload: {},
+      expectedFrom: row.stage,
+      idempotencyKey: `${input.idempotencyKey}:K-24:${row.connectionId}`,
+      uow,
+    });
+    if (!moved.ok) return moved;
+    cascaded.push({
+      entity,
+      transition: "K-24" as TransitionId,
+      stage: moved.value.stage,
+    });
+  }
+  return ok(cascaded);
 }
 
 async function commit(

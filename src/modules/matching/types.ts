@@ -175,6 +175,13 @@ export type ParentLead = {
   readonly area: AreaRef | null;
   readonly source: string | null;
   readonly completed: boolean;
+  /**
+   * **ADR-145 (2)** — `converted_at is not null`: this lead has already become somebody's position. A `leadId`
+   * travels in wizard URLs and in form state, so holding one is not evidence that the answers belong to the
+   * holder; `onboarding-parent` refuses to convert a claimed lead a second time. 02 §4.7's
+   * `parent_leads_converted_together_check` is why one column answers for all three.
+   */
+  readonly claimed: boolean;
 };
 
 export type SaveLeadInput = {

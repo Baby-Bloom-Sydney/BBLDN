@@ -101,3 +101,31 @@ describe("platform — a service module is a leaf (01 §2.4; 03 §1 rule 3)", ()
       ).toBeLessThanOrEqual(800);
   });
 });
+
+// ── M-10 (REVIEW-2; REVIEW-1 H-3 unchanged and worse) — one registry, not nineteen ─────────────────────────
+//
+// `platform` shipped `createRegistry` and exported the `Registry<T>` **type** but not the factory, so every
+// module that needed a boot slot wrote the same five lines by hand. REVIEW-1 counted 13 copies; REVIEW-2 counted
+// 19. Each is a place the `set` semantics can drift, and drift in a boot slot is a module bound to the wrong
+// implementation with nothing to catch it.
+//
+// Two claims, both RED before the fix: the factory is on the connector, and nobody rolls their own slot.
+describe("the boot slot has one implementation (M-10)", () => {
+  const MODULES = resolve(MODULE_DIR, "..");
+  const OWNER = "platform/lib/create-registry.ts";
+
+  it("`createRegistry` is exported from the connector, not only its type", async () => {
+    const platform = await import("../index");
+    expect(typeof platform.createRegistry).toBe("function");
+  });
+
+  it("no module hand-rolls the slot", () => {
+    const offenders = listSourceFiles(MODULES)
+      .filter((file) =>
+        /const\s+slot\s*=\s*\{\s*current:/u.test(readFileSync(file, "utf8")),
+      )
+      .map((file) => relative(MODULES, file))
+      .filter((file) => file !== OWNER);
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+});

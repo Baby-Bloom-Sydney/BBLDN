@@ -17,6 +17,8 @@ import {
   registerSlice,
 } from "@/modules/positions";
 import type { PositionMatchDetail, PositionStore } from "@/modules/positions";
+import { configureConnections } from "@/modules/connections";
+import type { ConnectionSummary } from "@/modules/connections";
 import {
   configureEvents,
   configureUnitOfWork,
@@ -30,6 +32,7 @@ import {
 } from "@/modules/platform";
 import type {
   Actor,
+  ConnectionId,
   Email,
   Instant,
   NannyId,
@@ -80,6 +83,10 @@ let store: PositionStore;
 let inServiceArea: boolean;
 let callSliceRefuses: boolean;
 const cascadesSeen: string[] = [];
+/** H-12 — what the `connections` connector answers for this position, and whether it answers at all. */
+let connectionRows: ReadonlyArray<ConnectionSummary>;
+let connectionsRefuse: boolean;
+const k24Actors: Array<Actor> = [];
 
 /**
  * A stand-in for `call-layer`'s C rows, registered through the same seam the real slice uses. It exists so this
@@ -105,11 +112,56 @@ const fakeCallSlice = () =>
     },
   }));
 
+/**
+ * The K-row receiver, registered through the same seam `connections` uses at boot. It exists so this suite can
+ * prove what P-7 does to a connection **without** importing `connections`' slice — the arrow `positions` has is
+ * to the connector's reads, never to the slice (fix: A-2 / R2).
+ */
+const fakeConnectionSlice = () => [
+  {
+    id: "K-24" as const,
+    run: async (input: {
+      readonly entity: { readonly kind: string; readonly id: string };
+      readonly actor: Actor;
+    }) => {
+      cascadesSeen.push("K-24");
+      k24Actors.push(input.actor);
+      return ok({
+        entity: input.entity as never,
+        stage: "CANCELLED_BY_PARENT" as const,
+        version: 1,
+        changedAt: NOW,
+        cascaded: [],
+        events: [],
+      });
+    },
+  },
+];
+
 const wire = () => {
   store = memoryPositionStore();
   inServiceArea = true;
   callSliceRefuses = false;
+  connectionsRefuse = false;
   cascadesSeen.length = 0;
+  k24Actors.length = 0;
+  // Two live connections on the position by default, so P-7's K-24 fan-out has something to fan out to.
+  connectionRows = [
+    {
+      connectionId: "conn-1" as ConnectionId,
+      positionId: POSITION,
+      nannyId: NANNY,
+      stage: "REQUEST_SENT",
+      origin: "parent_request",
+    },
+    {
+      connectionId: "conn-2" as ConnectionId,
+      positionId: POSITION,
+      nannyId: NANNY,
+      stage: "INTRO_SCHEDULED",
+      origin: "parent_request",
+    },
+  ];
   registerPositionsSlice(
     createPositionsSlice({
       store,
@@ -118,6 +170,17 @@ const wire = () => {
     }),
   );
   registerSlice({ entity: "call", handlers: fakeCallSlice() });
+  registerSlice({ entity: "connection", handlers: fakeConnectionSlice() });
+  configureConnections({
+    liveNannyIdsForParent: async () => ok([]),
+    liveCountForPosition: async () => ok(connectionRows.length),
+    forParent: async () =>
+      connectionsRefuse
+        ? err("INTERNAL", "the connection list did not answer", {
+            reason: "connections-not-configured" as const,
+          })
+        : ok(connectionRows),
+  });
   configurePositions(createPositions({ store }));
 };
 
@@ -330,22 +393,65 @@ describe("P-7 — close, and the call it closes with it", () => {
     });
   });
 
-  it.fails(
-    "PINNED (03 §2.4 P-7 side effects — `1g` owns the K rows): closing cascades K-24 on every live connection",
-    async () => {
-      const result = await advance({
-        entity: { kind: "position", id: POSITION },
-        transition: "P-7",
-        actor: admin,
-        payload: { closeReason: "admin_closed" },
-        expectedFrom: "OPEN",
-        idempotencyKey: "close-4",
-      });
-      expect(
-        result.ok && result.value.cascaded.map((each) => each.transition),
-      ).toContain("K-24");
-    },
-  );
+  // H-12, closed. 03 §2.4's P-7 also cascades **K-24** onto every live connection, and `connections` was already
+  // built to receive it (`runCascades`'s `fromPositionClose`, which is true exactly when the actor is the
+  // `cascade` job) — but no caller could set it, because `positions` dispatched only C-4. Two halves of one
+  // seam, built by two units, never joined. The pin is flipped by joining them, not by changing the assertion.
+  it("closing cascades K-24 on every live connection (03 §2.4 P-7)", async () => {
+    const result = await advance({
+      entity: { kind: "position", id: POSITION },
+      transition: "P-7",
+      actor: admin,
+      payload: { closeReason: "admin_closed" },
+      expectedFrom: "OPEN",
+      idempotencyKey: "close-4",
+    });
+    expect(
+      result.ok && result.value.cascaded.map((each) => each.transition),
+    ).toContain("K-24");
+    // One per live connection, and the job is named so `connections` reads `fromPositionClose` as true and does
+    // not reopen the position it is being closed with (K-24's own "and not from P-7").
+    expect(cascadesSeen.filter((id) => id === "K-24")).toHaveLength(2);
+    expect(k24Actors.every((actor) => actor.id === "cascade")).toBe(true);
+  });
+
+  // A connection past `ACCEPTED` ends through L-2, never here: K-24's `from` is `CANCELLABLE`, which is
+  // `LIVE_STAGES` minus `CONFIRMED` and `ACTIVE` (`connection-transitions.ts`). Cascading onto one would be a
+  // refusal the close then had to swallow, which is how a silent half-move starts.
+  it("leaves a CONFIRMED connection alone — that one ends through L-2", async () => {
+    connectionRows = [
+      {
+        connectionId: "conn-confirmed" as ConnectionId,
+        positionId: POSITION,
+        nannyId: NANNY,
+        stage: "CONFIRMED",
+        origin: "parent_request",
+      },
+    ];
+    await advance({
+      entity: { kind: "position", id: POSITION },
+      transition: "P-7",
+      actor: admin,
+      payload: { closeReason: "admin_closed" },
+      expectedFrom: "OPEN",
+      idempotencyKey: "close-5",
+    });
+    expect(cascadesSeen).not.toContain("K-24");
+  });
+
+  // Fail closed: a close that cannot enumerate its connections has not cascaded, and must not say it has.
+  it("refuses the close when the connection list cannot be read", async () => {
+    connectionsRefuse = true;
+    const result = await advance({
+      entity: { kind: "position", id: POSITION },
+      transition: "P-7",
+      actor: admin,
+      payload: { closeReason: "admin_closed" },
+      expectedFrom: "OPEN",
+      idempotencyKey: "close-6",
+    });
+    expect(result.ok).toBe(false);
+  });
 });
 
 describe("the K-row cascades that arrive at a P row", () => {

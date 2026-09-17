@@ -18,6 +18,8 @@ export { memoryConnectionStore } from "./lib/memory-connection-store";
 export { connectionsSliceRegistration } from "./lib/register-connections-slice";
 export { CONNECTION_TRANSITIONS } from "./lib/connection-transitions";
 export { LIVE_STAGES } from "./lib/live-stages";
+/** H-12 — the stages K-24 may be cascaded onto; `positions` reads it so P-7 never fans out into a refusal. */
+export { CANCELLABLE_STAGES } from "./lib/cancellable-stages";
 
 // The reads `positions` calls (03 §7.5).
 export { connections } from "./lib/default-connections";

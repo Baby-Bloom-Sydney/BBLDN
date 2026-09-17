@@ -59,6 +59,9 @@ export function stubMatching(seed: StubMatchingSeed = {}): Matching {
         area: input.answers.area ?? null,
         source: input.source,
         completed: input.completed,
+        // A lead the stub has just saved has not been converted by anyone (ADR-145 (2)); a seeded `leadRows`
+        // fixture says so for itself.
+        claimed: false,
       });
       return ok(undefined);
     },

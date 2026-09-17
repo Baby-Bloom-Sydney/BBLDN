@@ -17,6 +17,11 @@ export { envelopeOf } from "./lib/envelope-of";
 export { toResponse } from "./lib/to-response";
 export { toActionResult } from "./lib/to-action-result";
 
+// The boot slot every module's `configure*` seam is built on (M-10). The **type** was exported and the factory
+// was not, so nineteen modules wrote the same five lines by hand — nineteen places the `set` semantics could
+// drift, in the one mechanism that decides which implementation a module is bound to.
+export { createRegistry } from "./lib/create-registry";
+
 // Clock + id minting (the one place a branded id is minted)
 export { nowInstant } from "./lib/now-instant";
 export { newId } from "./lib/new-id";

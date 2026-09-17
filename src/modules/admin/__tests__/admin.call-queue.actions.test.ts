@@ -12,7 +12,9 @@ import {
   createSchedulingStub,
 } from "@/modules/scheduling";
 import { ok } from "@/modules/platform";
-import type { Email } from "@/modules/shared-types";
+import { configurePositions, stubPositions } from "@/modules/positions";
+import type { Email, ParentId, PositionId } from "@/modules/shared-types";
+import type { PositionMatchDetail } from "@/modules/positions";
 import { recordCallOutcomeAction } from "../call-queue/actions/record-call-outcome-action";
 import { moveCallSlotAction } from "../call-queue/actions/move-call-slot-action";
 import { clearCallSlotAction } from "../call-queue/actions/clear-call-slot-action";
@@ -25,6 +27,23 @@ const lever = () => vi.fn(async () => ok({ kind: "call", state: {} }) as never);
 let levers: Record<string, ReturnType<typeof lever>>;
 
 const ADMIN_ID = "22222222-2222-4222-8222-222222222222";
+
+/** The shape `PositionForMatching` needs; nothing in these specs reads it. */
+const DETAIL: PositionMatchDetail = Object.freeze({
+  area: { area: "Islington", district: "N1" },
+  schedule: { type: "Fixed", blocks: [{ day: 0, part: "morning" }] } as const,
+  requirements: {
+    childAgeMonths: [{ min: 12, max: 24 }],
+    capacity: 1,
+    specialNeeds: false,
+    licence: false,
+    car: false,
+    vaccination: false,
+    nonSmoker: false,
+    pets: false,
+    roleType: "",
+  },
+});
 
 /** 07 §5.4 rows 1–2: an admin session, and one that passed a second factor. Anything less and the gate refuses. */
 const signedInAs = (role: "parent" | "admin", mfaVerified: boolean): void =>
@@ -61,6 +80,20 @@ beforeEach(() => {
     ...levers,
   } as never);
   configureScheduling(createSchedulingStub());
+  // ADR-145 (1): the action checks the position against the named parent before it books, so the suite needs a
+  // `positions` connector that answers. `pos-1` belongs to `parent-1` here, which is what every green case uses.
+  configurePositions(
+    stubPositions({
+      forMatching: {
+        positionId: "pos-1" as PositionId,
+        parentId: "parent-1" as ParentId,
+        stage: "OPEN",
+        district: "N1",
+        activeConnectionNannyIds: [],
+        detail: DETAIL,
+      },
+    }),
+  );
 });
 
 const POSITION_REF = {
@@ -174,6 +207,39 @@ describe("admin actions — authority is the session's, and the gate refuses fir
 
   it("refuses an admin who has not passed a second factor (07 §5.4 row 2)", async () => {
     signedInAs("admin", false);
+    const refused = await bookCallSlotAction({
+      positionId: "pos-1",
+      parentId: "parent-1",
+      slotId: "default:2026-01-09T10:00:00.000Z",
+    } as never);
+    expect(refused.ok).toBe(false);
+    expect(levers.chooseSlot).not.toHaveBeenCalled();
+  });
+});
+
+// ── ADR-145 (1) — caller-supplied ownership is verified, never trusted ─────────────────────────────────────
+//
+// REVIEW-2 M-3: `onBehalfOf`'s **presence** was required and its **membership** never was. This action takes a
+// caller-supplied `parentId` beside an independently caller-supplied `positionId` and passed both on with no
+// check that the two belong together. That is not privilege escalation — the caller is already an MFA'd admin —
+// but 07 §5.4 row 6 makes the audit subject the control, and a forgeable subject is not one.
+describe("booking on behalf verifies the position belongs to the named parent (ADR-145)", () => {
+  it("refuses E_SUBJECT_MISMATCH when the parent does not own the position, and never books", async () => {
+    const refused = await bookCallSlotAction({
+      positionId: "pos-1",
+      parentId: "someone-else",
+      slotId: "default:2026-01-09T10:00:00.000Z",
+    } as never);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) {
+      expect(refused.error.code).toBe("FORBIDDEN");
+      expect(refused.error.details?.reason).toBe("E_SUBJECT_MISMATCH");
+    }
+    expect(levers.chooseSlot).not.toHaveBeenCalled();
+  });
+
+  it("refuses rather than books when the position cannot be read at all", async () => {
+    configurePositions(stubPositions({}));
     const refused = await bookCallSlotAction({
       positionId: "pos-1",
       parentId: "parent-1",

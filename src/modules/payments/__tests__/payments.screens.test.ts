@@ -4,7 +4,7 @@
 // pinning here is the **wiring**, not the markup.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PRICES } from "@/modules/config";
 import type { Instant } from "@/modules/shared-types";
 import { moneyPageView } from "../lib/money-page-view";
@@ -99,7 +99,14 @@ describe("the routes are thin and land where they should (05 §7 rule 5)", () =>
 
   it("S-P-11 offers only the self-serve preset, and takes the shape from the form, never the amount", () => {
     const source = read("subscribe/page.tsx");
-    expect(source).toContain('option.preset === "self-serve-app"');
+    // ADR-144 moved the filter one file down, into `selfServeShapes()`, so an empty answer can be logged as an
+    // outage without putting that judgement in a route. The claim is unchanged; its home moved.
+    const lib = readFileSync(
+      resolve(__dirname, "../lib/self-serve-shapes.ts"),
+      "utf8",
+    );
+    expect(lib).toContain("one.preset === PRESET");
+    expect(lib).toContain('const PRESET = "self-serve-app"');
     // The form carries a shape and a count; an amount posted by a stranger would be an amount we charged.
     expect(source).not.toMatch(/get\("(amount|pence|total)"\)/u);
   });
@@ -151,5 +158,87 @@ describe("the two money actions are rate limited, and refuse when the limiter ca
     const { SECURITY } = await import("@/modules/config");
     expect(SECURITY.rateLimits.purchaseActions.key).toBe("user");
     expect(SECURITY.rateLimits.purchaseActions.perMinute).toBeGreaterThan(0);
+  });
+});
+
+// ── ADR-144 — an empty list of shapes is an outage, not an answer ──────────────────────────────────────────
+//
+// REVIEW-2 H-13: `prices()` is the one method on the unconfigured registry that is not a coded refusal — it
+// answers `[]`. That reached S-P-11 and `SelfServePage`'s `{shapes.length === 0 ? null : …}` rendered HTTP 200
+// with a correct-looking standing panel and **no way to pay**: no log, no alert, no 5xx, indistinguishable from
+// "we took the self-serve road away".
+//
+// ADR-144 keeps `prices()` synchronous and non-`Result` (03 §5.2 — the presets come from config, not from the
+// provider) and rules that the *page* treats `[]` as `E_PROVIDER`: it logs `ALERT_PROVIDER_DOWN` and renders the
+// payments-unavailable state. Both halves are pinned here, and both were RED first.
+describe("an empty shape list is an outage, not an answer (ADR-144)", () => {
+  it("logs ALERT_PROVIDER_DOWN when the registry answers nothing", async () => {
+    const { selfServeShapes } = await import("../lib/self-serve-shapes");
+    const { PAYMENTS_REGISTRY } = await import("../lib/payments-registry");
+    const { configureLog } = await import("@/modules/platform");
+    const before = PAYMENTS_REGISTRY.get();
+    const errors: Array<Record<string, unknown>> = [];
+    const out = vi.spyOn(console, "error").mockImplementation((line) => {
+      errors.push(JSON.parse(String(line)) as Record<string, unknown>);
+      return undefined;
+    });
+    configureLog({ format: "json", minLevel: "info" });
+    try {
+      PAYMENTS_REGISTRY.set({ ...before, prices: () => [] });
+      expect(selfServeShapes()).toEqual([]);
+      expect(errors.map((row) => row.alert)).toContain("ALERT_PROVIDER_DOWN");
+      expect(errors.map((row) => row.module)).toContain("payments");
+    } finally {
+      PAYMENTS_REGISTRY.set(before);
+      out.mockRestore();
+    }
+  });
+
+  it("says nothing at all when the presets are there", async () => {
+    const { selfServeShapes } = await import("../lib/self-serve-shapes");
+    const { PAYMENTS_REGISTRY } = await import("../lib/payments-registry");
+    const { presetPrices } = await import("../lib/preset-prices");
+    const { configureLog } = await import("@/modules/platform");
+    const before = PAYMENTS_REGISTRY.get();
+    const errors: Array<unknown> = [];
+    const out = vi.spyOn(console, "error").mockImplementation((line) => {
+      errors.push(line);
+      return undefined;
+    });
+    configureLog({ format: "json", minLevel: "info" });
+    try {
+      PAYMENTS_REGISTRY.set({ ...before, prices: presetPrices });
+      expect(selfServeShapes().length).toBeGreaterThan(0);
+      expect(errors).toEqual([]);
+    } finally {
+      PAYMENTS_REGISTRY.set(before);
+      out.mockRestore();
+    }
+  });
+
+  it("the screen renders the unavailable state rather than an empty pay page", async () => {
+    const { SelfServePage } = await import("../components/SelfServePage");
+    const { render } = await import("@testing-library/react");
+    const view = moneyPageView({
+      state: "lapsed",
+      lapsedAt: AT,
+      reason: "trial-ended",
+    });
+    // Called as a function, not through JSX: this suite is a `.ts` file and the component is a plain one.
+    const { container } = render(
+      SelfServePage({
+        view,
+        shapes: [],
+        chooseAction: async () => undefined,
+        refused: false,
+      }),
+    );
+    expect(container.querySelectorAll('[role="alert"]').length).toBe(1);
+    expect(container.textContent).toContain("Try again shortly");
+  });
+
+  it("the route hands the screen what `selfServeShapes` answered, and does not filter twice", () => {
+    const source = read("subscribe/page.tsx");
+    expect(source).toContain("selfServeShapes()");
   });
 });

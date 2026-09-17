@@ -4,7 +4,7 @@
 // for exactly that reason — but a **server action** has no deps object handed to it. So the same function boot
 // injects into the slice is also parked here, by the same `configureConnectionsSlice`-shaped seam every other
 // registry in this codebase uses: fails closed until boot sets it, and says so.
-import { err } from "@/modules/platform";
+import { createRegistry, err } from "@/modules/platform";
 import type { Registry } from "@/modules/platform";
 import type { AdvanceFn } from "../types";
 
@@ -14,11 +14,5 @@ const NOT_CONFIGURED: ReturnType<AdvanceFn> = Promise.resolve(
   }),
 );
 
-const slot = { current: (() => NOT_CONFIGURED) as AdvanceFn };
-
-export const CONNECTIONS_DISPATCH: Registry<AdvanceFn> = Object.freeze({
-  get: () => slot.current,
-  set: (next: AdvanceFn) => {
-    slot.current = next;
-  },
-});
+export const CONNECTIONS_DISPATCH: Registry<AdvanceFn> =
+  createRegistry<AdvanceFn>((() => NOT_CONFIGURED) as AdvanceFn);

@@ -179,4 +179,55 @@ describe("the security review's closed findings (H1 · M1 · M3)", () => {
 
     expect(made.ok).toBe(true);
   });
+
+  // ── M-6 (REVIEW-2) — the read side of the same rule ──────────────────────────────────────────────────────
+  //
+  // Security review M1 required `onBehalfOf` on mint and revoke; the **read** was left as `actor.kind ===
+  // "admin"`, and `invitesForChild` returns the full share URL — token and all — for any `childId`. Same class,
+  // left open on one side. RED first.
+  it("★ M-6 — a bare admin cannot read a child's live invite tokens either", async () => {
+    const { createChildLinking, memoryChildLinkingStore } =
+      await import("@/modules/app");
+    const CHILD = "33333333-3333-4333-8333-333333333333";
+    const PARENT = "44444444-4444-4444-8444-444444444444";
+    const NOW = "2026-09-17T09:00:00.000Z";
+    const inside = createChildLinking({
+      store: memoryChildLinkingStore({
+        children: [
+          {
+            id: CHILD,
+            parent_user_id: PARENT,
+            first_name: "Amara",
+            date_of_birth: "2025-01-15",
+            gender: null,
+            profile_image_id: null,
+            status: "active",
+            onboarded: true,
+            orphaned_at: null,
+            feed_locked_for_nanny: false,
+            feed_locked_at: null,
+            created_at: NOW,
+            updated_at: NOW,
+          } as never,
+        ],
+      }),
+      events: { emit: async () => ({ ok: true, value: undefined }) } as never,
+      now: () => NOW as never,
+      inviteBaseUrl: "https://example.test/invite",
+    });
+
+    const bare = await inside.invitesForChild(CHILD as never, {
+      kind: "admin",
+      id: "a1" as never,
+    });
+    expect(bare.ok).toBe(false);
+    if (!bare.ok) expect(bare.error.details?.reason).toBe("E_ACTOR_FORBIDDEN");
+
+    const named = await inside.invitesForChild(CHILD as never, {
+      kind: "admin",
+      id: "a1" as never,
+      onBehalfOf: { role: "parent", id: PARENT as never },
+    });
+    expect(named.ok).toBe(true);
+  });
 });

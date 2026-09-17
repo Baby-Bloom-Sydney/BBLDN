@@ -5,8 +5,9 @@
 //
 // **What it honours:** I-1 (no overlap) · I-5 (one calendar) · I-7 (window from config) · I-8 (hold TTL) ·
 // I-9 (status lattice) · I-10 (one active booking per subject) · I-11 (idempotent `book`) · I-12 (`due`
-// computed at read). **What it does not:** I-2 / I-3 / I-13, the parent-over-nanny displacement, which
-// returns `NOT_IMPLEMENTED` rather than a quiet `SLOT_TAKEN` — see the module README "Gaps".
+// computed at read) and — since REVIEW-2 §6.2 row 4 — **I-2 / I-3 / I-13, the parent-over-nanny displacement**,
+// with the same pure `nextFreeSlot` the real inside hands to `book_slot()` as `p_displace_to`, so the two
+// implementations 03 §11 row 2 swaps between agree about where a displaced nanny goes.
 import { SCHEDULING } from "@/modules/config";
 import { err, newId, nowInstant, ok } from "@/modules/platform";
 import type {
@@ -39,6 +40,7 @@ import type {
 } from "./types";
 import { canMoveStatus } from "./lib/status-lattice";
 import { generateSlots } from "./lib/generate-slots";
+import { nextFreeSlot } from "./lib/next-free-slot";
 
 const MINUTE_MS = 60_000;
 const DAY_MS = 86_400_000;
@@ -229,25 +231,103 @@ function bookSlot(
   )
     return fail("ALREADY_BOOKED", "There is already a call booked");
   const taken = occupant(snapshot, start);
-  if (taken !== undefined) {
-    if (taken.priority === "nanny" && priorityOf(input.kind) === "parent")
-      return err<SchedulingErrorDetails>(
-        "INTERNAL",
-        "Displacement is not built yet",
-        {
-          reason: "NOT_IMPLEMENTED",
-        },
-      );
+  const displacing =
+    taken !== undefined &&
+    taken.priority === "nanny" &&
+    priorityOf(input.kind) === "parent";
+  if (taken !== undefined && !displacing)
     return fail("SLOT_TAKEN", "That time has just been taken");
-  }
+  // I-13: at the cap her slot stops being displaceable at all — `availableSlots` already hides it, and a book
+  // that reached here anyway is refused rather than moving her a third time today.
+  if (
+    displacing &&
+    displacementsOn(snapshot, taken as Booking) >=
+      SCHEDULING.maxDisplacementsPerNannyPerDay
+  )
+    return fail("NOT_DISPLACEABLE", "That time cannot be taken");
+  const moved = displacing ? displace(holder, clock, taken as Booking) : null;
+  const after = moved === null ? snapshot : holder.current;
   const booking = newBooking(input, start, clock());
   holder.current = {
-    ...snapshot,
-    bookings: [...snapshot.bookings, booking],
-    holds: snapshot.holds.filter((hold) => hold.id !== input.holdId),
-    replays: { ...snapshot.replays, [input.idempotencyKey]: booking.id },
+    ...after,
+    bookings: [...after.bookings, booking],
+    holds: after.holds.filter((hold) => hold.id !== input.holdId),
+    replays: { ...after.replays, [input.idempotencyKey]: booking.id },
   };
-  return ok({ booking });
+  return ok(moved === null ? { booking } : { booking, displaced: moved });
+}
+
+/** How many times this nanny's call has already been moved on the day it sits on (I-13). */
+function displacementsOn(snapshot: Snapshot, hers: Booking): number {
+  const day = hers.start.slice(0, "YYYY-MM-DD".length);
+  return snapshot.bookings.filter(
+    (booking) =>
+      booking.priority === "nanny" &&
+      sameSubject(booking.subject, hers.subject) &&
+      booking.displacedFrom !== undefined &&
+      booking.displacedFrom.startsWith(day),
+  ).length;
+}
+
+/**
+ * **I-2 / I-3 — the parent-over-nanny displacement, in the stub.**
+ *
+ * It used to answer `NOT_IMPLEMENTED`, which left `call-layer`'s own suite pinning test scaffolding rather than
+ * a doc/code disagreement (REVIEW-2 §6.2 row 4). The real inside computes the target with `nextFreeSlot` and
+ * hands it to `book_slot()` as `p_displace_to` (`displace-to.ts`, ADR-127); this does the same arithmetic with
+ * the same pure function, so the two implementations 03 §11 row 2 swaps between agree about where she goes.
+ *
+ * I-2: she is **moved** to her next free start, `rescheduled`, carrying `displacedFrom`. I-3: if there is no
+ * free start at all, her call is cancelled `displaced-no-slot` and flagged. The parent succeeds either way,
+ * which is the invariant.
+ */
+function displace(
+  holder: Holder,
+  clock: () => ISO,
+  hers: Booking,
+): Booking | null {
+  const snapshot = holder.current;
+  const horizon = new Date(
+    Date.parse(hers.start) + SCHEDULING.horizonDays * DAY_MS,
+  ).toISOString() as ISO;
+  const free = generateSlots({
+    rules: snapshot.rules,
+    from: hers.start,
+    to: horizon,
+    slotMinutes: SCHEDULING.slotMinutes,
+  }).filter(
+    (slot) =>
+      slot.start !== hers.start &&
+      !withinBlock(snapshot.blocks, slot.start) &&
+      occupant(snapshot, slot.start) === undefined,
+  );
+  const target = nextFreeSlot(free, hers.start, new Set<string>());
+  const after: Booking =
+    target === null
+      ? {
+          ...hers,
+          status: "cancelled",
+          cancelReason: "displaced-no-slot",
+          displacedFrom: hers.start,
+          version: hers.version + 1,
+        }
+      : {
+          ...hers,
+          status: "rescheduled",
+          start: target.start,
+          end: new Date(
+            Date.parse(target.start) + SCHEDULING.slotMinutes * MINUTE_MS,
+          ).toISOString() as ISO,
+          displacedFrom: hers.start,
+          version: hers.version + 1,
+        };
+  holder.current = {
+    ...snapshot,
+    bookings: snapshot.bookings.map((booking) =>
+      booking.id === hers.id ? after : booking,
+    ),
+  };
+  return after;
 }
 
 function newBooking(input: BookInput, start: ISO, at: ISO): Booking {
