@@ -24,6 +24,14 @@ const OWNED_ROUTE_FILES = [
   "src/app/(public)/how-it-works/page.tsx",
   "src/app/(public)/pricing/page.tsx",
   "src/app/(public)/contact/page.tsx",
+  // `1c` — the signup screens (S-X-05 · S-X-06 · S-X-08 · S-X-09) and the `(auth)` group chrome.
+  "src/app/(auth)/layout.tsx",
+  "src/app/(auth)/signup/page.tsx",
+  "src/app/(auth)/signup/parent/page.tsx",
+  "src/app/(auth)/login/page.tsx",
+  "src/app/(auth)/forgot-password/page.tsx",
+  "src/app/(auth)/reset-password/page.tsx",
+  "src/app/(funnel)/matchmaking/signup/page.tsx",
 ];
 
 function listFiles(dir: string): string[] {
