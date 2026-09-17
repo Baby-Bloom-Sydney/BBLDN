@@ -1,12 +1,15 @@
 // The `SpineStore` over `auth`'s data port (01 §6.3; 03 §1.4). Every operation is a `NamedOperation` so the port
 // logs and scopes it; nothing here throws across the seam — the port turns a driver throw into `INTERNAL`.
 //
-// **The keyed-read gap, named (P1-WIRE decision 4; 03 §1.4).** `TableQuery` is `select(columns?)` · `insert` ·
-// `update(id)` — no predicate. So "this family's row" under the **service** role is a column-restricted read of
-// the spine table filtered in memory, and the sweeps are the same read once per run. Session-scoped reads are
-// RLS-bounded to the caller's own row and are not a scan. At launch scale (a few hundred families) this is a
-// small table read once per webhook and once per cron; it is recorded in the L-007 1h entry with its owner
-// (a predicate on `TableQuery`, or a `parent_subscriptions_by_parent` RPC) so nobody mistakes it for an index.
+// **Every by-id read is a keyed read (ADR-131 (1), S5b).** `from(name).eq(column, value).single()` is the whole
+// road: one row over the wire, the predicate in Postgres, and `single()` refusing at the seam when two rows
+// match — which on a money table is the difference between "this family's standing" and "some family's
+// standing". The earlier draft of this file scanned `parent_subscriptions` and filtered in memory because the
+// port had no predicate; that landmine is gone and must not come back. The one remaining whole-table read is
+// `listSpine`, which the sweeps genuinely want (every row, once per run).
+//
+// **Scope, per operation.** Parent-facing reads run `session` so RLS bounds them to the caller's own row; the
+// webhook, the sweeps and the three RPCs run `service` — the caller is the provider or a cron, not a session.
 import type { DataAccessPort } from "@/modules/auth";
 import { ok } from "@/modules/platform";
 import type { Email, FamilyId, Instant, Uuid } from "@/modules/shared-types";
@@ -14,11 +17,6 @@ import { isDuplicateKeyError } from "./is-duplicate-key-error";
 import type { SpineRow, SpineStore } from "./spine-store";
 
 const EVENT_UNIQUE = "payment_events_provider_event_key";
-
-const byFamily =
-  (familyId: FamilyId) =>
-  (row: SpineRow): boolean =>
-    row.parent_user_id === familyId;
 
 function reads(
   port: DataAccessPort,
@@ -31,10 +29,11 @@ function reads(
       port.run(
         {
           name: "payments.readByFamily",
-          exec: async (q) =>
-            (await q.from("parent_subscriptions").select()).find(
-              byFamily(familyId),
-            ) ?? null,
+          exec: (q) =>
+            q
+              .from("parent_subscriptions")
+              .eq("parent_user_id", familyId)
+              .single(),
         },
         { scope },
       ),
@@ -51,12 +50,11 @@ function reads(
         {
           name: "payments.familyContact",
           exec: async (q) => {
-            const row = (
-              await q
-                .from("user_profiles")
-                .select(["user_id", "email", "first_name"])
-            ).find((r) => r.user_id === familyId);
-            return row === undefined
+            const row = await q
+              .from("user_profiles")
+              .eq("user_id", familyId)
+              .single();
+            return row === null
               ? null
               : {
                   userId: row.user_id as Uuid,
@@ -72,12 +70,11 @@ function reads(
         {
           name: "payments.placementTerms",
           exec: async (q) => {
-            const row = (
-              await q
-                .from("nanny_placements")
-                .select(["id", "weekly_hours", "hourly_rate_pence"])
-            ).find((r) => r.id === placementId);
-            return row === undefined
+            const row = await q
+              .from("nanny_placements")
+              .eq("id", placementId)
+              .single();
+            return row === null
               ? null
               : {
                   weeklyHours: row.weekly_hours,

@@ -11,6 +11,8 @@ export const PRICES = Object.freeze({
   trialDays: 30, // self-serve only (ADR-090 / 093)
   satisfactionWindowDays: 30, // G2 / G3 window from the nanny's first day (ADR-088 / 090)
   accessAgeYears: 3, // access until the child turns 3, all future children (ADR-083 / 084)
+  trialReminderDaysBefore: 5, // the T-5 trial-reminder cue (03 §5.4.4 "T-5 London") — the operator calls, the
+  // email does not sell; the day count had no key and a literal in a job is exactly what L4 forbids
   linkTtlDays: 30, // @pending:B-02 (default running now)
   pastDueGraceDays: 7, // @pending:B-02 (default running now)
   /** The four link / checkout presets (02 `payment_link_kind` + `price_preset`; HANDOFF §5.2). `null` = per family. */

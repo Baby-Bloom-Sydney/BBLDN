@@ -8,4 +8,15 @@ export type * from "./types";
 // `INTERNAL { reason: 'payments-not-configured' }` — never a silent success.
 export { payments } from "./lib/default-payments";
 export { configurePayments } from "./lib/configure-payments";
+export { createPayments } from "./lib/create-payments";
 export { stubPayments } from "./payments.stub";
+
+// The five scheduled jobs beside the purchase methods (01 §4f). Same inside, same store, its own binding — a
+// cron runs under the service role on a schedule, a purchase method under a session on a request.
+export { paymentsJobs } from "./lib/default-payments-jobs";
+export { configurePaymentsJobs } from "./lib/configure-payments-jobs";
+export { createPaymentsJobs } from "./lib/create-payments-jobs";
+
+// The two stores the boot file chooses between (03 §11 row 4: swap either half).
+export { dbSpineStore } from "./lib/db-spine-store";
+export { memorySpineStore } from "./lib/memory-spine-store";
