@@ -20,8 +20,8 @@ import { ParentJourneyRail, loadParentJourney } from "@/modules/call-layer";
 import { accessGate } from "@/modules/access-gate";
 import { ChildrenCard, loadChildrenCard } from "@/modules/app";
 import { auth } from "@/modules/auth";
-import type { FamilyId } from "@/modules/shared-types";
 import { appRailFacts } from "./app-rail-facts";
+import { familyRead } from "./family-read";
 
 const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
@@ -49,11 +49,23 @@ export default async function ParentHubPage({
   // The gate, once. `hasAccess` fails closed by carrying `payments`' error rather than defaulting to
   // `open: false` (`1h`), so a refusal here becomes `null` — "we could not tell" — and the card renders the
   // outage state rather than a paywall. Flattening the two would bill a paying family for a database blip.
-  const signedInUserId = await auth.getCurrentUserId();
-  const familyId =
-    signedInUserId.ok && signedInUserId.value !== null
-      ? (signedInUserId.value as string as FamilyId)
-      : null;
+  // ★ M-15 (REVIEW-2): a failed session read used to fold into the same `null` as a signed-out visitor, skip
+  // the gate and render the logged-out page with no log. `familyRead` keeps the three answers apart.
+  const session = familyRead(await auth.getCurrentUserId());
+  if (session.kind === "unavailable")
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="flex items-center gap-3 py-6">
+            <AlertCircle className="h-5 w-5 text-amber-500" />
+            <p className="text-amber-700">
+              We can&rsquo;t load your app just now. Try again shortly.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  const familyId = session.kind === "family" ? session.familyId : null;
   const gate = familyId === null ? null : await accessGate.hasAccess(familyId);
   const access = gate !== null && gate.ok ? gate.value : null;
 

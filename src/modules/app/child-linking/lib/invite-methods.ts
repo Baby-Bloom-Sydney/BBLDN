@@ -55,8 +55,13 @@ export function inviteMethods(
           "We can't find that child.",
         );
       const id = actingUserId(actor);
+      // ★ M-6 (REVIEW-2). Security review M1 put `actor.onBehalfOf !== undefined` on mint and revoke
+      // (`invite-authorisation.ts`) and left the **read** as "any admin" — and this read answers with the full
+      // share URL, token included, for any `childId`. Same class, and an un-attributable read of a live token
+      // is the one thing the token's stability (no expiry, no rotation — 02 §4.6) cannot absorb. An admin acts
+      // on behalf of a named person or not at all (03 §2.5).
       const mine =
-        actor.kind === "admin" ||
+        (actor.kind === "admin" && actor.onBehalfOf !== undefined) ||
         (id !== null && child.value.parent_user_id === id);
       if (!mine)
         return failChildLinking(

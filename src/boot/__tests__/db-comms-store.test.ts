@@ -100,7 +100,8 @@ describe("dbCommsStore — email_logs", () => {
   });
 
   it("settle updates the row by id: sent carries provider id + sent_at, failed stamps failed_at from the clock", async () => {
-    const fake = fakeDataPort();
+    // M-13: the row has to be there now — a settle against a message that does not exist is a refusal.
+    const fake = fakeDataPort({ email_logs: [logRow({})] });
     const store = dbCommsStore(fake.port, clock);
     await store.settle(MESSAGE_ID, {
       status: "sent",
@@ -236,5 +237,23 @@ describe("dbCommsStore — inbox_messages", () => {
     const uow = {} as never;
     await dbCommsStore(fake.port, clock).createInboxMessage(message, { uow });
     expect(fake.calls[0]?.uow).toBe(uow);
+  });
+});
+
+// ── M-13 (REVIEW-2) — a settle that matched nothing is not a settle ────────────────────────────────────────
+//
+// `settle` discarded the update's result, so a patch matching zero rows was indistinguishable from one that
+// matched and `comms` was told `ok`. The consequence is quiet: a provider callback for a message id we do not
+// hold reports success, and the send's real state is never written anywhere. RED first.
+describe("dbCommsStore — settle refuses an unknown message (M-13)", () => {
+  it("answers the documented not-found refusal, and writes nothing", async () => {
+    const fake = fakeDataPort({ email_logs: [] });
+    const settled = await dbCommsStore(fake.port, clock).settle(MESSAGE_ID, {
+      status: "failed",
+    });
+    expect(settled.ok).toBe(false);
+    if (!settled.ok)
+      expect(settled.error.details?.reason).toBe("unknown-message");
+    expect(fake.updated).toEqual([]);
   });
 });

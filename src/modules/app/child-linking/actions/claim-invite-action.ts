@@ -21,6 +21,7 @@ import { redirect } from "next/navigation";
 import { appActor } from "../lib/app-actor";
 import { consumeInviteLookupLimit } from "../lib/consume-invite-lookup-limit";
 import { inviteLookupKey } from "../lib/invite-lookup-key";
+import { normaliseInviteToken } from "../lib/normalise-invite-token";
 import { childLinking } from "../lib/default-child-linking";
 
 /** One sentence for every throttled or unavailable outcome: it must reveal nothing the guess was after. */
@@ -32,7 +33,19 @@ export async function claimInviteAction(
 ): Promise<{ readonly error: string | null }> {
   const token = String(form.get("token") ?? "");
   const actor = await appActor();
-  if (actor === null) redirect(`/login?redirect=/invite/connect/${token}`);
+  // ★ M-7 (REVIEW-2). This spliced the **raw form string** into the URL; `normaliseInviteToken` runs later,
+  // inside `claimInvite`, so a value carrying `?`, `#` or `&` reshaped the very parameter the login screen's
+  // `safeNextPath` then consumes. Normalise first — 02 §4.6's `XXXX-XXXX` is the only shape that can ever be
+  // looked up — then encode, as the sibling `post-signup-destination.ts` already does. A string that is not a
+  // token is not carried at all: there is nothing to come back to.
+  if (actor === null) {
+    const clean = normaliseInviteToken(token);
+    redirect(
+      clean === null
+        ? "/login"
+        : `/login?redirect=${encodeURIComponent(`/invite/connect/${clean}`)}`,
+    );
+  }
 
   const forwardedFor = headers().get("x-forwarded-for");
   const [rateKey, missKey] = await Promise.all([
