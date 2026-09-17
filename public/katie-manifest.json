@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-09-17T22:51:27.531Z",
+  "generated_at": "2026-09-17T23:21:01.803Z",
   "summary": {
     "route_count": 59,
     "page_count": 88,
     "cron_count": 23,
-    "migration_count": 21,
+    "migration_count": 22,
     "server_action_file_count": 41
   },
   "routes": [
@@ -531,10 +531,6 @@
       "file": "src/app/(public)/nannies/page.tsx"
     },
     {
-      "path": "/nanny/apply",
-      "file": "src/app/(public)/nanny/apply/page.tsx"
-    },
-    {
       "path": "/",
       "file": "src/app/(public)/page.tsx"
     },
@@ -633,6 +629,10 @@
     {
       "path": "/invite/connect/[token]",
       "file": "src/app/invite/connect/[token]/page.tsx"
+    },
+    {
+      "path": "/nanny/apply",
+      "file": "src/app/nanny/apply/page.tsx"
     },
     {
       "path": "/nanny/dashboard",
@@ -976,8 +976,13 @@
     },
     {
       "filename": "0020_lead-email-ignored-outcome.sql",
-      "bytes": 16983,
-      "modified_at": "2026-09-17T21:56:28.687Z"
+      "bytes": 18845,
+      "modified_at": "2026-09-17T22:57:10.093Z"
+    },
+    {
+      "filename": "0021_nanny-onboarding.sql",
+      "bytes": 15926,
+      "modified_at": "2026-09-17T23:18:16.809Z"
     }
   ],
   "server_actions": [
