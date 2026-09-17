@@ -2,7 +2,7 @@
 // installs the inside — and this one is the most important fail-closed default in the fan-out: every method here
 // moves a real family's or nanny's stage. The inside is not written in this unit because it must begin with
 // `auth.requireRole('admin')` + `mfaVerified` (07 §5.4 row 2), which is a security-reviewed surface.
-import { err } from "@/modules/platform";
+import { createRegistry, err } from "@/modules/platform";
 import type { Registry } from "@/modules/platform";
 import type { AdminOnBehalf } from "../types";
 
@@ -21,11 +21,5 @@ const unconfigured: AdminOnBehalf = Object.freeze({
   autofire: async () => NOT_CONFIGURED,
 });
 
-const slot = { current: unconfigured };
-
-export const ADMIN_ON_BEHALF_REGISTRY: Registry<AdminOnBehalf> = Object.freeze({
-  get: () => slot.current,
-  set: (next: AdminOnBehalf) => {
-    slot.current = next;
-  },
-});
+export const ADMIN_ON_BEHALF_REGISTRY: Registry<AdminOnBehalf> =
+  createRegistry<AdminOnBehalf>(unconfigured);

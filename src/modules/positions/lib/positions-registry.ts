@@ -5,7 +5,7 @@
 //
 // `listAllowed` has no `Result` in the contract (03 §2.5 returns the ids directly), so unconfigured it returns
 // no levers — a button that is absent, never a button that moves a stage nothing is behind.
-import { err } from "@/modules/platform";
+import { createRegistry, err } from "@/modules/platform";
 import type { Registry } from "@/modules/platform";
 import type { PositionsReads } from "../types";
 
@@ -23,11 +23,5 @@ const unconfigured: PositionsReads = Object.freeze({
   findLive: async () => NOT_CONFIGURED,
 });
 
-const slot = { current: unconfigured };
-
-export const POSITIONS_REGISTRY: Registry<PositionsReads> = Object.freeze({
-  get: () => slot.current,
-  set: (next: PositionsReads) => {
-    slot.current = next;
-  },
-});
+export const POSITIONS_REGISTRY: Registry<PositionsReads> =
+  createRegistry<PositionsReads>(unconfigured);

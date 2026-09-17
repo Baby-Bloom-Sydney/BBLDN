@@ -2,7 +2,7 @@
 // is what bounds a family's access (ADR-083 / 084), so answering "no children" from nowhere would silently
 // unbound every family's grant — and a write that quietly did nothing would leave a family looking at a share
 // link that exists on no row.
-import { err } from "@/modules/platform";
+import { createRegistry, err } from "@/modules/platform";
 import type { Registry } from "@/modules/platform";
 import type { ChildLinking } from "../types";
 
@@ -32,11 +32,5 @@ const unconfigured: ChildLinking = Object.freeze({
   claimInvite: refuse,
 });
 
-const slot = { current: unconfigured };
-
-export const CHILD_LINKING_REGISTRY: Registry<ChildLinking> = Object.freeze({
-  get: () => slot.current,
-  set: (next: ChildLinking) => {
-    slot.current = next;
-  },
-});
+export const CHILD_LINKING_REGISTRY: Registry<ChildLinking> =
+  createRegistry<ChildLinking>(unconfigured);
