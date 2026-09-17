@@ -6,6 +6,7 @@
 //
 // Order is load-bearing twice over: `scoring` before `matching`, because `matching` is the engine's only caller
 // (03 §7.2), and `call-layer` after `scheduling` and `comms`, because its orchestrator holds both.
+import { URLS } from "@/modules/config";
 import type { ParsedEnv } from "@/modules/config";
 import type { BootReport } from "./types";
 import { wireAreas } from "./wire-areas";
@@ -16,6 +17,8 @@ import { wireConsent } from "./wire-consent";
 import { wireEvents } from "./wire-events";
 import { wireMatching } from "./wire-matching";
 import { wireParentProfileStore } from "./wire-parent-profile-store";
+import { wirePayments } from "./wire-payments";
+import { wirePurchaseProvider } from "./wire-purchase-paths";
 import { wireRateLimiter } from "./wire-rate-limiter";
 import { wireScheduling } from "./wire-scheduling";
 import { wireScoring } from "./wire-scoring";
@@ -36,5 +39,14 @@ export function wirePorts(env: ParsedEnv): BootReport {
     wireMatching(),
     wireCallLayer(env.environment),
     wireParentProfileStore(),
+    // `purchase-paths` before `payments` for readability only — `payments` holds the module-level provider
+    // binding, not a provider object, so an unconfigured provider is a fail-closed `Result` at call time.
+    wirePurchaseProvider(
+      env.server.PURCHASE_PROVIDER,
+      env.environment,
+      env.server.STUB_EVENT_SECRET,
+      URLS.app,
+    ),
+    wirePayments(),
   ]);
 }

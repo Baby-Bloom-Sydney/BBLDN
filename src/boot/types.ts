@@ -14,7 +14,9 @@ export type BootPort =
   | "scoring"
   | "matching"
   | "call-layer"
-  | "parent-profile";
+  | "parent-profile"
+  | "purchase-paths"
+  | "payments";
 
 export type PortWiring = {
   readonly port: BootPort;
