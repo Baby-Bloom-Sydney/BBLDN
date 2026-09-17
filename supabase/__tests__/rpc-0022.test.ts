@@ -396,6 +396,72 @@ describe("submit_verification_evidence() — the one write per submission (ADR-1
   });
 });
 
+describe("submit_verification_evidence() — the database-reviewer closures (H2 / H3 / M3) and the selfie rule", () => {
+  let nannyId: string;
+  beforeEach(async () => {
+    nannyId = await makeNanny(NANNY, "amara-review-0022@example.test");
+  });
+
+  it("M3: an evidence type submitted under the wrong section is refused (22023)", async () => {
+    await expect(
+      submit(NANNY, EVIDENCE_1, "identity", "dbs-certificate", {}),
+    ).rejects.toMatchObject({ code: "22023" });
+    await expect(
+      submit(NANNY, EVIDENCE_1, "dbs", "selfie", {}),
+    ).rejects.toMatchObject({ code: "22023" });
+  });
+
+  it("the selfie is a second submission under identity and not a second attempt", async () => {
+    const consentId = await giveBiometricConsent(NANNY);
+    await submit(
+      NANNY,
+      EVIDENCE_1,
+      "identity",
+      "identity-document",
+      identityColumns(consentId),
+    );
+    await submit(NANNY, EVIDENCE_2, "identity", "selfie", {
+      identity_selfie_ref: `${NANNY}/identity-selfie/selfie-2.jpg`,
+      biometric_consent_id: consentId,
+    });
+    const row = await verificationRow(nannyId);
+    expect(row.identity_attempts).toBe(1);
+    expect(row.identity_selfie_ref).toBe(
+      `${NANNY}/identity-selfie/selfie-2.jpg`,
+    );
+    const { rows } = await db.query<{ evidence_type: string }>(
+      "select evidence_type from public.vetting_submissions where verification_id = $1 order by submitted_at",
+      [row.id],
+    );
+    expect(rows.map((r) => r.evidence_type)).toEqual([
+      "identity-document",
+      "selfie",
+    ]);
+  });
+
+  it("H3: a check result for an older attempt of the same evidence type is refused as STALE_SUBMISSION", async () => {
+    const first = await submit(NANNY, EVIDENCE_1, "dbs", "dbs-certificate", {
+      dbs_certificate_ref: `${NANNY}/dbs-certificate/one.pdf`,
+    });
+    // a second attempt while the first is still pending (the wizard refuses this itself; the database must too)
+    await db.query(
+      "update public.vetting_submissions set submitted_at = submitted_at - interval '1 minute' where id = $1",
+      [first.submission_id],
+    );
+    await submit(NANNY, EVIDENCE_2, "dbs", "dbs-certificate", {
+      dbs_certificate_ref: `${NANNY}/dbs-certificate/two.pdf`,
+    });
+    await expect(
+      asService(
+        `select public.apply_vetting_check_result($1::uuid, 'verified', null, null, null, 'admin', null)`,
+        [first.submission_id],
+      ),
+    ).rejects.toMatchObject({ code: "55006" });
+    const row = await verificationRow(nannyId);
+    expect(row.dbs_status).toBe("pending");
+  });
+});
+
 describe("save_verification_contact() — contact 'saved' is the verified value with its stamp (ADR-154 (3))", () => {
   it("stamps the row (creating it if absent) once the contact values exist on user_profiles", async () => {
     const nannyId = await makeNanny(NANNY, "amara-contact-0022@example.test");

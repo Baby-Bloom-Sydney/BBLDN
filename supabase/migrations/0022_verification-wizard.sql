@@ -27,18 +27,30 @@
 --
 -- WHAT IS DELIBERATELY NOT HERE (2c's).
 --   `level` and `level_changed_at` (`deriveLevel` → `syncNannyVerificationState`, the single writer of
---   `nannies.verification_level`), `dbs_outcome`, the cross-check and the Update Service columns, the admin
---   `record`, the stale-`processing` sweep and the expiry sweep. Nothing below writes any of them; the verify
---   block asserts the level is untouched by every function here.
+--   `nannies.verification_level`), `dbs_outcome`, the cross-check, and the sweep-owned Update Service columns
+--   (`dbs_update_service_subscribed · _last_checked_at · _last_result · _checked_by`) — the one Update Service
+--   column written here is `dbs_update_service_consent_at`, the nanny's OWN consent stamp (04 §4.1 row 11), which
+--   is a submission column, not a check result (database-reviewer M2). The admin `record`, the stale-`processing`
+--   sweep and the expiry sweep are 2c's too. The verify block asserts none of the sweep-owned columns and none of
+--   the level columns is named by any function here.
 
 -- ---------------------------------------------------------------------------
 -- 1. `vetting_submissions.evidence_id` — the idempotency key (03 §4.2 "same evidenceId twice → the existing
---    Submission"; 07 §4.20). The table is empty in every environment; the backfill is there so the NOT NULL
---    cannot fail on a database this migration meets with rows in it.
+--    Submission"; 07 §4.20). The table is empty in every environment; a row without the key is refused
+--    rather than backfilled.
 -- ---------------------------------------------------------------------------
 
 alter table public.vetting_submissions add column if not exists evidence_id uuid;
-update public.vetting_submissions set evidence_id = gen_random_uuid() where evidence_id is null;
+-- database-reviewer M1: the premise is asserted, not assumed. A row that exists with no evidence id is a
+-- submission this migration cannot attribute; minting one would mask a duplicate rather than surface it
+-- (0017's own rule for its consent backfill).
+do $$
+begin
+  if exists (select 1 from public.vetting_submissions s where s.evidence_id is null limit 1) then
+    raise exception '0022: vetting_submissions carries rows with no evidence_id; attribute them by hand before applying (03 §4.2)';
+  end if;
+end
+$$;
 alter table public.vetting_submissions alter column evidence_id set not null;
 create unique index if not exists vetting_submissions_evidence_id_key
   on public.vetting_submissions (evidence_id);
@@ -126,6 +138,18 @@ begin
       using errcode = '22023';
   end if;
 
+  -- database-reviewer M3: the evidence type belongs to the section it is submitted under (03 §4.2 / 03 §4.3's
+  -- four submit calls); 0008's CHECK knows the flat set only.
+  if not (
+    (p_section = 'identity'      and p_evidence_type in ('identity-document', 'selfie'))
+    or (p_section = 'dbs'        and p_evidence_type in ('dbs-certificate', 'dbs-update-service'))
+    or (p_section = 'right_to_work' and p_evidence_type in
+          ('right-to-work-passport', 'right-to-work-share-code', 'right-to-work-document'))
+  ) then
+    raise exception 'submit_verification_evidence: % is not %-section evidence (03 §4.2)',
+      p_evidence_type, p_section using errcode = '22023';
+  end if;
+
   select n.id into v_nanny_id from public.nannies n where n.user_id = v_user_id;
   if v_nanny_id is null then
     raise exception 'submit_verification_evidence: no nannies row for this session (02 §4.2)'
@@ -185,11 +209,31 @@ begin
     end if;
   end if;
 
+  -- database-reviewer H2: the select above is a fast path, not the guarantee. Two retries of the same evidence
+  -- id can both pass it; ON CONFLICT DO NOTHING makes the loser block on the winner's row, write nothing, and
+  -- answer the committed submission (0019's create_child_invite idiom).
   insert into public.vetting_submissions
     (verification_id, nanny_id, evidence_id, section, evidence_type, provider_key, status)
   values
     (v_row.id, v_nanny_id, p_evidence_id, p_section, p_evidence_type, p_provider_key, p_status)
+  on conflict (evidence_id) do nothing
   returning id into v_submission_id;
+
+  if v_submission_id is null then
+    select * into v_existing from public.vetting_submissions s where s.evidence_id = p_evidence_id;
+    if not found then
+      raise exception 'SUBMISSION_RACE' using errcode = 'serialization_failure';
+    end if;
+    if v_existing.nanny_id <> v_nanny_id then
+      raise exception 'submit_verification_evidence: evidence belongs to another nanny (07 §4)'
+        using errcode = '42501';
+    end if;
+    return jsonb_build_object(
+      'submission_id', v_existing.id,
+      'verification_id', v_existing.verification_id,
+      'existing', true
+    );
+  end if;
 
   update public.verifications v
      set identity_evidence_type = v_new.identity_evidence_type,
@@ -208,7 +252,9 @@ begin
          rtw_document_ref       = v_new.rtw_document_ref,
          identity_status        = case when p_section = 'identity'      then 'pending'::public.section_status else v.identity_status end,
          identity_status_at     = case when p_section = 'identity'      then now() else v.identity_status_at end,
-         identity_attempts      = case when p_section = 'identity'      then v.identity_attempts + 1 else v.identity_attempts end,
+         -- one attempt = one document; the selfie that travels with it (03 §4.3 "identity-document + selfie") is
+         -- not a second attempt
+         identity_attempts      = case when p_evidence_type = 'identity-document' then v.identity_attempts + 1 else v.identity_attempts end,
          dbs_status             = case when p_section = 'dbs'           then 'pending'::public.section_status else v.dbs_status end,
          dbs_status_at          = case when p_section = 'dbs'           then now() else v.dbs_status_at end,
          rtw_status             = case when p_section = 'right_to_work' then 'pending'::public.section_status else v.rtw_status end,
@@ -378,6 +424,19 @@ begin
         using errcode = '22023';
   end case;
 
+  -- database-reviewer H3: 0008 says the LATEST row per (verification, section) is the section's provider state.
+  -- A check result for an older attempt must not overwrite a newer one; identity carries a document row and a
+  -- selfie row per attempt, so recency is judged within the evidence type.
+  if exists (
+    select 1 from public.vetting_submissions later
+    where later.verification_id = v_sub.verification_id
+      and later.section = v_sub.section
+      and later.evidence_type = v_sub.evidence_type
+      and later.submitted_at > v_sub.submitted_at
+  ) then
+    raise exception 'STALE_SUBMISSION' using errcode = '55006';
+  end if;
+
   v_guidance := case when p_guidance_key is null then null else jsonb_build_object('key', p_guidance_key) end;
 
   update public.vetting_submissions s
@@ -403,7 +462,8 @@ begin
            identity_extracted        = coalesce(p_extracted, v.identity_extracted),
            identity_rejection_reason = p_reject_reason,
            identity_user_guidance    = v_guidance,
-           identity_document_expiry  = coalesce(p_expires_at::date, v.identity_document_expiry)
+           -- the document's expiry is a calendar date; taken in UTC so the session's zone cannot move it (L2)
+           identity_document_expiry  = coalesce((p_expires_at at time zone 'UTC')::date, v.identity_document_expiry)
      where v.id = v_sub.verification_id;
   elsif v_sub.section = 'dbs' then
     update public.verifications v
@@ -483,15 +543,24 @@ begin
          where n.nspname = 'public' and p.proname = v_fn) <> 1 then
       raise exception '0022: public.%() must have exactly one overload', v_fn;
     end if;
+    -- the exact value, not a wildcard (database-reviewer H1): `search_path=public` would pass a LIKE
     if not exists (
       select 1 from pg_proc p where p.oid = v_oid
         and (p.prosecdef or v_fn = 'verification_submission_columns')
-        and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
+        and p.proconfig is not null and 'search_path=""' = any(p.proconfig)
     ) then
-      raise exception '0022: public.%() must be SECURITY DEFINER with search_path pinned', v_fn;
+      raise exception '0022: public.%() must be SECURITY DEFINER with search_path pinned to '''' (02 §7)', v_fn;
     end if;
     if has_function_privilege('anon', v_oid, 'execute') then
       raise exception '0022: anon must not execute public.%()', v_fn;
+    end if;
+    -- database-reviewer H4 (0019's own check): a definer over a FORCE RLS table writes only because its owner
+    -- has BYPASSRLS; if ownership ever differed these would write nothing, silently.
+    if v_fn <> 'verification_submission_columns' and exists (
+      select 1 from pg_proc p join pg_roles r on r.oid = p.proowner
+      where p.oid = v_oid and not (r.rolbypassrls or r.rolsuper)
+    ) then
+      raise exception '0022: public.%() is owned by a role without BYPASSRLS; FORCE RLS would make it write nothing, silently', v_fn;
     end if;
   end loop;
 
@@ -527,9 +596,12 @@ begin
     if exists (
       select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
        where n.nspname = 'public' and p.proname = v_fn
-         and (p.prosrc ~ 'set\s+level\s*=' or p.prosrc ~ 'level_changed_at\s*=' or p.prosrc ~ 'dbs_outcome\s*=')
+         and (p.prosrc ~ '\ylevel\s*=' or p.prosrc ~ 'level_changed_at\s*=' or p.prosrc ~ 'dbs_outcome\s*='
+              or p.prosrc ~ 'cross_check_status\s*=' or p.prosrc ~ 'dbs_update_service_subscribed\s*='
+              or p.prosrc ~ 'dbs_update_service_last_checked_at\s*=' or p.prosrc ~ 'dbs_update_service_last_result\s*='
+              or p.prosrc ~ 'dbs_update_service_checked_by\s*=')
     ) then
-      raise exception '0022: public.%() must not write level / level_changed_at / dbs_outcome (2c)', v_fn;
+      raise exception '0022: public.%() must not write level / level_changed_at / dbs_outcome / the cross-check / the sweep-owned Update Service columns (2c)', v_fn;
     end if;
   end loop;
 end
