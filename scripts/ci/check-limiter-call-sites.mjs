@@ -6,7 +6,9 @@
 // somewhere outside `src/modules/config/`, or be listed with a reason in `limiter-call-sites.allow.json`.
 //
 // A **test is not a consumer**: a policy referenced only from a `*.test.*` / `*.spec.*` file or `__tests__/`
-// satisfies nobody, so those files are not scanned. The allow-list is for a policy 07 §8 names whose surface
+// satisfies nobody, so those files are not scanned. Neither is a **comment or a string**: the reference has to be
+// code, or `// TODO: wire rateLimits.clientEvents` would satisfy the gate for a policy nothing consumes — the very
+// state it exists to catch (`security-reviewer`, MEDIUM). The allow-list is for a policy 07 §8 names whose surface
 // does not exist in Phase 1 — it is a recorded gap, and a stale entry (a policy that *has* acquired a call site)
 // fails too, so the file cannot quietly outlive its reason.
 //
@@ -56,6 +58,46 @@ function declaredPolicyNames(body) {
   return names;
 }
 
+/**
+ * The file's **code**, with comments and string / template contents blanked out.
+ *
+ * Without this the consumer test is a raw substring search, so `// TODO: wire rateLimits.clientEvents` in any
+ * non-test file satisfies the gate for a policy nothing consumes — exactly the declared-but-unenforced state the
+ * gate exists to catch (`security-reviewer`, MEDIUM). Blanking rather than deleting keeps offsets meaningless but
+ * harmless; we only ever ask "does this text contain the reference".
+ *
+ * A quote inside a regex literal can confuse the scanner and blank more than it should. That direction is safe:
+ * it can only lose a real call site and turn the gate **red**, never green.
+ */
+function codeOnly(text) {
+  let out = "";
+  let i = 0;
+  while (i < text.length) {
+    const two = text.slice(i, i + 2);
+    if (two === "//") {
+      const end = text.indexOf("\n", i);
+      i = end === -1 ? text.length : end;
+      continue;
+    }
+    if (two === "/*") {
+      const end = text.indexOf("*/", i + 2);
+      i = end === -1 ? text.length : end + 2;
+      continue;
+    }
+    const quote = text[i];
+    if (quote === '"' || quote === "'" || quote === "`") {
+      i += 1;
+      while (i < text.length && text[i] !== quote)
+        i += text[i] === "\\" ? 2 : 1;
+      i += 1;
+      continue;
+    }
+    out += text[i];
+    i += 1;
+  }
+  return out;
+}
+
 function fail(message) {
   console.error(`check-limiter-call-sites: FAIL — ${message}`);
   process.exit(1);
@@ -87,7 +129,7 @@ const consumers = new Map(declared.map((name) => [name, []]));
 for (const file of listFiles(SCAN_ROOT, { extensions: SOURCE_EXTENSIONS })) {
   if (file.startsWith(`${CONFIG_DIR}/`)) continue;
   if (IS_TEST.test(file) || file.includes("/__tests__/")) continue;
-  const text = readFileSync(file, "utf8");
+  const text = codeOnly(readFileSync(file, "utf8"));
   for (const name of declared)
     if (text.includes(`rateLimits.${name}`))
       consumers.get(name).push(relative(REPO_ROOT, file));
