@@ -12,17 +12,30 @@ Supabase SDK internally and **never exports a client or any driver type**, so a 
 | ------------------------ | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | The gate (03 §1.4)       | `auth` (module binding) · `configureAuth` · `createAuth`                                           | `Auth` · `Session` · `Role` · `SignInInput` · `SignUpInput` · `AuthErrorDetails`                |
 | Data access              | `auth.data.run(op, { uow?, scope? })` · `auth.data.signUrl(ref, ttl)`                              | `DataAccessPort` · `NamedOperation` · `RunOptions` · `DataScope` · `StorageRef` · `AppDatabase` |
-| Drivers                  | `supabaseAuthDriver` (real) · `stubAuth` (`auth.stub.ts`)                                          | `AuthDriver` · `AuthDeps` · `DriverUser`                                                        |
+| Drivers                  | `supabaseAuthDriver` (real) · `stubAuth` (`auth.stub.ts`)                                          | `AuthDriver` · `AuthDeps` (+ `unitOfWork?: UnitOfWorkJoin`) · `DriverUser`                      |
 | Route knowledge (01 §4d) | `ROUTE_MAP` · `roleDashboardPath` · `requiredRoleForPath` · `isAuthGroupPath` · `loginRedirectUrl` | —                                                                                               |
 | Pure predicates          | `isParentRole` · `isNannyRole` · `isAdminRole` (+ `auth.isParent/isNanny/isAdmin` on a `Session`)  | —                                                                                               |
 
 **Errors** (03 §1.4): `UNAUTHENTICATED` · `FORBIDDEN { reason: 'role' | 'mfa' | 'scope' }` · `INTERNAL`
 (connection / commit). Every method returns `Result`; nothing throws to a caller (03 §1 rule 4).
 
+**The unit of work (ADR-127 — one RPC is one transaction).** `data.run(op, { uow })` honours a token through a
+`UnitOfWorkJoin` (`AuthDeps.unitOfWork`; defaults to `platform`'s module-level `unitOfWorkJoin`, which follows
+whatever binding boot installed). The token is judged **before the driver is touched** — one no binding holds
+open is refused `INTERNAL { reason: 'unit-of-work-unknown' }` and the operation never runs — and an open one gets
+a guarded `Query` (`lib/guard-unit-of-work-query.ts`): exactly one `rpc()`, booked through the join so a second
+is refused (`second-rpc-in-unit-of-work`); reads pass; a table `insert` / `update` is refused
+(`write-outside-rpc`) because under PostgREST it could never be atomic with the RPC. A refused call reaches the
+`NamedOperation` as a thrown `UnitOfWorkRefusal` and comes back out of `run` as the carried `Result` — the one
+place a throw becomes a `Result` stays the one place. `stub-auth` takes the same `unitOfWork` option and honours
+it identically (03 §11 row 9).
+
 **Boot wiring — and where it deliberately differs from `platform`.** `auth` uses the same registry shape, but the
 **default is the real inside, not a fail-closed stub**: the first call to the module-level `auth` binding resolves
 to `createAuth({ driver: supabaseAuthDriver() })` and caches it in the registry. `configureAuth` replaces it, and
-every method re-reads the registry so a later call wins.
+every method re-reads the registry so a later call wins. `src/boot/wire-auth.ts` (P1-WIRE) installs
+`createAuth({ driver: supabaseAuthDriver(), unitOfWork: <the boot binding's join> })` explicitly. There is **no env
+name that selects `stub-auth`** (06 §2.5 defines none): the stub is reached by test wiring only.
 
 That is on purpose, and it is the opposite of `platform`'s ports. `platform` fails closed because its ports have
 **no** implementation until the S5 schema exists, so anything that "worked" would be a stub succeeding silently.
@@ -33,13 +46,10 @@ stub:** `stub-auth` is reached only by an explicit `configureAuth(stubAuth(...))
 
 **What this module does _not_ do yet (S4 boundaries — see `docs/build-progress.md`).**
 
-- **No `src/instrumentation.ts`.** Every port the boot file must configure (`configureUnitOfWork`,
-  `configureEvents`, `configureConsent`, `configureRateLimiter`) needs either the S5 schema or the unresolved
-  transaction-opener decision; wiring `memoryTransactionOpener` in its place would turn `platform`'s deliberate
-  fail-closed into a silent success against a stub. Recorded, not guessed.
 - **No rate limiting on the auth surfaces** (07 §8 row 3). `platform`'s `rateLimiter.consume` denies in any
   production-resolved environment (Vercel preview included) until boot declares a **shared** backend, and the
-  shared store is the S5 `rate_limit_buckets` table. Supabase Auth's own limits stay on meanwhile (07 §8 row 3).
+  shared store is the `rate_limit_buckets` table — which **has no specification** (07 §8 names it; 02 §4 / §6
+  never create it), so P1-WIRE left the limiter undeclared on purpose. Supabase Auth's own limits stay on meanwhile.
 - **No anonymous passwordless catch** (AC-X-14). 01 §4d step 3 — a _signed-in_ user with no password → set-password
   — is implemented (`needsPasswordSetup`). The login-form half, where an anonymous visitor types a known
   passwordless email, needs a named lookup 02 §7 does not define plus an account-enumeration ruling; raised as a
@@ -53,11 +63,12 @@ flags are `@supabase/ssr`'s defaults plus `SameSite=Lax`, `httpOnly`, `secure` o
 
 **Named `service`-scope (service-role) uses** — 01 §6.3 requires each to be listed and reviewed:
 
-| Call                                 | Why it must bypass RLS                                                                                |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `driver.writeRole` (signup)          | `user_roles` has no client INSERT policy (02 §4.1); the row is written from a server-side value.      |
-| `driver.writeRole` (`grantRole`)     | Admin actor only; `user_roles.role` UPDATE has no client policy (07 §5.4 row 3).                      |
-| `data.run(op, { scope: 'service' })` | Named jobs and definers only (crons, webhooks, `delete-account`, `retention-sweep`, admin-on-behalf). |
+| Call                                                        | Why it must bypass RLS                                                                                                                                                                                                          |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `driver.writeRole` (signup)                                 | `user_roles` has no client INSERT policy (02 §4.1); the row is written from a server-side value.                                                                                                                                |
+| `driver.writeRole` (`grantRole`)                            | Admin actor only; `user_roles.role` UPDATE has no client policy (07 §5.4 row 3).                                                                                                                                                |
+| `data.run(op, { scope: 'service' })`                        | Named jobs and definers only (crons, webhooks, `delete-account`, `retention-sweep`, admin-on-behalf).                                                                                                                           |
+| `platform.events.insert` (`src/boot/db-event-log-store.ts`) | The `event-log` sink: `events` carries no client policy at all (07 §5.2), so the row is written under the service role — 07 §5.1 rule 5 names this use. The envelope was validated by `Events.emit` before it reaches the port. |
 
 **Allowed imports.** `@/modules/config` (client half) · `@/modules/config/server` (the `server-only` second entry
 point, `elevated-client.ts` only) · `@/modules/shared-types` · `@/modules/platform` (Result helpers + `log`) ·
@@ -65,11 +76,14 @@ point, `elevated-client.ts` only) · `@/modules/shared-types` · `@/modules/plat
 No business module, ever (01 §2.3; 05 §7 rule 1).
 
 **Suites.** `src/modules/auth/__tests__/` — `auth.connector.test.ts` (the contract, run twice: real driver double
-and `stub-auth`), `auth.route-map.test.ts` (01 §4d prefix table), `auth.data-port.test.ts` (scopes, `uow`,
-`signUrl`), and `int.auth-gate.test.ts` (05 §4.2 — the middleware gate end to end).
+and `stub-auth`), `auth.route-map.test.ts` (01 §4d prefix table), `auth.data-port.test.ts` (scopes, the
+unit-of-work join — one RPC, a second refused, a write refused, a failing RPC as a `Result` — and `signUrl`), and
+`int.auth-gate.test.ts` (05 §4.2 — the middleware gate end to end).
 
 <!-- audit
-Last edited: 2026-09-16T11:05+10:00 — BB-LDN-Planner-070926/S4
+Last edited: 2026-09-17T12:10+10:00 — BB-LDN-Planner-070926/P1-WIRE
+Notes: the unit-of-work join (ADR-127) documented — token judged before the driver, one RPC, writes refused, reads pass, refusal as a Result; boot wiring now names src/boot/wire-auth.ts and the absence of a stub-auth env name; the "no instrumentation.ts" boundary retired; the event-log insert added to the named service-role uses.
+Prior: 2026-09-16T11:05+10:00 — BB-LDN-Planner-070926/S4
 Notes: initial authoring — the S4 connector (03 §1.4), its fail-closed boot binding, the three S4 boundaries
 (no instrumentation.ts, no auth-surface rate limiting, no anonymous passwordless catch) and the named service-scope
 uses 01 §6.3 requires.

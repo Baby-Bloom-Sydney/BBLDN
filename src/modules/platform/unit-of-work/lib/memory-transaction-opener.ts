@@ -2,8 +2,8 @@
 // an in-memory ledger of begun / committed / rolled-back transactions, immutable rows, optional failure switches.
 import type { Result } from "@/modules/shared-types";
 import type { MemoryTransaction, MemoryTransactionOpener } from "../types";
-import { err } from "./err";
-import { ok } from "./ok";
+import { err } from "../../lib/err";
+import { ok } from "../../lib/ok";
 
 type Switches = { readonly failBegin?: boolean; readonly failCommit?: boolean };
 

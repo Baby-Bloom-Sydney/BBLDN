@@ -1,9 +1,9 @@
-// The boot slot for the module-level `withUnitOfWork`. Until the boot code (S4: `auth` owns the data client)
+// The boot slot for the module-level `withUnitOfWork`. Until the boot code (`src/instrumentation.ts`, ADR-127)
 // installs a binding, every unit of work fails closed — nothing can "commit" against a stub by accident.
 import type { UnitOfWorkBinding } from "../types";
-import { createRegistry } from "./create-registry";
+import { createRegistry } from "../../lib/create-registry";
 import { createUnitOfWork } from "./create-unit-of-work";
-import { err } from "./err";
+import { err } from "../../lib/err";
 
 const NOT_CONFIGURED = err("INTERNAL", "Unit of work is not configured", {
   reason: "unit-of-work-not-configured",
