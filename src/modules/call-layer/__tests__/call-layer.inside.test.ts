@@ -747,9 +747,12 @@ describe("the C-row slice through advance (C-a · C-c) and the nanny call (§2.7
 });
 
 describe("platform — the event id schema (03 §9.3 'ids only'; owned by platform, pinned here because 1d hit it)", () => {
-  // The document says a uuid is an id and passes. Measured 2026-09-17: a uuid whose digits run 9+ across the
-  // hyphens is redacted by `scrubFreeText` and so refused. Turns red the day `platform` fixes it — remove then.
-  it.fails("accepts every canonical uuid as an id", () => {
+  // **Closed by P1-WIRE-2.** 1d pinned this `it.fails` because a uuid whose digits ran 9+ across the hyphens was
+  // redacted by `scrubFreeText` and so refused (2 904 / 20 000 measured on the fixed tree before the change).
+  // `piiSafeString` now exempts a whole-value canonical uuid before the scrub, so the pin is flipped to a
+  // passing test rather than removed — the claim 1d made is the claim that now holds. The exhaustive half lives
+  // in `platform/__tests__/platform.pii-safe-string.test.ts`; this stays as the C row's own regression.
+  it("accepts every canonical uuid as an id", () => {
     const phoneLikeUuid = "750a1806-4696-48bc-a5b0-e23b717d495c";
     const parsed = EVENT_SCHEMAS["call.slot-chosen"].safeParse({
       bookingId: phoneLikeUuid,
