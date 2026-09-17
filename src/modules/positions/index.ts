@@ -55,3 +55,6 @@ export { loadPositionPage } from "./lib/load-position-page";
 export { positionPageView } from "./lib/position-page-view";
 export { PositionPage } from "./components/PositionPage";
 export { closePositionAction } from "./actions/close-position-action";
+
+// Rows 7 and 8's facts (`1i`): declared beside the rail, handed in by the caller that may read them.
+export type { AppRailFacts } from "./lib/journey-rows-4-to-8";

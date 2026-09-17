@@ -6,15 +6,16 @@
 // terminal stages. **Row 3 arrives whole from the `JourneyRowSource` port** — its words are `call-layer`'s
 // `callRailLine` and `positions` may never import that module (fix: A-2 / R2).
 //
-// `1g`: rows 4, 5 and 6 are now real — `journey-rows-4-to-8.ts` derives them from the connection stages and the
-// placement, both of which `positions` may read (01 §2.3). Rows 7 and 8 still read `pending`: 7 is
-// `payments.getAccess` (`1h`) and 8 the child-linking read model (`1i`), and inventing their states would put a
-// made-up journey on a parent's dashboard.
+// `1g`: rows 4, 5 and 6 are real — `journey-rows-4-to-8.ts` derives them from the connection stages and the
+// placement, both of which `positions` may read (01 §2.3). `1i`: rows 7 and 8 are real too, from facts handed
+// in on `rest.app` rather than read, because `positions` may import neither `payments` nor `app`. With no facts
+// supplied they still read `pending` — which is the honest answer when nobody asked, not a made-up journey.
 import type { ConnectionSummary } from "@/modules/connections";
 import type { PlacementRead } from "@/modules/placements";
 import type { JourneyStep } from "@/modules/shared-types";
 import type { PositionRecord } from "../types";
 import { journeyRows4to8 } from "./journey-rows-4-to-8";
+import type { AppRailFacts } from "./journey-rows-4-to-8";
 
 const LABELS = Object.freeze({
   1: "Matches",
@@ -77,6 +78,7 @@ export function journeySteps(
   rest: {
     readonly connections: ReadonlyArray<ConnectionSummary>;
     readonly placement: PlacementRead | null;
+    readonly app?: AppRailFacts;
   } = { connections: [], placement: null },
 ): ReadonlyArray<JourneyStep> {
   if (

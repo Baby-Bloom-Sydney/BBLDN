@@ -9,13 +9,49 @@
 // name out, rather than rendering a raw id at a family — the same gap `1f` recorded on the admin drawer and
 // `1e` on autofire's recipient, and it wants the same fix.
 //
-// Rows 7 and 8 stay `pending` and say so: row 7 is `payments.getAccess` (`1h`) and row 8 the child-linking read
-// model (`1i`). Inventing their states would put a made-up journey on a parent's dashboard, which is the one
-// thing 04 §7.1's "never hidden, never empty" rule is *not* asking for.
+// `1i` fills rows 7 and 8. Both arrive as **plain data on the input**, never as an import: 01 §2.3 gives
+// `positions` arrows to `connections` and `placements` and to neither `payments` nor `app`, and row 3 already
+// established the pattern — the words are composed here, the facts are handed in by the caller that may read
+// them (`loadParentJourney`, which is a route-level read and may). `appRow` being absent means "the caller did
+// not ask", and both rows then read `pending` exactly as they did before, rather than claiming a standing.
+//
+// ★ CONTRADICTION inside 04, stopped on and ruled rather than guessed (model-marking rule). §7.1 row 7 gives
+// the in-motion trial line as `"Your app is open — {n} days"`; §3 says, of the same state, "no in-app countdown
+// banner (ruling carried)", and the standing memory rule is the same — no ambient in-app countdown, the T-5
+// email carries the urgency. A day count on the rail **is** an ambient countdown; it is on every dashboard
+// load, which is more ambient than a banner. So the line reads "Your app is open" with no number, the omission
+// is pinned by test, and the owner of the disagreement is 04 §7.1 (its row wants amending to match its own §3).
 import { LOCALE } from "@/modules/config";
 import type { ConnectionSummary } from "@/modules/connections";
 import type { PlacementRead } from "@/modules/placements";
 import type { ConnectionStage, JourneyStep } from "@/modules/shared-types";
+
+/**
+ * Rows 7 and 8's facts, structurally. `standing` is `payments`' `AccessState["state"]` and `reason` the gate's
+ * `AccessReason`; `link` is `app/child-linking`'s `AppLinkFacts`. Declared locally because neither module is
+ * reachable from here — the ADR-119 precedent, used for the same reason.
+ */
+export type AppRailFacts = {
+  readonly standing:
+    | "none"
+    | "deposit-paid"
+    | "placed"
+    | "trial"
+    | "active"
+    | "paid-in-full"
+    | "lapsed"
+    | "toggled";
+  readonly open: boolean;
+  /** The nanny's first day, for the `placed` line (04 §7.1: "Your app — from {start date}"). */
+  readonly appOnFrom?: string;
+  /** ADR-094: a week after the nanny starts, and the only date this row ever shows. */
+  readonly paymentDueAt?: string;
+  readonly link?: {
+    readonly hasChild: boolean;
+    readonly invitePending: boolean;
+    readonly nannyLinked: boolean;
+  };
+};
 
 const step = (
   row: JourneyStep["row"],
@@ -137,17 +173,77 @@ function rowSix(placement: PlacementRead | null, label: string): JourneyStep {
   );
 }
 
+/**
+ * Row 7 — "Your app" (04 §7.1). The standing is `payments`', said in the family's words:
+ *
+ *   deposit-paid → in motion, "deposit taken" — the deposit opens **nothing** (ADR-097), and the row must not
+ *                  imply it did; what it says is that the place is held.
+ *   placed       → in motion or done: the app is on from the nanny's first day, before any bill (ADR-093 /
+ *                  094), and the one date it carries is when the amount falls due.
+ *   trial        → in motion, "Your app is open" — **no day count** (the ruling above).
+ *   active · paid-in-full → done.
+ *   toggled      → follows `open`, because an admin toggle overrides every other standing in both directions.
+ *   lapsed · none → pending.
+ */
+function rowSeven(app: AppRailFacts | undefined, label: string): JourneyStep {
+  if (app === undefined) return step(7, label, "pending");
+  switch (app.standing) {
+    case "deposit-paid":
+      return step(
+        7,
+        label,
+        "in-motion",
+        "We're holding your place — your app switches on the day your nanny starts",
+      );
+    case "placed":
+      return step(
+        7,
+        label,
+        "in-motion",
+        app.paymentDueAt === undefined
+          ? "Your app is on"
+          : `Your app is on — the amount falls due ${londonDate(app.paymentDueAt.slice(0, 10))}`,
+      );
+    case "trial":
+      return step(7, label, "in-motion", "Your app is open");
+    case "active":
+    case "paid-in-full":
+      return step(7, label, "done", "Your app is open");
+    case "toggled":
+      return app.open
+        ? step(7, label, "done", "Your app is open")
+        : step(7, label, "pending");
+    default:
+      return step(7, label, "pending");
+  }
+}
+
+/**
+ * Row 8 — "App — family + nanny in" (04 §7.1, §7.2). Three facts, three states, and the "after" wording is
+ * 04 §7.1's own. A family with no child yet is `pending` rather than absent: 04 §7.1's rule is that a step is
+ * never hidden and never reads as a room it is waiting in.
+ */
+function rowEight(app: AppRailFacts | undefined, label: string): JourneyStep {
+  const link = app?.link;
+  if (link === undefined || !link.hasChild) return step(8, label, "pending");
+  if (link.nannyLinked)
+    return step(8, label, "done", "Your app — family and nanny in");
+  if (link.invitePending)
+    return step(8, label, "in-motion", "Your nanny's link is out");
+  return step(8, label, "in-motion", "Share your app with your nanny");
+}
+
 export function journeyRows4to8(input: {
   readonly connections: ReadonlyArray<ConnectionSummary>;
   readonly placement: PlacementRead | null;
+  readonly app?: AppRailFacts;
   readonly labels: Readonly<{ meetings: string; hire: string; app: string }>;
 }): ReadonlyArray<JourneyStep> {
   return Object.freeze([
     rowFour(input.connections, input.labels.meetings),
     rowFive(input.connections, input.labels.meetings),
     rowSix(input.placement, input.labels.hire),
-    // 7 and 8 are `1h`'s and `1i`'s — named, not guessed.
-    step(7, input.labels.app, "pending"),
-    step(8, input.labels.app, "pending"),
+    rowSeven(input.app, input.labels.app),
+    rowEight(input.app, input.labels.app),
   ]);
 }

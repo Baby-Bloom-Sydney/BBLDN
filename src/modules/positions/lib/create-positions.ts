@@ -25,6 +25,7 @@ import { connections } from "@/modules/connections";
 import type { ConnectionSummary } from "@/modules/connections";
 import { placements } from "@/modules/placements";
 import type { PlacementRead } from "@/modules/placements";
+import type { AppRailFacts } from "./journey-rows-4-to-8";
 import type {
   JourneyRowSource,
   PositionRecord,
@@ -156,6 +157,7 @@ export function createPositions(deps: PositionsDeps): PositionsReads {
 
     getJourneySteps: async (
       parentId: ParentId,
+      app?: AppRailFacts,
     ): Promise<Result<ReadonlyArray<JourneyStep>>> => {
       const record = await liveFor(parentId);
       if (!record.ok) return record;
@@ -170,11 +172,10 @@ export function createPositions(deps: PositionsDeps): PositionsReads {
       // worse answer than a rail whose later rows read `pending` (04 §7.1 "never hidden, never empty").
       const rest = await railRest(record.value?.parentId ?? parentId);
       return ok(
-        journeySteps(
-          record.value,
-          callRow === null ? null : callRow.value,
-          rest,
-        ),
+        journeySteps(record.value, callRow === null ? null : callRow.value, {
+          ...rest,
+          ...(app === undefined ? {} : { app }),
+        }),
       );
     },
 
