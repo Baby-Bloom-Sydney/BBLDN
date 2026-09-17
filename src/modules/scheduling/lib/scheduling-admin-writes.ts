@@ -196,7 +196,13 @@ export function schedulingAdminWrites(
         },
       );
       if (!flagged.ok) return flagged;
-      affected.push(bookingFromRow(flagged.value));
+      // ADR-143 — the flagged row's parent is joined, not invented. A row whose position is gone is still
+      // flagged in the database (the block is over its time either way); it simply cannot be *returned* as a
+      // `Booking`, so it is left out of the list the admin screen shows rather than given a fabricated parent.
+      const parentId = await calendarReads.parentFor(flagged.value);
+      if (!parentId.ok) return parentId;
+      const booking = bookingFromRow(flagged.value, parentId.value);
+      if (booking !== null) affected.push(booking);
     }
     const blockRow = written.value as AvailabilityBlockRow;
     // 03 §3.6 / §3.5 seq 4: an admin notification only, no customer message — the admin opens each and moves

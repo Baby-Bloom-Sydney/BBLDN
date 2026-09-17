@@ -71,5 +71,24 @@ export function schedulingReads(auth: Auth): SchedulingReads {
         },
         service,
       ),
+    // ADR-143 — the sixth read, and the only one outside 02 §4.4's four tables. It exists because the ruling
+    // resolves a position subject's parent **by join at read** rather than by a `bookings.parent_id` column:
+    // `nanny_positions.parent_id` is `not null` and cascades from `parents`, so a row that answers answers the
+    // truth, and a row that does not is a position that is gone. One keyed read on the primary key; the module
+    // reads nothing else from that table and writes nothing to it.
+    positionParent: (positionId: Uuid) =>
+      auth.data.run(
+        {
+          name: "scheduling.readPositionParent",
+          exec: async (q) => {
+            const row = await q
+              .from("nanny_positions")
+              .eq("id", positionId)
+              .single();
+            return row === null ? null : (row.parent_id as Uuid);
+          },
+        },
+        service,
+      ),
   });
 }

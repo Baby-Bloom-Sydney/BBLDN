@@ -3,7 +3,12 @@
 // `booking.blocked-over` and the displacement rows write; `admin/call-queue` decorates the item with the people
 // (03 §3.6) and never recomputes either of these.
 import { SCHEDULING } from "@/modules/config";
-import type { AttentionFlag, CallListItem, ISO } from "@/modules/shared-types";
+import type {
+  AttentionFlag,
+  CallListItem,
+  ISO,
+  UserId,
+} from "@/modules/shared-types";
 import type { BookingRow } from "../types";
 import { bookingFromRow } from "./booking-from-row";
 
@@ -20,7 +25,14 @@ const flagsOf = (row: BookingRow): ReadonlyArray<AttentionFlag> =>
 /** `held`, `booked` and `rescheduled` are the rows still in front of the admin; the rest are behind her. */
 const TERMINAL = new Set<string>(["cancelled", "done", "no-answer"]);
 
-export function callListItem(row: BookingRow, now: ISO): CallListItem {
+/** `null` when the row's position subject no longer resolves (ADR-143) — the caller decides what that means. */
+export function callListItem(
+  row: BookingRow,
+  now: ISO,
+  positionParentId: UserId | null,
+): CallListItem | null {
+  const booking = bookingFromRow(row, positionParentId);
+  if (booking === null) return null;
   const start = Date.parse(row.start_at);
   const end = Date.parse(row.end_at);
   const at = Date.parse(now);
@@ -33,7 +45,7 @@ export function callListItem(row: BookingRow, now: ISO): CallListItem {
         ? "due"
         : "overdue";
   return Object.freeze({
-    booking: bookingFromRow(row),
+    booking,
     due,
     flags: flagsOf(row),
   });

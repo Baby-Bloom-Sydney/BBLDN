@@ -228,6 +228,12 @@ export type SchedulingReads = {
   ): Promise<Result<ReadonlyArray<AvailabilityBlockRow>>>;
   bookings(calendarId: Uuid): Promise<Result<ReadonlyArray<BookingRow>>>;
   booking(bookingId: Uuid): Promise<Result<BookingRow | null>>;
+  /**
+   * ADR-143 — the position subject's `parentId`, joined from `nanny_positions.parent_id`, because `bookings`
+   * stores `subject_type` + `subject_id` only and the ruling adds no column. `null` means the position row is
+   * gone; the caller refuses rather than inventing a parent.
+   */
+  positionParent(positionId: Uuid): Promise<Result<Uuid | null>>;
 };
 
 /** The one calendar, resolved: 03 §3.2's `'default'` and 02 §4.4's uuid plus the values the admin may edit. */

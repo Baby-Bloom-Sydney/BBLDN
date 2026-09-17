@@ -104,6 +104,8 @@ const calendarOf = (
     readonly blocks?: ReadonlyArray<Record<string, unknown>>;
     readonly rules?: ReadonlyArray<Record<string, unknown>>;
     readonly admin?: boolean;
+    /** ADR-143: a position subject's parent is a join, so the joined table is part of the fixture. */
+    readonly positions?: ReadonlyArray<Record<string, unknown>>;
   } = {},
 ) => {
   const port = fakeSchedulingPort({
@@ -112,6 +114,7 @@ const calendarOf = (
       availability_rules: over.rules ?? [fridayRule],
       availability_blocks: over.blocks ?? [],
       bookings: over.bookings ?? [],
+      nanny_positions: over.positions ?? [{ id: POSITION, parent_id: PARENT }],
     },
     ...(over.admin === undefined ? {} : { admin: over.admin }),
   });
@@ -615,27 +618,23 @@ describe("scheduling inside — what the document says and the code cannot yet d
     expect(lifted.ok).toBe(true);
   });
 
-  // ★ 03 §3.2's `Subject` for a position carries `parentId`; `bookings` (02 §4.4 row 4) stores only
-  // `subject_type` + `subject_id`. After an admin books on behalf, `booked_by_user_id` is the admin, so the
-  // parent is simply not in the row. Owed to 02 §4.4 (a `parent_id` column) or to 03 §3.2 (optional on
-  // read-back). 03 §3.6 already says `admin` decorates the subject from `positions`, which is the workaround
-  // the queue uses today.
-  it.fails(
-    "a position booked on behalf reads back carrying its parent",
-    async () => {
-      const onBehalf = bookingRow({
-        booked_by_role: "admin",
-        booked_by_user_id: "admin-1",
-      });
-      const { calendar } = calendarOf({ bookings: [onBehalf] });
-      const read = await calendar.getBooking("bk-1" as BookingId, admin);
-      expect(read.ok).toBe(true);
-      if (!read.ok) return;
-      expect(
-        read.value.subject.kind === "position" && read.value.subject.parentId,
-      ).toBe(PARENT);
-    },
-  );
+  // ADR-143 closes what this used to pin. 03 §3.2's `Subject` for a position carries `parentId`; `bookings`
+  // (02 §4.4 row 4) stores only `subject_type` + `subject_id`, so after an admin books on behalf the parent is
+  // simply not in the row. The ruling is **no new `bookings` column**: the parent is resolved by join from
+  // `nanny_positions.parent_id` at read.
+  it("a position booked on behalf reads back carrying its parent", async () => {
+    const onBehalf = bookingRow({
+      booked_by_role: "admin",
+      booked_by_user_id: "admin-1",
+    });
+    const { calendar } = calendarOf({ bookings: [onBehalf] });
+    const read = await calendar.getBooking("bk-1" as BookingId, admin);
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    expect(
+      read.value.subject.kind === "position" && read.value.subject.parentId,
+    ).toBe(PARENT);
+  });
 });
 
 /**
@@ -803,41 +802,64 @@ describe("scheduling inside — an unreadable book_slot answer is a Result, neve
     });
 });
 
-// ── REVIEW-2 (typescript-review HIGH) — the empty-string sentinel, PINNED rather than invented ─────────────
+// ── ADR-143 — an absent booker is a contract state, not an empty id ────────────────────────────────────────
 //
-// `booking-from-row.ts` reconstructs an absent booker as a **branded empty string**: `(row.booked_by_user_id ??
-// "") as AdminId` for an admin row, and `parentId: "" as UserId` for a position subject whose booker was not the
-// parent. A well-typed id belonging to nobody then travels into `schedulingEvents` and the admin call queue as
-// the acting party. This is the class-5 defect (a non-authority value typed as an authority) reached with a
-// value the type system approves of, so no cast and no `any` is involved and nothing catches it.
+// REVIEW-2 H-10 pinned this: `booking-from-row.ts` reconstructed an absent booker as a **branded empty string**,
+// `(row.booked_by_user_id ?? "") as AdminId`. `0009` declares `booked_by_user_id … on delete set null`, so 07
+// §6's own account-deletion path turned every booking a departed admin made into an admin whose id was `""` — a
+// well-typed reference to nobody, travelling on as the acting party.
 //
-// **It is reachable, which is what makes it worth pinning.** `0009` declares `booked_by_user_id uuid references
-// auth.users (id) ON DELETE SET NULL`. So 07 §6's own account-deletion path turns every booking an admin made
-// into `booked_by_role = 'admin'` with a NULL user id — and every one of them reads back as an admin whose id is
-// `""`.
-//
-// **Not fixed here, deliberately.** 03 §3.2's `Actor` and `Subject` have no "booker absent" arm, so any value
-// this module chooses is an invention, and REVIEW-2's brief forbids contract changes. ADR-123 rule 2 says what
-// to do when code and document disagree: pin the documented behaviour as a failing test and record it. The owner
-// is 03 §3.2 (an optional / absent booker) together with 02 §4.4 (whether `parent_id` should be its own column,
-// which the sibling pin above already asks for).
-describe("scheduling inside — an absent booker is never a branded empty id (REVIEW-2)", () => {
-  it.fails(
-    'PINNED (03 §3.2): a deleted admin\'s booking reads back without minting `""` as an AdminId',
-    async () => {
-      const orphan = bookingRow({
-        booked_by_role: "admin",
-        booked_by_user_id: null,
-      });
-      const { calendar } = calendarOf({ bookings: [orphan] });
-      const read = await calendar.getBooking("bk-1" as BookingId, admin);
-      expect(read.ok).toBe(true);
-      if (!read.ok) return;
-      // Whatever the contract grows, it must not be an id that is a well-typed reference to nobody.
-      const bookedBy = read.value?.bookedBy;
-      expect(bookedBy?.kind === "admin" ? bookedBy.id : "not-admin").not.toBe(
-        "",
-      );
-    },
-  );
+// ADR-143 rules it: `Booking.bookedBy` is `Actor | null`, null meaning the booker's account is gone. The pin is
+// flipped by that behaviour, not by the test.
+describe("scheduling inside — an absent booker is null, never a branded empty id (ADR-143)", () => {
+  it("a deleted admin's booking reads back with `bookedBy: null`", async () => {
+    const orphan = bookingRow({
+      booked_by_role: "admin",
+      booked_by_user_id: null,
+    });
+    const { calendar } = calendarOf({ bookings: [orphan] });
+    const read = await calendar.getBooking("bk-1" as BookingId, admin);
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    expect(read.value.bookedBy).toBeNull();
+  });
+
+  it("a deleted parent's booking reads back with `bookedBy: null` too", async () => {
+    const orphan = bookingRow({
+      booked_by_role: "parent",
+      booked_by_user_id: null,
+    });
+    const { calendar } = calendarOf({ bookings: [orphan] });
+    const read = await calendar.getBooking("bk-1" as BookingId, admin);
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    expect(read.value.bookedBy).toBeNull();
+  });
+
+  // A `system` row has no user id by construction (`actor-columns.ts`), so it is the one NULL that is not an
+  // absence — it stays the named job, never null.
+  it("a system row keeps its named job rather than becoming null", async () => {
+    const cascade = bookingRow({
+      booked_by_role: "system",
+      booked_by_user_id: null,
+    });
+    const { calendar } = calendarOf({ bookings: [cascade] });
+    const read = await calendar.getBooking("bk-1" as BookingId, admin);
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    expect(read.value.bookedBy).toEqual({ kind: "system", id: "cascade" });
+  });
+
+  // ADR-143's second half: the parent comes from `nanny_positions.parent_id`, so a booking whose position is
+  // gone has no subject to answer with — it refuses rather than inventing one.
+  it("a booking whose position no longer exists refuses NOT_FOUND", async () => {
+    const { calendar } = calendarOf({
+      bookings: [bookingRow({})],
+      positions: [],
+    });
+    const read = await calendar.getBooking("bk-1" as BookingId, admin);
+    expect(read.ok).toBe(false);
+    if (read.ok) return;
+    expect(read.error.details?.reason).toBe("NOT_FOUND");
+  });
 });
