@@ -10,6 +10,7 @@ import { auth, roleDashboardPath } from "@/modules/auth";
 import { err, ok, toActionResult } from "@/modules/platform";
 import type { Email } from "@/modules/shared-types";
 import type { SignInAction, SignInErrorDetails } from "../types";
+import { consumeSignInLimit } from "../lib/consume-sign-in-limit";
 import { safeNextPath } from "../lib/safe-next-path";
 
 const schema = z.object({
@@ -41,6 +42,12 @@ export const signInAction: SignInAction = async (
         { reason: "invalid-input" },
       ),
     );
+  // 07 §8 row 3 (REVIEW-2, security HIGH-2). Taken **ahead of** the credential check, so a spent burst refuses
+  // the right password too — a limit taken after the check would still hand the attacker the answer. The verdict
+  // never changes the sentence: `REFUSED` is the one refusal this form has, so a throttle cannot become the
+  // account-enumeration oracle ADR-132 forbids. A limiter outage refuses as well (ADR-134: auth fails closed).
+  if (!(await consumeSignInLimit(parsed.data.email as Email)))
+    return toActionResult(REFUSED);
   const signedIn = await auth.signIn({
     email: parsed.data.email as Email,
     password: parsed.data.password,

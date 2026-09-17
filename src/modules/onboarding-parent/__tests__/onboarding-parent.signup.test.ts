@@ -1,7 +1,7 @@
 // S-X-05 / S-X-06 — the signup action: validated once at the boundary, the role always `parent`, a refusal that
 // never leaks provider text, the profile row written through the store `0017` made possible (ADR-131), and —
 // pinned as failing until the P-2 slice exists (ADR-120 rule 2) — the outcome the code cannot yet deliver.
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { auth, configureAuth, stubAuth } from "@/modules/auth";
 import { LOCALE, SECURITY } from "@/modules/config";
 import {
@@ -15,6 +15,10 @@ import {
   memoryConsentStore,
   memoryEventLogStore,
   memoryTransactionOpener,
+  memoryRateLimitStore,
+  configureRateLimiter,
+  createRateLimiter,
+  err,
   ok,
 } from "@/modules/platform";
 import { configureMatching, stubMatching } from "@/modules/matching";
@@ -58,7 +62,19 @@ let consents: ReturnType<typeof memoryConsentStore>;
  *  what the next one is testing. */
 const UNCONFIGURED_PROFILE_STORE = PARENT_PROFILE_STORE_REGISTRY.get();
 
+/** REVIEW-2: signup now consumes 07 §8 row 2's per-address budget, and the limiter is module state. Without a
+ *  fresh one per spec the fourth test in this file would be refused by the third test's attempts. */
+const freshLimiter = (): void => {
+  configureRateLimiter(
+    createRateLimiter({
+      store: memoryRateLimitStore(),
+      burstAlertMultiple: SECURITY.burstAlertMultiple,
+    }),
+  );
+};
+
 beforeEach(() => {
+  freshLimiter();
   PARENT_PROFILE_STORE_REGISTRY.set(UNCONFIGURED_PROFILE_STORE);
   configureAuth(stubAuth());
   consents = memoryConsentStore();
@@ -308,5 +324,77 @@ describe("onboarding-parent — the one-go signup with a lead (04 §3.1 steps 5�
       destination: "/parent",
       positionOpened: false,
     });
+  });
+});
+
+// ── REVIEW-2 (security HIGH-3) — 07 §8 row 2's limit on signup ────────────────────────────────────────────
+//
+// Written RED first against the shipped action, which ran `auth.signUp` -> consent rows -> profile row ->
+// welcome email with no ceiling on an anonymous `"use server"` POST. `SECURITY.rateLimits.signupPerEmail` was
+// declared in config with zero call sites. Both cases failed before the fix.
+describe("onboarding-parent — signup is rate limited (07 §8 row 2; REVIEW-2)", () => {
+  const OTHER = { ...VALID, email: "grace@example.test" };
+
+  beforeEach(() => {
+    configureParentProfileStore(memoryParentProfileStore());
+  });
+
+  it("writes nothing at all once the address's budget is spent — no account, no consent row", async () => {
+    configureRateLimiter(
+      { consume: async () => err("RATE_LIMITED", "Too many") },
+      "shared",
+    );
+    const answer = await signUpParentAction(null, formDataOf(VALID));
+    expect(answer.ok).toBe(false);
+    // The limit is taken ahead of every write, so the AGR-01 rows the happy path asserts are simply absent.
+    expect(consents.consents).toEqual([]);
+  });
+
+  it("refuses with the form's own generic line, never a different one (ADR-132)", async () => {
+    configureRateLimiter(
+      { consume: async () => err("RATE_LIMITED", "Too many") },
+      "shared",
+    );
+    const throttled = await signUpParentAction(null, formDataOf(VALID));
+    expect(throttled.ok).toBe(false);
+    if (throttled.ok) return;
+    // `toActionResult` collapses every INTERNAL to one fixed client sentence (01 §4a), which is exactly the
+    // property ADR-132 wants: the caller reads the same words for a throttle, an outage and a taken address.
+    expect(throttled.error.code).toBe("INTERNAL");
+    expect(throttled.error.message).not.toMatch(
+      /already|taken|exists|limit|many|rate/i,
+    );
+    expect(throttled.error.message).not.toContain(VALID.email);
+  });
+
+  it("fails CLOSED when the limiter cannot answer (ADR-134)", async () => {
+    configureRateLimiter(
+      { consume: async () => err("INTERNAL", "Rate limit unavailable") },
+      "shared",
+    );
+    const answer = await signUpParentAction(null, formDataOf(VALID));
+    expect(answer.ok).toBe(false);
+    expect(consents.consents).toEqual([]);
+  });
+
+  it("buckets per address — one address's spent budget does not refuse another's first signup", async () => {
+    const spent = new Set<string>();
+    configureRateLimiter(
+      {
+        consume: async (key: string) => {
+          if (spent.has(key)) return err("RATE_LIMITED", "Too many");
+          spent.add(key);
+          return ok({ count: 1 });
+        },
+      },
+      "shared",
+    );
+    const first = await signUpParentAction(null, formDataOf(VALID));
+    const again = await signUpParentAction(null, formDataOf(VALID));
+    const other = await signUpParentAction(null, formDataOf(OTHER));
+    expect(first.ok).toBe(true);
+    expect(again.ok).toBe(false);
+    // A different address hashes to a different key, so it still gets its own first attempt.
+    expect(other.ok).toBe(true);
   });
 });

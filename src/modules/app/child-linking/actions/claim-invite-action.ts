@@ -7,9 +7,24 @@
 // On success the parent goes to the onboarding call (04 §6.1 S-P-14 → S-P-01, path E) and the nanny to her hub.
 // Both are `redirect`s rather than a rendered "done" page, because the claim is a step in a journey and the
 // next screen is the point of it.
+//
+// ★ **07 §8 row 7 is consumed here too (REVIEW-2, security HIGH-1).** `consume-invite-lookup-limit.ts` calls
+// itself "the enumeration defence, and it is the whole of it", and it was consumed in exactly one place: the
+// server-component GET in `load-invite-landing.ts`. This action is a `"use server"` export — an HTTP endpoint of
+// its own — and it reached `store.invitePreview` through `claimInvite` with no counter. `carryLinkStoreError`
+// answers a live token with one of four distinguishable sentences and a dead one with a fifth, so unlimited this
+// is a token walker with a readable answer per guess, against a token with no expiry and no rotation (02 §4.6).
+// The two counters are the landing page's, keyed the same way, so a guesser cannot buy a second budget by
+// switching road. A refused claim spends a miss, because a refused claim is a guess.
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { appActor } from "../lib/app-actor";
+import { consumeInviteLookupLimit } from "../lib/consume-invite-lookup-limit";
+import { inviteLookupKey } from "../lib/invite-lookup-key";
 import { childLinking } from "../lib/default-child-linking";
+
+/** One sentence for every throttled or unavailable outcome: it must reveal nothing the guess was after. */
+const HELD = "Too many attempts just now. Try again in a little while.";
 
 export async function claimInviteAction(
   _state: { readonly error: string | null } | null,
@@ -19,8 +34,22 @@ export async function claimInviteAction(
   const actor = await appActor();
   if (actor === null) redirect(`/login?redirect=/invite/connect/${token}`);
 
+  const forwardedFor = headers().get("x-forwarded-for");
+  const [rateKey, missKey] = await Promise.all([
+    inviteLookupKey(forwardedFor, "invite-lookup"),
+    inviteLookupKey(forwardedFor, "invite-miss"),
+  ]);
+  if ((await consumeInviteLookupLimit.before(rateKey)) === "limited")
+    return { error: HELD };
+
   const claimed = await childLinking.claimInvite(token, actor);
-  if (!claimed.ok) return { error: claimed.error.message };
+  if (!claimed.ok) {
+    // A refusal is a guess that missed. Spend one of row 7's five; once they are gone the counter's own hour is
+    // the block. An INTERNAL is our fault, not a guess, so it does not spend the caller's budget.
+    if (claimed.error.code !== "INTERNAL")
+      await consumeInviteLookupLimit.afterMiss(missKey);
+    return { error: claimed.error.message };
+  }
   redirect(
     claimed.value.direction === "nanny_to_parent" ? "/parent/call" : "/nanny",
   );
