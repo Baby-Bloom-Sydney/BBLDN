@@ -71,6 +71,17 @@ smoke_env() {
       # contradiction between 07 §5.5 item 2 / ADR-108 and 06 §2.5 — recorded in docs/build-progress.md).
       export VERCEL_ENV=production
       export PURCHASE_PROVIDER=stripe-uk
+      # ADR-141 (REVIEW-2 H-11 / M-9): the production column refuses **every** stub provider, not just the
+      # purchase one, so the positive control names the real bindings. `refineEnv` now fails the boot on
+      # `EMAIL_PROVIDER=stub-email` or `AREAS_SOURCE=stub` under production — leaving `smoke_env_base`'s values
+      # here would turn case 5 red and, before that, was CI actively certifying that a production boot with a
+      # stub mail transport and a 20-area stub is acceptable (§6.1).
+      #
+      # Placeholder credentials only, and nothing here reaches a network at boot: no Resend inside exists yet, so
+      # `emailProviderFor` refuses `resend` loudly and the seam stays fail-closed (no client is constructed), and
+      # `db-areas` reads the table lazily on the first call rather than at wire time.
+      export EMAIL_PROVIDER=resend
+      export AREAS_SOURCE=db
       # The prod column additionally requires the analytics trio (06 §2.5).
       export NEXT_PUBLIC_META_PIXEL_ID=placeholder-pixel-id
       export META_CAPI_ACCESS_TOKEN=placeholder-capi-token

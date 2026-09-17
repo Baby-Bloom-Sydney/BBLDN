@@ -13,7 +13,10 @@
 #   4. dev-bypass name present → must EXIT NON-ZERO (07 §5.4 row 4 / 01 §4d step 4: the `NEXT_PUBLIC_DEV_MODE`
 #                                bypass is not merely ignored outside development — the env registry marks the
 #                                name dev-only, so a deployment that sets it does not boot at all)
-#   5. valid production env    → must LISTEN (the positive control for `check:prod-guard`)
+#   5. valid production env    → must LISTEN (the positive control for `check:prod-guard`), and its boot
+#                                report must name NO stub provider (ADR-141: `EMAIL_PROVIDER=stub-email` and
+#                                `AREAS_SOURCE=stub` are refused by `refineEnv`; this reads the report the boot
+#                                itself prints, so a stub reached by any other road is caught too)
 #   6. off-Vercel production   → must EXIT NON-ZERO (a measured contradiction, not a guard — see the case)
 #   7. production WRITE road    → the production environment's position / connection / placement writes reach
 #                                the driver instead of being refused by the port (`0019`, ADR-127). Case 5
@@ -51,6 +54,27 @@ expect_outcome() {
   fi
 }
 
+# Reads the boot report the case that just ran printed (`BOOT_SERVER_OUTPUT`, kept by `boot_outcome`). Only the
+# `binding` field is judged: a `reason` may legitimately say the word "stub" — three of the four deliberately
+# unwired ports explain themselves by naming the stub they refuse to bind — while a binding that names one is a
+# stub actually installed. An empty report is a failure, not a pass: nothing to read means nothing was proved.
+expect_no_stub_binding() {
+  local label="$1"
+  if [[ -z "$BOOT_SERVER_OUTPUT" ]]; then
+    echo "boot-guard: FAIL — ${label}: the boot printed nothing to read" >&2
+    failures=$((failures + 1))
+    return
+  fi
+  local bound
+  bound="$(grep -o '"binding":"[^"]*"' <<< "$BOOT_SERVER_OUTPUT" | grep stub || true)"
+  if [[ -z "$bound" ]]; then
+    echo "boot-guard: OK   — ${label}"
+  else
+    echo "boot-guard: FAIL — ${label}: ${bound}" >&2
+    failures=$((failures + 1))
+  fi
+}
+
 # Each case runs inline (never in a subshell — a subshell could neither raise `failures` nor expose the server's
 # pid to the trap), with the environment rebuilt from scratch every time: `smoke_env` re-exports every name and
 # unsets every dev-only one, so the previous case's deliberate corruption cannot leak into the next.
@@ -73,6 +97,11 @@ expect_outcome "the dev bypass name refuses the boot outside development" exited
 # column's other reasons and still look like the stub guard working.
 smoke_env production
 expect_outcome "a valid production env boots and serves /api/health" listening "$((BASE_PORT + 4))"
+# 5b — ADR-141: *which* providers that production boot bound, not merely that it came up. Until now this case
+# asserted only `listening`, so CI certified a production boot whose mail transport delivered nothing and whose
+# areas provider was the 20-area seed (§6.1). `refineEnv` refuses both names outright; this is the second layer,
+# read off the report the boot itself prints, and it catches a stub reached by any other road.
+expect_no_stub_binding "the production boot report names no stub provider"
 
 # The stub-provider case (07 §5.5 item 2 / AC-X-35) is **not** repeated here: `check:prod-guard` owns it, and
 # E1 fixed that script's environment so it now proves the claim instead of exiting on four unrelated missing

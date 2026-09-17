@@ -204,6 +204,33 @@ describe("config.env — guards (07 §7 item 1; 07 §5.5; 06 §2.2; 06 §4.1 C)"
     expect(error.names).toContain("PURCHASE_PROVIDER");
   });
 
+  // ADR-141 (REVIEW-2 H-11 / M-9): the other two stubs were legal in the production column. `stub-email`
+  // reports every reset, invite and app-ready mail as sent while nothing leaves the building; the 20-area seed
+  // tells 271 of 291 real London districts they are out of area. Same shape as the guard above.
+  it("refuses EMAIL_PROVIDER=stub-email in production", () => {
+    expect(
+      failure(() => parseEnv({ ...production, EMAIL_PROVIDER: "stub-email" }))
+        .names,
+    ).toContain("EMAIL_PROVIDER");
+  });
+
+  it("refuses AREAS_SOURCE=stub in production", () => {
+    expect(
+      failure(() => parseEnv({ ...production, AREAS_SOURCE: "stub" })).names,
+    ).toContain("AREAS_SOURCE");
+  });
+
+  it("leaves both stubs legal outside production", () => {
+    const preview = parseEnv({
+      ...production,
+      VERCEL_ENV: "preview",
+      EMAIL_PROVIDER: "stub-email",
+      AREAS_SOURCE: "stub",
+    });
+    expect(preview.server.EMAIL_PROVIDER).toBe("stub-email");
+    expect(preview.server.AREAS_SOURCE).toBe("stub");
+  });
+
   it("requires STUB_EVENT_SECRET iff the stub is bound, and never in production", () => {
     expect(
       failure(() => parseEnv(withoutName(dotEnvTest, "STUB_EVENT_SECRET")))

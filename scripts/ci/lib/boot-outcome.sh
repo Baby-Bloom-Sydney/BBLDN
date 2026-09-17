@@ -21,6 +21,10 @@ BOOT_PROBE_PATH="${BOOT_PROBE_PATH:-/api/health}"
 BOOT_SERVER_PID=""
 BOOT_SERVER_LOG=""
 BOOT_OUTCOME=""
+# The server's stdout+stderr for the case that just ran, kept after the log file is removed so a caller can
+# assert on what the boot *said* and not only on whether it came up (ADR-141: the production report must name no
+# stub provider). Rebuilt on every `boot_outcome`, so one case can never be read as another's.
+BOOT_SERVER_OUTPUT=""
 
 # Install as `trap boot_cleanup EXIT INT TERM` in every script that calls `boot_outcome`.
 boot_cleanup() {
@@ -36,6 +40,9 @@ boot_cleanup() {
 
 _boot_finish() {
   BOOT_OUTCOME="$1"
+  if [[ -n "$BOOT_SERVER_LOG" && -f "$BOOT_SERVER_LOG" ]]; then
+    BOOT_SERVER_OUTPUT="$(cat "$BOOT_SERVER_LOG")"
+  fi
   boot_cleanup
 }
 
@@ -43,6 +50,7 @@ _boot_finish() {
 # (a test server is never for anyone but this machine), and sets BOOT_OUTCOME.
 boot_outcome() {
   local port="$1" elapsed=0
+  BOOT_SERVER_OUTPUT=""
   BOOT_SERVER_LOG="$(mktemp "${TMPDIR:-/tmp}/boot-outcome.XXXXXX")"
   npx next start --hostname 127.0.0.1 --port "$port" > "$BOOT_SERVER_LOG" 2>&1 &
   BOOT_SERVER_PID=$!
