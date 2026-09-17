@@ -8,6 +8,9 @@ export type * from "./types";
 export { matching } from "./lib/default-matching";
 export { configureMatching } from "./lib/configure-matching";
 export { createMatching } from "./lib/create-matching";
+
+// `1e` — the 03 §7.4 pre-check task, exported so the waves sweep composes the same task the P-2 caller runs.
+export { autofire } from "./lib/autofire";
 export { stubMatching } from "./matching.stub";
 
 // The screens' routes and the shared query keys (02.13 funnel-source contract, carried).
@@ -23,6 +26,9 @@ export { WIZARD_QUESTIONS } from "./lib/wizard-questions";
 export { AGE_LABELS } from "./lib/age-labels";
 export type { WizardQuestion } from "./lib/wizard-questions";
 export { parseWizardAnswers } from "./lib/wizard-answers-schema";
+
+// `1e` — the one conversion from the shared answers to the position P-2 opens (both roads into the stage model).
+export { positionDetailOf } from "./lib/position-detail-of";
 
 // Server actions (01 §4e) — passed to client components as props.
 export { saveParentLeadAction } from "./actions/save-parent-lead-action";

@@ -4243,37 +4243,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      record_cookie_consent:
-        | {
-            Args: {
-              p_analytics: boolean
-              p_choice: Database["public"]["Enums"]["cookie_choice"]
-              p_created_at: string
-              p_expiry_date: string
-              p_id: string
-              p_ip?: unknown
-              p_marketing: boolean
-              p_user_agent?: string
-              p_user_id?: string
-              p_visitor_id: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_analytics: boolean
-              p_choice: Database["public"]["Enums"]["cookie_choice"]
-              p_created_at: string
-              p_expiry_date: string
-              p_id: string
-              p_ip: unknown
-              p_marketing: boolean
-              p_user_agent: string
-              p_user_id: string
-              p_visitor_id: string
-            }
-            Returns: string
-          }
+      record_cookie_consent: {
+        Args: {
+          p_analytics: boolean
+          p_choice: Database["public"]["Enums"]["cookie_choice"]
+          p_created_at: string
+          p_expiry_date: string
+          p_id: string
+          p_ip?: unknown
+          p_marketing: boolean
+          p_user_agent?: string
+          p_user_id?: string
+          p_visitor_id: string
+        }
+        Returns: string
+      }
       remove_nanny_from_child: {
         Args: { p_child_id: string; p_reason: string }
         Returns: string

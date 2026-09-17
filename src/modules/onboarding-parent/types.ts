@@ -5,6 +5,7 @@
 // its own one-export file (L1).
 import type { ClientResult } from "@/modules/platform";
 import type { TemplateId } from "@/modules/comms";
+import type { WizardAnswers } from "@/modules/matching";
 import type {
   E164,
   Email,
@@ -57,7 +58,10 @@ export type ParentProfileInput = {
 
 /** `details.reason` of an `INTERNAL` from the profile store. */
 export type ParentProfileErrorDetails = {
-  readonly reason: "profile-store-not-configured" | "profile-write-failed";
+  readonly reason:
+    | "profile-store-not-configured"
+    | "profile-write-failed"
+    | "profile-read-failed";
 };
 
 /**
@@ -69,6 +73,23 @@ export type ParentProfileStore = {
   create(
     input: ParentProfileInput,
   ): Promise<Result<void, ParentProfileErrorDetails>>;
+  /**
+   * `1e` — the read behind the in-app position flow (S-P-04). P-2 carries the parent's contact details as facts
+   * (03 §8.1: comms never looks a person up; the stage model reads no other module's table), so the one place
+   * that already owns `user_profiles` resolves them. Same owed migration as `create`.
+   */
+  get(
+    userId: UserId,
+  ): Promise<Result<ParentProfileRow | null, ParentProfileErrorDetails>>;
+};
+
+/** What `get` answers: the P-2 payload's `recipient` + the "parent has mobile" precondition (03 §2.4). */
+export type ParentProfileRow = {
+  readonly userId: UserId;
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly mobile: E164;
+  readonly email: Email;
 };
 
 /** What the signup action tells the form: where the parent goes next (`03.36`) and whether a position opened (path B). */
@@ -155,4 +176,16 @@ export type AuthShellProps = {
   readonly clientTermsHref: string;
   readonly privacyHref: string;
   readonly children: React.ReactNode;
+};
+
+// ── S-P-04 — the in-app position flow (04 §6.2; 04 §3.3 trigger b) ──
+
+/** What the flow submits: the shared question bank's answers (02 §4.7 `form_data`, `matching`'s shape). */
+export type CreatePositionInput = {
+  readonly answers: WizardAnswers;
+};
+
+/** What S-P-04 tells the client: where the parent goes next — S-P-01, always (04 §6.2 "completion → S-P-01"). */
+export type PositionFlowOutcome = {
+  readonly destination: string;
 };
