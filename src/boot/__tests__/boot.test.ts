@@ -42,6 +42,7 @@ type Modules = {
   readonly positions: typeof import("@/modules/positions");
   readonly onboardingParent: typeof import("@/modules/onboarding-parent");
   readonly payments: typeof import("@/modules/payments");
+  readonly app: typeof import("@/modules/app");
   readonly purchasePaths: typeof import("@/modules/purchase-paths");
   readonly accessGate: typeof import("@/modules/access-gate");
 };
@@ -90,6 +91,7 @@ beforeAll(async () => {
     positions: await import("@/modules/positions"),
     onboardingParent: await import("@/modules/onboarding-parent"),
     payments: await import("@/modules/payments"),
+    app: await import("@/modules/app"),
     purchasePaths: await import("@/modules/purchase-paths"),
     accessGate: await import("@/modules/access-gate"),
   };
@@ -334,6 +336,14 @@ describe("after register() in a valid preview environment", () => {
       "2026-09-17T09:00:00.000Z" as never,
     );
     expect(reasonOf(run)).not.toBe("payments-not-configured");
+  });
+
+  it("app/child-linking — the db inside replaced child-linking-not-configured (`1i`)", async () => {
+    // Wired, the read reaches the database this environment does not have, so it is `E_STORE` — the store's
+    // own reason, carried. Either answer is a refusal; only one of them proves `wire-app.ts` ran.
+    const youngest = await m.app.childLinking.youngestChildDateOfBirth(FAMILY);
+    expect(reasonOf(youngest)).not.toBe("child-linking-not-configured");
+    expect(reasonOf(youngest)).toBe("E_STORE");
   });
 
   it("access-gate — it derives from payments and therefore fails closed with payments' reason (fix: A-3)", async () => {

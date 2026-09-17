@@ -197,4 +197,37 @@ describe("every port fails closed until src/instrumentation.ts wires it", () => 
     expect(decision.ok).toBe(false);
     expect(reasonOf(decision)).toBe("payments-not-configured");
   });
+
+  it("app/child-linking — every method refuses by name, reads and writes alike (`1i`)", async () => {
+    const { childLinking } = await import("@/modules/app");
+    // The reads matter most: a confident "no children" from an unwired module would tell
+    // `set_access_window` that a family has nobody to bound its grant by. But a write that quietly did
+    // nothing is its own failure — a family looking at a share link that exists on no row — so the writes
+    // refuse by the same name rather than succeeding emptily.
+    expect(reasonOf(await childLinking.youngestChildDateOfBirth(FAMILY))).toBe(
+      "child-linking-not-configured",
+    );
+    expect(reasonOf(await childLinking.appLinkFacts(FAMILY))).toBe(
+      "child-linking-not-configured",
+    );
+    expect(reasonOf(await childLinking.invitePreview("ABCD-EFGH"))).toBe(
+      "child-linking-not-configured",
+    );
+    expect(
+      reasonOf(
+        await childLinking.createChild(
+          { firstName: "Amara", dateOfBirth: "2025-01-15" as never },
+          { kind: "system", id: "cascade" } as never,
+        ),
+      ),
+    ).toBe("child-linking-not-configured");
+    expect(
+      reasonOf(
+        await childLinking.claimInvite("ABCD-EFGH", {
+          kind: "system",
+          id: "cascade",
+        } as never),
+      ),
+    ).toBe("child-linking-not-configured");
+  });
 });

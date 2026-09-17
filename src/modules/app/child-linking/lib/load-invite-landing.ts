@@ -1,0 +1,100 @@
+// S-X-13's one server read (05 §7 rule 5 — the route file is thin). Session → role, token → preview, and the
+// two failure modes kept apart all the way to the view: a malformed token and a lookup that could not run are
+// different from "that link is closed", and only the third is a statement about the invite.
+//
+// **The token is normalised before it is looked up.** A mistyped link never reaches Postgres and never spends
+// one of 07 §8 row 7's five failed lookups, because it was never a lookup.
+//
+// ★ **07 §8 row 7's limiter is consumed here**, which is what makes 32^8 an enumeration argument rather than a
+// number. Two counters: the ordinary rate before the lookup, and the failed-lookup counter after a **miss** —
+// the latter is only ever reached by a caller who guessed, so a family following her own link never touches
+// it. A refusal renders the "no longer open" screen: a blocked prober must not be able to tell a block from a
+// dead token, which is the same reason claimed and revoked share one screen.
+import { headers } from "next/headers";
+import { URLS } from "@/modules/config";
+import { consumeInviteLookupLimit } from "./consume-invite-lookup-limit";
+import { inviteLookupKey } from "./invite-lookup-key";
+import { childLinking } from "./default-child-linking";
+import { appActor } from "./app-actor";
+import { inviteLandingView } from "./invite-landing-view";
+import type { InviteLandingView } from "./invite-landing-view";
+import { normaliseInviteToken } from "./normalise-invite-token";
+
+/** The one screen a refusal, a revoke and a made-up token all share (07 §8 row 7's no-enumeration rule). */
+const closedView = (
+  viewerRole: "parent" | "nanny" | "admin" | null,
+): InviteLandingView =>
+  inviteLandingView({
+    preview: null,
+    viewerRole,
+    tokenWasMalformed: false,
+    lookupFailed: false,
+    signUpHref: "/signup",
+    signInHref: "/login",
+  });
+
+export async function loadInviteLanding(rawToken: string): Promise<{
+  readonly view: InviteLandingView;
+  readonly token: string | null;
+}> {
+  const token = normaliseInviteToken(rawToken);
+  const actor = await appActor();
+  const viewerRole =
+    actor === null
+      ? null
+      : actor.kind === "admin"
+        ? ("admin" as const)
+        : actor.kind === "user"
+          ? actor.role
+          : null;
+
+  if (token === null)
+    return {
+      token: null,
+      view: inviteLandingView({
+        preview: null,
+        viewerRole,
+        tokenWasMalformed: true,
+        lookupFailed: false,
+        signUpHref: "/signup",
+        signInHref: "/login",
+      }),
+    };
+
+  const forwardedFor = headers().get("x-forwarded-for");
+  const [rateKey, missKey] = await Promise.all([
+    inviteLookupKey(forwardedFor, "invite-lookup"),
+    inviteLookupKey(forwardedFor, "invite-miss"),
+  ]);
+  if ((await consumeInviteLookupLimit.before(rateKey)) === "limited")
+    return { token: null, view: closedView(viewerRole) };
+
+  const preview = await childLinking.invitePreview(token);
+  // A miss is a guess. Spend one of the five, and once they are gone the hour-long window is the block.
+  if (preview.ok && preview.value === null) {
+    if ((await consumeInviteLookupLimit.afterMiss(missKey)) === "limited")
+      return { token: null, view: closedView(viewerRole) };
+  }
+  // The sign-up and sign-in links carry the return path so the visitor lands back here after making an account
+  // (04 §6.1: S-X-13 → S-X-06 / S-X-07 → the claim). `URLS.invite` is config's; the path is built from it
+  // rather than from a literal (L4).
+  //
+  // ★ **One copy of the token, not two** (security review M2). The first draft also passed `invite=<token>` as
+  // its own parameter, which put the same secret in two places in the same URL for no gain — `redirect` alone
+  // brings the visitor back to the page that knows it. The remaining copy is still a token in a query string,
+  // and therefore in browser history and in whatever logging `/signup` and `/login` do; 07 §4.6's pattern —
+  // a short-lived `HttpOnly` signed cookie, as the parent-lead flow uses — is the proper fix and is recorded
+  // as owed rather than half-built here, because it spans two modules' surfaces.
+  const back = encodeURIComponent(`${new URL(URLS.invite).pathname}/${token}`);
+  return {
+    token,
+    view: inviteLandingView({
+      preview: preview.ok ? preview.value : null,
+      viewerRole,
+      tokenWasMalformed: false,
+      lookupFailed: !preview.ok,
+      signUpHref: `/signup?redirect=${back}`,
+      signInHref: `/login?redirect=${back}`,
+    }),
+  };
+}

@@ -15,6 +15,13 @@ import { ParentHubClient } from "./ParentHubClient";
 import type { ChildClient } from "@/types/bapp";
 // S-P-03 (04 §7.1; `04.30`): the steps in motion sit above the carried Sydney hub until `1e` rebuilds the page.
 import { ParentJourneyRail, loadParentJourney } from "@/modules/call-layer";
+// S-P-13 (`1i`): the children card, and rows 7-8 of the rail. This route file is the one place the gate, the
+// money standing and the child-link reads are all legal to reach (01 §2.3) — see `app-rail-facts.ts`.
+import { accessGate } from "@/modules/access-gate";
+import { ChildrenCard, loadChildrenCard } from "@/modules/app";
+import { auth } from "@/modules/auth";
+import type { FamilyId } from "@/modules/shared-types";
+import { appRailFacts } from "./app-rail-facts";
 
 const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
@@ -39,7 +46,35 @@ export default async function ParentHubPage({
   } = await supabase.auth.getUser();
   const admin = createAdminClient();
 
-  const journey = await loadParentJourney();
+  // The gate, once. `hasAccess` fails closed by carrying `payments`' error rather than defaulting to
+  // `open: false` (`1h`), so a refusal here becomes `null` — "we could not tell" — and the card renders the
+  // outage state rather than a paywall. Flattening the two would bill a paying family for a database blip.
+  const signedInUserId = await auth.getCurrentUserId();
+  const familyId =
+    signedInUserId.ok && signedInUserId.value !== null
+      ? (signedInUserId.value as string as FamilyId)
+      : null;
+  const gate = familyId === null ? null : await accessGate.hasAccess(familyId);
+  const access = gate !== null && gate.ok ? gate.value : null;
+
+  const [journey, childrenCard] = await Promise.all([
+    loadParentJourney(
+      familyId === null || access === null
+        ? undefined
+        : await appRailFacts({
+            familyId,
+            access,
+            standing: access.state.state,
+            ...(access.state.state === "placed"
+              ? {
+                  appOnFrom: access.state.startedAt,
+                  paymentDueAt: access.state.paymentDueAt,
+                }
+              : {}),
+          }),
+    ),
+    loadChildrenCard(access),
+  ]);
 
   const [
     placementResult,
@@ -98,6 +133,7 @@ export default async function ParentHubPage({
         steps={journey.kind === "steps" ? journey.steps : []}
         failed={journey.kind !== "steps"}
       />
+      {childrenCard === null ? null : <ChildrenCard view={childrenCard} />}
       <ParentHubClient
         position={position}
         placement={placement}

@@ -9,6 +9,33 @@ export type * from "./katie";
 export type * from "./child-development";
 export type * from "./child-linking";
 
-// The one runtime surface today: the child-link reads that bound a family's access (ADR-083 / 084).
-export { childLinking, configureChildLinking } from "./child-linking";
+// `child-linking`'s runtime surface (ADR-083 / 084; `1i`): the reads that bound a family's access, the writes
+// that create a child and move an invite, and the screens of 04 §6.1 / §6.2.
+export {
+  childLinking,
+  configureChildLinking,
+  createChildLinking,
+  dbChildLinkingStore,
+  memoryChildLinkingStore,
+  normaliseInviteToken,
+  mintInviteToken,
+  inviteAuthorisation,
+  InviteLandingPage,
+  ChildrenCard,
+  AppGateNotice,
+  loadInviteLanding,
+  loadChildrenCard,
+  inviteLandingView,
+  childrenCardView,
+  appAccessView,
+  claimInviteAction,
+  createChildAction,
+  createChildInviteAction,
+  revokeChildInviteAction,
+} from "./child-linking";
+// The two gate consumers (`07.09`, `07.59`). Both are pure and three-valued — a closed app and an app we
+// could not check are different answers, and neither sub-module flattens them into a boolean.
+export { childAppGate } from "./child-development";
+export { katieAccessGate } from "./katie";
+
 export { stubApp } from "./app.stub";

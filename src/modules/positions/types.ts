@@ -3,6 +3,7 @@
 // `call-layer`) register their handlers with it at boot. The stage-model vocabulary itself lives in
 // `shared-types/stage-model.ts` (03 §2.5) — the slice-registration types included (ADR-119) — and is re-exported
 // by `index.ts`; this file adds only what the `positions` connector needs.
+import type { AppRailFacts } from "./lib/journey-rows-4-to-8";
 import type { PositionPageView } from "./lib/position-page-view";
 import type {
   AmendInput,
@@ -97,8 +98,14 @@ export type PrecheckRecord = {
 export type PositionsReads = {
   readonly amend: (input: AmendInput) => Promise<Result<StateAfter>>;
   readonly getStage: (entity: EntityRef) => Promise<Result<StageRead>>;
+  /**
+   * `app` is rows 7 and 8's facts (`1i`), optional and handed in rather than read: 01 §2.3 gives `positions`
+   * no arrow to `payments` or `app`, so the caller that may read them supplies them. Omitted, both rows read
+   * `pending` — which is what they did before `1i` and is still the honest answer when nobody asked.
+   */
   readonly getJourneySteps: (
     parentId: ParentId,
+    app?: AppRailFacts,
   ) => Promise<Result<ReadonlyArray<JourneyStep>>>;
   /** admin levers + user buttons (03 §2.5). */
   readonly listAllowed: (
