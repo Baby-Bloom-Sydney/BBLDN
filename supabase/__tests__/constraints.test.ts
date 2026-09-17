@@ -515,7 +515,11 @@ describe("db.constraints — what 0019 added (the three write definers)", () => 
     "upsert_position",
     "upsert_connection",
     "upsert_placement",
+    "apply_payment_event",
   ] as const;
+
+  /** The two that ARE the user-session road — 07 §5.2, not 07 §5.1 rule 5. */
+  const SESSION_ROADS = ["create_child_invite", "revoke_child_invite"] as const;
 
   // ADR-127: without these three, every position / connection / placement write is refused inside
   // the caller's unit of work and no definer exists to call instead — the state P1-STORES measured.
@@ -608,5 +612,91 @@ describe("db.constraints — what 0019 added (the three write definers)", () => 
           and cmd <> 'SELECT'`,
     );
     expect(rows).toEqual([]);
+  });
+
+  it("the two invite definers exist, are definers, and are the session road (07 §5.2)", async () => {
+    for (const name of SESSION_ROADS) {
+      const { rows } = await db.query<{
+        secdef: boolean;
+        config: string | null;
+        anon: boolean;
+        auth: boolean;
+      }>(
+        `select p.prosecdef as secdef,
+                array_to_string(p.proconfig, ',') as config,
+                has_function_privilege('anon', p.oid, 'execute') as anon,
+                has_function_privilege('authenticated', p.oid, 'execute') as auth
+           from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+          where ns.nspname = 'public' and p.proname = $1`,
+        [name],
+      );
+      expect(rows.length, `${name} exists exactly once`).toBe(1);
+      expect(rows[0]?.secdef, name).toBe(true);
+      expect(rows[0]?.config, name).toContain('search_path=""');
+      // the inverse of §§1-3: authenticated MUST have it, anon must not
+      expect(rows[0]?.auth, `${name} authenticated`).toBe(true);
+      expect(rows[0]?.anon, `${name} anon`).toBe(false);
+    }
+  });
+
+  // 07 §5.2: "links and invites written only by the RPCs". The functions are only meaningful while the
+  // table still refuses a direct client write.
+  it("child_invites still carries no client write policy", async () => {
+    const { rows } = await db.query<{ policyname: string; cmd: string }>(
+      `select policyname, cmd from pg_policies
+        where schemaname = 'public' and tablename = 'child_invites'`,
+    );
+    expect(rows.map((r) => r.cmd)).toEqual(["SELECT"]);
+  });
+
+  // 04 §4.4 c1. The column, its covering index, and the arm that makes it useful.
+  it("children.created_by_user_id is a nullable FK with a covering index and a stamp trigger", async () => {
+    const { rows } = await db.query<{ is_nullable: string }>(
+      `select is_nullable from information_schema.columns
+        where table_schema = 'public' and table_name = 'children'
+          and column_name = 'created_by_user_id'`,
+    );
+    expect(rows[0]?.is_nullable).toBe("YES");
+    expect(await checkDef("children_created_by_user_id_fkey")).toContain(
+      "ON DELETE SET NULL",
+    );
+    expect(await indexDef("children_created_by_idx")).toContain(
+      "created_by_user_id",
+    );
+    const { rows: trg } = await db.query<{ tgname: string }>(
+      `select tgname from pg_trigger
+        where tgrelid = 'public.children'::regclass and tgname = 'children_stamp_creator'`,
+    );
+    expect(trg).toHaveLength(1);
+  });
+
+  // The one that was measured rather than reasoned: as a SECURITY DEFINER, is_privileged_writer() is
+  // always true inside this trigger (0000's own comment), so it stamps nothing and the nanny's own row
+  // becomes unreadable to her — the exact symptom 0019 exists to fix.
+  it("children_stamp_creator is SECURITY INVOKER, or it stamps nothing at all", async () => {
+    const { rows } = await db.query<{ secdef: boolean }>(
+      `select p.prosecdef as secdef from pg_proc p
+         join pg_namespace ns on ns.oid = p.pronamespace
+        where ns.nspname = 'public' and p.proname = 'children_stamp_creator'`,
+    );
+    expect(rows[0]?.secdef).toBe(false);
+  });
+
+  it("user_has_child_access carries the creator arm, limited to an unclaimed child", async () => {
+    const { rows } = await db.query<{ src: string }>(
+      `select p.prosrc as src from pg_proc p
+         join pg_namespace ns on ns.oid = p.pronamespace
+        where ns.nspname = 'public' and p.proname = 'user_has_child_access'`,
+    );
+    expect(rows[0]?.src).toContain("created_by_user_id");
+    // without this clause the arm is a permanent read on a family's record
+    expect(rows[0]?.src).toContain("parent_user_id is null");
+  });
+
+  // apply_payment_event's replay guard is this constraint, not a lookup it invents.
+  it("payment_events still carries the provider/event unique the webhook fold rests on", async () => {
+    expect(await checkDef("payment_events_provider_event_key")).toBe(
+      "UNIQUE (provider, provider_event_id)",
+    );
   });
 });

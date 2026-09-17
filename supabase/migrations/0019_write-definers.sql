@@ -494,7 +494,424 @@ grant execute on function public.upsert_placement(uuid, uuid, uuid, uuid, public
   public.placement_state, jsonb, uuid, integer) to service_role;
 
 -- ---------------------------------------------------------------------------
--- 4. Verify — the migration asserts its own result (02 §6; `0017` / `0018`'s pattern).
+-- 4. `children.created_by_user_id`, and the fourth arm `user_has_child_access()` owes it.
+--
+--    04 §4.4 c1 has a nanny add an existing client's child and mint a
+--    `nanny_to_parent` token for that family. `1i` stopped on it rather than
+--    guessing: `children` has **no creator column**, and `user_has_child_access()`
+--    (`0012`) admits only the child's parent, an actively linked nanny, or an
+--    admin — so the nanny cannot read back the row she has just inserted, let
+--    alone prove it is hers. `1i` pinned it `it.fails` and named 02 §4.6 as the
+--    owner. Both halves land here, because either alone is useless: the column
+--    records who created the row, and the arm is what lets her read it.
+--
+--    **The arm is deliberately narrow: the creator of an UNCLAIMED child.** Once
+--    `parent_user_id` is set the child belongs to a family, and the creator needs
+--    an active `child_client` link like any other nanny — which is exactly the
+--    third arm. A creator arm without the `parent_user_id is null` clause would
+--    give whoever first typed a child's name a permanent read on that family's
+--    record, which 07 §5.2's "`user_has_child_access` on every read and write"
+--    exists to prevent.
+--
+--    **The column is stamped by a trigger, not trusted from the caller.**
+--    `0012`'s `children_nanny_insert` policy lets any nanny insert a row with
+--    `parent_user_id is null`; if the creator column were merely writable, a
+--    nanny could name somebody else as the creator and hand a stranger the read
+--    this arm grants. A BEFORE INSERT trigger stamps `auth.uid()` for every
+--    non-privileged caller instead, so the column cannot be spoofed and no
+--    existing policy has to be narrowed (which would break every parent's
+--    child-create, since none of them sends the column).
+--    `guard_children_protected_columns()` (`0012`) is a whitelist of the columns
+--    a client may UPDATE and does not list this one, so it is write-once by
+--    construction — no new guard is needed and none is added.
+-- ---------------------------------------------------------------------------
+
+alter table public.children
+  add column if not exists created_by_user_id uuid
+    references auth.users (id) on delete set null;
+
+comment on column public.children.created_by_user_id is
+  '04 §4.4 c1 / L-007 1i: who inserted this row. Stamped from the session by children_stamp_creator, never trusted from the caller. Reads back through user_has_child_access() only while the child is unclaimed (parent_user_id is null).';
+
+-- `0006`'s database-reviewer M-3, same rule: an ON DELETE SET NULL FK without a covering index makes every
+-- `auth.users` delete a sequential scan of this table.
+create index if not exists children_created_by_idx
+  on public.children (created_by_user_id)
+  where created_by_user_id is not null;
+
+-- **SECURITY INVOKER, deliberately — and found by invoking it, not by reading it.** Written first as a
+-- definer, this trigger stamped nothing: `0000`'s own comment says `is_privileged_writer()` is true for
+-- "any SECURITY DEFINER owned by" the schema owner, so inside a definer trigger it is ALWAYS true and the
+-- branch below never ran. The nanny's INSERT then succeeded with a null creator and her `RETURNING id`
+-- was refused by `children_access_select`, which is the exact symptom `1i` pinned. `0012`'s own column
+-- guards (`guard_children_protected_columns`, `guard_subscribe_invite_columns`) are invoker for the same
+-- reason; this one now matches them, and the verify block asserts it rather than trusting the next editor.
+create or replace function public.children_stamp_creator()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  -- A privileged writer (the module at service scope, a definer, a migration) keeps whatever it sent: it is
+  -- the one caller that can legitimately create a child on somebody else's behalf, and `auth.uid()` is null
+  -- for it anyway (0000's note on `is_privileged_writer()`).
+  if not public.is_privileged_writer() then
+    new.created_by_user_id := auth.uid();
+  end if;
+  return new;
+end;
+$$;
+
+comment on function public.children_stamp_creator is
+  '04 §4.4 c1: the creator is the session, not an argument. Without this, 0012 children_nanny_insert would let a nanny name a stranger as creator and hand them the read user_has_child_access grants an unclaimed child.';
+
+-- `0000` §3's discipline, applied without exception: PUBLIC keeps EXECUTE on a new function by default.
+-- A trigger function is not reachable through PostgREST, so this is hygiene rather than a hole - and 0000
+-- makes the same revoke for the same reason on every one of its own trigger functions.
+revoke all on function public.children_stamp_creator() from public;
+
+drop trigger if exists children_stamp_creator on public.children;
+create trigger children_stamp_creator
+  before insert on public.children
+  for each row execute function public.children_stamp_creator();
+
+-- The fourth arm. Replaced whole rather than patched, because `0012` wrote it as one `select` and a
+-- policy that reads it must keep reading one object; the first three arms are `0012`'s, unchanged.
+create or replace function public.user_has_child_access(p_child_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select
+    (select public.is_admin())
+    or exists (
+      select 1 from public.children c
+       where c.id = p_child_id and c.parent_user_id = (select auth.uid())
+    )
+    or exists (
+      select 1 from public.child_client cc
+       where cc.child_id = p_child_id
+         and cc.state = 'active'
+         and ((select auth.uid()) in (cc.nanny_user_id, cc.parent_user_id))
+    )
+    -- 04 §4.4 c1 (0019): the creator of a child no family has claimed yet.
+    or exists (
+      select 1 from public.children c
+       where c.id = p_child_id
+         and c.parent_user_id is null
+         and c.created_by_user_id = (select auth.uid())
+    );
+$$;
+
+comment on function public.user_has_child_access is
+  '0012 + 0019: the one RLS predicate for every app table. Admin, the child''s parent, an actively linked party, and - since 0019 - the creator of a child that is still unclaimed (04 §4.4 c1).';
+
+revoke all on function public.user_has_child_access(uuid) from public;
+grant execute on function public.user_has_child_access(uuid) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- 5. `create_child_invite()` and `revoke_child_invite()` — 07 §5.2's missing halves.
+--
+--    07 §5.2 row `children · child_client · child_invites` ends "links and
+--    invites written only by the RPCs", and `0012` says the same in its own
+--    words — yet `0012` shipped the **claim** (`connect_child_invite`) and the
+--    unlinks and no mint and no revoke. `child_invites` carries exactly one
+--    policy, a SELECT, so there is no legal client road to either write; `1i`
+--    made both service-scoped and pinned the gap, noting that
+--    `invite-authorisation.ts` is then the **only** gate and nothing in Postgres
+--    stands behind it. These two put the same two rules in SQL.
+--
+--    **These two ARE the user-session road, and their `EXECUTE` says so.** Unlike
+--    §§1-3, the authority here is genuinely the caller's: a parent mints for her
+--    own child, a nanny for a child she created or is linked to, an admin for
+--    either. `auth.uid()` is therefore the right test and a null one is refused
+--    outright, so a service-scope call fails loudly instead of quietly minting
+--    with no authority. **Consequence the wiring owes:** the module's store calls
+--    both writes at `{ scope: "service" }` today; moving them onto these
+--    functions means moving them to session scope.
+--
+--    **The token is the caller's, and the reason is one owner per rule.**
+--    `1i` proposed `create_child_invite(p_child_id, p_direction)` with the
+--    function minting. It takes `p_token` instead: the alphabet
+--    (`invite-token-alphabet.ts`, Crockford's 32 minus I/L/O/U) and the
+--    collision retry already live in one place that can retry, and a second
+--    generator in DDL is a second place for them to drift. The shape is still
+--    refused twice - here, and by `0012`'s own
+--    `child_invites_token_shape_check`. **No rotation:** there is no argument
+--    that replaces a pending token, because a pending invite is returned as it
+--    stands; revoke is the only invalidation path, which is `0012`'s own
+--    assertion ("child_invites has no expiry column").
+-- ---------------------------------------------------------------------------
+
+create or replace function public.create_child_invite(
+  p_child_id  uuid,
+  p_direction public.invite_direction,
+  p_token     text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor  uuid := auth.uid();
+  v_child  public.children;
+  v_id     uuid;
+begin
+  if v_actor is null then
+    raise exception 'INVITE_NO_SESSION' using errcode = '42501';
+  end if;
+
+  select * into v_child from public.children c where c.id = p_child_id;
+  if not found then
+    raise exception 'INVITE_CHILD_NOT_FOUND' using errcode = 'no_data_found';
+  end if;
+
+  -- `invite-authorisation.ts` `mayMint`, in SQL. One refusal for every way it can fail, so a caller
+  -- cannot tell "not your child" from "wrong direction for your role" (07 §4).
+  if not (
+    (select public.is_admin())
+    or (p_direction = 'parent_to_nanny' and v_child.parent_user_id = v_actor)
+    or (
+      p_direction = 'nanny_to_parent'
+      and (select public.is_nanny())
+      and v_child.parent_user_id is null
+      and (
+        v_child.created_by_user_id = v_actor
+        or exists (
+          select 1 from public.child_client cc
+           where cc.child_id = p_child_id and cc.state = 'active' and cc.nanny_user_id = v_actor
+        )
+      )
+    )
+  ) then
+    raise exception 'INVITE_NOT_YOURS' using errcode = 'insufficient_privilege';
+  end if;
+
+  if p_token !~ '^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$' then
+    raise exception 'INVITE_TOKEN_MALFORMED' using errcode = 'invalid_parameter_value';
+  end if;
+
+  -- Idempotent, and it matches `child_invites_one_pending_per_direction_idx` rather than racing it: the
+  -- pending invite for this (child, direction) IS the answer, and a caller that asks twice gets the same
+  -- token rather than a second one that would invalidate the link already passed to a family.
+  select i.id into v_id
+    from public.child_invites i
+   where i.child_id = p_child_id and i.direction = p_direction and i.status = 'pending';
+  if found then
+    return v_id;
+  end if;
+
+  insert into public.child_invites (child_id, token, direction, created_by_user_id)
+  values (p_child_id, p_token, p_direction, v_actor)
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
+comment on function public.create_child_invite is
+  '07 §5.2 / 02 §7 (0019): the mint 0012 never shipped. mayMint asserted in SQL, the token minted by the caller and shape-checked here and by 0012''s CHECK, idempotent on the one pending invite per (child, direction). authenticated only - the authority is the session.';
+
+create or replace function public.revoke_child_invite(
+  p_invite_id uuid,
+  p_reason    public.invite_revoked_reason
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor  uuid := auth.uid();
+  v_invite public.child_invites;
+begin
+  if v_actor is null then
+    raise exception 'INVITE_NO_SESSION' using errcode = '42501';
+  end if;
+
+  select * into v_invite from public.child_invites i where i.id = p_invite_id for update;
+  if not found then
+    raise exception 'INVITE_NOT_FOUND' using errcode = 'no_data_found';
+  end if;
+
+  -- `mayRevoke`: the creator, or an admin. Same one refusal either way.
+  if not ((select public.is_admin()) or v_invite.created_by_user_id = v_actor) then
+    raise exception 'INVITE_NOT_YOURS' using errcode = 'insufficient_privilege';
+  end if;
+
+  -- A terminal invite is returned unchanged, never un-revoked and never re-revoked: `connected` is a claim
+  -- that already happened, and `revoked` already carries the reason and the instant it was revoked at.
+  if v_invite.status <> 'pending' then
+    return false;
+  end if;
+
+  update public.child_invites i
+     set status = 'revoked', revoked_at = now(), revoked_reason = p_reason
+   where i.id = p_invite_id;
+
+  return true;
+end;
+$$;
+
+comment on function public.revoke_child_invite is
+  '07 §5.2 / 02 §7 (0019): the revoke 0012 never shipped, and the ONLY invalidation path for a token - there is no rotation and no expiry (0012''s own assertion). mayRevoke asserted in SQL. authenticated only.';
+
+revoke all on function public.create_child_invite(uuid, public.invite_direction, text) from public, anon;
+revoke all on function public.revoke_child_invite(uuid, public.invite_revoked_reason) from public, anon;
+grant execute on function public.create_child_invite(uuid, public.invite_direction, text) to authenticated;
+grant execute on function public.revoke_child_invite(uuid, public.invite_revoked_reason) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 6. `apply_payment_event()` — the webhook's two writes, made one (ADR-127).
+--
+--    `1h` shipped `handleWebhook` as 03 §5.4.3's ordered spine and wrote the gap
+--    into the file rather than hiding it: "this spine is a ledger **insert** then
+--    a spine **update** — two table writes... Making it atomic means a new
+--    SECURITY DEFINER function and therefore a migration, which this unit may not
+--    write." This is that function.
+--
+--    **What it does NOT take over.** The signature verification (07 §10.1), the
+--    family resolution and the transition table (`dispatch-purchase-event.ts`)
+--    stay in TypeScript, where they are pure and tested. The function is handed a
+--    decided patch and applies it; it decides nothing about money.
+--
+--    **The ordering rule survives, in a better form.** `1h` inserted the ledger
+--    row first so that a crash left a *visible unprocessed delivery* rather than
+--    a lost one, and reconciled from `payment_events.processed_at IS NULL`
+--    (`0010` §2). Inside one transaction the failure mode changes and improves:
+--    a failure rolls the ledger row back too, so the delivery is neither applied
+--    nor recorded, and the provider retries it. The unprocessed-delivery index
+--    still earns its place — the `unresolved` outcome below commits a ledger row
+--    with its `processing_error` and no spine write, which is exactly the row the
+--    runbook wants to see.
+--
+--    **Idempotency is unchanged and is the table's.** `ON CONFLICT ON CONSTRAINT
+--    payment_events_provider_event_key DO NOTHING` returning nothing IS the
+--    duplicate, so a replay costs one statement and touches no money.
+--
+--    `p_access_age_years` is a required-when-used number rather than a SQL
+--    default, for `0010`'s stated reason: `PRICES.accessAgeYears` is config and
+--    L4 forbids a product literal outside `config/`.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.apply_payment_event(
+  p_provider          text,
+  p_provider_event_id text,
+  p_event_type        text,
+  p_payload           jsonb,
+  p_received_at       timestamptz,
+  p_parent_user_id    uuid    default null,
+  p_spine_patch       jsonb   default null,
+  p_access_age_years  integer default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_event_id     uuid;
+  v_spine        public.parent_subscriptions;
+  v_in           public.parent_subscriptions;
+  v_patch        jsonb;
+  v_access_until timestamptz;
+begin
+  if not public.is_privileged_writer() then
+    raise exception 'NOT_PRIVILEGED_WRITER' using errcode = 'insufficient_privilege';
+  end if;
+
+  insert into public.payment_events
+    (provider, provider_event_id, event_type, payload, received_at)
+  values
+    (p_provider, p_provider_event_id, p_event_type, p_payload,
+     coalesce(p_received_at, now()))
+  on conflict on constraint payment_events_provider_event_key do nothing
+  returning id into v_event_id;
+
+  if v_event_id is null then
+    return jsonb_build_object('outcome', 'duplicate', 'event_id', null);
+  end if;
+
+  if p_parent_user_id is null then
+    update public.payment_events e
+       set processing_error = 'E_EVENT_UNRESOLVED'
+     where e.id = v_event_id;
+    return jsonb_build_object('outcome', 'unresolved', 'event_id', v_event_id);
+  end if;
+
+  if p_spine_patch is not null then
+    select * into v_spine
+      from public.parent_subscriptions s
+     where s.parent_user_id = p_parent_user_id
+       for update;
+    if not found then
+      -- I-M1: the spine row is minted before a purchase can be dispatched against it. A missing one is
+      -- the same shape `set_access_window` refuses on, and it is recorded rather than invented.
+      update public.payment_events e
+         set processing_error = 'E_SPINE_MISSING', parent_user_id = p_parent_user_id
+       where e.id = v_event_id;
+      return jsonb_build_object('outcome', 'unresolved', 'event_id', v_event_id);
+    end if;
+
+    v_patch := p_spine_patch
+               - 'id' - 'parent_user_id' - 'created_at' - 'updated_at'
+               -- `access_until` is `set_access_window()`'s alone (`0010`; ADR-083 / 084), and this
+               -- function calls it below rather than letting a patch reach the column directly.
+               - 'access_until';
+    v_in := jsonb_populate_record(v_spine, v_patch);
+
+    update public.parent_subscriptions s set
+      status                 = v_in.status,
+      plan_shape             = v_in.plan_shape,
+      purchase_path          = v_in.purchase_path,
+      purchased_at           = v_in.purchased_at,
+      instalments_total      = v_in.instalments_total,
+      instalments_paid       = v_in.instalments_paid,
+      price_pence            = v_in.price_pence,
+      price_preset           = v_in.price_preset,
+      deposit_pence          = v_in.deposit_pence,
+      deposit_paid_at        = v_in.deposit_paid_at,
+      deposit_refunded_at    = v_in.deposit_refunded_at,
+      current_period_ends_at = v_in.current_period_ends_at,
+      past_due_grace_ends_at = v_in.past_due_grace_ends_at,
+      cancelled_at           = v_in.cancelled_at
+    where s.id = v_spine.id;
+
+    -- ADR-083 / 084, and the same condition `handleWebhook` applies: the window is recomputed on a
+    -- transition that moved the status, and only then. In this transaction, so a paid delivery cannot
+    -- leave a spine that says `paid_in_full` beside a window that was never opened.
+    if p_spine_patch ? 'status' and p_access_age_years is not null then
+      v_access_until := public.set_access_window(p_parent_user_id, p_access_age_years);
+    end if;
+  end if;
+
+  update public.payment_events e
+     set processed_at = now(), parent_user_id = p_parent_user_id
+   where e.id = v_event_id;
+
+  return jsonb_build_object(
+    'outcome', 'applied',
+    'event_id', v_event_id,
+    'access_until', v_access_until
+  );
+end;
+$$;
+
+comment on function public.apply_payment_event is
+  '03 §5.4.3 / ADR-127 (0019): the webhook''s ledger insert, spine update and processed_at stamp in one transaction - the fold 1h named and could not write. Decides nothing about money: the signature check, the family resolution and the transition table stay in TypeScript. service_role only.';
+
+revoke all on function public.apply_payment_event(
+  text, text, text, jsonb, timestamptz, uuid, jsonb, integer) from public;
+revoke all on function public.apply_payment_event(
+  text, text, text, jsonb, timestamptz, uuid, jsonb, integer) from anon, authenticated;
+grant execute on function public.apply_payment_event(
+  text, text, text, jsonb, timestamptz, uuid, jsonb, integer) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- 7. Verify — the migration asserts its own result (02 §6; `0017` / `0018`'s pattern).
 --
 --    Metadata only, and it says so: S5b's lesson on `0017` was that 151 metadata
 --    assertions passed over a function that could not insert a row. What follows
@@ -589,6 +1006,135 @@ begin
       and p.prosrc !~ 'call_booking_id'
   ) then
     raise exception '0019: upsert_position() must strip the call_* keys so upsert_call_mirror() stays their one writer';
+  end if;
+
+  -- §4 — the creator column, its index, its stamp trigger, and the fourth arm.
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'children'
+      and column_name = 'created_by_user_id' and is_nullable = 'YES'
+  ) then
+    raise exception '0019: children.created_by_user_id missing or NOT NULL (04 §4.4 c1) - every existing row has no creator and always will';
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.children'::regclass and contype = 'f'
+      and conname = 'children_created_by_user_id_fkey' and confdeltype = 'n'
+  ) then
+    raise exception '0019: children.created_by_user_id must be a FK to auth.users ON DELETE SET NULL';
+  end if;
+
+  if to_regclass('public.children_created_by_idx') is null then
+    raise exception '0019: children_created_by_idx missing - an ON DELETE SET NULL FK with no covering index (0006''s M-3)';
+  end if;
+
+  if not exists (
+    select 1 from pg_trigger
+    where tgrelid = 'public.children'::regclass and tgname = 'children_stamp_creator'
+  ) then
+    raise exception '0019: the children_stamp_creator trigger is missing - the column would be caller-supplied and spoofable';
+  end if;
+
+  -- The one that was measured, not reasoned: as a SECURITY DEFINER this function stamps NOTHING, because
+  -- `is_privileged_writer()` is true for any definer the schema owner owns (0000's own comment). The
+  -- nanny's insert then lands with a null creator and her own RETURNING is refused by
+  -- children_access_select - which is exactly the symptom 1i pinned this migration to fix.
+  if exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'children_stamp_creator' and p.prosecdef
+  ) then
+    raise exception '0019: children_stamp_creator() must be SECURITY INVOKER - as a definer, is_privileged_writer() is always true and it stamps nothing';
+  end if;
+
+  if has_function_privilege('anon', 'public.children_stamp_creator()', 'execute') then
+    raise exception '0019: children_stamp_creator() kept PUBLIC''s default EXECUTE (0000 §3 - the rule has no exceptions)';
+  end if;
+
+  -- The name alone is not the assertion: the arm is only safe BECAUSE of the unclaimed clause, and an edit
+  -- that dropped it would give a creator a permanent read on a family's record.
+  if (select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.proname = 'user_has_child_access') !~ 'created_by_user_id' then
+    raise exception '0019: user_has_child_access() has no creator arm (04 §4.4 c1)';
+  end if;
+  if (select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.proname = 'user_has_child_access') !~ 'parent_user_id is null' then
+    raise exception '0019: user_has_child_access()''s creator arm must be limited to an UNCLAIMED child';
+  end if;
+
+  -- §5 — the mint and the revoke, and the one thing that makes them different from §§1-3: they ARE the
+  -- user-session road, so `authenticated` must have EXECUTE and `anon` must not.
+  for v_i in 1 .. 2 loop
+    v_sig := (array[
+      'public.create_child_invite(uuid, public.invite_direction, text)',
+      'public.revoke_child_invite(uuid, public.invite_revoked_reason)'
+    ])[v_i];
+    v_fn := (array['create_child_invite', 'revoke_child_invite'])[v_i];
+
+    if to_regprocedure(v_sig) is null then
+      raise exception '0019: %() missing (07 §5.2 - links and invites are written only by the RPCs)', v_fn;
+    end if;
+    if not exists (
+      select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = v_fn
+        and p.prosecdef and p.proconfig is not null and 'search_path=""' = any(p.proconfig)
+    ) then
+      raise exception '0019: %() must be SECURITY DEFINER with search_path pinned', v_fn;
+    end if;
+    if not has_function_privilege('authenticated', v_sig, 'execute') then
+      raise exception '0019: %() must be EXECUTE-able by authenticated - the authority IS the session', v_fn;
+    end if;
+    if has_function_privilege('anon', v_sig, 'execute') then
+      raise exception '0019: %() must not be reachable by anon (get_invite_preview is the only anon invite road)', v_fn;
+    end if;
+    -- Both read `auth.uid()` and refuse a null one; without that a service-scope call would mint or revoke
+    -- with no authority at all, which is the hole these functions exist to close.
+    if (select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public' and p.proname = v_fn) !~ 'INVITE_NO_SESSION' then
+      raise exception '0019: %() must refuse a call with no session', v_fn;
+    end if;
+  end loop;
+
+  -- `0012`'s own rule, restated because §5 depends on it: the one pending invite per (child, direction) is
+  -- what makes the mint idempotent instead of a second token racing the first.
+  if to_regclass('public.child_invites_one_pending_per_direction_idx') is null then
+    raise exception '0019: child_invites_one_pending_per_direction_idx is missing - create_child_invite()''s idempotency rests on it';
+  end if;
+
+  -- 0012 asserted it and 0019 depends on it: revoke is the only invalidation path.
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'child_invites'
+      and column_name in ('expires_at', 'expiry', 'rotated_at')
+  ) then
+    raise exception '0019: child_invites has gained an expiry/rotation column; revoke is the only invalidation path';
+  end if;
+
+  -- §6 — the webhook fold.
+  v_sig := 'public.apply_payment_event(text, text, text, jsonb, timestamptz, uuid, jsonb, integer)';
+  if to_regprocedure(v_sig) is null then
+    raise exception '0019: apply_payment_event() missing (03 §5.4.3 / ADR-127)';
+  end if;
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'apply_payment_event'
+      and p.prosecdef and p.proconfig is not null and 'search_path=""' = any(p.proconfig)
+  ) then
+    raise exception '0019: apply_payment_event() must be SECURITY DEFINER with search_path pinned';
+  end if;
+  if has_function_privilege('anon', v_sig, 'execute')
+     or has_function_privilege('authenticated', v_sig, 'execute') then
+    raise exception '0019: apply_payment_event() must be service_role only (I-M2 - no client writes the spine)';
+  end if;
+  -- The idempotency is the named constraint's, not a lookup this function invents.
+  if not exists (
+    select 1 from pg_constraint where conname = 'payment_events_provider_event_key'
+  ) then
+    raise exception '0019: payment_events_provider_event_key is missing - apply_payment_event()''s replay guard rests on it';
+  end if;
+  if (select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.proname = 'apply_payment_event') !~ 'set_access_window' then
+    raise exception '0019: apply_payment_event() must recompute the access window inside its own transaction (ADR-083 / 084)';
   end if;
 end
 $$;

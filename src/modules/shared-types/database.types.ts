@@ -846,6 +846,7 @@ export type Database = {
       children: {
         Row: {
           created_at: string
+          created_by_user_id: string | null
           date_of_birth: string
           feed_locked_at: string | null
           feed_locked_for_nanny: boolean
@@ -861,6 +862,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by_user_id?: string | null
           date_of_birth: string
           feed_locked_at?: string | null
           feed_locked_for_nanny?: boolean
@@ -876,6 +878,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by_user_id?: string | null
           date_of_birth?: string
           feed_locked_at?: string | null
           feed_locked_for_nanny?: boolean
@@ -4101,6 +4104,19 @@ export type Database = {
       }
     }
     Functions: {
+      apply_payment_event: {
+        Args: {
+          p_access_age_years?: number
+          p_event_type: string
+          p_parent_user_id?: string
+          p_payload: Json
+          p_provider: string
+          p_provider_event_id: string
+          p_received_at: string
+          p_spine_patch?: Json
+        }
+        Returns: Json
+      }
       book_slot: {
         Args: {
           p_actor_role: Database["public"]["Enums"]["actor_role"]
@@ -4131,6 +4147,14 @@ export type Database = {
           count: number
           reset_at: string
         }[]
+      }
+      create_child_invite: {
+        Args: {
+          p_child_id: string
+          p_direction: Database["public"]["Enums"]["invite_direction"]
+          p_token: string
+        }
+        Returns: string
       }
       create_parent_profile: {
         Args: { p_first_name: string; p_last_name: string; p_mobile: string }
@@ -4305,6 +4329,13 @@ export type Database = {
       remove_nanny_from_child: {
         Args: { p_child_id: string; p_reason: string }
         Returns: string
+      }
+      revoke_child_invite: {
+        Args: {
+          p_invite_id: string
+          p_reason: Database["public"]["Enums"]["invite_revoked_reason"]
+        }
+        Returns: boolean
       }
       set_access_window: {
         Args: { p_access_age_years: number; p_parent_user_id: string }
