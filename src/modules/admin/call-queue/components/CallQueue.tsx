@@ -168,7 +168,7 @@ export function CallQueue({
 /**
  * The calls with no booking behind them (03 §3.6). Its own table, because its columns are different ones: a
  * call that has never had a time has no time, no priority lane and no outcome — it has a family who has been
- * waiting since a known instant, and 03 §2.2's promise that "BabyBloom calls anyway".
+ * waiting since a known instant, and 03 §2.2's promise that we ring anyway.
  *
  * A retry after a no-answer is named as one (R5), because an admin who does not know that is about to ring a
  * number that already did not answer.

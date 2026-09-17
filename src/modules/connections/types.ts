@@ -2,13 +2,25 @@
 // (`00-glossary` §1.2; 03 §2.2) as a **slice** of `positions`: its K-row handlers are registered with the stage
 // model at boot and it is never called directly (03 §2.1). The stage vocabulary itself is `shared-types`' and is
 // re-exported by `index.ts`.
+import type { ENUMS } from "@/modules/shared-types";
 import type {
+  AdvanceInput,
+  ConnectionId,
+  ConnectionStage,
+  Email,
+  Instant,
+  ISODate,
   NannyId,
   ParentId,
   PositionId,
+  PositionStage,
   Result,
+  StateAfter,
   TransitionHandler,
+  TransitionId,
+  UnitOfWork,
 } from "@/modules/shared-types";
+import type { Comms } from "@/modules/comms";
 
 /**
  * The K-row handlers the boot file registers with the stage model (03 §2.1). `TransitionHandler` is
@@ -43,4 +55,96 @@ export type ConnectionsReads = {
   readonly liveCountForPosition: (
     positionId: PositionId,
   ) => Promise<ConnectionsResult<number>>;
+};
+
+// ── The inside (`1g`) ──
+
+/**
+ * One connection row (02 §4.2 `connection_requests`), as the module holds it. Only the fields the 25 K rows and
+ * the two reads actually move are here: a column the stage model never touches (the `held_for_verification`
+ * pair, `phone_exchanged_at`) belongs to whoever writes it, not to this record.
+ */
+export type ConnectionRecord = {
+  readonly connectionId: ConnectionId;
+  readonly positionId: PositionId;
+  readonly parentId: ParentId;
+  readonly nannyId: NannyId;
+  readonly stage: ConnectionStage;
+  readonly origin: ConnectionOrigin;
+  readonly createdAt: Instant;
+  readonly version: number;
+  readonly expiresAt?: Instant;
+  readonly meetingAt?: Instant;
+  readonly meetingSetBy?: "parent" | "nanny" | "admin" | "system";
+  readonly meetingOutcome?: MeetingOutcome;
+  readonly trialDate?: ISODate;
+  readonly fillInitiatedBy?: "parent" | "nanny" | "admin";
+  readonly availabilitySlots?: number;
+  /** the terms K-20 carries and L-1 needs (03 §2.4) */
+  readonly terms?: PlacementTerms;
+};
+
+export type ConnectionOrigin = (typeof ENUMS.connection_origin)[number];
+export type MeetingOutcome = (typeof ENUMS.meeting_outcome)[number];
+
+/** K-20's payload, and what the L-1 cascade hands `placements` (03 §2.4). */
+export type PlacementTerms = {
+  readonly weeklyHours: number;
+  readonly hourlyRatePence: number;
+  readonly startDate: ISODate;
+};
+
+export type ConnectionStore = {
+  get(connectionId: ConnectionId): Promise<Result<ConnectionRecord | null>>;
+  /** Every connection on one position — I-2's "≥ 1 live connection" and K-26's blast both read it. */
+  forPosition(
+    positionId: PositionId,
+  ): Promise<Result<ReadonlyArray<ConnectionRecord>>>;
+  /** Every connection a parent holds, across positions — S-P-08's list and `liveNannyIdsForParent`. */
+  forParent(
+    parentId: ParentId,
+  ): Promise<Result<ReadonlyArray<ConnectionRecord>>>;
+  put(record: ConnectionRecord, uow?: UnitOfWork): Promise<Result<void>>;
+};
+
+/**
+ * How a K row fires a cascade into a row it does not own (P-3 · P-4 · P-5, L-1, and K-26 on its siblings).
+ *
+ * `connections` has **no arrow to `positions`** (01 §2.3; the cycle R2 closed), so it cannot call `advance`
+ * itself — the same reason `registerSlice` had to be inverted. The dispatcher is therefore injected at boot,
+ * which may import both, and is declared structurally here exactly as `TransitionHandler` was before ADR-119.
+ * Typed only from `shared-types`, which every module may import.
+ */
+export type AdvanceFn = (
+  input: AdvanceInput<TransitionId>,
+) => Promise<Result<StateAfter>>;
+
+/**
+ * What a K row needs from `positions` without importing it: whether the position is live, and how many of its
+ * connections are live. Both are preconditions the rows state (K-1 "position live"; P-3 / P-4's cascade
+ * conditions), and both are facts about a row this module does not own.
+ */
+export type PositionFacts = {
+  readonly stage: PositionStage;
+  readonly parentId: ParentId;
+};
+
+export type ConnectionsDeps = {
+  readonly store: ConnectionStore;
+  readonly advance: AdvanceFn;
+  /** the position's stage, read through the injected reader rather than an import (01 §2.3) */
+  readonly positionFacts: (
+    positionId: PositionId,
+  ) => Promise<Result<PositionFacts | null>>;
+  readonly comms: Comms;
+  /** the nanny's verification level and isolation — K-1 / K-2 / K-3's preconditions (I-5) */
+  readonly nannyFacts: (nannyId: NannyId) => Promise<Result<NannyFacts | null>>;
+  readonly clock?: () => Instant;
+};
+
+export type NannyFacts = {
+  readonly verificationLevel: string;
+  readonly isolated: boolean;
+  readonly firstName?: string;
+  readonly email?: Email;
 };

@@ -2,15 +2,23 @@
 // **slice** of `positions`: its L-row handlers are registered with the stage model at boot and it is never called
 // directly (03 §2.1). On `placement.started` (L-1b) it opens done-for-you app access through
 // `payments.openDfyAccess` (ADR-093) and renders the hire summary through `hire-docs`.
+import type { ENUMS } from "@/modules/shared-types";
 import type {
+  AdvanceInput,
   ConnectionId,
+  EndReason,
   Instant,
   ISODate,
+  NannyId,
+  ParentId,
   PlacementId,
   PlacementState,
   PositionId,
   Result,
+  StateAfter,
   TransitionHandler,
+  TransitionId,
+  UnitOfWork,
 } from "@/modules/shared-types";
 
 /**
@@ -57,4 +65,59 @@ export type PlacementsReads = {
   readonly activeForPosition: (
     positionId: PositionId,
   ) => Promise<PlacementsResult<PlacementRead | null>>;
+};
+
+// ── The inside (`1g`) ──
+
+/** One placement row (02 §4.2 `nanny_placements`), as the module holds it. */
+export type PlacementRecord = PlacementRead & {
+  readonly parentId: ParentId;
+  readonly nannyId: NannyId;
+  readonly source: PlacementSource;
+  readonly createdAt: Instant;
+  readonly version: number;
+  readonly endedAt?: Instant;
+  readonly endReason?: EndReason;
+  readonly endNotes?: string;
+};
+
+export type PlacementSource = (typeof ENUMS.placement_source)[number];
+
+export type PlacementStore = {
+  get(placementId: PlacementId): Promise<Result<PlacementRecord | null>>;
+  /** I-3's "≤ 1 non-ended placement per position", and the read `activeForPosition` answers. */
+  forPosition(
+    positionId: PositionId,
+  ): Promise<Result<ReadonlyArray<PlacementRecord>>>;
+  forParent(
+    parentId: ParentId,
+  ): Promise<Result<ReadonlyArray<PlacementRecord>>>;
+  put(record: PlacementRecord, uow?: UnitOfWork): Promise<Result<void>>;
+};
+
+/**
+ * How an L row fires a cascade into a row it does not own (K-21 from L-1b; P-6 and K-23 from L-2).
+ *
+ * `placements` has **no arrow to `positions`** (01 §2.3), so it cannot call `advance` itself. The dispatcher is
+ * injected at boot, which may import both — the same inversion `registerSlice` is, and the same one
+ * `connections` uses. Typed only from `shared-types`, which every module may import.
+ */
+export type PlacementAdvanceFn = (
+  input: AdvanceInput<TransitionId>,
+) => Promise<Result<StateAfter>>;
+
+export type PlacementsDeps = {
+  readonly store: PlacementStore;
+  readonly advance: PlacementAdvanceFn;
+  readonly clock?: () => Instant;
+  /**
+   * L-1b's `payments.openDfyAccess(familyId, placementId)` — done-for-you access switches **on** from the
+   * nanny's first day (ADR-093). Injected rather than imported so `1h` can wire the real one without this
+   * module changing: `placements` may import `payments` (01 §2.3), but the inside does not exist yet and a
+   * module that imported a fail-closed binding would make every L-1b fail with it.
+   */
+  readonly openDfyAccess?: (input: {
+    readonly parentId: ParentId;
+    readonly placementId: PlacementId;
+  }) => Promise<Result<void>>;
 };

@@ -12,10 +12,12 @@ import { wireAreas } from "./wire-areas";
 import { wireAuth } from "./wire-auth";
 import { wireCallLayer } from "./wire-call-layer";
 import { wireComms } from "./wire-comms";
+import { wireConnections } from "./wire-connections";
 import { wireConsent } from "./wire-consent";
 import { wireEvents } from "./wire-events";
 import { wireMatching } from "./wire-matching";
 import { wireParentProfileStore } from "./wire-parent-profile-store";
+import { wirePlacements } from "./wire-placements";
 import { wireRateLimiter } from "./wire-rate-limiter";
 import { wireScheduling } from "./wire-scheduling";
 import { wireScoring } from "./wire-scoring";
@@ -35,6 +37,8 @@ export function wirePorts(env: ParsedEnv): BootReport {
     wireScoring(),
     wireMatching(),
     wireCallLayer(),
+    wirePlacements(),
+    wireConnections(),
     wireParentProfileStore(),
   ]);
 }

@@ -68,8 +68,8 @@ export type CallQueueGroup = {
  * decorate — no `bookingId`, no start, no flags. `1f` shipped S-A-03 with this half missing and said so on the
  * screen, because the mirror had no table to enumerate; `0018` gave it one.
  *
- * What the admin does with it is the whole point of the group: these are the families BabyBloom rings anyway
- * (03 §2.2 — "`awaiting-slot` = the parent left the call page without picking … BabyBloom calls anyway").
+ * What the admin does with it is the whole point of the group: these are the families we ring anyway
+ * (03 §2.2 — `awaiting-slot` is "the parent left the call page without picking", and we call regardless).
  */
 export type AwaitingCallRow = {
   readonly positionId: PositionId;

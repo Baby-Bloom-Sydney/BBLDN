@@ -8,8 +8,16 @@ export type * from "./types";
 // The stage vocabulary a caller reads a connection through (03 §2.2).
 export type { ConnectionStage } from "@/modules/shared-types";
 
-// The K-row slice the boot file hands to `positions.registerSlice` (03 §2.1). Phase 1f writes the real handlers.
+// The K-row slice the boot file hands to `positions.registerSlice` (03 §2.1).
 export { stubConnectionsSlice } from "./lib/stub-connections-slice";
+
+// The inside (`1g`): the 25 K rows over the store port, the two reads, and the §2.4 connection table.
+export { createConnectionsSlice } from "./lib/create-connections-slice";
+export { createConnections } from "./lib/create-connections";
+export { memoryConnectionStore } from "./lib/memory-connection-store";
+export { connectionsSliceRegistration } from "./lib/register-connections-slice";
+export { CONNECTION_TRANSITIONS } from "./lib/connection-transitions";
+export { LIVE_STAGES } from "./lib/live-stages";
 
 // The reads `positions` calls (03 §7.5).
 export { connections } from "./lib/default-connections";
