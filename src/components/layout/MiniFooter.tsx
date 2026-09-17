@@ -3,7 +3,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { isPublicSitePath } from "@/modules/public-site";
+// The pure path predicate is reached at its leaf, **not** through the `public-site` connector barrel: this file
+// is a client component, and that barrel re-exports screens which import `matching`'s connector, which reaches
+// `auth`'s — whose module-level binding is the real Supabase inside and pulls the `server-only` service-role
+// client into whatever bundle reaches it (07 §7 item 3). A client bundle never reaches a connector barrel
+// (`auth/index.ts`: "the action is passed to the client component as a prop so the client bundle never reaches
+// the connector barrel"). Pinned by `src/__tests__/client-server-boundary.test.ts`.
+import { isPublicSitePath } from "@/modules/public-site/lib/is-public-site-path";
 
 const HIDDEN_PATHS = [
   "/parent/request",

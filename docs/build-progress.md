@@ -318,6 +318,44 @@ Branch `shell-smoke-160926-1`, off `origin/main` `1ec71e1`. **ADR-117 Tier A und
 
 **Gates, exit codes measured in the foreground on the merged tree:** `typecheck` **0** · `lint` **0** (60 legacy files warn, **0** on any file this unit touched) · `prettier --check .` **0** · `vitest run` **0 — 3 003 passed + 7 expected-fail / 3 010 across 213 files** (+22 tests, +1 file; pins 8 → 7, 1d's uuid pin flipped) · `lint:boundaries` **0** · `check:allowed-imports` **0** · `check:config-literals` **0** · `check:env-reads` **0** · `check:claude-md` **0** · `check:prod-guard` **0** · `env:check` **0** · `crons:check` **0**. Accepted reds: **`build` 1** and **`check:boot-guard` 1** (both pre-existing on `main`, measured there) · **`check:banned-words` 1** (ADR-124 — 963 legacy hits, **0** on this unit's files).
 
+## Files created / modified in the current unit (BUILD-FIX — a server-only module no longer reaches a client bundle; `1b` regression)
+
+**Branch `build-fix-170926-1`**, own worktree, off **`bd0f5da` = `origin/main`**; **`c43a206` (P1-WIRE-2, PR #23) merged down** after it landed, so `merge-base --is-ancestor` reports CURRENT. ADR-123 build task: no review battery, no skills. Registered in `../OPERATIONS/BRANCHES.md`.
+
+**The defect, reproduced on `origin/main` `bd0f5da` in a fresh checkout before anything was changed** (`npm run build`, verbatim):
+
+```
+./src/modules/auth/lib/elevated-client.ts
+Error:
+  x You're importing a component that needs server-only. That only works in a Server Component which is not
+  | supported in the pages/ directory.
+ ,-[src/modules/auth/lib/elevated-client.ts:1:1]
+ 4 | import "server-only";
+   : ^^^^^^^^^^^^^^^^^^^^^
+Import trace for requested module:
+./src/modules/auth/lib/elevated-client.ts → ./src/modules/auth/lib/supabase-auth-driver.ts →
+./src/modules/auth/index.ts → ./src/modules/matching/lib/connect-decision.ts →
+./src/modules/matching/matching.stub.ts → ./src/modules/matching/index.ts →
+./src/modules/public-site/components/HomeHero.tsx → ./src/modules/public-site/index.ts →
+./src/components/layout/MiniFooter.tsx
+```
+
+**Cause, one line:** a **client component imports a connector barrel**. `MiniFooter` (`"use client"`) takes `isPublicSitePath` from the `public-site` barrel; `1b` made that barrel import `matching`'s connector (ADR-126, which 01 §2.3 allows), `matching`'s reaches `auth`'s, and `auth`'s module-level binding **is** the real Supabase inside — so the `server-only` service-role client lands in the client compilation. The lazy `await import("./elevated-client")` in the driver does not save it: webpack still compiles a dynamic-import chunk into the client graph.
+
+**Second break of the same class, behind the first** (webpack stops at the `server-only` error, so `main` never reports it): `AreaCombobox` · `QuickMatchResults` · `NannyPreviewCard` (all `1b`, all `"use client"`) take `formatAreaLabel` from the `areas` barrel → `areas.stub.ts` → `@/modules/platform` → `unit-of-work` → **`node:async_hooks`** ("Reading from `node:async_hooks` is not handled by plugins"). `platform`'s own barrel header says **"Client-safe"**; P1-WIRE's static `node:` import made that false.
+
+- **`src/components/layout/MiniFooter.tsx`** — one import: `isPublicSitePath` now comes from its leaf (`@/modules/public-site/lib/is-public-site-path`), not the connector barrel. The file is legacy tree (`eslint.legacy-paths.json`), so no boundary rule applies to it; when F-d crosses it into a module the lint will make the question explicit again.
+- **`src/modules/public-site/index.ts`** — **comment only.** `1a`'s "client-safe by construction" note was true on the narrower test of `@/modules/config/server` and `1b` made it false; it is corrected rather than left to mislead the next reader, because the barrel re-exports screens that import `matching` and **cannot** be client-safe again.
+- **`src/modules/platform/unit-of-work/lib/create-unit-of-work.ts`** — `node:async_hooks` becomes a **type-only** import plus one lazy `await import(/* webpackIgnore: true */ "node:async_hooks")` at first use, so the specifier enters no compilation and the barrel's "client-safe" claim is true again. `AsyncLocalStorage` is created on the first `withUnitOfWork` call instead of at `createUnitOfWork`; `current()` answers `undefined` before that, which is what it answered anyway (no storage = no unit of work open). No signature changed, so `src/boot/**` and `auth/**` are untouched.
+- **`src/__tests__/client-server-boundary.test.ts`** — new, the pin (below).
+- **Not touched:** `auth/**` (the defect's file is correct as written — `server-only` is exactly the guard 07 §7 item 3 asks for) · `shared-types/**` · `supabase/**` · `src/boot/**` · `/api/health` (S5b) · `config/**` · every module inside · eslint config · `package.json` · `next.config.mjs`.
+
+**The test that proves it.** `src/__tests__/client-server-boundary.test.ts` walks the graph **webpack** walks, from every `"use client"` file, and asserts none reaches `server-only` or a `node:` builtin. Three details make it measure the real bundle rather than a plausible one: type-only imports are erased (walking them reports eight violations that do not exist — `matching/types.ts` imports `type { Session }` from `auth`); `import()` **is** an edge (the defect hid behind one); `"use server"` is a stop (Next replaces those with a client reference). **Red on `main` — 6 offenders, the `server-only` chain plus five `node:async_hooks` ones — green here.** `npm test` now fails in ~1 s where `next build` failed in four minutes, and only after a Vercel preview had already gone red.
+
+**Gates, exit codes measured in the foreground on the merged tree (`c43a206` down):** **`build` 0** (the point of the unit) · **`check:boot-guard` 0 — back to 6 / 6** · `check:bundle-secrets` **0** (177 client chunks, no server-only name, no `stub-stripe`) · `typecheck` **0** · `lint` **0** (133 legacy warnings, **0** on any file this unit touched) · `prettier --check .` **0** · `vitest run` **0 — 3 007 passed + 7 expected-fail / 3 014 across 214 files** (+4 tests, +1 file) · `lint:boundaries` **0** · `check:allowed-imports` **0** · `check:claude-md` **0** · `check:config-literals` **0** · `check:env-reads` **0** · `check:prod-guard` **0** · `env:check` **0** · `crons:check` **0**. Accepted red: `check:banned-words` **1** (ADR-124 — legacy hits, **0** on this unit's files). `build` is measured with the CI workflow's placeholder `env:` block, as every unit since `1a` has measured it.
+
+**`build` is green on this branch and `main` is still red until this PR merges** — the trunk row in `../OPERATIONS/BRANCHES.md` carries the ★ until then.
+
 ## Next unit
 
 **Whoever wires a port at boot next (from P1-WIRE-2).** `src/boot/wire-<port>.ts`, one export, returning a `PortWiring` row; add the name to `BootPort` and one line to `wire-ports.ts` in dependency order. Two rules the three new files show: a binding is chosen by the **resolved environment**, never by an import edit (05 §3 rule 1); and a port whose _store_ is per-instance is refused in production with its reason on the report rather than installed quietly — that is why `call-layer` is wired on preview and not in production, exactly as `scheduling` is. `registerSlice` is last-wins, so `1e` and `1g` join the same registry without tearing it down, and a slice over a real store needs no environment gate at all. **`matching.autofire` / `matching.resultsFor` now answer `not-built`** — a named gap, pinned in `boot.test.ts`, waiting on `1e`.
