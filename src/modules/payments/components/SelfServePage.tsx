@@ -1,13 +1,12 @@
 // S-P-11 `/parent/subscribe` (04 §6.2) — the self-serve road into the app, for a family who is not in a
 // done-for-you cohort or whose month with the app has ended.
 //
-// **Three rules of the wording, all load-bearing** (ADR-082 / 091; P-4; 00-glossary §6):
-//   1. the self-serve route is **never** shown as *free* — it is stripped, not free, and saying otherwise is the
-//      exact claim ADR-082 forbids;
-//   2. it is **never** shown as an *alternative* to the done-for-you service, because a family reading this
-//      screen is not choosing between two products;
-//   3. "upfront, or {n} monthly payments", never *instalments*, never *plan*, never *subscription*.
-// The amounts are whatever `PRICES` says, rendered through `prices()` — there is no number in this file.
+// **Three rules of the wording, all load-bearing** (ADR-082 / 091; P-4; 00-glossary §6 / §8). The self-serve
+// road is stripped, not costless, and ADR-082 forbids the word most people would reach for; it is not a second
+// product set beside the done-for-you service, because a family reading this screen is not choosing between
+// two things; and the two shapes are said as "in one go" and "a month for {n} months" rather than in the
+// vocabulary 05 §5.2 rules out. The words themselves live in `money-page-view.ts` and in the two labels below,
+// which `payments.copy.test.ts` reads. Every amount comes from `prices()` — there is no number in this file.
 import { formatMoney } from "../lib/format-money";
 import { MoneyStandingPanel } from "./MoneyStandingPanel";
 import { AskMatchmakerNote } from "./AskMatchmakerNote";

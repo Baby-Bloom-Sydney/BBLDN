@@ -1,8 +1,8 @@
 // S-P-11 — `/parent/subscribe` (04 §2.2, §6.2): the self-serve road into the app. Thin by rule (05 §7 rule 5).
 //
-// This replaces the Sydney page, which read `@/lib/supabase` directly against Sydney columns, carried a hard
-// reveal of the amounts and a trial banner that said *free*, and bounced on a subscription row it queried
-// itself. None of that survives contact with ADR-082 (never displayed as free) or with the London schema.
+// This replaces the Sydney page, which read `@/lib/supabase` directly against Sydney columns, revealed the
+// amounts up front and carried a trial banner using the very word ADR-082 rules out. None of that survives
+// contact with that ruling or with the London schema.
 //
 // A family whose bundle is already open is sent to S-P-12: this screen is for taking it, not for reading it.
 // `?refused=1` is how a declined card comes back — it names no provider and carries no id.
@@ -42,7 +42,7 @@ export default async function ParentSubscribePage({
 
   const shapes = payments
     .prices()
-    .filter((price) => price.preset === "self-serve-app");
+    .filter((option) => option.preset === "self-serve-app");
 
   async function choose(formData: FormData): Promise<void> {
     "use server";
