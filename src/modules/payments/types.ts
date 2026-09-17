@@ -78,6 +78,10 @@ export type AccessStanding =
       readonly nextPaymentAt: Instant | null;
       readonly standing: "good" | "past-due";
       readonly graceUntil?: Instant;
+      /** Set when the schedule was cancelled inside a paid period: access runs to `nextPaymentAt`'s period end,
+       * then lapses `cancelled` (03 §5.4.3 / §5.4.5). Additive to 03 §5.2's shape — S-P-12's "cancelled in period"
+       * state has no other home; recorded for the 03 owner in the L-007 1h entry. */
+      readonly cancelledAt?: Instant;
     }
   | {
       readonly state: "paid-in-full";
@@ -200,4 +204,24 @@ export interface PurchasePath {
   ): Promise<PaymentsResult<{ readonly url: Url }>>;
   /** The presets, from `config` — never a literal (03 §5.2; 01 §3.2 rule 1). */
   prices(): ReadonlyArray<Price>;
+}
+
+/** The five scheduled jobs `payments` owns (01 §4f; 02 §4.5 "jobs"); the cron shells call them by name. */
+export type PaymentJobName =
+  | "expire-trials"
+  | "trial-reminders"
+  | "expire-past-due"
+  | "expire-cancelled-subscriptions"
+  | "payment-due-sweep";
+
+/** What one sweep did — the cron run-summary line reads it (01 §4f). */
+export type PaymentJobRun = {
+  readonly job: PaymentJobName;
+  readonly handled: number;
+  readonly skipped: number;
+};
+
+/** The jobs binding beside `payments` (same inside, same store); fails closed until boot configures it. */
+export interface PaymentsJobs {
+  run(job: PaymentJobName, now: Instant): Promise<PaymentsResult<PaymentJobRun>>;
 }
