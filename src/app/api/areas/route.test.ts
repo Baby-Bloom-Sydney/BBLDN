@@ -67,4 +67,43 @@ describe("GET /api/areas — 07 §8 row 1", () => {
 
     expect(other.status).toBe(200);
   });
+
+  // ADR-134 / ADR-140: this read is the only kind on `SECURITY.failOpenOnLimiterOutage`, and after M-2 the
+  // decision is the limiter's, not this route's — the route imports no fail-open helper any more. The behaviour
+  // it produces must be the same one ADR-134 ruled: a store that cannot answer does not close the front door.
+  it("still answers 200 when the limiter store cannot answer (the fail-open allow-list)", async () => {
+    configureRateLimiter(
+      createRateLimiter({
+        store: {
+          increment: async () => ({
+            ok: false,
+            error: { code: "INTERNAL", message: "db down" },
+          }),
+        },
+        burstAlertMultiple: SECURITY.burstAlertMultiple,
+        failOpenOnLimiterOutage: SECURITY.failOpenOnLimiterOutage,
+      }),
+      "shared",
+    );
+
+    expect((await GET(get(CALLER))).status).toBe(200);
+  });
+
+  it("refuses when the store cannot answer and the policy is NOT on the allow-list", async () => {
+    configureRateLimiter(
+      createRateLimiter({
+        store: {
+          increment: async () => ({
+            ok: false,
+            error: { code: "INTERNAL", message: "db down" },
+          }),
+        },
+        burstAlertMultiple: SECURITY.burstAlertMultiple,
+        failOpenOnLimiterOutage: [],
+      }),
+      "shared",
+    );
+
+    expect((await GET(get(CALLER))).status).toBe(500);
+  });
 });

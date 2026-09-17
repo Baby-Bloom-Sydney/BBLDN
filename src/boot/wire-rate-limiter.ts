@@ -43,6 +43,9 @@ export function wireRateLimiter(environment: Environment): PortWiring {
       store: dbRateLimitStore(auth.data),
       log,
       burstAlertMultiple: SECURITY.burstAlertMultiple,
+      // ADR-134 / ADR-140: the allow-list travels with the limiter, so fail-open is one config list read on the
+      // consume path — not a property any route can claim by importing a helper.
+      failOpenOnLimiterOutage: SECURITY.failOpenOnLimiterOutage,
     }),
     "shared",
   );

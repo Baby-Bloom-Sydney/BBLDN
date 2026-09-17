@@ -182,6 +182,82 @@ describe("platform/rate-limit — consume", () => {
     expect(lines.some((line) => line.level === "error")).toBe(true);
   });
 
+  // ADR-134 / ADR-140 — the fail-open decision is the limiter's, taken from the allow-list it was built with,
+  // and never a property a route file claims by importing a helper (REVIEW-2 M-2).
+  describe("the fail-open allow-list (ADR-140)", () => {
+    const brokenStore: RateLimitStore = {
+      increment: async () => ({
+        ok: false,
+        error: { code: "INTERNAL", message: "db down" },
+      }),
+    };
+    const outage = (failOpenOnLimiterOutage: ReadonlyArray<string>) => {
+      const lines: LogLine[] = [];
+      const limiter = createRateLimiter({
+        store: brokenStore,
+        log: createLogger({ sink: (line) => void lines.push(line) }),
+        burstAlertMultiple: 10,
+        failOpenOnLimiterOutage,
+      });
+      return { limiter, lines };
+    };
+
+    it("a policy NOT on the list fails closed when the store cannot answer", async () => {
+      const { limiter, lines } = outage(["publicRead"]);
+      const denied = await limiter.consume("k", {
+        name: "authPerEmail",
+        key: "email-hash+ip",
+        perMinute: 5,
+      });
+      expect(denied.ok).toBe(false);
+      if (!denied.ok) expect(denied.error.code).toBe("INTERNAL");
+      expect(lines.some((line) => line.alert === "ALERT_PROVIDER_DOWN")).toBe(
+        false,
+      );
+    });
+
+    it("a policy ON the list continues, loudly (ALERT_PROVIDER_DOWN)", async () => {
+      const { limiter, lines } = outage(["publicRead"]);
+      const allowed = await limiter.consume("k", {
+        name: "publicRead",
+        key: "ip",
+        perMinute: 30,
+      });
+      expect(allowed.ok).toBe(true);
+      const alerts = lines.filter(
+        (line) => line.alert === "ALERT_PROVIDER_DOWN",
+      );
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0]).toMatchObject({ policy: "ip" });
+      expect(JSON.stringify(alerts[0])).not.toContain("k");
+    });
+
+    it("a policy with no declared name is never on the list", async () => {
+      const { limiter } = outage(["publicRead"]);
+      const denied = await limiter.consume("k", { key: "ip", perMinute: 30 });
+      expect(denied.ok).toBe(false);
+    });
+
+    it("with no allow-list at all, every policy fails closed", async () => {
+      const { limiter } = outage([]);
+      const denied = await limiter.consume("k", {
+        name: "publicRead",
+        key: "ip",
+        perMinute: 30,
+      });
+      expect(denied.ok).toBe(false);
+    });
+
+    it("the configured list is exactly ['publicRead']", () => {
+      expect(SECURITY.failOpenOnLimiterOutage).toEqual(["publicRead"]);
+    });
+
+    it("every name on the list is a declared policy", () => {
+      for (const name of SECURITY.failOpenOnLimiterOutage)
+        expect(SECURITY.rateLimits[name]?.name).toBe(name);
+    });
+  });
+
   it("the module-level limiter runs on the memory store until configured", async () => {
     const policy = { key: "ip", perMinute: 1 };
     expect((await rateLimiter.consume("default-key", policy)).ok).toBe(true);

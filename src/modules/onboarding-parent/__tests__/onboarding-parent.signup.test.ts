@@ -389,6 +389,11 @@ describe("onboarding-parent — signup is rate limited (07 §8 row 2; REVIEW-2)"
     configureRateLimiter(
       {
         consume: async (key: string) => {
+          // The claim is about the **address** bucket (`signup:<hash>`), so only that key is one-shot here.
+          // Since ADR-140 (2) signup also spends 07 §8 row 2's per-IP half, and outside a request scope every
+          // caller shares the one `no-address` bucket — a fake that refused any repeated key would be asserting
+          // that instead of this. The per-IP half is pinned in `onboarding-parent.ip-limits.test.ts`.
+          if (!key.startsWith("signup:")) return allowed();
           if (spent.has(key)) return err("RATE_LIMITED", "Too many");
           spent.add(key);
           return allowed();
