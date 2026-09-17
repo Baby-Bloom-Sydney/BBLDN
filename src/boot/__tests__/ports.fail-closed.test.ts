@@ -16,13 +16,14 @@ import {
   unitOfWorkJoin,
   withUnitOfWork,
 } from "@/modules/platform";
-import { advance } from "@/modules/positions";
+import { advance, positions } from "@/modules/positions";
 import { scheduling } from "@/modules/scheduling";
 import { scoring } from "@/modules/scoring";
 import type {
   Email,
   FamilyId,
   Instant,
+  ParentId,
   PositionId,
   UnitOfWork,
   UserId,
@@ -34,6 +35,9 @@ const POSITION = "0f1e2d3c-0000-4000-8000-000000000001" as PositionId;
 const PARENT = "0a1b2c3d-0000-4000-8000-000000000011" as UserId;
 const FAMILY = "0a1b2c3d-0000-4000-8000-000000000031" as FamilyId;
 const NOW_INSTANT = "2026-09-17T09:00:00.000Z" as Instant;
+// The `ParentId` / `UserId` seam `1e` recorded: `findLive` is keyed by `ParentId` (03 §2.5 `JourneyOwner`) and
+// a session carries a `UserId`. The same id, two brands — spelled out here rather than cast at the call site.
+const PARENT_OWNER = PARENT as unknown as ParentId;
 const reasonOf = (result: { ok: boolean }): unknown =>
   "error" in result
     ? (result as { error: { details?: { reason?: unknown } } }).error.details
@@ -110,6 +114,25 @@ describe("every port fails closed until src/instrumentation.ts wires it", () => 
   // the only thing standing between an unwired boot and a made-up answer on a parent's screen: an empty result
   // set read as the true one (`matching`), a score nobody computed (`scoring`), a call said to be booked when
   // nothing says so (`call-layer`). Each must still refuse with its own reason, and say which port it was.
+  it("positions — the reads answer `positions-not-configured` and the P rows are not registered (AUTH-2)", async () => {
+    expect(reasonOf(await positions.findLive(PARENT_OWNER))).toBe(
+      "positions-not-configured",
+    );
+    const moved = await advance({
+      transition: "P-2",
+      entity: { kind: "position", id: POSITION },
+      actor: { kind: "system", id: "signup-convert-lead" },
+      payload: {
+        parentId: PARENT,
+        source: "signup",
+        detail: { district: "SW4" },
+      },
+      expectedFrom: null,
+      idempotencyKey: "fail-closed-probe-p2",
+    } as never);
+    expect(reasonOf(moved)).toBe("E_SLICE_NOT_REGISTERED");
+  });
+
   it("scoring · matching · call-layer — each answers its own not-configured reason (03 §7.2 · §10.1 · §2.7)", async () => {
     expect(reasonOf(await scoring.quickMatch(null, DISTRICT, []))).toBe(
       "scoring-not-configured",

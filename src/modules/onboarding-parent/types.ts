@@ -133,6 +133,13 @@ export type PasswordResetRequestErrorDetails = {
   readonly reason: "invalid-input";
 };
 
+/**
+ * 07 §8 row 3's verdict for one reset request: `send` = within the limit · `hold` = over it, so the action
+ * answers ok and sends nothing (a throttle that showed would be an enumeration oracle) · `unavailable` = the
+ * limiter could not answer, so the request is refused rather than sent.
+ */
+export type ResetRequestVerdict = "send" | "hold" | "unavailable";
+
 export type PasswordResetRequestAction = (
   previous: unknown,
   formData: FormData,

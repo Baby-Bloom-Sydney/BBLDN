@@ -6,12 +6,18 @@
 // priority as visible text** ("Priority: parent · Matchmaking") rather than colour, and every action a real
 // button. The drawer traps focus and returns it to the row that opened it (S-A-04, `CallItemDrawer`).
 //
-// One deliberate absence, stated on the screen: a call that has never had a booking cannot be listed — see
-// `types.ts` on `neverBookedUnavailable`. The admin is told, rather than shown an empty group that reads as
-// "nothing to do".
+// The absence `1f` stated on this screen is gone (`1g`): a call that has never had a time set is now listed,
+// under "Waiting for a time", from `callLayer.listOpenCalls` (03 §3.6). Those rows have no booking, so they
+// have no time column and no outcome — the one action they carry is the one that applies, setting a time on
+// the family's behalf.
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { CallType } from "@/modules/shared-types";
-import type { CallQueueActions, CallQueueRow, CallQueueView } from "../types";
+import type {
+  AwaitingCallRow,
+  CallQueueActions,
+  CallQueueRow,
+  CallQueueView,
+} from "../types";
 import { CALL_TYPE_LABEL } from "../lib/call-type-label";
 import { CALL_OUTCOME_LABEL } from "../lib/call-outcome-label";
 import { CallItemDrawer } from "./CallItemDrawer";
@@ -47,7 +53,13 @@ export function CallQueue({
       })),
     [view.groups, type],
   );
-  const shown = groups.reduce((count, group) => count + group.rows.length, 0);
+  const awaiting = useMemo(
+    () => view.awaiting.filter((row) => type === "all" || row.type === type),
+    [view.awaiting, type],
+  );
+  const shown =
+    groups.reduce((count, group) => count + group.rows.length, 0) +
+    awaiting.length;
 
   const openRow = useCallback(
     (row: CallQueueRow, trigger: HTMLButtonElement) => {
@@ -86,11 +98,7 @@ export function CallQueue({
         {shown === 1 ? "1 call shown" : `${String(shown)} calls shown`}
       </p>
 
-      <p>
-        Calls that have never had a time set are not listed here yet — the call
-        state has no store of its own. Open the family from Positions to set one
-        on her behalf.
-      </p>
+      <AwaitingCalls rows={awaiting} />
 
       {groups.map((group) => (
         <table key={group.name}>
@@ -154,5 +162,61 @@ export function CallQueue({
         <CallItemDrawer row={open} actions={actions} onClose={close} />
       )}
     </section>
+  );
+}
+
+/**
+ * The calls with no booking behind them (03 §3.6). Its own table, because its columns are different ones: a
+ * call that has never had a time has no time, no priority lane and no outcome — it has a family who has been
+ * waiting since a known instant, and 03 §2.2's promise that we ring anyway.
+ *
+ * A retry after a no-answer is named as one (R5), because an admin who does not know that is about to ring a
+ * number that already did not answer.
+ */
+function AwaitingCalls({
+  rows,
+}: {
+  readonly rows: ReadonlyArray<AwaitingCallRow>;
+}) {
+  return (
+    <table>
+      <caption>Waiting for a time — {String(rows.length)}</caption>
+      <thead>
+        <tr>
+          <th scope="col">Asked for (London)</th>
+          <th scope="col">Call</th>
+          <th scope="col">About</th>
+          <th scope="col">State</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.length === 0 ? (
+          <tr>
+            <td colSpan={4}>No families are waiting for a time.</td>
+          </tr>
+        ) : (
+          rows.map((row) => (
+            <tr key={row.positionId}>
+              <th scope="row">
+                <time dateTime={row.requestedAt}>{row.requestedWhen}</time>
+              </th>
+              <td>{CALL_TYPE_LABEL[row.type]}</td>
+              <td>
+                {row.about}
+                {row.aboutNanny === undefined
+                  ? null
+                  : ` · about ${row.aboutNanny}`}
+              </td>
+              <td>
+                No time set
+                {row.noAnswerCount === 0
+                  ? ""
+                  : ` · no answer ${String(row.noAnswerCount)}\u00d7 — ring again`}
+              </td>
+            </tr>
+          ))
+        )}
+      </tbody>
+    </table>
   );
 }

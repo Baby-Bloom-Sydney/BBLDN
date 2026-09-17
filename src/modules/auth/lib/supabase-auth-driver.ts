@@ -89,6 +89,9 @@ const unwrapUser = (
     email: user.email ?? null,
     hasPassword,
     aal: "aal1",
+    // Same rule as `aal` above: the credential calls report the neutral value and the gate never reads it from
+    // here — `refreshSession` / `getSession` re-derive both from the provider's own `amr` (`readDriverUser`).
+    isRecovery: false,
     expiresAtEpochSeconds: session?.expires_at ?? null,
   };
 };
@@ -143,6 +146,15 @@ export function supabaseAuthDriver(): AuthDriver<AppDatabase> {
       const { error } = await (
         await serverClient()
       ).auth.updateUser({ password: newPassword });
+      if (error !== null) throw new Error(error.message);
+    },
+    // ADR-132 / 07 §4: GoTrue answers this the same way for an address it knows and one it does not, so the
+    // no-enumeration property is the provider's, not a rule this module re-implements over a user lookup. The
+    // email itself is Supabase's own Recovery template (`08.05`, dashboard-configured) — see the module README.
+    sendRecoveryEmail: async (email: string, redirectTo: string) => {
+      const { error } = await (
+        await serverClient()
+      ).auth.resetPasswordForEmail(email, { redirectTo });
       if (error !== null) throw new Error(error.message);
     },
     exchangeCodeForSession: async (code: string) => {

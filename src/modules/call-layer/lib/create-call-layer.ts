@@ -357,6 +357,19 @@ async function findOpenCall(
   });
 }
 
+/**
+ * 03 §3.6 — "awaiting-slot calls come from `call-layer`". The store enumerates every call that is not `done`;
+ * the admin queue decorates (§3.6 again: "`scheduling` returns ids, `admin` decorates"), which is why nothing
+ * here reaches for a family's name or number.
+ */
+async function listOpenCalls(
+  deps: CallLayerDeps,
+): ReturnType<CallLayer["listOpenCalls"]> {
+  const open = await deps.store.listOpen();
+  if (!open.ok) return asCallError(open);
+  return ok(open.value);
+}
+
 export function createCallLayer(deps: CallLayerDeps): CallLayer {
   return Object.freeze({
     listSlots: async (kind, range) => {
@@ -386,5 +399,7 @@ export function createCallLayer(deps: CallLayerDeps): CallLayer {
         : positionOutcome(deps, ref.positionId, outcome, notes, actor),
     getCallState: (ref) => getCallState(deps, ref),
     findOpenCall: (parentId) => findOpenCall(deps, parentId),
+    listOpenCalls: (): ReturnType<CallLayer["listOpenCalls"]> =>
+      listOpenCalls(deps),
   });
 }

@@ -7,7 +7,7 @@
 import { SCHEDULING } from "@/modules/config";
 import { positions } from "@/modules/positions";
 import { scheduling } from "@/modules/scheduling";
-import { londonSlotWords } from "@/modules/call-layer";
+import { callLayer, londonSlotWords } from "@/modules/call-layer";
 import type {
   Actor,
   CallListItem,
@@ -15,7 +15,12 @@ import type {
   PositionId,
   UserId,
 } from "@/modules/shared-types";
-import type { CallQueueGroup, CallQueueRead, CallQueueRow } from "../types";
+import type {
+  AwaitingCallRow,
+  CallQueueGroup,
+  CallQueueRead,
+  CallQueueRow,
+} from "../types";
 import { callStateOf } from "./call-state-of";
 import { queueGroupOf } from "./queue-group-of";
 import { QUEUE_HEADINGS } from "./queue-headings";
@@ -53,16 +58,50 @@ async function decorate(item: CallListItem): Promise<CallQueueRow> {
   const positionId: PositionId = item.booking.subject.positionId;
   // The one decoration the connectors can answer today. The family's **name** has no road: `admin` may not read
   // a table (fix: A-11 / A-24) and neither `auth` nor `positions` exposes a person by id — recorded, pinned.
+  const about = await aboutPosition(positionId);
   const read = await positions.getForMatching(positionId);
-  const about = read.ok
-    ? `${read.value.district} · position ${read.value.stage.toLowerCase()}`
-    : "Position details unavailable";
   return Object.freeze({
     ...shared,
     subject: { kind: "position" as const, positionId },
     about,
     ...(read.ok ? { parentId: read.value.parentId as string as UserId } : {}),
   });
+}
+
+/** The position decoration both row kinds share — the one thing the connectors can answer (fix: A-11 / A-24). */
+async function aboutPosition(positionId: PositionId): Promise<string> {
+  const read = await positions.getForMatching(positionId);
+  return read.ok
+    ? `${read.value.district} · position ${read.value.stage.toLowerCase()}`
+    : "Position details unavailable";
+}
+
+/**
+ * 03 §3.6's other half: the calls that have never had a booking. `call-layer` enumerates them (`listOpenCalls`,
+ * `1g`) and this decorates, exactly as it does for a booked row. A call that already points at a booking is
+ * dropped here — `scheduling.listSchedule` has already returned it, and a family must not appear twice.
+ */
+async function awaitingRows(): Promise<ReadonlyArray<AwaitingCallRow>> {
+  const open = await callLayer.listOpenCalls();
+  if (!open.ok) return Object.freeze([]);
+  const neverBooked = open.value.filter((call) => call.bookingId === null);
+  const rows = await Promise.all(
+    neverBooked.map(async (call) =>
+      Object.freeze({
+        positionId: call.positionId,
+        parentId: call.parentId,
+        type: call.type,
+        requestedAt: call.requestedAt,
+        requestedWhen: londonSlotWords(call.requestedAt).full,
+        noAnswerCount: call.noAnswerCount,
+        about: await aboutPosition(call.positionId),
+        ...(call.aboutNanny === undefined
+          ? {}
+          : { aboutNanny: call.aboutNanny }),
+      }),
+    ),
+  );
+  return Object.freeze(rows);
 }
 
 export async function loadCallQueue(actor: Actor): Promise<CallQueueRead> {
@@ -80,7 +119,10 @@ export async function loadCallQueue(actor: Actor): Promise<CallQueueRead> {
       ? { kind: "forbidden" }
       : { kind: "unavailable" };
 
-  const rows = await Promise.all(listed.value.map(decorate));
+  const [rows, awaiting] = await Promise.all([
+    Promise.all(listed.value.map(decorate)),
+    awaitingRows(),
+  ]);
   const groups: ReadonlyArray<CallQueueGroup> = QUEUE_HEADINGS.map(
     ({ name, heading }) =>
       Object.freeze({
@@ -93,8 +135,8 @@ export async function loadCallQueue(actor: Actor): Promise<CallQueueRead> {
     kind: "queue",
     view: Object.freeze({
       groups: Object.freeze(groups),
-      total: rows.length,
-      neverBookedUnavailable: true,
+      total: rows.length + awaiting.length,
+      awaiting,
     }),
   };
 }

@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-09-17T08:19:43.340Z",
+  "generated_at": "2026-09-17T08:29:21.008Z",
   "summary": {
     "route_count": 59,
     "page_count": 88,
     "cron_count": 23,
-    "migration_count": 18,
+    "migration_count": 19,
     "server_action_file_count": 41
   },
   "routes": [
@@ -963,6 +963,11 @@
       "filename": "0017_consent-purpose-rate-limits-profile.sql",
       "bytes": 28374,
       "modified_at": "2026-09-17T07:22:07.458Z"
+    },
+    {
+      "filename": "0018_call-mirror.sql",
+      "bytes": 20350,
+      "modified_at": "2026-09-17T08:28:21.836Z"
     }
   ],
   "server_actions": [

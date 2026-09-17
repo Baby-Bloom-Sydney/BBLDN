@@ -183,6 +183,7 @@ describe("an authenticated account with no role row is a provisioning anomaly, n
         email: "a@b.test",
         hasPassword: true,
         aal: "aal1",
+        isRecovery: false,
         expiresAtEpochSeconds: 1,
       },
       role: null,

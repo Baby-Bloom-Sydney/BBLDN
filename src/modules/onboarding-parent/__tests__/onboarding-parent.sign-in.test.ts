@@ -1,5 +1,14 @@
 // S-X-08 — sign in: one refusal for every failure (07 §4), the gate's `next=` honoured only when safe, and the
-// anonymous passwordless catch (ADR-042 / D4; 04 §6.1) pinned as failing until `auth` has a method for it.
+// anonymous passwordless catch (ADR-042 / D4; 04 §6.1).
+//
+// **AUTH-2 closed `1c`'s pin (3), but not as it was written — recorded rather than quietly rewritten.** The pin
+// asked a known passwordless email at the login form to be routed to `/set-password`. That answer *is* the
+// enumeration oracle ADR-132 forbids: a form that routes one address differently from another has told the
+// attacker which addresses have passwordless accounts. The behaviour the pin was reaching for — "a passwordless
+// account never meets an error, it is offered a link" — is delivered instead by one refusal for every failure,
+// carrying the reassuring line to S-X-09, whose `auth.requestPasswordReset` emails the link that signs the
+// account in; the gate's step 3 then sends that session to set-password (01 §4d). Both halves are asserted below
+// and in `auth/__tests__/auth.password-recovery.test.ts`.
 import { beforeEach, describe, expect, it } from "vitest";
 import { configureAuth, stubAuth } from "@/modules/auth";
 import type { Email } from "@/modules/shared-types";
@@ -81,14 +90,28 @@ describe("onboarding-parent — signInAction (S-X-08)", () => {
     expect(result.error.code).toBe("VALIDATION");
   });
 
-  it.fails(
-    "PINNED (04 §6.1 S-X-08; ADR-042; auth README gap): a known passwordless email is routed to set-password, never refused",
-    async () => {
-      const result = await signInAction(
-        null,
-        formDataOf({ email: PASSWORDLESS.email, password: "" }),
-      );
-      expect(result.ok && result.value.destination).toBe("/set-password");
-    },
-  );
+  // `1c` pin (3), closed by AUTH-2 against ADR-132 rather than as written (see the header).
+  it("answers a known passwordless email exactly as it answers an unknown one — the form reveals no account state", async () => {
+    const passwordless = await signInAction(
+      null,
+      formDataOf({ email: PASSWORDLESS.email, password: "anything at all" }),
+    );
+    const unknown = await signInAction(
+      null,
+      formDataOf({ email: "nobody@example.test", password: "anything at all" }),
+    );
+    expect(passwordless.ok).toBe(false);
+    expect(passwordless).toEqual(unknown);
+  });
+
+  it("carries the reassuring line that sends a passwordless visitor to S-X-09, never an error about her account", async () => {
+    const result = await signInAction(
+      null,
+      formDataOf({ email: PASSWORDLESS.email, password: "anything at all" }),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.message).toMatch(/never set a password/i);
+    expect(result.error.message).not.toMatch(/no such account|does not exist/i);
+  });
 });

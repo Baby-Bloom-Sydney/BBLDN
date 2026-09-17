@@ -75,6 +75,7 @@ describe("call-layer through the connector binding", () => {
       recordOutcome: async () => notConfigured,
       getCallState: async () => notConfigured,
       findOpenCall: async () => notConfigured,
+      listOpenCalls: async () => notConfigured,
     });
 
     const result = await callLayer.getCallState({

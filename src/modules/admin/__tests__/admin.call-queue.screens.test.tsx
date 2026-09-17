@@ -54,7 +54,7 @@ const viewOf = (rows: ReadonlyArray<CallQueueRow>): CallQueueView => ({
     { name: "done", heading: "Done", rows: [] },
   ],
   total: rows.length,
-  neverBookedUnavailable: true,
+  awaiting: [],
 });
 
 const actionsOf = (): CallQueueActions => ({
@@ -111,10 +111,42 @@ describe("S-A-03 — the call list", () => {
     expect(screen.getByRole("status")).toHaveTextContent("1 call shown");
   });
 
-  it("says a never-booked call is not listed, rather than reading as an empty queue", () => {
+  // `1f`'s pin, flipped (`1g`). The screen used to explain that this half was missing; it now shows it.
+  it("lists the families waiting for a time, with the no-answer retries named", () => {
+    render(
+      <CallQueue
+        view={{
+          ...viewOf([]),
+          awaiting: [
+            {
+              positionId: "pos-9" as PositionId,
+              parentId: "parent-9" as UserId,
+              type: "matchmaking",
+              requestedAt: "2026-01-05T09:00:00.000Z" as ISO,
+              requestedWhen: "Monday 5 January, 9:00am London time",
+              noAnswerCount: 2,
+              about: "SW4 · position open",
+              aboutNanny: "Amara",
+            },
+          ],
+        }}
+        actions={actionsOf()}
+      />,
+    );
+    expect(
+      screen.getByText(/Monday 5 January, 9:00am London time/),
+    ).toBeInTheDocument();
+    // an admin about to ring a number that already did not answer needs to know that
+    expect(screen.getByText(/no answer 2/)).toBeInTheDocument();
+    expect(screen.getByText(/about Amara/)).toBeInTheDocument();
+    // and it counts: an empty-looking queue with a family waiting is the failure this half prevents
+    expect(screen.getByRole("status")).toHaveTextContent("1 call shown");
+  });
+
+  it("says the waiting group is empty rather than leaving a bare table", () => {
     render(<CallQueue view={viewOf([])} actions={actionsOf()} />);
     expect(
-      screen.getByText(/never had a time set are not listed/),
+      screen.getByText("No families are waiting for a time."),
     ).toBeInTheDocument();
   });
 

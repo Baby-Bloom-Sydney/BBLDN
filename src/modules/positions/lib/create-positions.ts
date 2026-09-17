@@ -21,6 +21,10 @@ import type {
   Result,
   TransitionId,
 } from "@/modules/shared-types";
+import { connections } from "@/modules/connections";
+import type { ConnectionSummary } from "@/modules/connections";
+import { placements } from "@/modules/placements";
+import type { PlacementRead } from "@/modules/placements";
 import type {
   JourneyRowSource,
   PositionRecord,
@@ -38,6 +42,21 @@ export type PositionsDeps = {
   /** Row 3 of the rail, composed by `call-layer` and handed in at boot (see `JourneyRowSource`). */
   readonly rows?: JourneyRowSource;
 };
+
+/** Rows 4-6's inputs. Both reads are best-effort by design — see `getJourneySteps`. */
+async function railRest(parentId: ParentId): Promise<{
+  readonly connections: ReadonlyArray<ConnectionSummary>;
+  readonly placement: PlacementRead | null;
+}> {
+  const [rows, placement] = await Promise.all([
+    connections.forParent(parentId),
+    placements.liveForParent(parentId),
+  ]);
+  return {
+    connections: rows.ok ? rows.value : [],
+    placement: placement.ok ? placement.value : null,
+  };
+}
 
 const notFound = () =>
   err("NOT_FOUND", "No such position", {
@@ -145,8 +164,17 @@ export function createPositions(deps: PositionsDeps): PositionsReads {
           ? null
           : await deps.rows.callRow(record.value.positionId);
       if (callRow !== null && !callRow.ok) return callRow;
+      // Rows 4-6 (`1g`). `positions` may import both connectors (01 §2.3), so this is a plain read — no port
+      // and no boot wiring, unlike row 3. A read that refuses does **not** fail the rail: rows 1-3 are the ones
+      // a family acts on, and a rail that disappeared because the placement read was unavailable would be a
+      // worse answer than a rail whose later rows read `pending` (04 §7.1 "never hidden, never empty").
+      const rest = await railRest(record.value?.parentId ?? parentId);
       return ok(
-        journeySteps(record.value, callRow === null ? null : callRow.value),
+        journeySteps(
+          record.value,
+          callRow === null ? null : callRow.value,
+          rest,
+        ),
       );
     },
 

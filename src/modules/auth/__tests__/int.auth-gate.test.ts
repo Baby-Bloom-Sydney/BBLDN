@@ -220,3 +220,23 @@ describe("the matcher never gates the app's own static assets", () => {
     expect(matcher).toContain("_next/image");
   });
 });
+
+describe("the recovery link's session reaches /reset-password, and nothing else changes (04 §6.1 S-X-09)", () => {
+  it("lets it through", async () => {
+    signedInAs("recovering");
+    const res = await middleware(request("/reset-password"));
+    expect(res.status).toBe(200);
+  });
+
+  it("still sends an ordinary signed-in parent to her dashboard from the same path", async () => {
+    signedInAs("parent");
+    const res = await middleware(request("/reset-password"));
+    expect(locationOf(res)).toBe("/parent");
+  });
+
+  it("does not open the rest of the (auth) group to her", async () => {
+    signedInAs("recovering");
+    const res = await middleware(request("/login"));
+    expect(locationOf(res)).toBe("/parent");
+  });
+});
