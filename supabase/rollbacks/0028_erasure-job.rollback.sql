@@ -11,11 +11,14 @@
 --     nullable because it is the keys that made them so, and a NOT NULL restored over a row whose party has
 --     already been erased would fail to apply anyway.
 --
---  2. ★ **`file_retention_log` and `account_erasure_requests` stay, with their guards attached.** These are
---     evidence, not machinery: one records that an object was deleted (Art 5(2)) and the other records that a
---     person asked to be erased and what we answered (Art 12). Dropping them would destroy the proof that a
---     right was exercised, which is the one thing a rollback must never be able to do quietly. Nothing before
---     `0028` references either table, so keeping them costs the reverted code nothing.
+--  2. ★ **`file_retention_log` and `account_erasure_requests` stay, with their guards attached, and neither is
+--     handed back to a client role.** These are evidence, not machinery: one records that an object was deleted
+--     (Art 5(2)) and the other records that a person asked to be erased and what we answered (Art 12). Dropping
+--     them would destroy the proof that a right was exercised, which is the one thing a rollback must never be
+--     able to do quietly — and re-granting `service_role` the ability to rewrite a request row would hand back
+--     exactly the hole the database pass found (HIGH-3). `prevent_erasure_request_modification()` therefore stays
+--     too, and so do the revokes. Nothing before `0028` references either table, so keeping them costs the
+--     reverted code nothing.
 --
 -- ⚠️ **WHAT IS LOST, stated rather than hidden.**
 --
@@ -43,6 +46,9 @@ begin;
 drop function if exists public.erase_account(uuid, uuid, jsonb);
 drop function if exists public.collect_erasure_objects(uuid);
 drop function if exists public.scrub_auth_user(uuid);
+
+-- `prevent_erasure_request_modification()` is NOT dropped — it is clause (2), and a guard function dropped out
+-- from under an attached trigger would take the trigger with it.
 
 -- ---------------------------------------------------------------------------
 -- 2. `is_privileged_writer()` back to its `0000` body
@@ -130,6 +136,15 @@ begin
        where g.tgrelid = 'public.file_retention_log'::regclass and not g.tgisinternal) <> 2 then
     raise exception '0028 twin: file_retention_log lost an append-only guard — the deletion evidence became rewritable';
   end if;
+  if (select count(*) from pg_trigger g
+       where g.tgrelid = 'public.account_erasure_requests'::regclass and not g.tgisinternal) <> 2 then
+    raise exception '0028 twin: account_erasure_requests lost its guard — a request could be marked completed with no scrub (database pass HIGH-3)';
+  end if;
+  foreach v_tbl in array array['account_erasure_requests', 'file_retention_log'] loop
+    if has_table_privilege('service_role', 'public.' || v_tbl, 'update') then
+      raise exception '0028 twin: service_role was handed UPDATE on public.% back — that is the hole, not a rollback', v_tbl;
+    end if;
+  end loop;
 
   -- HALF TWO: what the twin DID undo, so a half-run file is loud rather than silent.
   if to_regprocedure('public.erase_account(uuid, uuid, jsonb)') is not null then

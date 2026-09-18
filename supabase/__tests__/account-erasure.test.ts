@@ -73,6 +73,27 @@ async function count(sql: string, params: readonly unknown[] = []) {
   return Number(row?.n ?? "0");
 }
 
+/**
+ * Run a statement as `role` and report what happened. **Three** outcomes count as "the row is safe", and the
+ * distinction is the reason this helper reports rather than asserts (the shape `3e` established): the guard
+ * raises; the role has no privilege on the table at all; or RLS silently narrows the statement to zero rows,
+ * which raises nothing and is still a complete refusal.
+ */
+async function asRole(role: string, sql: string) {
+  await db.query("savepoint role_attempt");
+  try {
+    await db.query(`set local role ${role}`);
+    const result = await db.query(sql);
+    await db.query("reset role");
+    await db.query("rollback to savepoint role_attempt");
+    return { raised: false, rowCount: result.rowCount ?? 0 };
+  } catch {
+    await db.query("rollback to savepoint role_attempt");
+    await db.query("reset role");
+    return { raised: true, rowCount: 0 };
+  }
+}
+
 async function insertUser(id: string, email: string) {
   await db.query(
     `insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
@@ -230,9 +251,17 @@ async function seed(): Promise<void> {
   await db.query(
     `insert into public.verifications (id, nanny_id, level, identity_status, dbs_status, dbs_outcome,
                                        suspended_at, dbs_checked_by, identity_checked_by, rtw_checked_by,
-                                       surname, given_names, dbs_certificate_number, dbs_certificate_ref)
+                                       surname, given_names, dbs_certificate_number, dbs_certificate_ref,
+                                       identity_provider_key, identity_provider_ref,
+                                       dbs_provider_key, dbs_provider_ref,
+                                       rtw_provider_key, rtw_provider_ref,
+                                       identity_rejection_reason, dbs_rejection_reason, rtw_rejection_reason)
      values ($1,$2,'L0_SIGNED_UP','not_started','failed','barred', now(),'admin','admin','admin',
-             'Nanny','Nadia','001234567890', $3::text || '/dbs-certificate/x.pdf')`,
+             'Nanny','Nadia','001234567890', $3::text || '/dbs-certificate/x.pdf',
+             'stub-manual','vendor-identity-9911',
+             'stub-manual','vendor-dbs-9912',
+             'stub-manual','vendor-rtw-9913',
+             'mismatch','barred-list','expired')`,
     [VERIFICATION, NANNY, N_USER],
   );
   await db.query(
@@ -599,6 +628,29 @@ describe("int.account-erasure — a nanny asks to be erased (ADR-170 is the whol
     expect(result.outcome).toBe("erased");
   });
 
+  it("★ the third-party handles go with the evidence, and the provider's NAME stays (database pass, HIGH-2)", async () => {
+    const verification = await one<{
+      identity_provider_ref: string | null;
+      dbs_provider_ref: string | null;
+      rtw_provider_ref: string | null;
+      dbs_provider_key: string | null;
+      identity_rejection_reason: string | null;
+      dbs_rejection_reason: string | null;
+      rtw_rejection_reason: string | null;
+    }>("select * from public.verifications where id = $1", [VERIFICATION]);
+    // A `*_provider_ref` is a pointer into a vendor's system: leaving it leaves the handle that re-fetches the
+    // document we just deleted, which makes "the evidence is gone" untrue in the only sense that matters.
+    expect(verification?.identity_provider_ref).toBeNull();
+    expect(verification?.dbs_provider_ref).toBeNull();
+    expect(verification?.rtw_provider_ref).toBeNull();
+    // The provider's NAME stays: it says who decided, which is part of the decision §6.2 row 4 keeps and is a
+    // fact about us rather than about her.
+    expect(verification?.dbs_provider_key).toBe("stub-manual");
+    expect(verification?.identity_rejection_reason).toBeNull();
+    expect(verification?.dbs_rejection_reason).toBeNull();
+    expect(verification?.rtw_rejection_reason).toBeNull();
+  });
+
   it("the nanny's `nannies` row is gone and the pre-check row survives without her", async () => {
     expect(
       await count(
@@ -863,5 +915,112 @@ describe("int.account-erasure — who may run it (ADR-180)", () => {
         where p.oid = to_regprocedure('public.erase_account(uuid, uuid, jsonb)')`,
     );
     expect(rows[0]).toEqual({ owner: "bbldn_retention", definer: true });
+  });
+});
+
+// ── The two controls the database pass added ──────────────────────────────────────────────────────────────
+
+describe("int.account-erasure — the request ledger is the job's alone (database pass, HIGH-3)", () => {
+  it("★ no role the application arrives as may rewrite a request row", async () => {
+    // `file_retention_log` had append-only triggers from the first draft and this table had none, which left the
+    // asymmetry `0027` had just finished closing: `service_role` — the role every server path uses, and the role
+    // `erase_account()` is itself called by — could set `state = 'completed'` on a request with no scrub having
+    // run and nothing in the schema noticing. A state written on this table has to mean the job ran.
+    for (const role of ["anon", "authenticated", "service_role"] as const) {
+      const attempt = await asRole(
+        role,
+        `update public.account_erasure_requests set state = 'completed'`,
+      );
+      // Three shapes of refusal count, and the helper reports which: the guard raises, the role has no privilege,
+      // or RLS narrows the statement to zero rows. A test that only looked for an exception would call the third
+      // a failure; a test that only looked at the row could not say which control did the work.
+      expect({ role, changed: attempt.rowCount }).toEqual({
+        role,
+        changed: 0,
+      });
+    }
+  });
+
+  it("★ and the guard refuses the migration role too, so it is not a privilege check", async () => {
+    await db.query("savepoint ledger_probe");
+    let message = "the UPDATE was ACCEPTED";
+    try {
+      await db.query(
+        `update public.account_erasure_requests set state = 'completed' where id = $1`,
+        [R_REQUEST],
+      );
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    await db.query("rollback to savepoint ledger_probe");
+    expect(message).toMatch(/written by erase_account\(\) alone/);
+  });
+
+  it("the same guard refuses a DELETE and a TRUNCATE", async () => {
+    for (const statement of [
+      "delete from public.account_erasure_requests",
+      "truncate table public.account_erasure_requests",
+    ]) {
+      await db.query("savepoint ledger_probe_2");
+      let raised = false;
+      try {
+        await db.query(statement);
+      } catch {
+        raised = true;
+      }
+      await db.query("rollback to savepoint ledger_probe_2");
+      expect({ statement, raised }).toEqual({ statement, raised: true });
+    }
+  });
+});
+
+describe("int.account-erasure — the erasure never waits for a safeguarding row (database pass, HIGH-1)", () => {
+  /**
+   * **Proved by construction, and said so rather than dressed up** — the same standard `3e` set for its own
+   * deadlock probe. A true AB-BA race needs two connections and a committed fixture, which means writing rows
+   * into the database every other suite counts and then deleting them back out through the very guards this
+   * migration installs. What is asserted instead is the mechanism: all four safeguarding locks are taken
+   * `for update nowait`, so the erasure cannot be *in* a wait-for cycle at all — it either takes them or fails
+   * fast with the retryable error the sweep already knows how to handle.
+   *
+   * The half that IS driven is the consequence: the 27 cases above all run through this probe, so a mistake that
+   * made it raise when nothing holds a lock would redden every one of them.
+   */
+  it("★ probes all four safeguarding tables with `for update nowait` before writing any of them", async () => {
+    const { rows } = await db.query<{ src: string }>(
+      `select p.prosrc as src from pg_proc p
+        where p.oid = to_regprocedure('public.erase_account(uuid, uuid, jsonb)')`,
+    );
+    const source = rows[0].src;
+    for (const table of [
+      "public.nannies",
+      "public.verifications",
+      "public.vetting_submissions",
+      "public.nanny_suspension_lifts",
+    ]) {
+      const probe = new RegExp(
+        `from ${table.replace(".", "\\.")} \\w+ where [^;]*for update nowait`,
+      );
+      expect({ table, probed: probe.test(source) }).toEqual({
+        table,
+        probed: true,
+      });
+    }
+    // And the answer it gives, which is the one `0027`'s header promises and the one the connector maps to
+    // `retry` rather than to a permanent failure.
+    expect(source).toContain("lock_not_available");
+    expect(source).toMatch(
+      /a safeguarding decision is being recorded right now/,
+    );
+  });
+
+  it("the probe is harmless when nothing holds a lock — every case above ran through it", async () => {
+    // `nannies` is gone by now, so the probe found nothing to lock and the erasure completed. If it raised on an
+    // empty probe, the nanny-erasure block would have failed rather than this line.
+    expect(
+      await count("select count(*)::text n from public.nannies where id = $1", [
+        NANNY,
+      ]),
+    ).toBe(0);
   });
 });

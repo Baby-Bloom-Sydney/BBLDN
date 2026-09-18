@@ -194,6 +194,15 @@ alter table public.precheck_notifications
   add constraint precheck_notifications_nanny_id_fkey
   foreign key (nanny_id) references public.nannies (id) on delete set null;
 
+-- ★ The index the new referential action needs (database pass, MEDIUM). The only `parent_id`-leading index on
+-- this table is `nanny_placements_one_live_per_parent_idx` (`0007:218`), which is PARTIAL on
+-- `state <> 'ENDED'` — so it cannot serve the `set null` scan, because the rows that scan has to find are
+-- precisely the ENDED hire records §6.2 row 6 keeps for six years and which therefore come to dominate the table.
+-- Every `delete from parents` would have sequential-scanned it. Same defect and same fix as `0027:170` gave
+-- `vetting_submissions.nanny_id`; `nanny_placements.nanny_id` already has a full index and needs nothing.
+create index if not exists nanny_placements_parent_idx
+  on public.nanny_placements (parent_id);
+
 comment on column public.nanny_placements.parent_id is
   '07 §6.1 step 3 / §6.2 row 6: null once the parent has erased her account. The row is the hire record and outlives her by six years (Limitation Act); the NANNY''s id stays, because "the other party''s history keeps ids".';
 comment on column public.nanny_placements.nanny_id is
@@ -225,6 +234,30 @@ comment on table public.account_erasure_requests is
 comment on column public.account_erasure_requests.subject_user_id is
   'ON DELETE RESTRICT: the request is the record that the erasure happened, so it outlives the scrub exactly as the money and consent rows do. auth.users survives scrubbed and banned (07 §6.1 step 5).';
 
+-- ★ The ledger is not rewritable by the roles the application runs as (database pass, HIGH-3). `0028` gave
+-- `file_retention_log` append-only triggers and gave this table none, which left the asymmetry `0027` had just
+-- finished closing one migration earlier: `service_role` — the role every server path uses and the role
+-- `erase_account()` is itself called by — could set `state = 'completed'` on a request directly, with no scrub
+-- having run and nothing in the schema noticing. RLS does not stop it (BYPASSRLS), so the control is a guard plus
+-- the absence of a privilege, exactly as it is for a safeguarding row.
+create or replace function public.prevent_erasure_request_modification()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if public.is_retention_job() then
+    return case when tg_op = 'DELETE' then old else new end;
+  end if;
+  raise exception
+    'account_erasure_requests: % refused — the ledger is written by erase_account() alone (07 §6.1)', tg_op
+    using errcode = 'restrict_violation';
+end;
+$$;
+
+comment on function public.prevent_erasure_request_modification() is
+  '07 §6.1 / Art 12: an erasure request records that a right was exercised and what we answered. Only the retention identity may move it, so a state written here always means the scrub ran.';
+
 -- One open request per subject: a second click, or an admin actioning a request the person also made herself,
 -- must not produce two. The partial unique is what makes `erase_account()`'s idempotence visible at the ledger
 -- as well as at the subject.
@@ -243,6 +276,24 @@ alter table public.account_erasure_requests force row level security;
 drop policy if exists account_erasure_requests_own_select on public.account_erasure_requests;
 create policy account_erasure_requests_own_select on public.account_erasure_requests
   for select using ((select auth.uid()) = subject_user_id or (select public.is_admin()));
+
+drop trigger if exists account_erasure_requests_job_only on public.account_erasure_requests;
+create trigger account_erasure_requests_job_only
+  before update or delete on public.account_erasure_requests
+  for each row execute function public.prevent_erasure_request_modification();
+
+drop trigger if exists account_erasure_requests_no_truncate on public.account_erasure_requests;
+create trigger account_erasure_requests_no_truncate
+  before truncate on public.account_erasure_requests
+  for each statement execute function public.prevent_erasure_request_modification();
+
+-- The privilege half. Supabase grants the client roles table privileges by default, and a guard is one control;
+-- a role that cannot write the table at all is the other. SELECT stays, because the two policies above are the
+-- point: the subject may see that her own request is in progress (Art 12) and an admin may see the queue.
+revoke all on table public.account_erasure_requests from anon, authenticated, service_role;
+revoke all on table public.file_retention_log from anon, authenticated, service_role;
+grant select on table public.account_erasure_requests to authenticated;
+grant select on table public.file_retention_log to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 4. The retention identity's privileges — enumerated, because a definer runs with the OWNER's
@@ -427,7 +478,7 @@ declare
   v_tombstone constant text   := 'deleted+' || p_user_id::text || '@invalid';
   v_parent_id uuid;
   v_nanny_id  uuid;
-  v_email     text;
+  v_is_tombstoned boolean;
   v_tables    text[] := array[]::text[];
   v_n         integer;
   v_objects   integer := 0;
@@ -447,7 +498,10 @@ begin
   -- The subject's identity is read through `user_profiles`, the mirror `0002` keeps of `auth.users.email` (C-8),
   -- because `auth` is not reachable from this owner — see section 4. The tombstone is written to both, so the
   -- mirror is a faithful test of whether the scrub has already run.
-  select up.email::text into v_email
+  -- Compared through the column's own `citext` type, not cast to `text` first (database pass, MEDIUM): casting
+  -- made a case-insensitive column compare case-sensitively, so a tombstone written with different casing — by a
+  -- manual correction, or by a future tool — would have read as "not yet erased".
+  select (up.email = ('deleted+' || p_user_id::text || '@invalid')) into v_is_tombstoned
     from public.user_profiles up where up.user_id = p_user_id;
   if not found then
     raise exception 'ERASURE_SUBJECT_NOT_FOUND' using errcode = 'no_data_found';
@@ -455,7 +509,7 @@ begin
 
   -- (b) Idempotent. An already-erased subject is a success that changes nothing — including the request row,
   -- which is marked completed so a repeated ask is not left open for ever.
-  if v_email = v_tombstone then
+  if v_is_tombstoned then
     update public.account_erasure_requests r
        set state = 'completed', completed_at = coalesce(r.completed_at, now())
      where r.id = p_request_id and r.subject_user_id = p_user_id
@@ -596,6 +650,33 @@ begin
   get diagnostics v_n = row_count;
   if v_n > 0 then v_tables := v_tables || 'nanny_contact_state'::text; end if;
 
+  -- ★ **The erasure never waits for a safeguarding row** (database pass, HIGH-1). `0027`'s header states the
+  -- invariant: "a safeguarding decision in flight always beats an erasure … rather than whichever side Postgres's
+  -- detector picks". That held for the DBS path, which locks `verifications` before `nannies`, and **not** for an
+  -- identity or right-to-work decision: those go straight to `sync_nanny_verification_state()` (`0023:265,271`),
+  -- which locks `nannies` then `verifications` — the reverse of this function's order. A genuine AB-BA cycle, with
+  -- neither side using `nowait`, resolved by the detector picking a victim that may well be the decision.
+  --
+  -- The fix is not a lock order, because there is no order that satisfies both callers; it is a **refusal to
+  -- wait**. Every safeguarding row this function will touch is probed `for update nowait` here, before any of them
+  -- is written, so the erasure can never be *in* a wait-for cycle: either it takes all three at once or it fails
+  -- fast, which is the answer `0027` says it should give and the one the sweep already knows how to retry.
+  -- The limit, stated: the parent-side tables above are still taken with waiting, and that is sound because no
+  -- decision path touches them — it is the safeguarding cycle this closes, which is the cycle that was real.
+  if v_nanny_id is not null then
+    begin
+      perform 1 from public.nannies n where n.id = v_nanny_id for update nowait;
+      perform 1 from public.verifications v where v.nanny_id = v_nanny_id for update nowait;
+      perform 1 from public.vetting_submissions vs where vs.nanny_id = v_nanny_id for update nowait;
+      perform 1 from public.nanny_suspension_lifts l where l.nanny_id = v_nanny_id for update nowait;
+    exception
+      when lock_not_available then
+        raise exception
+          'erasure of nanny %: a safeguarding decision is being recorded right now — retry (ADR-170)', v_nanny_id
+          using errcode = 'lock_not_available';
+    end;
+  end if;
+
   -- The S4 half of step 3: evidence refs and extracted fields go; `level`, `dbs_outcome`, the decision dates and
   -- the decision-maker stay, because §6.2 row 4 keeps them and ADR-170 is why the row survives at all.
   if v_nanny_id is not null then
@@ -606,7 +687,15 @@ begin
            dbs_certificate_ref = null, dbs_certificate_number = null, dbs_extracted = null,
            dbs_ai_reasoning = null, dbs_user_guidance = null,
            rtw_document_ref = null, rtw_share_code = null, rtw_extracted = null, rtw_user_guidance = null,
-           cross_check_note = null
+           cross_check_note = null,
+           -- ★ The provider REFS go with the evidence (database pass, HIGH-2). `*_provider_ref` is a pointer into
+           -- a third-party KYC / DBS / right-to-work vendor's system: leaving it is leaving the handle that
+           -- re-fetches the document we just deleted, which makes "the evidence is gone" untrue in the only sense
+           -- that matters. `*_provider_key` STAYS — it names which provider decided, which is part of the decision
+           -- §6.2 row 4 keeps and is a fact about us, not about her. The three rejection reasons go because they
+           -- are written about her and are in no keep-list.
+           identity_provider_ref = null, dbs_provider_ref = null, rtw_provider_ref = null,
+           identity_rejection_reason = null, dbs_rejection_reason = null, rtw_rejection_reason = null
      where v.nanny_id = v_nanny_id;
     get diagnostics v_n = row_count;
     if v_n > 0 then v_tables := v_tables || 'verifications'::text; end if;
@@ -770,8 +859,15 @@ begin
 
   -- 7d. `file_retention_log` is append-only by behaviour, not by comment. Inserted and then updated inside this
   -- block: the insert must succeed (the table is writable at all) and the update must be refused.
-  insert into public.file_retention_log (bucket, path_hash, entity_kind, reason, job)
-  values ('profile-pictures', 'verify-block-probe', 'user', 'migration-verify', 'delete-account');
+  -- Guarded so a literal re-run of this file cannot duplicate a row in a table that refuses DELETE for ever
+  -- (database pass, LOW). Every other statement here is `create or replace` / `if not exists`; this is the one
+  -- that was not.
+  if not exists (
+    select 1 from public.file_retention_log where path_hash = 'verify-block-probe'
+  ) then
+    insert into public.file_retention_log (bucket, path_hash, entity_kind, reason, job)
+    values ('profile-pictures', 'verify-block-probe', 'user', 'migration-verify', 'delete-account');
+  end if;
   begin
     update public.file_retention_log set reason = 'rewritten' where path_hash = 'verify-block-probe';
     raise exception '0028: an UPDATE on file_retention_log was ACCEPTED — the append-only guard is not attached';

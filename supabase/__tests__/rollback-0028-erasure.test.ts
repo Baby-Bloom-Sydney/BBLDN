@@ -80,6 +80,13 @@ beforeAll(async () => {
      values ($1,$2,$3,$4,'invite_shell','ENDED', now(), 'natural')`,
     [PLACEMENT, POSITION, PARENT, NANNY],
   );
+  // A request row, so the guard has something to refuse: an UPDATE that matches nothing fires no row trigger and
+  // would pass for the wrong reason.
+  await db.query(
+    `insert into public.account_erasure_requests (subject_user_id, requested_by, road)
+     values ($1::uuid, $1::uuid, 'self-service')`,
+    [USER],
+  );
   await db.query(stripped.sql);
 });
 
@@ -134,6 +141,25 @@ describe("int.rollback-0028 — clause (2): the evidence stays, and stays unrewr
       expect(rows[0].present).toBe(table);
     },
   );
+
+  it("★ `account_erasure_requests` still refuses an UPDATE, and `service_role` still cannot", async () => {
+    await db.query("savepoint ledger_after_twin");
+    let message = "the UPDATE was ACCEPTED after the twin";
+    try {
+      await db.query(
+        "update public.account_erasure_requests set state = 'completed'",
+      );
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    await db.query("rollback to savepoint ledger_after_twin");
+    expect(message).toMatch(/written by erase_account\(\) alone/);
+
+    const { rows } = await db.query<{ can: boolean }>(
+      "select has_table_privilege('service_role', 'public.account_erasure_requests', 'update') as can",
+    );
+    expect(rows[0].can).toBe(false);
+  });
 
   it("★ `file_retention_log` still refuses an UPDATE — by behaviour, not by trigger count", async () => {
     await db.query("savepoint rewrite_probe");
