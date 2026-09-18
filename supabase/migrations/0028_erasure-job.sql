@@ -458,13 +458,26 @@ begin
   if v_email = v_tombstone then
     update public.account_erasure_requests r
        set state = 'completed', completed_at = coalesce(r.completed_at, now())
-     where r.id = p_request_id and r.state = 'requested';
+     where r.id = p_request_id and r.subject_user_id = p_user_id
+       and r.state = 'requested';
     return jsonb_build_object(
       'outcome', 'already-erased',
       'retainedClasses', to_jsonb(v_retained),
       'scrubbedTables', to_jsonb(array[]::text[]),
       'objectCount', 0
     );
+  end if;
+
+  -- ★ The request row must be THIS subject's (security pass MEDIUM, 2026-09-20). Every caller in the tree derives
+  -- both values from one source, so the mismatch is unreachable today — but `service_role` holds EXECUTE on this
+  -- function, and ADR-145's invariant belongs at the layer that performs the write rather than at the call sites
+  -- that happen to exist. A mismatched pair would mark an unrelated, possibly still-open request `completed` with
+  -- another person's table list: a corrupted Art 12 ledger, written by the job whose purpose is to be that ledger.
+  if p_request_id is not null and not exists (
+    select 1 from public.account_erasure_requests r
+     where r.id = p_request_id and r.subject_user_id = p_user_id
+  ) then
+    raise exception 'ERASURE_REQUEST_SUBJECT_MISMATCH' using errcode = 'invalid_parameter_value';
   end if;
 
   select p.id into v_parent_id from public.parents p where p.user_id = p_user_id;
@@ -492,7 +505,7 @@ begin
   if v_reason is not null then
     update public.account_erasure_requests r
        set state = 'refused', refusal_reason = v_reason
-     where r.id = p_request_id;
+     where r.id = p_request_id and r.subject_user_id = p_user_id;
     return jsonb_build_object(
       'outcome', 'refused',
       'reason', v_reason,
@@ -658,7 +671,7 @@ begin
   update public.account_erasure_requests r
      set state = 'completed', completed_at = now(),
          object_count = v_objects, scrubbed_tables = v_tables
-   where r.id = p_request_id;
+   where r.id = p_request_id and r.subject_user_id = p_user_id;
 
   return jsonb_build_object(
     'outcome', 'erased',

@@ -84,9 +84,8 @@ afterEach(() => {
 describe("admin/erasure — step 1 records the request that arrived by email", () => {
   it("resolves the address through the connector and erases nothing", async () => {
     const { openRequestForEmail, runRequest } = stubs();
-    const { openErasureRequestAction } = await import(
-      "../erasure/actions/open-erasure-request-action"
-    );
+    const { openErasureRequestAction } =
+      await import("../erasure/actions/open-erasure-request-action");
 
     const result = await openErasureRequestAction(
       null,
@@ -103,9 +102,8 @@ describe("admin/erasure — step 1 records the request that arrived by email", (
 
   it("★ refuses an `aal1` admin — the layout has no guard, so this is the only one", async () => {
     const { openRequestForEmail, consume } = stubs({ role: "mfa" });
-    const { openErasureRequestAction } = await import(
-      "../erasure/actions/open-erasure-request-action"
-    );
+    const { openErasureRequestAction } =
+      await import("../erasure/actions/open-erasure-request-action");
 
     const result = await openErasureRequestAction(
       null,
@@ -119,9 +117,8 @@ describe("admin/erasure — step 1 records the request that arrived by email", (
 
   it("refuses something that is not an address, without reaching the connector", async () => {
     const { openRequestForEmail } = stubs();
-    const { openErasureRequestAction } = await import(
-      "../erasure/actions/open-erasure-request-action"
-    );
+    const { openErasureRequestAction } =
+      await import("../erasure/actions/open-erasure-request-action");
 
     const result = await openErasureRequestAction(null, form("not-an-address"));
     expect(result.ok).toBe(false);
@@ -132,9 +129,8 @@ describe("admin/erasure — step 1 records the request that arrived by email", (
 describe("admin/erasure — step 2 names a request, never a person (ADR-145; 07 §5.4 row 6)", () => {
   it("★ passes the request id to the connector, and no subject travels from the caller", async () => {
     const { runRequest } = stubs();
-    const { runErasureRequestAction } = await import(
-      "../erasure/actions/run-erasure-request-action"
-    );
+    const { runErasureRequestAction } =
+      await import("../erasure/actions/run-erasure-request-action");
 
     const result = await runErasureRequestAction({ requestId: REQUEST });
     expect(result.ok).toBe(true);
@@ -145,9 +141,8 @@ describe("admin/erasure — step 2 names a request, never a person (ADR-145; 07 
 
   it("★ ignores a subject the caller tries to add — it is not a parameter of this road", async () => {
     const { runRequest } = stubs();
-    const { runErasureRequestAction } = await import(
-      "../erasure/actions/run-erasure-request-action"
-    );
+    const { runErasureRequestAction } =
+      await import("../erasure/actions/run-erasure-request-action");
 
     await runErasureRequestAction({
       requestId: REQUEST,
@@ -163,9 +158,8 @@ describe("admin/erasure — step 2 names a request, never a person (ADR-145; 07 
 
   it("★ refuses an `aal1` admin here too", async () => {
     const { runRequest } = stubs({ role: "mfa" });
-    const { runErasureRequestAction } = await import(
-      "../erasure/actions/run-erasure-request-action"
-    );
+    const { runErasureRequestAction } =
+      await import("../erasure/actions/run-erasure-request-action");
 
     const result = await runErasureRequestAction({ requestId: REQUEST });
     expect(result.ok).toBe(false);
@@ -174,12 +168,13 @@ describe("admin/erasure — step 2 names a request, never a person (ADR-145; 07 
 
   it("refuses a missing or empty request id", async () => {
     const { runRequest } = stubs();
-    const { runErasureRequestAction } = await import(
-      "../erasure/actions/run-erasure-request-action"
-    );
+    const { runErasureRequestAction } =
+      await import("../erasure/actions/run-erasure-request-action");
 
     for (const bad of [{}, { requestId: "" }, { requestId: 7 }]) {
-      const result = await runErasureRequestAction(bad as { requestId: string });
+      const result = await runErasureRequestAction(
+        bad as { requestId: string },
+      );
       expect(result.ok).toBe(false);
     }
     expect(runRequest).not.toHaveBeenCalled();

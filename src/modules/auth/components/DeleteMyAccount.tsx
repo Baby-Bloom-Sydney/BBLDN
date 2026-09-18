@@ -8,7 +8,10 @@
 //      sentences come from `LEGAL.erasureRetains` (ADR-179) — one list, read by this screen, by the job and by any
 //      future subject-access answer, so the three cannot drift apart. Nothing here is typed as prose.
 //   2. **Make the confirmation deliberate.** Typing DELETE is not decoration: this is irreversible, and a button
-//      that can be hit by accident on a settings page is the wrong shape for the one action nobody can undo.
+//      that can be hit by accident on a settings page is the wrong shape for the one action nobody can undo. It is
+//      **not** a security control and must never be mistaken for one (security pass LOW, 2026-09-20): the action
+//      takes no argument, so calling it directly just means a person deletes her own account with less friction —
+//      never somebody else's. The authority is the session, and the action's empty signature is what says so.
 //   3. **Say what actually happened.** Erased, already erased, or refused with the reason — and a refusal tells
 //      her the one thing she can do about it, because "we could not do that" with no reason is a dead end.
 import { useState } from "react";

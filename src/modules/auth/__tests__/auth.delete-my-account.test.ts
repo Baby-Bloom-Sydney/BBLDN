@@ -40,7 +40,7 @@ function stubs(options?: {
 }) {
   const eraseOwnAccount = vi.fn(async () => options?.answer ?? erased);
   const signOut = vi.fn(async () => ({ ok: true, value: undefined }));
-  const consume = vi.fn(async () =>
+  const consume = vi.fn(async (_key: string, _policy: unknown) =>
     options?.limiterOk === false
       ? {
           ok: false as const,

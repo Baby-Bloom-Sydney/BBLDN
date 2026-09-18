@@ -785,6 +785,23 @@ describe("int.account-erasure — it refuses rather than half-runs (ruling (c))"
     expect(verification?.nanny_id).toBe(G_NANNY);
   });
 
+  it("★ a request row belonging to somebody else is refused (security pass MEDIUM)", async () => {
+    // Every caller in the tree derives the subject and the request from one source, so this pair is unreachable
+    // through any road that exists. `service_role` holds EXECUTE on the function, though, and ADR-145's invariant
+    // belongs where the write happens rather than at the call sites that happen to exist today. Without the
+    // guard, this call would mark somebody else's still-open request `completed` with this subject's table list —
+    // a corrupted Art 12 ledger, written by the job whose whole purpose is to be that ledger.
+    await db.query("savepoint mismatch_probe");
+    let message = "the mismatched pair was ACCEPTED";
+    try {
+      await erase(G_USER, R_REQUEST);
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    await db.query("rollback to savepoint mismatch_probe");
+    expect(message).toContain("ERASURE_REQUEST_SUBJECT_MISMATCH");
+  });
+
   it("an unknown subject raises rather than silently doing nothing", async () => {
     await db.query("savepoint unknown_probe");
     let message = "an unknown subject was ACCEPTED";

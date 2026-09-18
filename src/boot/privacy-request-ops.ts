@@ -73,20 +73,20 @@ const listOpenRequests =
     const listed = await port.run(
       {
         name: "platform.privacy.listOpenRequests",
+        // Keyed on `state`, not read-then-filter (security pass LOW, 2026-09-20). Reachable only by an admin at
+        // service scope, so it was never an exposure — but `completed` and `refused` rows accumulate for the life
+        // of the product, and an unbounded table read on every panel load is a defect that arrives quietly.
         exec: async (q) =>
           (await q
             .from("account_erasure_requests")
+            .eq("state", "requested")
             .select()) as ReadonlyArray<RawRequest>,
       },
       service,
     );
     if (!listed.ok) return listed as never;
-    return ok(
-      listed.value
-        .filter((row) => row.state === "requested")
-        .slice(0, limit)
-        .map(erasureRequestFromRow),
-    );
+    // The query surface has no `limit`, so the cap is applied here — the filter is what bounds the read.
+    return ok(listed.value.slice(0, limit).map(erasureRequestFromRow));
   };
 
 /**
