@@ -1178,3 +1178,59 @@ Prior: 2026-09-15T17:40+10:00 — BB-LDN-Planner-070926/S2 (S2 shipped locally).
 Prior: 2026-09-15T15:20+10:00 — BB-LDN-Planner-070926/S1 (S1 shipped locally).
 Prior: 2026-09-15T13:55+10:00 — BB-LDN-Planner-070926/S0 (seeded at bootstrap).
 -->
+
+## Files created / modified in the current unit (P2-FIX — a bar is terminal, the verification id space, the hold's third road, and four honest gates; L-008 Phase 2 tail)
+
+**What this unit is.** REVIEW-4 (`docs/review-sweep-190926.md`) pinned two CRITICALs and one HIGH it could not
+fix from a checkpoint — a migration, a contract and a judgement call — and qualified its own "the gates are
+honest" finding four ways. The planner ruled all of it (**ADR-168**, **ADR-169**, and R-5 / R-6 / R-7 / R-8 by
+instruction) and this unit implements the rulings. Every item was RED first: each is a measured defect, so each
+has a failing test that reproduces it before the fix.
+
+- **`supabase/migrations/0025_suspension-is-terminal.sql`** (new) — **ADR-168**. `sync_nanny_verification_state()`
+  re-created with one clause changed: both `suspended_at` arms fall back to the column, so the derivation may SET
+  a bar and may never CLEAR one (REVIEW-4 C-2 measured `suspended t → f` when the same submission was re-decided
+  with `mismatch`). M-12's "universal un-suspender" goes with it. New `lift_nanny_suspension(p_nanny_id, p_reason,
+p_decided_by)` — `service_role`, the decider validated against `user_roles` (ADR-159's pattern), a blank reason
+  refused, an unsuspended nanny refused, the audit row written in the same transaction, and **no level written**
+  (ADR-157 (1) keeps one writer of that). New `nanny_suspension_lifts` — who, why, what it walked back, how long
+  she was suspended; RLS forced, admin SELECT only, no client write policy, `on delete restrict` on `decided_by`.
+  Verify block asserts the security clause **on `prosrc`**, so "forward-only" is machine-checkable.
+- **`supabase/rollbacks/0025_suspension-is-terminal.rollback.sql`** (new) — **ADR-165 (1)**: drops the lever,
+  keeps the clause, says which clause it deliberately does not undo, and asserts that it survived. Arm (1) and
+  not arm (2), because a suspension that cannot be lifted is the fail-safe direction.
+- **`supabase/__tests__/rollback-0025-suspension.test.ts`** (new, 4 cases) + **`supabase/__tests__/rollback-twin.ts`**
+  (new) — **ADR-165 (3)** for `0025`, reusing H-3's harness rather than rebuilding it: `bodyOf` moved out of
+  `rollback-security-clauses.test.ts` and is now shared. Forward → twin → the bar is still un-clearable, driven.
+- **`supabase/__tests__/decision-road-integrity.test.ts`** — REVIEW-4's C-2 pin **flipped by behaviour** (it stays
+  `t`), its C-3 pin **restated** (it asked the schema to make the two id spaces interchangeable, which ADR-169
+  refuses), plus six new cases over the lift: the refusals, the audit row, and the grants.
+- **ADR-169 — the verification id space.** `NannyId` through `VettingLedgerEntry` / `VettingLedgerFilter`,
+  `QueueEntry`, `AdminRecord`, `DecisionOutcome` and the three decision-store methods; the seam is
+  `VerificationDecisionStore.partyIdOf` plus `AdminRecord.userId`, resolved once where the row is read.
+  `db-verification-store.ts`'s three re-resolutions are gone and with them the fabricated `{L0 → L0}` sync that
+  turned a broken road into a silent one. `nannyNameOfParty` for the queue; `nannyNameOf` stays session-keyed for
+  `admin/call-queue`, which genuinely holds one. `emitVettingEvent` now takes an explicit `Actor` — the slot the
+  wrong id fitted is gone — and `ManualDecision.onBehalfOf` carries the audit subject down from the caller.
+  **The memory doubles model both id spaces as different values**: their unified opaque string is why 4,400 green
+  unit tests never saw this.
+- **`src/modules/verification/__tests__/verification.id-space.test.ts`** (new, 5 cases) — including
+  `@ts-expect-error` on every road REVIEW-4 measured dead, so `typecheck` is the guard that cannot rot.
+- **`src/modules/connections/lib/send-row-messages.ts`** — REVIEW-4 H-2 / R-5. The hold is consulted **once**,
+  where the recipient set is built (the shape `visibleToParent` uses on the read side): a held row has no parent
+  recipient, so all six parent-addressed templates drop and the nanny-addressed rows are untouched. Pin flipped;
+  the seam is now driven over every parent-addressed row, held and unheld.
+- **ADR-168 (b)'s road** — `verification.liftSuspension` (`requireAdmin` → `adminRoutes` → subject from the
+  submission → definer → comms), `liftSuspensionAction`, its form on `SubmissionPanel` shown only while a bar
+  stands, and two templates (`verification-suspension-lifted`, `admin-nanny-suspension-lifted`). No second
+  `admin_notifications` kind — ADR-160 adds none.
+- **The gates** — `check-action-limits.mjs` now checks a delegation instead of reading it: an entry that claims
+  "consumed one boundary in" must carry `delegatesTo` + `helper`, and the gate asserts the helper is actually
+  called in that file. Driven: deleting `decide.ts`'s `consumeAdminRouteLimit` — the exact edit that left
+  REVIEW-4's gate green — now fails naming the file. `nannyApplications`' reason corrected (M-1).
+  **`scripts/ci/check-long-functions.mjs`** (new) + `long-functions.ratchet.json` — the 50-line list is a ratchet:
+  entries must exist, must carry a reason, and the count may only fall (109, recorded). `.github/workflows/ci.yml` —
+  `integration`'s job-level `if` became a **step that fails**, so a fork PR is red rather than green-by-absence.
+- **`src/modules/payments/lib/create-payments-jobs.ts`** — REVIEW-4 §6.5's pin 2 flipped: ADR-160 gave
+  `admin_notifications` its connector, so `payment-due-sweep` raises the operator's row through
+  `comms.notifyAdmin`, **before** the event, idempotent on the one-open-per-subject index.
