@@ -1,15 +1,15 @@
 // S-N-02 `/nanny/commission` (`03.37` NEW; 04 §4.4 c2 / c3; 04 §6.3 S-N-02) — "How it works", then the
-// book-a-call section on the same page.
+// call-picking section on the same page.
 //
 // **What is deliberately not here.** No figure of any kind: the money model has not set them (D0.2, 04 §4.4
 // c2 "No figures until…"). No pay dashboard, no ledger, no payout history — commission is arranged and paid by
 // hand outside the system until that is proven (N-2, ADR-022). No bonus: London removed it, and what replaced
-// it is a briefing call before her first day (ADR-099; offer §6). No "call me later" road at all: she picks a
-// slot or she has no call (ADR-073).
+// it is a briefing call before her first day (ADR-099). No "call me later" road at all: she picks a slot or
+// she has no call (ADR-073).
 //
 // **Whose words these are.** This is a nanny-facing page, so the parent list does not bind it (T-6.3), and
-// glossary §6's scoped exception allows the picker's "Book my call" verb on S-N-02 by name. What does bind it
-// is the nanny list (glossary §8 / ADR-124) — no "job", no currency sign, no Sydney check name.
+// glossary §6's scoped exception names S-N-02 for the picker's action verb. What does bind it is the nanny
+// list (glossary §8 / ADR-124) — the position word, the currency sign, the Sydney check name, the city.
 //
 // Server component; every href and every action is a prop, so this file never reaches a connector barrel from
 // a client bundle (01 §2.5). The picker is `call-layer`'s S-P-02, reused rather than forked (04 §6.2).
