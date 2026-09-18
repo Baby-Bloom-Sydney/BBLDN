@@ -18,6 +18,9 @@
 #   2 typecheck       → typecheck       tsc --noEmit --pretty false
 #   3–6 tests         → test            vitest --coverage → diff-cover ≥ 80 % changed lines · contract · integration
 #                                        (supabase start) · e2e (next build → playwright)              [red until S2–S5, E1]
+#   5 integration     → integration     supabase start + db reset (0000..0023 from empty) → vitest --project
+#                                        integration. The same suites `test` runs, in a job that can block a
+#                                        merge (REVIEW-3 M-10 / R-6); same-repo PRs + pushes to main; no secrets
 #   7 build + budgets → build           next build · size-limit [Phase 1 baseline] · prod-guard · bundle string scan
 #   7 types           → types-drift     supabase gen types ↔ src/modules/shared-types/database.types.ts [red until S2/S5]
 #   sec               → gitleaks        gitleaks (pinned binary, .gitleaks.toml) · npm audit --audit-level=high with an
@@ -178,6 +181,46 @@ jobs:
       - name: process.env only in config/env.ts + config/public-env.ts (01 §1.3 rule 1; 07 §10.2) — legacy tree excluded until F-d
         if: ${{ !cancelled() }}
         run: npm run check:env-reads
+
+  # ── REVIEW-3 M-10 / R-6 — the behavioural proof of every SQL-only control, in a job that can block a merge ──
+  #
+  # `int.rpc-*`, `int.rls`, `int.storage-rls` and `db.constraints` are the ONLY place the column allow-lists, the
+  # consent gate, the isolation writer and the bucket policies are tested against behaviour rather than against a
+  # mock. Until now they ran only inside `test`, which is not a required check and is red for reasons of its own
+  # (the `contract` vitest project does not exist; the legacy Playwright journeys need a seeded database) — so
+  # excellent tests with no teeth, and REVIEW-3's CRITICAL is the worked example of what that costs: the gap it
+  # found lives in exactly the seam between a mock and a column.
+  #
+  # The stack is started **in the runner** and `supabase db reset` applies `0000`–`0023` forward from empty, so
+  # this job also proves on every PR that the whole ordered migration set still applies to an empty database —
+  # the other thing nothing checked. No secrets and no hosted project: `bb-ldn-preview` is behind (B-45) and a
+  # preview-backed job would be red for reasons that are not the code's. Same-repo PRs and pushes to `main` only,
+  # because a fork's runner is not ours to spend. Joins the required checks when it is green (ADR-109).
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: 2.117.0
+      - name: supabase start + db reset — the ordered set 0000..0023 applied forward from empty (02 §6)
+        run: |
+          supabase start
+          supabase db reset
+      - name: vitest --project integration (05 §9 stage 5) — db.constraints first, then the rpc / rls suites
+        # `SUPABASE_DB_URL` is the one name the suites read (`supabase/__tests__/db-client.ts`); left unset it
+        # falls back to the local stack's own URL, which is exactly what `supabase start` just brought up.
+        run: npx vitest run --project integration
+      - name: supabase stop
+        if: always()
+        run: supabase stop --no-backup || true
 
   test:
     name: test
