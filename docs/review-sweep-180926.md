@@ -4,7 +4,7 @@
 >
 > **Run by** `BB-LDN-Planner-070926/REVIEW-3` on `review-180926-3`, off `origin/main` `dada284`, in its own worktree. Battery: `code-reviewer` + `typescript-reviewer` + `silent-failure-hunter` in one parallel batch over the diff; then `security-reviewer` over every new server action, route, store and boot wiring; then `database-reviewer` **read-only** over `0020` / `0021` / `0022`. **Every finding below was re-verified by hand before it was acted on or recorded** — and this time that was load-bearing in both directions: it killed one of my own HIGHs (§7) and it corrected the stated mechanism of an agent's HIGH into a different and worse defect (H-3).
 >
-> **What was different about this sweep.** REVIEW-2 could reason only from source. This one had **the applied migration set on a live local stack**, so the headline finding is not an argument about SQL — it is a measured read of another family's data, and the fix that closes it was applied to the database and watched to turn the pin green before being reverted. Twelve integration suites, 307 passing cases, ran against `0000..0022` at every step.
+> **What was different about this sweep.** REVIEW-2 could reason only from source. This one had **the applied migration set on a live local stack**, so the headline finding is not an argument about SQL — it is a measured read of another family's data, and the fix that closes it was applied to the database and watched to turn the pin green before being reverted. The integration project — eleven suites at the baseline, twelve with this sweep's — ran against `0000..0022` at every step.
 
 ---
 
@@ -250,8 +250,8 @@ Local exit codes, in this sweep's own worktree, with the applied migration set o
 | `typecheck`                        | **0**                                                    |
 | `lint`                             | **0**                                                    |
 | `prettier --check .`               | **0**                                                    |
-| `vitest run` (`--project unit`)    | **0** — 279 files, **4,218 passed \| 5 expected fail**   |
-| `vitest run --project integration` | **0** — 13 files, **307 passed \| 2 expected fail**      |
+| `vitest run` (`--project unit`)    | **0** — 280 files, **4,218 passed \| 5 expected fail**   |
+| `vitest run --project integration` | **0** — 12 files, **307 passed \| 2 expected fail**      |
 | `lint:boundaries`                  | **0**                                                    |
 | `check:allowed-imports`            | **0**                                                    |
 | `check:limiter-call-sites`         | **0** — 14 of 21 policies consumed, 7 recorded           |
