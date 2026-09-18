@@ -4,6 +4,7 @@
 import { auth } from "@/modules/auth";
 import { err, toActionResult } from "@/modules/platform";
 import type { ContactAction, VerificationActionDetails } from "../types";
+import { consumeVerificationSubmitLimit } from "../lib/consume-verification-submit-limit";
 import { contactSchema } from "../lib/contact-schema";
 import { verification } from "../lib/default-verification";
 import { parseForm } from "../lib/parse-form";
@@ -22,6 +23,13 @@ export const saveVerificationContactAction: ContactAction = async (
     );
   const parsed = parseForm(contactSchema, formData, FIELDS);
   if (!parsed.ok) return toActionResult(parsed);
+  // 07 §8 row 11, contact bucket — after the parse (a malformed form spends nothing) and before the write.
+  const limit = await consumeVerificationSubmitLimit(
+    session.value.userId,
+    "contact",
+  );
+  if (!limit.ok)
+    return toActionResult(refuseVerification("saveVerificationContact", limit));
   const submitted = await verification.submitContact(
     session.value.userId,
     parsed.value,

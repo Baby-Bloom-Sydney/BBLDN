@@ -11,6 +11,8 @@
 #   1 lint            → limiter-call-sites  scripts/ci/check-limiter-call-sites.mjs — a rate-limit policy declared
 #                                        in config/security.ts with no consumer outside config/ fails (ADR-140 (2) /
 #                                        ADR-142 (2)); a recorded gap carries its reason in limiter-call-sites.allow.json
+#                                        + scripts/ci/check-action-limits.mjs — the inverse (REVIEW-3 R-3 / M-1): a
+#                                        server action that reaches no limiter fails; same job, same allow file
 #   1 lint            → banned-literals scripts/ci/check-config-literals.mjs · banned-words static pre-check ·
 #                                        env:check (.env.example) · crons:check (vercel.json) · process.env grep outside config
 #   2 typecheck       → typecheck       tsc --noEmit --pretty false
@@ -148,6 +150,9 @@ jobs:
       - run: npm ci
       - name: every declared rate-limit policy has a call site (ADR-140 (2); ADR-142 (2)) — recorded gaps in scripts/ci/limiter-call-sites.allow.json
         run: npm run check:limiter-call-sites
+      - name: every server action reaches a limiter (REVIEW-3 R-3 / M-1) — the inverse check; recorded gaps under "actions" in the same allow file
+        if: ${{ !cancelled() }}
+        run: npm run check:action-limits
 
   banned-literals:
     name: banned-literals

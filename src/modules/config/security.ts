@@ -120,6 +120,19 @@ const RATE_LIMITS = declarePolicies({
     perHour: 20,
     note: "checkout + portal session creation (1h; 07 §8 has no row)",
   },
+  // 07 §8 has **no row** for S-N-08's poll, and REVIEW-3 M-1 found it unlimited. It cannot take row 11's
+  // budget: `processVerification` is what `ProcessingStep` calls every `VETTING.wizard.pollMs` (2 000 ms — 30
+  // a minute), so five a day, or any ceiling at or under thirty a minute, would refuse the wizard itself. So
+  // this is the nearest-shaped policy written for the surface rather than borrowed from one it would break:
+  // keyed on the nanny, at twice the rate an honest screen spends, with a day ceiling that stops a runaway
+  // loop long before it stops a real session. Fails closed (not on `failOpenOnLimiterOutage`).
+  // Owner: 07 §8 — a row for the poll to ratify the numbers (REVIEW-3 R-3; P2-HARDEN).
+  verificationPolls: {
+    key: "user",
+    perMinute: 60,
+    perDay: 600,
+    note: "S-N-08 processing poll per nanny (P2-HARDEN; 07 §8 has no row)",
+  },
 });
 
 /**

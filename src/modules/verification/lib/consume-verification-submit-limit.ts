@@ -1,14 +1,19 @@
 // 07 §8 row 11 — `SECURITY.rateLimits.verificationSubmissions`: 5 submissions per section per day, per user.
 // Consumed before any upload so a loop cannot spend storage on refused attempts. Fails closed on a limiter
 // outage (ADR-134: a mutating surface refuses rather than running unbounded).
+//
+// The section is a `WizardSection`, not a `VerificationSection`: 02 §4.3 counts **four** sections and row 11
+// says "per section", so S-N-04's contact write sits in the same row and its own bucket. REVIEW-3 M-1 found it
+// with no limiter at all — `saveVerificationContactAction` is a `"use server"` export, so the form is not the
+// only caller and `user_profiles` was writable in a loop.
 import { SECURITY } from "@/modules/config";
 import { err, log, ok, rateLimiter } from "@/modules/platform";
 import type { Result, UserId } from "@/modules/shared-types";
-import type { VerificationErrorDetails, VerificationSection } from "../types";
+import type { VerificationErrorDetails, WizardSection } from "../types";
 
 export async function consumeVerificationSubmitLimit(
   nannyId: UserId,
-  section: VerificationSection,
+  section: WizardSection,
 ): Promise<Result<void, VerificationErrorDetails>> {
   const consumed = await rateLimiter.consume(
     `verification-submit:${section}:${nannyId}`,
