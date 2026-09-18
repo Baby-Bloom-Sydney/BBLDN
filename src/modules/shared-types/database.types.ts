@@ -34,6 +34,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_erasure_requests: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          object_count: number | null
+          refusal_reason: string | null
+          requested_at: string
+          requested_by: string | null
+          road: string
+          scrubbed_tables: string[] | null
+          state: string
+          subject_user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          object_count?: number | null
+          refusal_reason?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          road: string
+          scrubbed_tables?: string[] | null
+          state?: string
+          subject_user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          object_count?: number | null
+          refusal_reason?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          road?: string
+          scrubbed_tables?: string[] | null
+          state?: string
+          subject_user_id?: string
+        }
+        Relationships: []
+      }
       admin_notifications: {
         Row: {
           acknowledged_at: string | null
@@ -926,9 +968,9 @@ export type Database = {
           meeting_outcome_reported_by: string | null
           meeting_set_by: Database["public"]["Enums"]["actor_role"] | null
           message: string | null
-          nanny_id: string
+          nanny_id: string | null
           origin: Database["public"]["Enums"]["connection_origin"]
-          parent_id: string
+          parent_id: string | null
           phone_exchanged_at: string | null
           position_id: string
           stage: Database["public"]["Enums"]["connection_stage"]
@@ -955,9 +997,9 @@ export type Database = {
           meeting_outcome_reported_by?: string | null
           meeting_set_by?: Database["public"]["Enums"]["actor_role"] | null
           message?: string | null
-          nanny_id: string
+          nanny_id?: string | null
           origin: Database["public"]["Enums"]["connection_origin"]
-          parent_id: string
+          parent_id?: string | null
           phone_exchanged_at?: string | null
           position_id: string
           stage: Database["public"]["Enums"]["connection_stage"]
@@ -984,9 +1026,9 @@ export type Database = {
           meeting_outcome_reported_by?: string | null
           meeting_set_by?: Database["public"]["Enums"]["actor_role"] | null
           message?: string | null
-          nanny_id?: string
+          nanny_id?: string | null
           origin?: Database["public"]["Enums"]["connection_origin"]
-          parent_id?: string
+          parent_id?: string | null
           phone_exchanged_at?: string | null
           position_id?: string
           stage?: Database["public"]["Enums"]["connection_stage"]
@@ -1494,6 +1536,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      file_retention_log: {
+        Row: {
+          bucket: string
+          created_at: string
+          deleted_at: string
+          entity_id: string | null
+          entity_kind: string
+          id: string
+          job: string
+          path_hash: string
+          reason: string
+        }
+        Insert: {
+          bucket: string
+          created_at?: string
+          deleted_at?: string
+          entity_id?: string | null
+          entity_kind: string
+          id?: string
+          job: string
+          path_hash: string
+          reason: string
+        }
+        Update: {
+          bucket?: string
+          created_at?: string
+          deleted_at?: string
+          entity_id?: string | null
+          entity_kind?: string
+          id?: string
+          job?: string
+          path_hash?: string
+          reason?: string
+        }
+        Relationships: []
       }
       guarantee_events: {
         Row: {
@@ -2232,9 +2310,9 @@ export type Database = {
           ended_by_role: Database["public"]["Enums"]["actor_role"] | null
           hourly_rate_pence: number | null
           id: string
-          nanny_id: string
+          nanny_id: string | null
           nanny_notes: string | null
-          parent_id: string
+          parent_id: string | null
           parent_notes: string | null
           position_id: string
           roster: Json | null
@@ -2259,9 +2337,9 @@ export type Database = {
           ended_by_role?: Database["public"]["Enums"]["actor_role"] | null
           hourly_rate_pence?: number | null
           id?: string
-          nanny_id: string
+          nanny_id?: string | null
           nanny_notes?: string | null
-          parent_id: string
+          parent_id?: string | null
           parent_notes?: string | null
           position_id: string
           roster?: Json | null
@@ -2286,9 +2364,9 @@ export type Database = {
           ended_by_role?: Database["public"]["Enums"]["actor_role"] | null
           hourly_rate_pence?: number | null
           id?: string
-          nanny_id?: string
+          nanny_id?: string | null
           nanny_notes?: string | null
-          parent_id?: string
+          parent_id?: string | null
           parent_notes?: string | null
           position_id?: string
           roster?: Json | null
@@ -2371,7 +2449,7 @@ export type Database = {
           minimum_nanny_age: number | null
           non_smoker_required: boolean | null
           other_requirements: string | null
-          parent_id: string
+          parent_id: string | null
           pay_frequency: string[]
           pets_ok_required: boolean | null
           placement_length: string | null
@@ -2427,7 +2505,7 @@ export type Database = {
           minimum_nanny_age?: number | null
           non_smoker_required?: boolean | null
           other_requirements?: string | null
-          parent_id: string
+          parent_id?: string | null
           pay_frequency?: string[]
           pets_ok_required?: boolean | null
           placement_length?: string | null
@@ -2483,7 +2561,7 @@ export type Database = {
           minimum_nanny_age?: number | null
           non_smoker_required?: boolean | null
           other_requirements?: string | null
-          parent_id?: string
+          parent_id?: string | null
           pay_frequency?: string[]
           pets_ok_required?: boolean | null
           placement_length?: string | null
@@ -3066,7 +3144,7 @@ export type Database = {
           created_at: string
           expires_at: string | null
           id: string
-          nanny_id: string
+          nanny_id: string | null
           notified_at: string
           position_id: string
           responded_at: string | null
@@ -3081,7 +3159,7 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
-          nanny_id: string
+          nanny_id?: string | null
           notified_at?: string
           position_id: string
           responded_at?: string | null
@@ -3096,7 +3174,7 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
-          nanny_id?: string
+          nanny_id?: string | null
           notified_at?: string
           position_id?: string
           responded_at?: string | null
@@ -4230,6 +4308,15 @@ export type Database = {
         Returns: boolean
       }
       claim_verification_processing: { Args: never; Returns: string[] }
+      collect_erasure_objects: {
+        Args: { p_user_id: string }
+        Returns: {
+          bucket: string
+          entity_id: string
+          entity_kind: string
+          path: string
+        }[]
+      }
       connect_child_invite: {
         Args: { p_token: string; p_user_id: string }
         Returns: string
@@ -4288,6 +4375,14 @@ export type Database = {
           p_parent_user_id: string
         }
         Returns: string
+      }
+      erase_account: {
+        Args: {
+          p_deleted_objects?: Json
+          p_request_id: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       expire_verification_section: {
         Args: { p_required?: Json; p_submission_id: string }
@@ -4486,6 +4581,7 @@ export type Database = {
         Returns: boolean
       }
       save_verification_contact: { Args: never; Returns: boolean }
+      scrub_auth_user: { Args: { p_user_id: string }; Returns: undefined }
       set_access_window: {
         Args: { p_access_age_years: number; p_parent_user_id: string }
         Returns: string
