@@ -10,6 +10,11 @@
 // office and the ICO registration number do not exist until BAI's Ltd does (07 §11 item 3, B-35), so each carries the
 // house `@pending:B-nn` sentinel and `config.legal` asserts each is *still* the sentinel — replacing one fails a test,
 // which is the point: a plausible number must never ship unnoticed as if it were real.
+import { SECURITY } from "./security";
+
+/** So `moneyYears * 12` is a sentence rather than a magic 12 (`common/coding-style.md`). */
+const MONTHS_IN_A_YEAR = 12;
+
 export const LEGAL = Object.freeze({
   governingLaw: "England and Wales", // 04 §2 S-X-25; 08 §2 step 8
   courts: "the courts of England and Wales",
@@ -46,6 +51,17 @@ export const LEGAL = Object.freeze({
   // nannies only and it is the least comfortable to say. It is said anyway: she is told that a vetting decision
   // about her is kept, that her identity is removed from it, and why. Art 17(3) is what makes keeping these rows
   // lawful; Art 12 is what makes telling her about them mandatory.
+  // **Each row also carries its window, and the anchor the window runs from** (L-009 `3g`; 07 §6.1 step 6).
+  // `purge-scrubbed-users` hard-deletes the `auth.users` row 30 days after the scrub **only if** nothing in
+  // these classes is still inside its window — and the ruling for that job is that it reads *this* list rather
+  // than a second copy of the dates in SQL. The window is expressed from `SECURITY.retention`, never typed
+  // again: 07 §6.2 owns the numbers, and a class whose window disagrees with §6.2 is a wrong answer given
+  // confidently.
+  //
+  // `from` matters as much as the number, and the two classes differ. Money runs from the **last transaction**
+  // (§6.2 row 9 — HMRC and the Limitation Act both count from the event), consent runs from the **account
+  // scrub** (row 11, in its own words). A job that used one anchor for both would be wrong for one of them and
+  // would look right, so the anchor is a value the job reads rather than a rule it embeds.
   erasureRetains: Object.freeze([
     Object.freeze({
       class: "money",
@@ -53,6 +69,8 @@ export const LEGAL = Object.freeze({
       what: "Payment and subscription records",
       why: "UK tax and company law require us to keep them, and they may be needed to settle a dispute.",
       lawfulBasis: "Art 17(3)(b) and (e)",
+      windowMonths: SECURITY.retention.moneyYears * MONTHS_IN_A_YEAR,
+      from: "last-activity",
     }),
     Object.freeze({
       class: "consent",
@@ -60,6 +78,9 @@ export const LEGAL = Object.freeze({
       what: "A record of the permissions you gave, and when",
       why: "We have to be able to show what you agreed to and when you agreed to it.",
       lawfulBasis: "Art 17(3)(b)",
+      windowMonths:
+        SECURITY.retention.consentYearsAfterScrub * MONTHS_IN_A_YEAR,
+      from: "scrub",
     }),
     Object.freeze({
       class: "safeguarding",
@@ -67,6 +88,8 @@ export const LEGAL = Object.freeze({
       what: "Safeguarding decisions made about you, with your name and contact details removed",
       why: "Where a background-check decision has been made about someone who cares for children, we are accountable for that decision and have to be able to show who made it and why. Your identity is removed from the record; the decision itself is kept.",
       lawfulBasis: "Art 17(3)(b) and (e)",
+      windowMonths: SECURITY.retention.dbsRecordAfterAccountMonths,
+      from: "scrub",
     }),
   ] as const),
 });

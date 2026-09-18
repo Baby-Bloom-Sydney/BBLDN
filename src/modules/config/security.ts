@@ -270,6 +270,11 @@ export const SECURITY = Object.freeze({
     contactMessagesMonths: 24,
     spamMessagesDays: 30,
     consentYearsAfterScrub: 6,
+    // 07 §6.1 step 6 — how long after a completed scrub `purge-scrubbed-users` may hard-delete the
+    // `auth.users` row, and only then if no money or consent row is still inside its own window (in practice
+    // years later). The 30 days are not a retention window: they are the grace period in which a mistaken
+    // erasure can still be investigated while the row that identifies the request still resolves.
+    purgeScrubbedUserDays: 30,
     cookieConsentRecordMonths: 13,
     cookieConsentSupersededDays: 30,
     cookieExpiryDays: COOKIE_EXPIRY_DAYS, // the consent cookie itself — re-prompt after 12 months (07 §6.2 row 12 `config.consent.cookieExpiryDays`)

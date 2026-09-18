@@ -10,4 +10,5 @@ export const privacy: Privacy = Object.freeze({
   listOpenRequests: (limit) => PRIVACY_REGISTRY.get().listOpenRequests(limit),
   runRequest: (requestId) => PRIVACY_REGISTRY.get().runRequest(requestId),
   sweepRequests: (now) => PRIVACY_REGISTRY.get().sweepRequests(now),
+  purgeScrubbedUsers: (now) => PRIVACY_REGISTRY.get().purgeScrubbedUsers(now),
 });

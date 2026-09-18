@@ -76,6 +76,13 @@ export const CRONS: ReadonlyArray<CronSpec> = Object.freeze([
       "deletion requests: scrub-and-retain (07 §6.1), emits account.deleted",
   }),
   cron({
+    path: "/api/cron/purge-scrubbed-users",
+    job: "purge-scrubbed-users",
+    london: daily(2, 45),
+    serves:
+      "07 §6.1 step 6, second half: 30 days after a scrub, hard-delete the auth.users row only if no money / consent / safeguarding row is still inside its window (L-009 3g)",
+  }),
+  cron({
     path: "/api/cron/proactive",
     london: every(15),
     serves: "Katie proactive; handler gates on waking hours 07:00–22:00 London",

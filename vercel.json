@@ -44,6 +44,10 @@
       "schedule": "30 2 * * *"
     },
     {
+      "path": "/api/cron/purge-scrubbed-users",
+      "schedule": "45 2 * * *"
+    },
+    {
       "path": "/api/cron/proactive",
       "schedule": "*/15 * * * *"
     },

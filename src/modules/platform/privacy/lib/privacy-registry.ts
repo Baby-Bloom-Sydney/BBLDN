@@ -20,6 +20,8 @@ const unconfiguredStore: PrivacyStore = Object.freeze({
   collectObjects: async () => NOT_CONFIGURED,
   removeObject: async () => NOT_CONFIGURED,
   runErasure: async () => NOT_CONFIGURED,
+  listPurgeCandidates: async () => NOT_CONFIGURED,
+  purgeSubject: async () => NOT_CONFIGURED,
 });
 
 export const PRIVACY_REGISTRY = createRegistry<Privacy>(
