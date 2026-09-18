@@ -30,29 +30,24 @@ export function setCookiePrefs(prefs: CookiePrefs) {
   }
 }
 
-export function getVisitorId(): string {
-  const key = "baby_bloom_visitor_id";
-  try {
-    let id = localStorage.getItem(key);
-    if (!id) {
-      id = crypto.randomUUID();
-      localStorage.setItem(key, id);
-    }
-    return id;
-  } catch {
-    return crypto.randomUUID();
-  }
-}
-
+/**
+ * `getVisitorId()` is **gone, deliberately** (L-009 `3e`). It minted a uuid in `localStorage` and sent it in
+ * the request body, which let any caller name any visitor — including a real one, whose current consent row it
+ * would then collide with. The id is now minted server-side and carried in an `HttpOnly`, signed cookie, so
+ * this file cannot read it and does not need to: `credentials: "same-origin"` sends the cookie, and the
+ * response's `Set-Cookie` issues one on a first visit.
+ *
+ * Still non-blocking on a network failure — a banner that throws at a person choosing "reject" is worse than
+ * one that retries on her next page — but a refusal is now a *recorded* refusal on the server's side, not a
+ * `23505` from a unique index (`0004`) that made a second choice impossible.
+ */
 export async function recordCookieConsent(prefs: CookiePrefs) {
   try {
     await fetch("/api/legal/cookie-consent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        visitor_id: getVisitorId(),
-        ...prefs,
-      }),
+      credentials: "same-origin",
+      body: JSON.stringify(prefs),
     });
   } catch {
     // Non-blocking

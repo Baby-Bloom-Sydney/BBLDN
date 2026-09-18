@@ -1,7 +1,6 @@
 {
   "policies": {
     "clientEvents": "07 §8 row 4 — POST /api/events. No such route exists in the London tree; the client-event intake is not a Phase 1 surface. Wire the policy with the route.",
-    "cookieConsent": "07 §8 row 5 — POST /api/legal/cookie-consent. The only route at that path is the legacy Sydney one from the bootstrap import (src/lib/supabase/*), which F-d rewrites; there is no London surface to consume it yet.",
     "katieChat": "07 §8 row 8 — Katie chat. The London Katie routes are not built; /api/chat/* is the legacy Sydney tree (F-d). The chat_cost_daily USD cap is the hard stop until then.",
     "katieUploads": "07 §8 row 8 — Katie uploads. Same surface as katieChat: not built in the London tree.",
     "agentRoute": "07 §8 row 9 — the ADMIN_API_TOKEN recruitment-agent route. /api/agent is the legacy Sydney route (F-d); the London one does not exist.",

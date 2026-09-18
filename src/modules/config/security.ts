@@ -22,6 +22,14 @@ const declarePolicies = <T extends Record<string, RateLimit>>(
     ),
   ) as Readonly<{ readonly [K in keyof T]: RateLimit }>;
 
+/**
+ * 07 §6.2 row 12 — how long the cookie choice stands before the banner asks again. Named once because two
+ * things read it and they must not drift: the retention window on the record below, and the `Max-Age` of the
+ * cookie that carries the visitor id (`visitorCookie`). A visitor whose cookie outlived her record would be
+ * counted as having answered a question whose answer we had already dropped.
+ */
+const COOKIE_EXPIRY_DAYS = 365;
+
 const RATE_LIMITS = declarePolicies({
   publicRead: {
     key: "ip",
@@ -168,6 +176,25 @@ export const SECURITY = Object.freeze({
     invite: Object.freeze({ name: "bb_invite", maxAgeSeconds: 3600 }),
     nannyLead: Object.freeze({ name: "bb_nanny_lead", maxAgeSeconds: 86400 }),
   }),
+  // **The visitor id is ours to mint, not the caller's to name** (07 §2.9; L-009 `3e`).
+  //
+  // The legacy `POST /api/legal/cookie-consent` took `visitor_id` from the request body, so anyone could write
+  // a cookie-consent record against any identifier they chose — and, because
+  // `cookie_consent_records_current_idx` is UNIQUE on `(visitor_id) where superseded_by is null`, could also
+  // collide with a real visitor's current row. The id now travels in an **HttpOnly, signed** cookie the server
+  // mints on first contact: a body value is ignored, a tampered cookie is treated as no cookie, and a fresh id
+  // is minted rather than an error returned, because the visitor's actual request is to record a choice.
+  //
+  // `SameSite=Lax`, not `Strict`: the banner must work on a first visit that arrived from a link, and this
+  // cookie authorises nothing — it names a row. `Secure` is set outside development.
+  //
+  // It is **strictly necessary** in PECR's sense only insofar as it carries a consent record; ADR-175 (a) is
+  // explicit that the analytics `visitor_id` is NOT claimed strictly necessary, and this is not that value's
+  // home — this cookie exists so a person can *change her mind*, which is the withdrawal right (07 §6).
+  visitorCookie: Object.freeze({
+    name: "bb_visitor",
+    maxAgeSeconds: COOKIE_EXPIRY_DAYS * 24 * 60 * 60,
+  }),
   inviteLookupBlock: Object.freeze({ failedPerHour: 5, blockMinutes: 60 }), // 07 §8 row 7
   burstAlertMultiple: 10, // ALERT_RATE_LIMIT_BURST when a key trips ≥ 10× in an hour (07 §8)
   signedUrlTtlSeconds: Object.freeze({
@@ -211,7 +238,7 @@ export const SECURITY = Object.freeze({
     consentYearsAfterScrub: 6,
     cookieConsentRecordMonths: 13,
     cookieConsentSupersededDays: 30,
-    cookieExpiryDays: 365, // the consent cookie itself — re-prompt after 12 months (07 §6.2 row 12 `config.consent.cookieExpiryDays`)
+    cookieExpiryDays: COOKIE_EXPIRY_DAYS, // the consent cookie itself — re-prompt after 12 months (07 §6.2 row 12 `config.consent.cookieExpiryDays`)
     emailBodyDays: 90,
     emailMetadataMonths: 24,
     adminNotificationsMonths: 12,
