@@ -24,10 +24,22 @@ export async function sendRowMessages(
   const nanny = await deps.nannyFacts(record.nannyId);
   const nannyUserId = nanny.ok ? nanny.value?.userId : undefined;
 
+  // ★ ADR-158 (2) / R-14 — "held rows withhold parent **notification** until L4". The hold is consulted HERE,
+  // once, where the recipient set is built, which is the shape `visibleToParent` already uses on the read side:
+  // a held row simply has no parent recipient, so every `to: "parent"` row drops through the `to === null` arm
+  // that exists for an unresolvable address. Stage-blind on purpose, exactly as the read side is — the hold is
+  // not about where the connection has got to but about whether this family may be told about this nanny at all
+  // yet — so it covers all six parent-addressed templates of `MESSAGES_OF`, K-20's pair included. The nanny's
+  // rows are untouched: the hold silences one audience, never the send. (REVIEW-4 H-2 / §8 R-5.)
+  //
+  // **Absent is not held**, matching `visibleToParent`: a record with no flag — every row written before `0024`,
+  // and every double that does not model the pair — is not treated as held.
+  const held = record.heldForVerification === true;
+
   // The parent's address still comes from the injected recipient port: her messages predate ADR-136 and the
   // mirror already carries a resolved address for `call-confirmation`. The **nanny** is named, never addressed.
   const parent =
-    deps.recipientOf === undefined
+    held || deps.recipientOf === undefined
       ? null
       : await deps.recipientOf(record.parentId);
   const parentTo = parent?.ok === true ? parent.value : null;
