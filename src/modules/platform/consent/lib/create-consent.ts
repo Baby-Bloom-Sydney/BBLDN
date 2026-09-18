@@ -33,6 +33,7 @@ import { CONSENT_PURPOSES } from "./consent-purposes";
 import { auditConsentExpiry } from "./audit-consent-expiry";
 import { dueForRenewal } from "./due-for-renewal";
 import { RENEWABLE_PURPOSES } from "./renewable-purposes";
+import { sweepRenewals } from "./sweep-renewals";
 
 const MS_PER_DAY = 86400000;
 const KNOWN_PURPOSES: ReadonlySet<string> = new Set(CONSENT_PURPOSES);
@@ -257,5 +258,6 @@ export function createConsent(deps: ConsentDeps): Consent {
       dueForRenewal(userId, purposes, resolved),
     auditExpiry: (now, purposes = RENEWABLE_PURPOSES) =>
       auditConsentExpiry(now, purposes, resolved),
+    sweepRenewals: (now) => sweepRenewals(now, resolved),
   });
 }

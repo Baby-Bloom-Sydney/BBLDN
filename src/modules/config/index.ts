@@ -4,6 +4,7 @@ export type * from "./types";
 export { BRAND } from "./brand";
 export { LOCALE } from "./locale";
 export { LEGAL } from "./legal";
+export { CONSENT } from "./consent";
 export { DOMAIN } from "./domain";
 export { URLS } from "./urls";
 export { PRICES } from "./prices";

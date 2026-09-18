@@ -270,6 +270,31 @@ export type Consent = ConsentReader & {
     now: Instant,
     purposes?: ReadonlyArray<LegalDocumentId>,
   ): Promise<Result<{ readonly handled: number; readonly skipped: number }>>;
+  /**
+   * FATE `10.18` — the **per-user** half `3c` left unbuilt, because it needed a store read that did not exist.
+   * One pass per renewable purpose over the subjects whose newest row predates `CONSENT.renewalCheckMonths`:
+   * a purpose whose words have not moved is **carried forward and the carry is recorded** (ADR-174), and one
+   * whose hash has moved — or that she declined last time — is counted as owed a re-ask and nothing is written,
+   * because a row saying we asked her would be false until a surface actually has.
+   */
+  sweepRenewals(now: Instant): Promise<Result<RenewalSweepSummary>>;
+};
+
+/**
+ * What one sweep run did. `carried` and `reAsk` are deliberately separate numbers rather than one "handled":
+ * a carry is work **completed** and a re-ask is work **outstanding**, and the second is the one an operator has
+ * to act on — a re-ask count that stays high for a week is a document whose new words nobody is putting in
+ * front of anybody.
+ */
+export type RenewalSweepSummary = {
+  /** subjects examined across all renewable purposes (a person due for two purposes counts twice) */
+  readonly checked: number;
+  /** carry-forward rows written (ADR-174: the evidence that the check ran) */
+  readonly carried: number;
+  /** subject × purpose pairs whose words moved, or that were declined last time — owed a re-ask */
+  readonly reAsk: number;
+  /** subject × purpose pairs skipped because the document has no current version at all (an outage) */
+  readonly unavailable: number;
 };
 
 /**
@@ -298,6 +323,17 @@ export type ConsentStore = {
     subject: ConsentSubject,
   ): Promise<Result<CookieConsentRecord | null>>;
   currentDocument(id: LegalDocumentId): Promise<Result<CurrentDocument | null>>;
+  /**
+   * FATE `10.18` (L-009 `3g`) — the subjects whose newest row for `purpose` is older than `before`, i.e. who is
+   * due the **annual check**. It answers only that cheap half; whether each is re-asked or carried forward is
+   * decided per person on the content hash by `dueForRenewal`, because ADR-173's binding rule lives in one
+   * place. `0029`'s `consent_subjects_due_for_renewal` is the read; the stub does the same thing in memory.
+   */
+  subjectsDueForRenewal(input: {
+    readonly purpose: LegalDocumentId;
+    readonly before: Instant;
+    readonly limit: number;
+  }): Promise<Result<ReadonlyArray<UserId>>>;
 };
 
 /** The stub's observable state (`consent.stub.ts`). */

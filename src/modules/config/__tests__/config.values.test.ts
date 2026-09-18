@@ -83,6 +83,7 @@ describe("config — one export per file (build-standard L1; 05 §7 rule 4)", ()
         "areas-source.ts",
         "brand.ts",
         "connections.ts",
+        "consent.ts",
         "crons.ts",
         "domain.ts",
         "env.ts",

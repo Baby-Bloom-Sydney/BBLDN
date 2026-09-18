@@ -20,6 +20,7 @@ export const consent: Consent = Object.freeze({
     CONSENT_REGISTRY.get().dueForRenewal(userId, purposes),
   auditExpiry: (now, purposes) =>
     CONSENT_REGISTRY.get().auditExpiry(now, purposes),
+  sweepRenewals: (now) => CONSENT_REGISTRY.get().sweepRenewals(now),
   hasConsent: (userId, purpose) =>
     CONSENT_REGISTRY.get().hasConsent(userId, purpose),
 });

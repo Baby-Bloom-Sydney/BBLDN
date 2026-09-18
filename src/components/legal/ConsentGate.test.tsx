@@ -22,9 +22,14 @@ import { ConsentGate } from "./ConsentGate";
 
 const COOKIE = SECURITY.consentPreferenceCookie.name;
 
-/** Something unmistakably non-essential: a real tracker URL on an allow-listed CSP origin (07 §10.3). */
+/**
+ * Something unmistakably non-essential: a real tracker URL on an allow-listed CSP origin (07 §10.3). `async`
+ * because that is how a pixel loader is actually written — and because the sync-script lint rule is right, and
+ * a fixture that needs a rule disabled is a fixture that does not match what it stands for.
+ */
 const Pixel = () => (
   <script
+    async
     data-testid="pixel"
     src="https://connect.facebook.net/en_US/fbevents.js"
   />

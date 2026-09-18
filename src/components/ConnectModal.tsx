@@ -87,7 +87,6 @@ export function ConnectModal({
     recordInformedAction({
       agreementId: "AGR-06",
       buttonText: `Connect with ${firstName}`,
-      modalContentVersion: "v3.0-2026-03-23",
     }).catch(() => {});
 
     const result = await createConnectionRequest(

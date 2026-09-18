@@ -130,5 +130,23 @@ export function dbConsentStore(port: DataAccessPort): ConsentStore {
         exec: async (q) =>
           currentDocumentFromRows(await q.from("legal_documents").select(), id),
       }),
+    // FATE `10.18` — `0029`'s read, at **service** scope. It is a cross-subject read ("who is due"), which is a
+    // named job's question and not a person's: under a session RLS would narrow it to her own rows and the
+    // sweep would silently check one person. `0029` grants EXECUTE to `service_role` alone for the same reason.
+    subjectsDueForRenewal: ({ purpose, before, limit }) =>
+      port.run(
+        {
+          name: "platform.consent.subjectsDueForRenewal",
+          exec: async (q) =>
+            (
+              (await q.rpc("consent_subjects_due_for_renewal", {
+                p_purpose: purpose,
+                p_before: before,
+                p_limit: limit,
+              })) as ReadonlyArray<{ subject_user_id: string }> | null
+            )?.map((row) => row.subject_user_id as UserId) ?? [],
+        },
+        { scope: "service" },
+      ),
   });
 }

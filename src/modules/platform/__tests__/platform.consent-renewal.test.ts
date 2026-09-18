@@ -57,6 +57,24 @@ function movableStore(initial: Partial<Record<LegalDocumentId, Doc>>) {
     insertBiometric: async () => ({ ok: true, value: undefined }),
     insertCookie: async () => ({ ok: true, value: {} }),
     currentCookie: async () => ({ ok: true, value: null }),
+    // FATE `10.18` (L-009 `3g`) — the same "newest row per subject, older than the cutoff" answer `0029` gives.
+    subjectsDueForRenewal: async ({ purpose, before, limit }) => {
+      const newest = new Map<string, string>();
+      for (const row of state.consents) {
+        if (row.purpose !== purpose) continue;
+        const seen = newest.get(row.userId);
+        if (seen === undefined || row.createdAt > seen)
+          newest.set(row.userId, row.createdAt);
+      }
+      return {
+        ok: true,
+        value: [...newest.entries()]
+          .filter(([, createdAt]) => createdAt < before)
+          .map(([userId]) => userId as UserId)
+          .sort()
+          .slice(0, limit),
+      };
+    },
     currentDocument: async (id): Promise<Result<CurrentDocument | null>> => {
       const doc = state.documents[id];
       return {

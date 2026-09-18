@@ -1,7 +1,12 @@
 // The consent store stub (05 §3 rule 1: production code inside the module, one export): the three append-only
 // tables of 02 §4.1 in memory, plus the `legal_documents` current-version lookup (every id at version 1 unless
 // told otherwise). The real store (S5 tables over `auth`'s port) replaces it at boot; nothing else changes.
-import type { ConsentRecordId, Result } from "@/modules/shared-types";
+import type {
+  ConsentRecordId,
+  Instant,
+  Result,
+  UserId,
+} from "@/modules/shared-types";
 import type {
   BiometricConsentRecord,
   ConsentRecord,
@@ -112,6 +117,26 @@ export function memoryConsentStore(
             ...(options.documents?.[id] ?? DEFAULT_DOCUMENT),
           } as CurrentDocument)
         : ok(null),
+    // FATE `10.18` — the same answer `0029`'s `consent_subjects_due_for_renewal` gives: the newest row per
+    // subject for one purpose, kept only when it predates the cutoff. Written as a reduce rather than a filter
+    // because "newest per subject" is the whole point: a person with an old row AND a recent one is not due,
+    // and a `filter(created_at < before)` would have said she was.
+    subjectsDueForRenewal: async ({ purpose, before, limit }) => {
+      const newest = new Map<UserId, Instant>();
+      for (const row of state.consents) {
+        if (row.purpose !== purpose) continue;
+        const seen = newest.get(row.userId);
+        if (seen === undefined || row.createdAt > seen)
+          newest.set(row.userId, row.createdAt);
+      }
+      return ok(
+        [...newest.entries()]
+          .filter(([, createdAt]) => createdAt < before)
+          .map(([userId]) => userId)
+          .sort()
+          .slice(0, limit),
+      );
+    },
     get consents() {
       return state.consents;
     },

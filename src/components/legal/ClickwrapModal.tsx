@@ -58,7 +58,6 @@ export function ClickwrapModal({
   reminderFooter,
   disclosureText,
   footerText,
-  modalContentVersion,
 }: ClickwrapModalProps) {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [recording, setRecording] = useState(false);
@@ -84,11 +83,7 @@ export function ClickwrapModal({
         checkpointText: cp.text,
       }));
 
-      const result = await recordConsent(
-        consentInputs,
-        relatedEntityId,
-        modalContentVersion,
-      );
+      const result = await recordConsent(consentInputs, relatedEntityId);
       if (result.success) {
         await onConfirm();
       }
@@ -96,7 +91,6 @@ export function ClickwrapModal({
       const result = await recordInformedAction({
         agreementId,
         buttonText,
-        modalContentVersion: modalContentVersion || "",
         relatedEntityId,
       });
       if (result.success) {

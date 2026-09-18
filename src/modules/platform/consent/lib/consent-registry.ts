@@ -18,6 +18,7 @@ const unconfiguredStore: ConsentStore = Object.freeze({
   insertCookie: async () => NOT_CONFIGURED,
   currentCookie: async () => NOT_CONFIGURED,
   currentDocument: async () => NOT_CONFIGURED,
+  subjectsDueForRenewal: async () => NOT_CONFIGURED,
 });
 
 export const CONSENT_REGISTRY = createRegistry<Consent>(

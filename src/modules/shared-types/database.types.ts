@@ -4321,6 +4321,16 @@ export type Database = {
         Args: { p_token: string; p_user_id: string }
         Returns: string
       }
+      consent_subjects_due_for_renewal: {
+        Args: {
+          p_before: string
+          p_limit?: number
+          p_purpose: Database["public"]["Enums"]["consent_purpose"]
+        }
+        Returns: {
+          subject_user_id: string
+        }[]
+      }
       consume_rate_limit: {
         Args: { p_bucket: string; p_now: string; p_window_seconds: number }
         Returns: {
