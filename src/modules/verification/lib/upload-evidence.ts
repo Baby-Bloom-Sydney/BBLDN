@@ -1,5 +1,8 @@
 // The one upload road (07 §5.3 rule 3; ADR-155): session → path from server-side values → MIME sniffed from the
-// bytes → size cap → image re-encoded (EXIF gone) → scan → object with its metadata → the ref. The scan runs
+// bytes → size cap → image re-encoded (EXIF gone) → scan → object with its metadata → the ref. The cap is
+// `UPLOADS.maxUploadBytes` — what a serverless request body can carry — and not `maxBytes`, which is the
+// bucket's ceiling (REVIEW-3 R-5); it is measured on the bytes, before and after the re-encode, never on the
+// browser's `file.size`. The scan runs
 // BEFORE the object is written, so an infected file is never at rest; `verification-documents` fails closed
 // when the scanner is unavailable (rule 3: "fail closed for verification-documents"). The ref carries bucket +
 // path and never a URL (I-V7); the caller signs it for the provider (03 §4.2).
@@ -33,7 +36,7 @@ async function prepare(
 > {
   if (file.bytes.byteLength === 0)
     return refuse("missing_field", "Choose a file to upload.");
-  if (file.bytes.byteLength > UPLOADS.maxBytes)
+  if (file.bytes.byteLength > UPLOADS.maxUploadBytes)
     return refuse("file_too_large", "That file is too large.");
   const mime = sniffMime(file.bytes);
   if (mime === null || !ACCEPTED.includes(mime))
@@ -57,7 +60,7 @@ async function prepare(
       "invalid_type",
       "We couldn't read that image. Try another photo.",
     );
-  if (image.bytes.byteLength > UPLOADS.maxBytes)
+  if (image.bytes.byteLength > UPLOADS.maxUploadBytes)
     return refuse("file_too_large", "That file is too large.");
   return ok(image);
 }
