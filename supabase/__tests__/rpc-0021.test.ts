@@ -49,7 +49,7 @@ afterEach(async () => {
  * the "transaction is aborted" the `reset role` would otherwise throw over it.
  */
 async function asRole<T extends Record<string, unknown>>(
-  role: "authenticated" | "anon",
+  role: "authenticated" | "anon" | "service_role",
   claims: Record<string, unknown>,
   sql: string,
   params: ReadonlyArray<unknown> = [],
@@ -83,6 +83,12 @@ const asAuthenticated = <T extends Record<string, unknown>>(
   );
 
 const asAnon = (sql: string): Promise<unknown> => asRole("anon", {}, sql);
+/** ADR-163: the service road (`set local role service_role`), savepointed like the other two. */
+const asService = <T extends Record<string, unknown>>(
+  sql: string,
+  params: ReadonlyArray<unknown> = [],
+): Promise<ReadonlyArray<T>> =>
+  asRole<T>("service_role", { role: "service_role" }, sql, params);
 
 async function makeAuthUser(id: string, email: string): Promise<void> {
   await db.query(
@@ -112,9 +118,9 @@ const create = (
     mobile?: string | null;
   },
 ) =>
-  asAuthenticated<{ out: { nanny_id: string; lead_converted: boolean } }>(
-    userId,
-    `select public.create_nanny_account($1, $2, $3, $4, $5, $6, $7, $8::jsonb) as out`,
+  // ADR-163 (0023): service_role only, acting for p_user_id — the signup action's road
+  asService<{ out: { nanny_id: string; lead_converted: boolean } }>(
+    `select public.create_nanny_account($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::uuid) as out`,
     [
       "Amara",
       "Okafor",
@@ -124,6 +130,7 @@ const create = (
       args.district === undefined ? null : "Test Area",
       args.leadId ?? null,
       JSON.stringify(args.profile ?? {}),
+      userId,
     ],
   ).then((rows) => rows[0]!.out);
 
@@ -234,6 +241,14 @@ describe("create_nanny_account() — the signup pair + the party row + the conta
   it("refuses an anonymous caller (42501) and a user who already holds another role", async () => {
     await expect(
       asAnon("select public.create_nanny_account('A', 'B', false)"),
+    ).rejects.toMatchObject({ code: "42501" });
+    // ADR-163: a signed-in nanny's own session may not call it either — the road is the signup action's
+    await expect(
+      asAuthenticated(
+        PARENT,
+        "select public.create_nanny_account('A', 'B', false, null, null, null, null, '{}'::jsonb, $1::uuid)",
+        [PARENT],
+      ),
     ).rejects.toMatchObject({ code: "42501" });
 
     await makeAuthUser(PARENT, "parent-0021@example.test");
@@ -470,6 +485,16 @@ describe("lift_nanny_isolation() — the one writer of is_isolated → false (AD
     );
     expect(before[0]).toEqual({ active: false });
     await lift(NANNY);
+    // ADR-162 (0023): the flag alone no longer opens the board — the predicate is the conjunction, and she is L0
+    const lifted = await asAuthenticated<{ active: boolean }>(
+      NANNY,
+      "select public.is_active_nanny() as active",
+    );
+    expect(lifted[0]).toEqual({ active: false });
+    await db.query(
+      "update public.nannies set verification_level = 'L3_PROVISIONALLY_VERIFIED' where user_id = $1",
+      [NANNY],
+    );
     const after = await asAuthenticated<{ active: boolean }>(
       NANNY,
       "select public.is_active_nanny() as active",

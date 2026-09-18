@@ -2,6 +2,7 @@
 // fails is logged and never fails the submission it describes (03 §9.2: the event log is a record, not a gate).
 import { Events, log } from "@/modules/platform";
 import type {
+  Actor,
   EvidenceType,
   ProviderId,
   SubmissionId,
@@ -24,10 +25,12 @@ export async function emitVettingEvent(
     readonly statusKind?: string;
     readonly decision?: string;
   },
+  /** 03 §9.3: `vetting.decision-recorded` carries `actor admin, onBehalfOf nanny`; every other event is hers */
+  actor: Actor = { kind: "user", id: nannyId, role: "nanny" },
 ): Promise<void> {
   const emitted = await Events.emit({
     name,
-    actor: { kind: "user", id: nannyId, role: "nanny" },
+    actor,
     props,
   });
   if (!emitted.ok)

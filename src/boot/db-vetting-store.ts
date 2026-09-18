@@ -4,8 +4,11 @@
 // service-role only (02 §4.3 row 2) and the wizard's processing step and the queue both read it — named in the
 // module README (07 §5.1 rule 5). `recordDecision` is the admin road `2c` builds and refuses by name until then.
 import type { DataAccessPort } from "@/modules/auth";
-import { err, ok } from "@/modules/platform";
+import { VETTING } from "@/modules/config";
+import { nowInstant, ok } from "@/modules/platform";
+import { requiredSectionsByLevel } from "@/modules/verification";
 import type {
+  CheckResult,
   CheckStatus,
   Evidence,
   EvidenceType,
@@ -47,6 +50,7 @@ type LedgerRow = {
   readonly raw_response: {
     reject_reason?: string;
     guidance_key?: string;
+    note?: string;
   } | null;
   readonly submitted_at: string;
   readonly checked_at: string | null;
@@ -68,12 +72,16 @@ const checkStatusOf = (row: LedgerRow): CheckStatus => {
         kind: "verified",
         at: (row.checked_at ?? row.submitted_at) as Instant,
       };
-    case "failed":
+    case "failed": {
+      // REVIEW-3 M-8: a rejected section always carries a copy key — the recorded key, else the reason itself
+      // (SectionCard maps a reason to its line), never an empty string a screen would render as nothing
+      const reason = row.raw_response?.reject_reason ?? "mismatch";
       return {
         kind: "rejected",
-        reason: (row.raw_response?.reject_reason ?? "mismatch") as never,
-        guidanceKey: (row.raw_response?.guidance_key ?? "") as never,
+        reason: reason as never,
+        guidanceKey: (row.raw_response?.guidance_key || reason) as never,
       };
+    }
     case "needs_admin":
       return { kind: "needs-admin" };
     default:
@@ -92,6 +100,9 @@ const entryOf = (row: LedgerRow): VettingLedgerEntry => ({
   evidenceType: row.evidence_type as EvidenceType,
   submittedAt: row.submitted_at as Instant,
   ...(row.checked_at === null ? {} : { checkedAt: row.checked_at as Instant }),
+  ...(row.raw_response?.note === undefined
+    ? {}
+    : { note: row.raw_response.note }),
 });
 
 /** Evidence → the section's submission columns `0022` admits (ADR-154 (2)); a key outside the list is dropped there. */
@@ -118,29 +129,31 @@ function columnsOf(evidence: Evidence): Record<string, unknown> {
         dbs_certificate_ref: ref,
         dbs_certificate_number: d.certificateNumber,
         dbs_issue_date: d.issueDate,
+        // REVIEW-3 M-5: the key's PRESENCE is the consent; the instant is the server's (0023 stamps now())
         ...(d.updateServiceConsent === "true"
-          ? { dbs_update_service_consent_at: evidence.submittedAt }
+          ? { dbs_update_service_consent_at: true }
           : {}),
       };
+    // REVIEW-3 L-4: the Update Service consent submitted as evidence of its own (03 §4.2's type) — the same
+    // marker, never a silent `{}`
+    case "dbs-update-service":
+      return { dbs_update_service_consent_at: true };
     case "right-to-work-passport":
     case "right-to-work-document":
       return { rtw_evidence_type: d.kind, rtw_document_ref: ref };
     case "right-to-work-share-code":
       return { rtw_evidence_type: d.kind, rtw_share_code: d.shareCode };
-    default:
-      return {};
+    default: {
+      const never: never = evidence.type;
+      throw new Error(`columnsOf: unmapped evidence type ${String(never)}`);
+    }
   }
 }
 
+/** ADR-157 (1): the sync's `p_required` — `VETTING.requiredChecksByLevel` as sections, computed once at boot. */
+const REQUIRED = requiredSectionsByLevel(VETTING.requiredChecksByLevel);
+
 export function dbVettingStore(port: DataAccessPort): VettingSubmissionStore {
-  const notBuilt = (): Result<never, VettingErrorDetails> =>
-    err<VettingErrorDetails>(
-      "INTERNAL",
-      "That decision road is not built yet.",
-      {
-        reason: "decision-not-built",
-      },
-    );
   const readRows = async (
     name: `vetting-providers.${string}`,
     where: {
@@ -232,9 +245,53 @@ export function dbVettingStore(port: DataAccessPort): VettingSubmissionStore {
           ),
       );
     },
-    // ADR-154 (5): the admin decision (`record`) is `2c`'s road — the ledger + section write exists
-    // (`apply_vetting_check_result`), the actor, the note and the level derivation do not. Refused by name.
-    recordDecision: async () => notBuilt(),
+    // ADR-157 (2) / ADR-159: the admin decision in one transaction — `record_vetting_decision()` at service
+    // scope (named in the module README, 07 §5.1 rule 5): the ledger + the section through
+    // `apply_vetting_check_result(…, 'admin')`, the decider, the note, for DBS the outcome and the cross-check,
+    // then the sync. The actor's authority was checked by the action (`auth.requireRole`) before this adapter was
+    // reached; `p_decided_by` is the durable record of *who* — REVIEW-3's security H-3, because the event that also
+    // carries the id is best-effort by design (03 §9), so one dropped emit used to leave the database unable to say
+    // which admin approved a criminal-record check. The definer re-validates the id against `user_roles` and
+    // refuses to record at all without one.
+    recordDecision: async (input) =>
+      asVetting(
+        await port.run<CheckResult>(
+          {
+            name: "vetting-providers.recordDecision",
+            exec: async (q) => {
+              await q.rpc("record_vetting_decision", {
+                p_submission_id: input.submissionId,
+                p_decision: input.decision,
+                p_reject_reason: input.reason,
+                p_note: input.note,
+                p_expires_at: input.expiresAt,
+                p_required: REQUIRED as never,
+                p_decided_by: input.actor.id as string,
+              });
+              const status: CheckStatus =
+                input.decision === "verified"
+                  ? {
+                      kind: "verified",
+                      at: nowInstant(),
+                      ...(input.expiresAt === undefined
+                        ? {}
+                        : { expiresAt: input.expiresAt }),
+                    }
+                  : {
+                      kind: "rejected",
+                      reason: input.reason ?? "mismatch",
+                      guidanceKey: (input.reason ?? "mismatch") as never,
+                    };
+              return {
+                submissionId: input.submissionId,
+                status,
+                checkedAt: nowInstant(),
+              };
+            },
+          },
+          service,
+        ),
+      ),
   };
   return Object.freeze(store);
 }

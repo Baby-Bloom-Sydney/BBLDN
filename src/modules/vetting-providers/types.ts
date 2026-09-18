@@ -84,6 +84,8 @@ export type VettingLedgerEntry = Submission & {
   readonly evidenceType: EvidenceType;
   readonly submittedAt: Instant;
   readonly checkedAt?: Instant;
+  /** the admin's note on the decision (`raw_response.note`; ADR-157 (2)) */
+  readonly note?: string;
 };
 
 export type VettingLedgerFilter = {
@@ -134,9 +136,16 @@ export type MemorySectionRow = {
   readonly rejectionReason?: string;
   readonly guidanceKey?: string;
   readonly statusAt?: Instant;
+  /** the latest decided submission (`_provider_ref`) and its expiry (`_expires_at`) — what `vetting-expiry` walks (2c) */
+  readonly submissionId?: SubmissionId;
+  readonly expiresAt?: Instant;
 };
 
-/** The double's `verifications` row: the level `2c` will write, the four sections, the suspension flag. */
+/**
+ * The double's `verifications` row: the level (written by `verification`'s memory store through `deriveLevel`,
+ * ADR-157), the four sections, the suspension flag, and — since `2c` — the decision-side facts `0023` keeps
+ * beside the sections, plus the declared fields and object paths an admin's read carries.
+ */
 export type MemoryVerificationRow = {
   readonly level: EnumValue<"verification_level">;
   readonly suspended: boolean;
@@ -144,6 +153,24 @@ export type MemoryVerificationRow = {
   readonly identity: MemorySectionRow;
   readonly dbs: MemorySectionRow;
   readonly rightToWork: MemorySectionRow;
+  readonly dbsOutcome?: EnumValue<"dbs_outcome">;
+  readonly crossCheckPassed?: boolean;
+  readonly updateService?: {
+    readonly result?: EnumValue<"update_service_result">;
+    readonly subscribed?: boolean;
+    readonly checkedBy?: UserId;
+    readonly checkedAt?: Instant;
+    readonly consentAt?: Instant;
+  };
+  /** the nanny's typed fields, as the evidence declared them (S4 — an admin reads them inside a reveal) */
+  readonly declared?: Readonly<Record<string, string>>;
+  /** object paths by 02 §8 section name, never a URL (I-V7) */
+  readonly documents?: ReadonlyArray<{
+    readonly section: string;
+    readonly path: string;
+  }>;
+  /** ADR-158 arm 2 in the memory world: how many of her connections are held; released at L4 */
+  readonly heldConnections?: number;
 };
 
 export type MemoryVettingStore = VettingSubmissionStore & {
@@ -151,6 +178,8 @@ export type MemoryVettingStore = VettingSubmissionStore & {
   rows(): ReadonlyArray<VettingLedgerEntry>;
   /** the double's `verifications` row for a nanny, or `undefined` before her first write (I-V1) */
   sectionsOf(nannyId: UserId): MemoryVerificationRow | undefined;
+  /** every nanny with a row — what the sweeps walk (2c) */
+  nannyIds(): ReadonlyArray<UserId>;
   /** the writes `verification`'s memory store makes through the same world (contact, claim, apply) */
   patchSections(
     nannyId: UserId,

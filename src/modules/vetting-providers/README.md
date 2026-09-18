@@ -32,9 +32,12 @@ on `record`; a failed emit is logged and never fails the submission it describes
 
 **Gaps (recorded, not hidden).**
 
-1. **`recordDecision` on the boot adapter refuses `decision-not-built`** (`2c`): the write it needs exists
-   (`apply_vetting_check_result()`, `checked_by = 'admin'`), the actor, the note and the level derivation do not.
-   The memory double implements it so `stub-manual.record` is testable now.
+1. ~~`recordDecision` refuses `decision-not-built`~~ **Closed by `2c` (ADR-157 (2)):** the boot adapter's
+   `recordDecision` is `record_vetting_decision()` at service scope (named here, 07 §5.1 rule 5) — the ledger +
+   the section through `apply_vetting_check_result(…, 'admin')`, the note on `raw_response`, for DBS the outcome
+   and the cross-check, then the level sync in one transaction; `stub-manual.record` emits
+   `vetting.decision-recorded` with `actor admin` + `onBehalfOf nanny` (03 §9.3). The memory world mirrors the
+   facts; the level itself is `verification`'s to derive (`syncLevel`), because this module may not import it.
 2. **No real provider.** `ai-id-check`, `admin-manual`, `dbs-update-service`, `home-office-share-code` are Phase 2
    (03 §4.4) and are not installed; asking for one fails loudly (`unsupported-evidence`).
 3. **`vetting.extracted` · `vetting.checked` · `vetting.expiry-approaching` · `vetting.expired` ·
@@ -43,7 +46,9 @@ on `record`; a failed emit is logged and never fails the submission it describes
    `processing` on a provider failure for the stale sweep (`2c`) rather than retrying.
 
 <!-- audit
-Last edited: 2026-09-18T12:10+10:00 — BB-LDN-Planner-070926/2b
+Last edited: 2026-09-18T19:30+10:00 — BB-LDN-Planner-070926/2c
+Notes: 2c — gap 1 closed: recordDecision = record_vetting_decision() at service scope; the decision event's admin actor; the memory world's decision-side facts.
+Prior: 2026-09-18T12:10+10:00 — BB-LDN-Planner-070926/2b
 Notes: the ledger port built over 0022 (ADR-154): upsert takes the evidence, the reads at service scope named, the memory world shared with verification, events; stub-manual's only outcome stated; four gaps.
 Prior: 2026-09-16T13:55+10:00 — BB-LDN-Planner-070926/F-b
 Notes: created at F-b — ADR-117 Tier A, so the connector, `getProvider` / `listProviders` from config, and the `stub-manual` shell over a fail-closed store. No evidence handling anywhere in the module.

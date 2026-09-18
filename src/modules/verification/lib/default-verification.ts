@@ -20,4 +20,18 @@ export const verification: Verification = Object.freeze({
     VERIFICATION_REGISTRY.get().applyCheckResult(result),
   override: (nannyId, decision) =>
     VERIFICATION_REGISTRY.get().override(nannyId, decision),
+  // the queue's road + the named jobs (2c; ADR-159 / ADR-161)
+  listQueue: (query) => VERIFICATION_REGISTRY.get().listQueue(query),
+  readQueueRecord: (submissionId) =>
+    VERIFICATION_REGISTRY.get().readQueueRecord(submissionId),
+  openEvidence: (submissionId) =>
+    VERIFICATION_REGISTRY.get().openEvidence(submissionId),
+  decide: (input) => VERIFICATION_REGISTRY.get().decide(input),
+  recordUpdateServiceCheck: (input) =>
+    VERIFICATION_REGISTRY.get().recordUpdateServiceCheck(input),
+  adminOverview: () => VERIFICATION_REGISTRY.get().adminOverview(),
+  sweepStaleProcessing: (now) =>
+    VERIFICATION_REGISTRY.get().sweepStaleProcessing(now),
+  sweepReminders: (now) => VERIFICATION_REGISTRY.get().sweepReminders(now),
+  sweepExpiry: (now) => VERIFICATION_REGISTRY.get().sweepExpiry(now),
 });

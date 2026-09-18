@@ -37,6 +37,12 @@ S-X-07 (with or without an invite) with `true`; only `lift_nanny_isolation()` cl
 `applyFromPortalAction`. Pool visibility is the reads' conjunction with the verification level — this module never
 reads or writes the level.
 
+**`create_nanny_account()` at service scope (ADR-163; `2c`).** REVIEW-3 measured that a nanny's own session could
+call the definer with `p_isolated = false` and skip the apply road, so `0023` made it `service_role` only, acting
+for `p_user_id`: `signUpNanny` passes the user id `auth.signUp` just minted and decides `isolated` by road (`/apply`
+→ `false`, S-X-07 → `true`); the boot adapter's `create` runs at service scope — a named use (07 §5.1 rule 5). The
+profile and isolation writes stay at session scope.
+
 **Gaps (recorded, not hidden).**
 
 1. **N3's photo upload is S-N-17's** (`2d`; ADR-148 (1)). The funnel and the stepper carry no photo field.
@@ -67,7 +73,9 @@ renders the active wording for everyone. Owner: whoever next widens the account 
 the variant is dropped.
 
 <!-- audit
-Last edited: 2026-09-18T16:20+10:00 — BB-LDN-Planner-070926/2g
+Last edited: 2026-09-18T19:30+10:00 — BB-LDN-Planner-070926/2c
+Notes: 2c — create_nanny_account at service scope with p_user_id (ADR-163); nothing else.
+Prior: 2026-09-18T16:20+10:00 — BB-LDN-Planner-070926/2g
 Notes: S-N-02 built (L-008 2g) — the explainer + book-a-call section over call-layer, the hub's two pitch links, gap 5 closed by 2g, gap 9 (the under-3 variant) recorded.
 Prior: 2026-09-18T09:40+10:00 — BB-LDN-Planner-070926/2a
 Notes: the inside built (L-008 2a): funnel + signup + profile + hub + portal; stores, adapters, service-role uses named; gaps 1–6.

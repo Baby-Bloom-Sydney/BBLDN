@@ -107,14 +107,21 @@ async function makeNanny(
   const { rows } = await db.query<{ district: string }>(
     "select district from public.areas order by district limit 1",
   );
-  const out = await asNanny<{
+  // ADR-163 (0023): the definer is service_role only and acts for p_user_id
+  const out = await asService<{
     out: { nanny_id: string };
   }>(
-    userId,
-    `select public.create_nanny_account($1, $2, false, $3, $4, $5, null, '{}'::jsonb) as out`,
+    `select public.create_nanny_account($1, $2, false, $3, $4, $5, null, '{}'::jsonb, $6::uuid) as out`,
     withContact
-      ? ["Amara", "Okafor", "+447700900001", rows[0]!.district, "Test Area"]
-      : ["Amara", "Okafor", null, null, null],
+      ? [
+          "Amara",
+          "Okafor",
+          "+447700900001",
+          rows[0]!.district,
+          "Test Area",
+          userId,
+        ]
+      : ["Amara", "Okafor", null, null, null, userId],
   );
   return out[0]!.out.nanny_id;
 }

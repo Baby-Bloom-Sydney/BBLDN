@@ -257,3 +257,54 @@ describe("dbCommsStore — settle refuses an unknown message (M-13)", () => {
     expect(fake.updated).toEqual([]);
   });
 });
+
+describe("dbCommsStore — createAdminNotification, the one writer of admin_notifications (ADR-160)", () => {
+  it("inserts one row under the service role with the kind, subject, summary and due-at", async () => {
+    const fake = fakeDataPort({ admin_notifications: [] });
+    const raised = await dbCommsStore(fake.port, clock).createAdminNotification(
+      {
+        kind: "commission_call_booked",
+        subject: { type: "booking", id: MESSAGE_ID as never },
+        summary: "A nanny booked a commission call.",
+        dueAt: NOW as never,
+      },
+    );
+    expect(raised.ok).toBe(true);
+    expect(fake.calls.map((c) => c.scope)).toEqual(["service"]);
+    expect(fake.inserted).toEqual([
+      {
+        table: "admin_notifications",
+        row: expect.objectContaining({
+          kind: "commission_call_booked",
+          subject_type: "booking",
+          subject_id: MESSAGE_ID,
+          summary: "A nanny booked a commission call.",
+          due_at: NOW,
+        }),
+      },
+    ]);
+  });
+
+  it("answers the open row for the same (kind, subject) rather than inserting a second (the open-row index, 0011)", async () => {
+    const fake = fakeDataPort({
+      admin_notifications: [
+        {
+          id: "n-open",
+          kind: "nanny_barred",
+          subject_type: "nanny",
+          subject_id: MESSAGE_ID,
+          acknowledged_at: null,
+        },
+      ],
+    });
+    const raised = await dbCommsStore(fake.port, clock).createAdminNotification(
+      {
+        kind: "nanny_barred",
+        subject: { type: "nanny", id: MESSAGE_ID as never },
+        summary: "again",
+      },
+    );
+    expect(raised.ok && raised.value.id).toBe("n-open");
+    expect(fake.inserted).toEqual([]);
+  });
+});

@@ -21,4 +21,13 @@ export const unconfiguredVerification: Verification = Object.freeze({
   process: async () => refuse(),
   applyCheckResult: async () => refuse(),
   override: async () => refuse(),
+  listQueue: async () => refuse(),
+  readQueueRecord: async () => refuse(),
+  openEvidence: async () => refuse(),
+  decide: async () => refuse(),
+  recordUpdateServiceCheck: async () => refuse(),
+  adminOverview: async () => refuse(),
+  sweepStaleProcessing: async () => refuse(),
+  sweepReminders: async () => refuse(),
+  sweepExpiry: async () => refuse(),
 });

@@ -14,6 +14,7 @@ import type {
   Result,
   Uuid,
 } from "@/modules/shared-types";
+import { adminNotificationInsertRow } from "./admin-notification-insert-row";
 import { emailLogInsertRow } from "./email-log-insert-row";
 import { inboxInsertRow } from "./inbox-insert-row";
 import { messageStateFromRow } from "./message-state-from-row";
@@ -170,6 +171,46 @@ export function dbCommsStore(
           service,
         ),
       ),
+    // ADR-160: the one writer of `admin_notifications` (admin SELECT / UPDATE only — 0011), at service scope.
+    // One OPEN row per (kind, subject) is `admin_notifications_one_open_per_subject_idx`: a repeat while the first
+    // is unacknowledged is answered with the open row rather than duplicated (the seam's idempotency promise).
+    //
+    // **The index is what enforces that, not the read below.** The read-then-insert is a lookup, not a lock: two
+    // concurrent calls for the same `(kind, subject)` — two roads barring the same nanny in the same second — can
+    // both find nothing open before either insert lands. The loser's insert is then refused by the partial unique
+    // index, `port.run` turns that into an error `Result`, and `notifyAdmin`'s caller warns and carries on (the
+    // message the row accompanies is already sent). That is the intended outcome: the duplicate cannot exist, and
+    // the operator's queue is never the reason a decision fails. Do not close the race by dropping the index — it
+    // is the only guarantee — and do not promote its refusal into a failure of the decision.
+    createAdminNotification: async (input) => {
+      const id = newId<Uuid>();
+      return asComms(
+        await port.run<{ readonly id: Uuid }>(
+          {
+            name: "comms.createAdminNotification",
+            exec: async (q) => {
+              const open = await q
+                .from("admin_notifications")
+                .eq("kind", input.kind)
+                .select();
+              const existing = open.find(
+                (row) =>
+                  row.acknowledged_at === null &&
+                  (row.subject_type ?? null) ===
+                    (input.subject?.type ?? null) &&
+                  (row.subject_id ?? null) === (input.subject?.id ?? null),
+              );
+              if (existing !== undefined) return { id: existing.id as Uuid };
+              const inserted = await q
+                .from("admin_notifications")
+                .insert(adminNotificationInsertRow(input, id));
+              return { id: (inserted.id ?? id) as Uuid };
+            },
+          },
+          service,
+        ),
+      );
+    },
     createInboxMessage: async (msg, opts) =>
       asComms(
         await port.run(
