@@ -46,7 +46,7 @@ const LANGUAGE_OPTIONS = {
 };
 
 // `@typescript-eslint` is registered so that `eslint-disable` comments naming its rules resolve here; the
-// rules themselves stay off — they are the main `next lint` config's business (`.eslintrc.json`).
+// rules themselves stay off — they are the main `next lint` config's business (`.eslintrc.js`).
 const PLUGINS = { bb, "@typescript-eslint": tsPlugin };
 
 const LINTER_OPTIONS = { reportUnusedDisableDirectives: false };
