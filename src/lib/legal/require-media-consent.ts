@@ -1,55 +1,31 @@
-/**
- * Server-action helper: gate a child-tied media-URL write on the
- * parent's media consent.
- *
- * Pattern: call at the top of any action that writes a media URL
- * tied to a child. Returns a structured error envelope when consent
- * is missing/expired/revoked, OR `null` when the action is allowed
- * to proceed.
- *
- * **Important contract** (Bailey 2026-05-14): if `imageUrl` is
- * `null`/`undefined`/empty, the gate is bypassed — the action's
- * non-media part still works. The gate only fires when the caller
- * actually wants to write a media URL.
- *
- * Builds the `media_consent_required` error consistently across every
- * surface (bapp server actions + Katie applies + upload routes).
- */
-
+// The one line a server action writes to gate a child-tied media URL on the parent's consent (FATE `07.71`).
+//
+// **Contract, unchanged:** if there is no `imageUrl`, the gate does not fire — the action's non-media part still
+// works, because a text-only diary entry is not a media write and consent for photographs is not consent for
+// text.
+//
+// **What changed (L-009 `3g`): the `NODE_ENV === "test"` bypass is gone.** It returned `{ ok: true }` for every
+// caller in every test run, which meant no test in the tree — not one — could have caught this gate being
+// wrong. It was justified by pointing at the gate's own dedicated suite, and that is exactly the argument that
+// does not hold: the gate's suite proves the *decision*, and this file is about the *wiring*, which is the half
+// that silently stops being connected. A gate that is off under test has a coverage number and no coverage.
+//
+// Callers that do not care about consent now mock this module (`observations.test.ts` already did), which is
+// what a test should have been doing all along: stating that it is not exercising the gate, rather than a
+// production file stating it for them.
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasParentMediaConsent } from "./media-consent-gate";
 
-export interface MediaConsentGuardResult {
-  ok: boolean;
-  error?: "media_consent_required";
-  reason?:
-    | "never_given"
-    | "expired"
-    | "revoked"
-    | "child_not_found"
-    | "nearing_expiry"; // non-blocking; included for UI awareness
-  expiresAt?: string;
-}
-
-/** Returns `null` when the write is allowed; an error envelope when it
- *  isn't. Pass `imageUrl` as the value the caller intends to write. */
+/** `null`-ish `imageUrl` ⇒ no gate. Otherwise the parent's bundled per-child consent decides. */
 export async function requireMediaConsentForImageWrite(input: {
   childId: string;
   imageUrl: string | null | undefined;
 }): Promise<{ ok: true } | { ok: false; error: "media_consent_required" }> {
-  // No media → no gate. Text-only logs / diary / observations still work.
   if (!input.imageUrl) return { ok: true };
 
-  // Test environment bypass — vitest fixtures don't set up
-  // consent_records and shouldn't have to. The gate's own dedicated
-  // test suite (media-consent-gate.test.ts) covers correctness. This
-  // bypass is identical to `gemini-client.ts`'s NODE_ENV check.
-  if (process.env.NODE_ENV === "test") return { ok: true };
-
-  const admin = createAdminClient();
   const gate = await hasParentMediaConsent(
     { childId: input.childId },
-    { admin },
+    { admin: createAdminClient() },
   );
   if (gate.allowed) return { ok: true };
   return { ok: false, error: "media_consent_required" };

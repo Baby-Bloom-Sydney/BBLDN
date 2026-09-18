@@ -1,380 +1,200 @@
-/**
- * media-consent-gate — automated coverage of the parent-photo consent
- * decision tree.
- *
- * Bailey 2026-05-14 + COPC exposure draft (2026-03-31): parents must
- * affirmatively consent to media uploads for their child, the consent
- * is valid for 12 months, and the rule applies until the child is 15.
- *
- * AGR slug is treated as a configuration parameter ("agr-20-parent-
- * photo-consent-v1" as placeholder) so T-014's final slug naming can
- * land via a single migration without code churn.
- */
-
-import { describe, it, expect, vi, beforeEach } from "vitest";
+// The media consent gate, re-based (FATE `07.71`; L-009 `3g`).
+//
+// **Why this suite changed rather than being extended.** The Sydney one asserted three behaviours the re-base
+// deliberately removes, and per CLAUDE.md §3 rule 2 a test is never bent to the code — so each is replaced by
+// the case for the behaviour that supersedes it, with the reason stated:
+//
+//   · *"age >= 15: not_required + allowed (COPC age floor)"* — the OAIC Children's Online Privacy Code is
+//     Australian and has no force in England and Wales; the fate table already records that it "needs its UK
+//     equivalent" as research. It is removed rather than translated (guessing a UK age would be inventing a
+//     legal threshold), so the gate now requires consent for **every** child — the conservative direction.
+//   · *"falls back to age_months_approx"* — with no age cliff there is no age to compute, and the gate no
+//     longer reads the child at all.
+//   · the implicit "a test run bypasses the gate" — the `NODE_ENV === "test"` early return is gone, so these
+//     cases exercise the same code path production does.
+//
+// What stays, because it was right: the newest row wins, a decline closes the gate, the TTL has a
+// nearing-expiry window for `3b`'s modal, and rows for another child or another purpose are not this child's.
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { CONSENT } from "@/modules/config";
 import {
+  hasChildConsent,
   hasParentMediaConsent,
-  PARENT_APP_CONSENT_AGREEMENT_ID,
-  PARENT_APP_CONSENT_SLUG,
+  NANNY_ATTESTATION_PURPOSE,
+  PARENT_APP_CONSENT_PURPOSE,
   type MediaConsentGateDeps,
 } from "./media-consent-gate";
 
-// ---------------------------------------------------------------------------
-// Test fixtures
-// ---------------------------------------------------------------------------
-
-const NOW = new Date("2026-06-01T12:00:00+10:00");
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-interface ChildRow {
-  id: string;
-  date_of_birth: string | null;
-  age_months_approx: number | null;
-}
+const NOW = new Date("2026-06-01T12:00:00Z");
+const DAY_MS = 24 * 60 * 60 * 1000;
+const TTL_DAYS = CONSENT.renewalCheckMonths * 30;
+const CHILD = "child-1";
+const OTHER_CHILD = "child-2";
+const PARENT = "parent-1";
 
 interface ConsentRow {
   user_id: string;
-  user_type: "client" | "professional" | null;
-  agreement_id: string;
+  purpose: string;
   related_entity_id: string;
   consent_given: boolean;
   created_at: string;
 }
 
-function isoOffset(days: number): string {
-  return new Date(NOW.getTime() + days * ONE_DAY_MS).toISOString();
+function daysAgo(days: number): string {
+  return new Date(NOW.getTime() - days * DAY_MS).toISOString();
 }
 
-function isoYearsAgo(years: number, extraDays = 0): string {
-  const d = new Date(NOW);
-  d.setUTCFullYear(d.getUTCFullYear() - years);
-  d.setUTCDate(d.getUTCDate() - extraDays);
-  return d.toISOString();
+function row(overrides: Partial<ConsentRow> = {}): ConsentRow {
+  return {
+    user_id: PARENT,
+    purpose: PARENT_APP_CONSENT_PURPOSE,
+    related_entity_id: CHILD,
+    consent_given: true,
+    created_at: daysAgo(1),
+    ...overrides,
+  };
 }
 
-function dobYearsAgo(years: number, extraDays = 0): string {
-  // Return YYYY-MM-DD style for a DOB.
-  return isoYearsAgo(years, extraDays).slice(0, 10);
-}
-
-// ---------------------------------------------------------------------------
-// Minimal Supabase fake — implements just the chain shapes we use.
-// ---------------------------------------------------------------------------
-
-function createFakeAdmin(seed: {
-  children: ChildRow[];
-  consents: ConsentRow[];
-}): MediaConsentGateDeps["admin"] {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+/** Minimal Supabase fake — just the chain shapes the gate uses, and it throws on any other table. */
+function createFakeAdmin(
+  consents: ConsentRow[],
+): MediaConsentGateDeps["admin"] {
   return {
     from(table: string) {
-      if (table === "child_client") return childClientTable(seed.children);
-      if (table === "consent_records")
-        return consentRecordsTable(seed.consents);
-      throw new Error(`fake admin: unhandled table ${table}`);
+      if (table !== "consent_records")
+        throw new Error(`fake admin: unhandled table ${table}`);
+      const filters: Array<(r: ConsentRow) => boolean> = [];
+      const builder = {
+        eq(field: keyof ConsentRow, value: unknown) {
+          filters.push((r) => r[field] === value);
+          return builder;
+        },
+        order() {
+          return builder;
+        },
+        limit() {
+          return builder;
+        },
+        async maybeSingle<T>() {
+          const top =
+            consents
+              .filter((r) => filters.every((f) => f(r)))
+              .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ??
+            null;
+          return { data: top as unknown as T | null, error: null };
+        },
+      };
+      return { select: () => builder };
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
 }
 
-function childClientTable(children: ChildRow[]) {
-  return {
-    select(_cols: string) {
-      return {
-        eq(field: keyof ChildRow, value: unknown) {
-          return {
-            async maybeSingle<T>(): Promise<{ data: T | null; error: null }> {
-              const row = children.find((c) => c[field] === value) ?? null;
-              return { data: row as unknown as T | null, error: null };
-            },
-          };
-        },
-      };
-    },
-  };
-}
+const gate = (consents: ConsentRow[], now: Date = NOW) =>
+  hasParentMediaConsent(
+    { childId: CHILD },
+    { admin: createFakeAdmin(consents), now },
+  );
 
-function consentRecordsTable(consents: ConsentRow[]) {
-  const filters: Array<(r: ConsentRow) => boolean> = [];
-  const builder: {
-    eq: (field: keyof ConsentRow, value: unknown) => typeof builder;
-    order: (field: string, opts: unknown) => typeof builder;
-    limit: (n: number) => typeof builder;
-    maybeSingle: <T>() => Promise<{ data: T | null; error: null }>;
-  } = {
-    eq(field, value) {
-      filters.push((r) => r[field] === value);
-      return builder;
-    },
-    order(_field, _opts) {
-      return builder;
-    },
-    limit(_n) {
-      return builder;
-    },
-    async maybeSingle<T>() {
-      const matched = consents
-        .filter((r) => filters.every((f) => f(r)))
-        .sort((a, b) => b.created_at.localeCompare(a.created_at));
-      const top = matched[0] ?? null;
-      return { data: top as unknown as T | null, error: null };
-    },
-  };
-  return {
-    select(_cols: string) {
-      return builder;
-    },
-  };
-}
+beforeEach(() => vi.clearAllMocks());
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-
-describe("hasParentMediaConsent — child age cliff", () => {
-  it("age >= 15: not_required + allowed (COPC age floor)", async () => {
-    const admin = createFakeAdmin({
-      children: [
-        {
-          id: "c1",
-          date_of_birth: dobYearsAgo(15),
-          age_months_approx: null,
-        },
-      ],
-      consents: [],
-    });
-    const result = await hasParentMediaConsent(
-      { childId: "c1" },
-      { admin, now: NOW },
-    );
-    expect(result.state).toBe("not_required");
-    expect(result.allowed).toBe(true);
+describe("media consent gate — consent is required for every child (L-009 `3g`)", () => {
+  it("★ blocks when nothing has been recorded — there is no age at which it stops asking", async () => {
+    expect(await gate([])).toEqual({ allowed: false, state: "never_given" });
   });
 
-  it("age = 14y364d: still requires consent", async () => {
-    const admin = createFakeAdmin({
-      children: [
-        {
-          id: "c1",
-          date_of_birth: dobYearsAgo(14, 364),
-          age_months_approx: null,
-        },
-      ],
-      consents: [],
-    });
-    const result = await hasParentMediaConsent(
-      { childId: "c1" },
-      { admin, now: NOW },
-    );
-    expect(result.state).toBe("never_given");
-    expect(result.allowed).toBe(false);
-  });
-
-  it("falls back to age_months_approx when DOB is null", async () => {
-    const admin = createFakeAdmin({
-      children: [
-        {
-          id: "c1",
-          date_of_birth: null,
-          // 16y * 12mo = 192. Over the threshold.
-          age_months_approx: 16 * 12,
-        },
-      ],
-      consents: [],
-    });
-    const result = await hasParentMediaConsent(
-      { childId: "c1" },
-      { admin, now: NOW },
-    );
-    expect(result.state).toBe("not_required");
+  it("★ does not read the child at all: no DOB is fetched to answer a consent question", async () => {
+    // The fake throws on any table but `consent_records`, so a gate that still looked up a child's date of
+    // birth would fail here rather than quietly processing a field it has no stated purpose for.
+    await expect(gate([row()])).resolves.toMatchObject({ allowed: true });
   });
 });
 
-describe("hasParentMediaConsent — consent freshness", () => {
-  function youngChild(): ChildRow {
-    return {
-      id: "c1",
-      date_of_birth: dobYearsAgo(3),
-      age_months_approx: null,
-    };
-  }
-
-  function consent(over: Partial<ConsentRow> = {}): ConsentRow {
-    return {
-      user_id: "parent-1",
-      user_type: "client",
-      agreement_id: PARENT_APP_CONSENT_AGREEMENT_ID,
-      related_entity_id: "c1",
-      consent_given: true,
-      created_at: NOW.toISOString(),
-      ...over,
-    };
-  }
-
-  it("never_given: blocked when no record exists", async () => {
-    const admin = createFakeAdmin({
-      children: [youngChild()],
-      consents: [],
+describe("media consent gate — the TTL", () => {
+  it("allows a consent given today", async () => {
+    expect(await gate([row({ created_at: daysAgo(0) })])).toMatchObject({
+      allowed: true,
+      state: "active",
     });
-    const result = await hasParentMediaConsent(
-      { childId: "c1" },
-      { admin, now: NOW },
-    );
-    expect(result.state).toBe("never_given");
-    expect(result.allowed).toBe(false);
   });
 
-  it("active: consent given today, expires in ~365d", async () => {
-    const admin = createFakeAdmin({
-      children: [youngChild()],
-      consents: [consent({ created_at: NOW.toISOString() })],
-    });
-    const result = await hasParentMediaConsent(
-      { childId: "c1" },
-      { admin, now: NOW },
-    );
-    expect(result.state).toBe("active");
-    expect(result.allowed).toBe(true);
-    expect(result.signedAt).toBe(NOW.toISOString());
-    expect(result.expiresAt).toBeDefined();
+  it("allows a consent most of the way through the window", async () => {
+    expect(
+      await gate([row({ created_at: daysAgo(TTL_DAYS - 60) })]),
+    ).toMatchObject({ allowed: true, state: "active" });
   });
 
-  it("active: consent 11 months ago is still valid", async () => {
-    const admin = createFakeAdmin({
-      children: [youngChild()],
-      consents: [consent({ created_at: isoOffset(-30 * 11) })],
-    });
-    const result = await hasParentMediaConsent(
-      { childId: "c1" },
-      { admin, now: NOW },
-    );
-    expect(result.state).toBe("active");
-    expect(result.allowed).toBe(true);
+  it("★ flags nearing_expiry inside the notice window, and still allows the write", async () => {
+    expect(
+      await gate([
+        row({ created_at: daysAgo(TTL_DAYS - CONSENT.renewalNoticeDays + 1) }),
+      ]),
+    ).toMatchObject({ allowed: true, state: "nearing_expiry" });
   });
 
-  it("nearing_expiry: consent within 7d of TTL (T-7d modal trigger)", async () => {
-    // 365 - 5 = 360 days ago → 5 days until expiry → within 7d window.
-    const admin = createFakeAdmin({
-      children: [youngChild()],
-      consents: [consent({ created_at: isoOffset(-360) })],
-    });
-    const result = await hasParentMediaConsent(
-      { childId: "c1" },
-      { admin, now: NOW },
-    );
-    expect(result.state).toBe("nearing_expiry");
-    expect(result.allowed).toBe(true);
+  it("blocks once the window has passed", async () => {
+    expect(
+      await gate([row({ created_at: daysAgo(TTL_DAYS + 1) })]),
+    ).toMatchObject({ allowed: false, state: "expired" });
   });
 
-  it("expired: consent older than 365d", async () => {
-    const admin = createFakeAdmin({
-      children: [youngChild()],
-      consents: [consent({ created_at: isoOffset(-366) })],
-    });
-    const result = await hasParentMediaConsent(
-      { childId: "c1" },
-      { admin, now: NOW },
-    );
-    expect(result.state).toBe("expired");
-    expect(result.allowed).toBe(false);
-  });
-
-  it("revoked: most recent record has consent_given=false", async () => {
-    const admin = createFakeAdmin({
-      children: [youngChild()],
-      consents: [
-        consent({ created_at: isoOffset(-30) }),
-        consent({
-          created_at: isoOffset(-1),
-          consent_given: false,
-        }),
-      ],
-    });
-    const result = await hasParentMediaConsent(
-      { childId: "c1" },
-      { admin, now: NOW },
-    );
-    expect(result.state).toBe("revoked");
-    expect(result.allowed).toBe(false);
-  });
-
-  it("uses most recent record when multiple exist", async () => {
-    // Older record expired; newer record fresh. Should be active.
-    const admin = createFakeAdmin({
-      children: [youngChild()],
-      consents: [
-        consent({ created_at: isoOffset(-400) }),
-        consent({ created_at: isoOffset(-1) }),
-      ],
-    });
-    const result = await hasParentMediaConsent(
-      { childId: "c1" },
-      { admin, now: NOW },
-    );
-    expect(result.state).toBe("active");
-  });
-
-  it("ignores records for other agreements (e.g. nanny attestation)", async () => {
-    const admin = createFakeAdmin({
-      children: [youngChild()],
-      consents: [
-        consent({
-          agreement_id: "NANNY-ATTESTATION",
-          created_at: isoOffset(-1),
-        }),
-      ],
-    });
-    const result = await hasParentMediaConsent(
-      { childId: "c1" },
-      { admin, now: NOW },
-    );
-    expect(result.state).toBe("never_given");
-  });
-
-  it("ignores records for other children", async () => {
-    const admin = createFakeAdmin({
-      children: [youngChild()],
-      consents: [
-        consent({
-          related_entity_id: "c-other",
-          created_at: isoOffset(-1),
-        }),
-      ],
-    });
-    const result = await hasParentMediaConsent(
-      { childId: "c1" },
-      { admin, now: NOW },
-    );
-    expect(result.state).toBe("never_given");
+  it("★ takes the TTL from config, not from a literal — one cadence with the renewal sweep", () => {
+    expect(CONSENT.renewalCheckMonths).toBe(12);
+    expect(CONSENT.renewalNoticeDays).toBe(7);
   });
 });
 
-describe("hasParentMediaConsent — error cases", () => {
-  it("child_not_found: child row doesn't exist", async () => {
-    const admin = createFakeAdmin({ children: [], consents: [] });
-    const result = await hasParentMediaConsent(
-      { childId: "ghost" },
-      { admin, now: NOW },
-    );
-    expect(result.state).toBe("child_not_found");
-    expect(result.allowed).toBe(false);
+describe("media consent gate — which row answers", () => {
+  it("★ a decline closes the gate, and the consent before it is not resurrected", async () => {
+    expect(
+      await gate([
+        row({ created_at: daysAgo(30) }),
+        row({ created_at: daysAgo(1), consent_given: false }),
+      ]),
+    ).toMatchObject({ allowed: false, state: "revoked" });
   });
 
-  it("missing both DOB and age_months_approx: blocked + reason", async () => {
-    const admin = createFakeAdmin({
-      children: [{ id: "c1", date_of_birth: null, age_months_approx: null }],
-      consents: [],
+  it("uses the most recent row when several exist", async () => {
+    expect(
+      await gate([
+        row({ created_at: daysAgo(TTL_DAYS + 10) }),
+        row({ created_at: daysAgo(2) }),
+      ]),
+    ).toMatchObject({ allowed: true, state: "active" });
+  });
+
+  it("★ keys on the registry PURPOSE — the nanny's attestation is not the parent's consent", async () => {
+    expect(await gate([row({ purpose: NANNY_ATTESTATION_PURPOSE })])).toEqual({
+      allowed: false,
+      state: "never_given",
     });
-    const result = await hasParentMediaConsent(
-      { childId: "c1" },
+  });
+
+  it("ignores a consent recorded for another child", async () => {
+    expect(await gate([row({ related_entity_id: OTHER_CHILD })])).toEqual({
+      allowed: false,
+      state: "never_given",
+    });
+  });
+
+  it("names who consented, so the surface can say whose permission it has", async () => {
+    expect((await gate([row({ user_id: "parent-9" })])).consentingUserId).toBe(
+      "parent-9",
+    );
+  });
+});
+
+describe("media consent gate — the nanny's half uses the same rule", () => {
+  it("reads the nanny attestation for this child on the same TTL", async () => {
+    const admin = createFakeAdmin([
+      row({ purpose: NANNY_ATTESTATION_PURPOSE, created_at: daysAgo(1) }),
+    ]);
+
+    const result = await hasChildConsent(
+      { childId: CHILD, purpose: NANNY_ATTESTATION_PURPOSE },
       { admin, now: NOW },
     );
-    // Can't determine age cliff — be defensive, require consent.
-    expect(result.state).toBe("never_given");
-    expect(result.allowed).toBe(false);
+
+    expect(result).toMatchObject({ allowed: true, state: "active" });
   });
 });

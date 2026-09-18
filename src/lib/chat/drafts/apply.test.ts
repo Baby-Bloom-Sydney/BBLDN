@@ -5,6 +5,21 @@ import type { ChildSummary } from "@/lib/chat/modules/types";
 // Stub out external side-effects so the dispatcher tests stay
 // hermetic — observation-cascade and OpenAI both have their own
 // module-level test coverage.
+vi.mock("@/lib/legal/media-consent-gate", () => ({
+  // Not this suite's subject (FATE `07.71`), and stated rather than relied on: L-009 `3g` removed the gate's
+  // `NODE_ENV === "test"` bypass, because a gate that is off under test has a coverage number and no coverage.
+  hasParentMediaConsent: vi.fn(async () => ({
+    allowed: true,
+    state: "active",
+  })),
+}));
+
+vi.mock("@/lib/legal/require-media-consent", () => ({
+  // This suite is not about the media consent gate (FATE `07.71`) — it states that rather than relying on the
+  // gate having a `NODE_ENV === "test"` bypass, which L-009 `3g` removed: a gate that is off under test has a
+  // coverage number and no coverage. `media-consent-gate.test.ts` is where the decision itself is driven.
+  requireMediaConsentForImageWrite: vi.fn(async () => ({ ok: true })),
+}));
 vi.mock("@/lib/actions/bapp/progress", () => ({
   recalculateProgress: vi.fn().mockResolvedValue(undefined),
   writeHistorySnapshot: vi.fn().mockResolvedValue(undefined),

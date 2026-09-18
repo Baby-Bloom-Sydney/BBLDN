@@ -19,4 +19,10 @@ export const CONSENT = Object.freeze({
    * computed from the newest row rather than from a cursor a failed run could lose.
    */
   renewalSweepLimit: 500,
+  /**
+   * How long before a per-child consent reaches `renewalCheckMonths` the surface starts calling it
+   * "nearing expiry" — the window in which `3b`'s renewal modal fires. A product dial for the same reason as
+   * the cadence above: nothing expires here, it is when we start asking.
+   */
+  renewalNoticeDays: 7,
 });
