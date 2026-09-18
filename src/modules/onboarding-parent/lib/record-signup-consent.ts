@@ -40,7 +40,12 @@ export async function recordSignupConsent(
       checkpointText: CHECKPOINT_TEXT,
       context: {},
       purpose,
-      document: { id: document.id, version: document.version },
+      // Ruling 5.1 — the whole triple, so the row names the exact words she was shown.
+      document: {
+        id: document.id,
+        version: document.version,
+        contentHash: document.contentHash,
+      },
       consentGiven: true,
     });
     if (!recorded.ok) return recorded;

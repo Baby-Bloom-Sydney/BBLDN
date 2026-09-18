@@ -24,8 +24,11 @@ type Documents = Partial<
   >
 >;
 
+// Ruling 5.1 — a stub document version carries a hash like a real one, so a test that builds a consent through
+// the stub exercises the same triple the database enforces rather than a two-thirds-shaped one.
 const DEFAULT_DOCUMENT = Object.freeze({
   version: 1,
+  contentHash: "stub-hash-v1",
   requiresReacceptance: false as const,
 });
 const isDocumentId = (purpose: string): purpose is LegalDocumentId =>

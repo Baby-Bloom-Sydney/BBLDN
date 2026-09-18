@@ -28,12 +28,14 @@
 //   · **ADR-162's level term survives the twin** — passes. This is the REFUSED regression the twin's header
 //     names, and it is true in fact and not only in prose: after the twin, an applied, unverified nanny still
 //     reads nothing. That is REVIEW-3's CRITICAL, measured to stay shut through a rollback.
-//   · **ADR-163's grant does not survive the twin** — PINNED `it.fails`. The twin restores EXECUTE on
-//     `create_nanny_account` to `authenticated`, which is the escalation ADR-163 closed: an invited nanny's own
-//     session calls the RPC with `p_isolated => false` and enters the matching pool outside the apply funnel.
-//     The twin states this and asks the operator to revoke it by hand. ADR-165 (2) says that is exactly the
-//     position in which a twin must instead refuse. **Owner: `2c` / the migration's author — a twin is a
-//     migration artefact and a checkpoint sweep does not write one.** See REVIEW-4 §8 R-2.
+//   · **ADR-163's grant does not survive the twin either** — was PINNED `it.fails`, **closed by L-009 `3c`**.
+//     The twin used to restore EXECUTE on `create_nanny_account` to `authenticated`, which is the escalation
+//     ADR-163 closed: an invited nanny's own session calls the RPC with `p_isolated => false` and enters the
+//     matching pool outside the apply funnel. It stated this and asked the operator to revoke the grant by hand.
+//     REVIEW-4 R-2 framed the fix as a choice between ADR-165 (2)'s `RAISE EXCEPTION` and amending ADR-165; it
+//     was neither. The twin now restores the function and **leaves the grant narrow** — arm (1) — so the
+//     rollback completes with the hole shut, and the cost (invited signup refuses until a roll-forward) is
+//     stated in the twin's header instead of delegated to an operator's memory.
 import { resolve } from "node:path";
 import type { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -167,23 +169,31 @@ describe("int.rollback — a twin restores a feature, never a hole (ADR-165)", (
   });
 
   /**
-   * PINNED — ADR-165 (2). The twin restores `create_nanny_account`'s EXECUTE to `authenticated` and tells the
-   * operator to revoke it by hand if the rolled-back state outlives the incident. ADR-165 (2) rules that a twin
-   * in exactly that position must `RAISE EXCEPTION` naming the roll-forward instead, because a comment is not a
-   * control and the operator reading it is at 3 a.m.
-   *
-   * Red on the shipped tree; green the moment the twin either keeps the narrowing or refuses to run.
-   * **Owner: `2c` / the migration's author.** REVIEW-4 §8 R-2.
+   * **CLOSED — REVIEW-4 M-3 / R-2, by L-009 `3c`.** This case was pinned `it.fails`: the twin restored
+   * `create_nanny_account`'s EXECUTE to `authenticated` and asked the operator, in a comment, to revoke it by
+   * hand. R-2 framed it as a choice between ADR-165 (2)'s `RAISE EXCEPTION` and amending ADR-165. It was
+   * neither — the twin had a third option and did not take it: **restore the function and leave the grant
+   * narrow** (arm (1), a security clause is forward-only). The rollback still completes, the escalation stays
+   * shut, and the cost is that invited signup refuses until a roll-forward lands, which the twin's header now
+   * says in as many words.
    */
-  it.fails(
-    "★ PINNED — ADR-165 (2): the twin does not hand `authenticated` EXECUTE on create_nanny_account back (owner: `2c`)",
-    async () => {
-      const { rows } = await db.query<{ granted: boolean }>(
-        `select has_function_privilege('authenticated',
-                  'public.create_nanny_account(text, text, boolean, text, text, text, uuid, jsonb)',
-                  'EXECUTE') as granted`,
-      );
-      expect(rows[0].granted).toBe(false);
-    },
-  );
+  it("★ ADR-165 (1) — the twin does not hand `authenticated` EXECUTE on create_nanny_account back", async () => {
+    const { rows } = await db.query<{ granted: boolean }>(
+      `select has_function_privilege('authenticated',
+                'public.create_nanny_account(text, text, boolean, text, text, text, uuid, jsonb)',
+                'EXECUTE') as granted`,
+    );
+    expect(rows[0].granted).toBe(false);
+  });
+
+  it("the signup road still exists for the server — `service_role` keeps EXECUTE", async () => {
+    // Keeping the narrowing must not be mistaken for dropping the function: a twin that leaves no caller at all
+    // is a twin that has to be rolled back itself.
+    const { rows } = await db.query<{ granted: boolean }>(
+      `select has_function_privilege('service_role',
+                'public.create_nanny_account(text, text, boolean, text, text, text, uuid, jsonb)',
+                'EXECUTE') as granted`,
+    );
+    expect(rows[0].granted).toBe(true);
+  });
 });

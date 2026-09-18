@@ -37,7 +37,7 @@ const record = (): ConsentRecord => ({
   checkpointText: "I agree",
   context: { ipAddress: "203.0.113.9" },
   purpose: "client-tos",
-  document: { id: "client-tos", version: 1 },
+  document: { id: "client-tos", version: 1, contentHash: "h" },
   consentGiven: true,
   createdAt: "2026-09-17T00:00:00.000Z" as never,
 });
@@ -65,6 +65,8 @@ describe("dbConsentStore — consent_records", () => {
         purpose: "client-tos",
         document_id: "client-tos",
         document_version: 1,
+        // ruling 5.1 — the row names the words, not only the version
+        document_content_hash: "h",
         consent_given: true,
         ip_address: "203.0.113.9",
         user_agent: null,
@@ -118,6 +120,7 @@ describe("dbConsentStore — consent_records", () => {
           purpose: "vaccination-status",
           document_id: null,
           document_version: null,
+          document_content_hash: null,
         }),
       ],
     });
@@ -164,6 +167,7 @@ describe("dbConsentStore — legal_documents", () => {
       value: {
         id: "privacy-policy",
         version: 2,
+        contentHash: "h",
         requiresReacceptance: true,
         reacceptanceDeadline: "2026-10-01T00:00:00.000Z",
       },

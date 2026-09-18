@@ -23,7 +23,7 @@
 -- file the database alone cannot say which admin approved or rejected a given DBS check. **Export the column
 -- before running this on any database where a real decision has been recorded.**
 --
--- ⚠️ **TWO SECURITY REGRESSIONS, one accepted and one refused.**
+-- ⚠️ **TWO SECURITY REGRESSIONS, BOTH REFUSED** (amended by L-009 `3c` for REVIEW-4 M-3 / R-2).
 --
 -- 1. **REFUSED — ADR-162's level term is KEPT.** `is_active_nanny()` is restored to the `0005` shape in every
 --    respect *except* the verification-level term, which stays inlined. Dropping it would re-open REVIEW-3's
@@ -31,14 +31,23 @@
 --    Art 9 data) in the middle of an incident, with nothing in the tree depending on the gap. A rollback undoes a
 --    feature; it does not undo a measured security fix. See the note at the function itself.
 --
--- 2. **ACCEPTED, AND IT MUST BE HOT-PATCHED — ADR-163 is undone.** `create_nanny_account()` goes back to `0021`'s
---    8-argument, `auth.uid()`-reading form with EXECUTE to `authenticated`, because the code this rollback
---    accompanies calls exactly that signature and would otherwise have no signup road at all. That restores the
---    escalation ADR-163 closed: an invited nanny's own session can call the RPC with `p_isolated = false` and enter
---    the matching pool outside the apply funnel. **If the rolled-back state is to be left running for more than the
---    length of the incident, revoke EXECUTE from `authenticated` by hand** (`revoke execute on function
---    public.create_nanny_account(text, text, boolean, text, text, text, uuid, jsonb) from authenticated;`) and
---    accept that invited signup refuses until the code is rolled forward again.
+-- 2. **REFUSED — ADR-163's narrowing is KEPT.** This file used to restore `create_nanny_account()` at `0021`'s
+--    8-argument form *with EXECUTE re-granted to `authenticated`*, and asked the operator in a comment to revoke
+--    it by hand if the rolled-back state outlived the incident. REVIEW-4 M-3 measured the result —
+--    `authenticated=X/postgres` — and R-2 put the question: does this twin take ADR-165 (2)'s `RAISE EXCEPTION`,
+--    or does the accepted-and-documented arm amend ADR-165?
+--
+--    **Neither. The twin was choosing between two options when there were three.** ADR-165 (2)'s refusal is for
+--    a twin that *genuinely cannot proceed* without the weaker grant. This one can: the function is restored at
+--    `0021`'s signature and body, and the grant simply stays narrow (`service_role` only), which is arm (1) —
+--    a security clause is forward-only. The rollback completes, the escalation stays shut, and the verify block
+--    at the foot of this file asserts it rather than asking anyone to remember.
+--
+--    **What that costs, stated rather than hidden.** Any road that calls `create_nanny_account` from a user's
+--    own session refuses after this file — invited signup among them. **The recovery is roll-forward**: a new
+--    migration that keeps the service-role narrowing and fixes whatever `0023` broke, with the caller moved
+--    behind a server action, exactly as `0023` itself did. Do not hand the grant back by hand; a comment is not
+--    a control, and the operator reading one is at 3 a.m.
 
 begin;
 
@@ -142,8 +151,11 @@ begin
 end
 $$;
 
-revoke all on function public.create_nanny_account(text, text, boolean, text, text, text, uuid, jsonb) from public, anon;
-grant execute on function public.create_nanny_account(text, text, boolean, text, text, text, uuid, jsonb) to authenticated;
+-- ★ ADR-165 (1), ADR-163 kept: `authenticated` does NOT get EXECUTE back. `0021` granted it here; this twin
+-- restores the function and leaves the narrowing in place. Invited signup refuses until the roll-forward lands
+-- (see the header) — that is the accepted cost, and it is the cheap side of the trade.
+revoke all on function public.create_nanny_account(text, text, boolean, text, text, text, uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.create_nanny_account(text, text, boolean, text, text, text, uuid, jsonb) to service_role;
 
 -- REVIEW-3 M-5 undone: 0022's submit_verification_evidence returns (client-authored consent instant).
 create or replace function public.submit_verification_evidence(
@@ -527,5 +539,25 @@ create index if not exists payment_events_unprocessed_idx
   where processed_at is null;
 
 alter table public.payment_events drop column if exists outcome;
+
+-- ---------------------------------------------------------------------------
+-- ★ Verify — the two refused regressions, asserted inside the transaction that would otherwise commit them
+-- ---------------------------------------------------------------------------
+-- ADR-165 (3) is a test that applies forward -> twin -> and checks the hole is shut
+-- (`supabase/__tests__/rollback-security-clauses.test.ts`). This block is the same claim made where it cannot be
+-- skipped: if a future edit re-grants either function, the rollback aborts instead of quietly re-opening a hole.
+do $$
+begin
+  if has_function_privilege('authenticated',
+       'public.create_nanny_account(text, text, boolean, text, text, text, uuid, jsonb)', 'EXECUTE') then
+    raise exception
+      '0023 twin: `authenticated` must NOT hold EXECUTE on create_nanny_account (ADR-163 / ADR-165 (1)). Invited signup is restored by a ROLL-FORWARD migration, never by handing the grant back.';
+  end if;
+  if not has_function_privilege('service_role',
+       'public.create_nanny_account(text, text, boolean, text, text, text, uuid, jsonb)', 'EXECUTE') then
+    raise exception '0023 twin: service_role must hold EXECUTE on create_nanny_account, or there is no signup road at all';
+  end if;
+end;
+$$;
 
 commit;

@@ -29,6 +29,9 @@ import { newId } from "../../lib/new-id";
 import { nowInstant } from "../../lib/now-instant";
 import { ok } from "../../lib/ok";
 import { CONSENT_PURPOSES } from "./consent-purposes";
+import { auditConsentExpiry } from "./audit-consent-expiry";
+import { dueForRenewal } from "./due-for-renewal";
+import { RENEWABLE_PURPOSES } from "./renewable-purposes";
 
 const MS_PER_DAY = 86400000;
 const KNOWN_PURPOSES: ReadonlySet<string> = new Set(CONSENT_PURPOSES);
@@ -67,10 +70,14 @@ async function checkDocument(
       : ok(undefined);
   const current = await deps.store.currentDocument(input.purpose);
   if (!current.ok) return propagate(current.error);
+  // Ruling 5.1: all three, or the binding is a pointer. The hash is checked here as well as by `0026`'s
+  // composite foreign key because a caller that builds the triple by hand should be told which part is wrong,
+  // not handed a 23503 from the driver.
   if (
     current.value === null ||
     current.value.version !== input.document.version ||
-    current.value.id !== input.document.id
+    current.value.id !== input.document.id ||
+    current.value.contentHash !== input.document.contentHash
   ) {
     return err("VALIDATION", "The document version is not the current one", {
       reason: "document-not-current",
@@ -223,5 +230,9 @@ export function createConsent(deps: ConsentDeps): Consent {
     getPolicy: (purpose) => getPolicy(purpose, resolved),
     hasMarketing: (subject) => hasMarketing(subject, resolved),
     hasConsent: (userId, purpose) => hasConsent(userId, purpose, resolved),
+    dueForRenewal: (userId, purposes = RENEWABLE_PURPOSES) =>
+      dueForRenewal(userId, purposes, resolved),
+    auditExpiry: (now, purposes = RENEWABLE_PURPOSES) =>
+      auditConsentExpiry(now, purposes, resolved),
   });
 }

@@ -58,8 +58,6 @@ export function buildProfessionalHireConfirmationEmail(
     <h3 style="font-size:15px;margin:16px 0 8px;">4. Affiliate Acknowledgment</h3>
     <p style="font-size:14px;color:#475569;line-height:1.6;">Baby Bloom may receive affiliate commissions from third-party products or services recommended on the Platform. These will always be disclosed.</p>
 
-    <h3 style="font-size:15px;margin:16px 0 8px;">5. Mandatory Reporting</h3>
-    <p style="font-size:14px;color:#475569;line-height:1.6;">As a childcare provider, you have legal obligations to report situations involving Risk of Significant Harm (ROSH) to the NSW DCJ Child Protection Helpline on <strong>132 111</strong>.</p>
 
     <h3 style="font-size:15px;margin:16px 0 8px;">6. Confidentiality</h3>
     <p style="font-size:14px;color:#475569;line-height:1.6;">You must keep all information about the family, their children, household, and routines strictly confidential. This obligation survives termination of the arrangement.</p>

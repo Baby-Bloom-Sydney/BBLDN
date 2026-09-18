@@ -1179,6 +1179,71 @@ Prior: 2026-09-15T15:20+10:00 — BB-LDN-Planner-070926/S1 (S1 shipped locally).
 Prior: 2026-09-15T13:55+10:00 — BB-LDN-Planner-070926/S0 (seeded at bootstrap).
 -->
 
+## Files created / modified in the current unit (`3c` — the safeguarding deletions, the draft seed, ruling 5.1's binding, renewal and the expiry cron; L-009 Phase 3)
+
+**What this unit is.** Two commits. The first is **ADR-172**, which the brief put before everything else: a
+wrong-jurisdiction _safety instruction_ is deleted the day it is found and is never replaced by a guess. The
+second is `3c` proper — the consent system as mechanism, pointed at **draft** documents per L-009 kickoff §3.
+
+**The finding that made the second commit necessary.** `legal_documents` has been empty since `0003`
+(`body_md NOT NULL` refuses a placeholder), so `currentDocument` answered `null`, `checkDocument` refused, and
+**every document consent in the tree failed `document-required`** — signup clickwrap (AGR-01 / AGR-02), the
+biometric notice (AGR-04), the guardian permission (AGR-14). The mechanism was built and could not run.
+
+- **`src/lib/legal/checkpoints.ts`, five `/legal/*` pages, two email templates, two PDFs** — **ADR-172**. 70
+  lines of reporting duty, threshold, agency and hotline deleted, not translated: `checkpoints.ts:147`'s "You are
+  a mandatory reporter under NSW law… report to DCJ on 132 111", both "call 000 immediately" lines, both
+  "link to their WWCC via Service NSW for ongoing status alerts", `client-terms` s19, `professional-terms` s15 +
+  s8.4, `code-of-conduct` s6 and its four echoes, `privacy-policy` s18 + the disclosure list, `disclaimer`'s
+  immediate-concern block / direct-report note / helpline row, `biometric-notice`'s disclosure recipient, and
+  section 5 of both hire emails and both hire PDFs. **Numbering is deliberately not closed up** — these documents
+  already carry gaps (`client-terms` runs 17 → 19), a gap is visible where a silent renumber would re-point
+  cross-references, and `3a` / `3b` replace the bodies wholesale.
+- **`scripts/ci/check-config-literals.mjs`** — a `safeguarding` rule carrying **`everywhere: true`**, the one rule
+  the parked legacy tree is _not_ exempt from, covering the duty, the threshold, the Australian agencies and
+  hotlines, **and the England-and-Wales names too**: the correct route is a solicitor's (`3a`, FATE `10.39` /
+  `10.40`) and belongs in a versioned `legal_documents` body, never hardcoded in a component, an email or a PDF.
+  `Service NSW` is deliberately absent — it is the NSW transaction portal, not a reporting agency, and reddening
+  the legacy WWCC apply link would drag F-d's data-model surfaces into a safety rule. The scanner no longer runs
+  on import or calls `process.exit` from module scope (`scanRepo()` is exported, the CLI is guarded): importing it
+  from a test previously risked aborting the whole vitest process with exit 1 instead of a failing test.
+- **`supabase/migrations/0026_consent-draft-seed-and-binding.sql`** (new) — the v1 rows for all eleven day-one
+  slugs, every body's first line **`DRAFT — not legal advice, pending review`**, `content_hash` computed from the
+  body rather than typed, `on conflict do nothing` so a ratified version can never be overwritten. **Ruling 5.1
+  (ADR-173):** `legal_documents_version_hash_key` unique `(document_id, version, content_hash)`, and both consent
+  tables' document references widened from the pair to that **triple** — the database refuses a signature naming
+  words a version never had, declaratively, with no trigger and no exemption list. **ADR-176:** both subject keys
+  `cascade` → **`restrict`**. Both guards re-created with the hash requirement **above** the
+  `is_privileged_writer()` early return, because a service-role insert that forgets the hash is exactly as
+  unusable as a client's.
+- **`supabase/rollbacks/0026_…rollback.sql`** (new) — **ADR-165 (1)**: drops what `0026` adds, **keeps the
+  `restrict` narrowing**, keeps the seed (the table is append-only and an empty one takes every consent road
+  down), and _announces_ the data loss (`document_content_hash` goes with every value in it) rather than refusing.
+- **`supabase/rollbacks/0023_…rollback.sql`** — **REVIEW-4 M-3 / R-2 closed (ADR-177).** The twin no longer
+  re-grants `authenticated` EXECUTE on `create_nanny_account`; it restores the function and leaves the grant at
+  `service_role`, with a verify block asserting it inside the transaction that would otherwise commit it. R-2 read
+  as a choice between ADR-165 (2)'s `RAISE EXCEPTION` and amending ADR-165; it was neither — arm (1) was available
+  and unused. Generalised: **a rollback that re-opens a hole refuses; one that destroys data completes and says so.**
+- **`src/modules/platform/consent/`** — `DocumentVersion` gains `contentHash` (which is what drove all 26 call
+  sites), `BiometricConsentInput` gains `noticeContentHash`; new `lib/due-for-renewal.ts` (**ruling 5.2 /
+  ADR-174** — re-ask only what the _hash_ moved on, carry the rest, record the carry; a decline is re-asked,
+  never carried), `lib/renewal-carry.ts`, `lib/renewable-purposes.ts`, `lib/audit-consent-expiry.ts`.
+- **`src/app/api/cron/audit-consent-expiry/route.ts`** — handler-less since Phase 0, now `consent.auditExpiry`:
+  a day-one document with no version at all is `ALERT_CONSENT_DOCUMENT_MISSING` (new, 01 §4b), a passed
+  re-acceptance deadline is a `warn`. It audits **documents**, not users — the per-user sweep needs a store read
+  this port does not have, and half of it would look like a check that was not happening.
+- **Tests** — `config.safeguarding-literals.test.ts` (30, RED first: 26 failed before the rule existed) ·
+  `platform.consent-renewal.test.ts` (14) · `consent-cron.route.test.ts` (2) · `consent-erasure-binding.test.ts`
+  (25 + **4 pinned**) · `rollback-0026-consent.test.ts` (5). `rollback-security-clauses.test.ts`'s ADR-165 (2) pin
+  **closed** and a second case added. Fixtures in `rpc-0022` / `rpc-0023` now read the seeded hash instead of
+  inventing one — which is what the new foreign key refuses.
+- **The security pass** (0 CRITICAL, 0 HIGH, 2 MEDIUM, 1 LOW) — both MEDIUMs fixed in-unit:
+  `biometric_consent_records.notice_content_hash` is now **`NOT NULL`** rather than trigger-guarded only (a
+  composite FK with a NULL member is not enforced — MATCH SIMPLE), with three raw-SQL regression cases; and the
+  emergency-number guard no longer lets a real instruction through when a comma or full stop sits against the
+  number (`call, 999`, `ext.999`), with both shapes driven as cases. The LOW is the section-numbering gap, kept
+  deliberately — see above.
+
 ## Files created / modified in the current unit (P2-FIX — a bar is terminal, the verification id space, the hold's third road, and four honest gates; L-008 Phase 2 tail)
 
 **What this unit is.** REVIEW-4 (`docs/review-sweep-190926.md`) pinned two CRITICALs and one HIGH it could not

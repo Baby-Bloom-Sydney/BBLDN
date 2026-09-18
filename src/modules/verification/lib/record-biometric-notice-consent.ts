@@ -26,6 +26,8 @@ export async function recordBiometricNoticeConsent(
   const biometric = await consent.recordBiometricConsent({
     userId,
     noticeVersion: document.version,
+    // Ruling 5.1 — Art 9(2)(a) consent binds to the notice she actually scrolled, not to a version number.
+    noticeContentHash: document.contentHash,
     noticeOpenedAt: evidence.openedAt,
     noticeScrollCompletedAt: evidence.scrollCompletedAt,
     checkboxesEnabledAt: evidence.checkboxesEnabledAt,
@@ -47,7 +49,11 @@ export async function recordBiometricNoticeConsent(
     checkpointText: CHECKPOINT_TEXT,
     context: {},
     purpose: "biometric-notice",
-    document: { id: document.id, version: document.version },
+    document: {
+      id: document.id,
+      version: document.version,
+      contentHash: document.contentHash,
+    },
     consentGiven: true,
   });
   if (!recorded.ok)

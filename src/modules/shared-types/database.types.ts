@@ -279,6 +279,7 @@ export type Database = {
           checkboxes_enabled_at: string
           created_at: string
           id: string
+          notice_content_hash: string
           notice_document_id: string
           notice_opened_at: string
           notice_scroll_completed_at: string
@@ -293,6 +294,7 @@ export type Database = {
           checkboxes_enabled_at: string
           created_at?: string
           id?: string
+          notice_content_hash: string
           notice_document_id?: string
           notice_opened_at: string
           notice_scroll_completed_at: string
@@ -307,6 +309,7 @@ export type Database = {
           checkboxes_enabled_at?: string
           created_at?: string
           id?: string
+          notice_content_hash?: string
           notice_document_id?: string
           notice_opened_at?: string
           notice_scroll_completed_at?: string
@@ -318,10 +321,14 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "biometric_consent_records_notice_fkey"
-            columns: ["notice_document_id", "notice_version"]
+            columns: [
+              "notice_document_id",
+              "notice_version",
+              "notice_content_hash",
+            ]
             isOneToOne: false
             referencedRelation: "legal_documents"
-            referencedColumns: ["document_id", "version"]
+            referencedColumns: ["document_id", "version", "content_hash"]
           },
         ]
       }
@@ -1026,6 +1033,7 @@ export type Database = {
           checkpoint_text: string
           consent_given: boolean
           created_at: string
+          document_content_hash: string | null
           document_id: string | null
           document_version: number | null
           id: string
@@ -1043,6 +1051,7 @@ export type Database = {
           checkpoint_text: string
           consent_given: boolean
           created_at?: string
+          document_content_hash?: string | null
           document_id?: string | null
           document_version?: number | null
           id?: string
@@ -1060,6 +1069,7 @@ export type Database = {
           checkpoint_text?: string
           consent_given?: boolean
           created_at?: string
+          document_content_hash?: string | null
           document_id?: string | null
           document_version?: number | null
           id?: string
@@ -1074,10 +1084,14 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "consent_records_document_fkey"
-            columns: ["document_id", "document_version"]
+            columns: [
+              "document_id",
+              "document_version",
+              "document_content_hash",
+            ]
             isOneToOne: false
             referencedRelation: "legal_documents"
-            referencedColumns: ["document_id", "version"]
+            referencedColumns: ["document_id", "version", "content_hash"]
           },
         ]
       }

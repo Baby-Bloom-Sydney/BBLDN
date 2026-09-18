@@ -99,7 +99,11 @@ async function biometricConsent(): Promise<ConsentRecordId> {
     checkpointText: "I consent.",
     context: {},
     purpose: "biometric-notice",
-    document: { id: "biometric-notice", version: 1 },
+    document: {
+      id: "biometric-notice",
+      version: 1,
+      contentHash: "stub-hash-v1",
+    },
     consentGiven: true,
   });
   if (!recorded.ok) throw new Error("consent not recorded");
@@ -164,7 +168,9 @@ beforeEach(() => {
   configureConsent(
     createConsent({
       store: memoryConsentStore({
-        documents: { "biometric-notice": { version: 1 } } as never,
+        documents: {
+          "biometric-notice": { version: 1, contentHash: "stub-hash-v1" },
+        } as never,
       }),
       cookieExpiryDays: SECURITY.retention.cookieExpiryDays,
     }),

@@ -8,7 +8,7 @@
 // Reports check `banned-literals` (HANDOFF §9). Exit 0 = clean; 1 = hits listed.
 import { readFileSync } from "node:fs";
 import { resolve, dirname, relative } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { listFiles } from "./lib/list-files.mjs";
 import { loadExclusions } from "./lib/load-exclusions.mjs";
 import { globToRegExp } from "./lib/glob-to-regexp.mjs";
@@ -87,27 +87,77 @@ export const RULES = [
     pattern:
       /New South Wales|\bNSW\b|\.com\.au|Privacy Act 1988|\bOAIC\b|\bWWCC\b|\bwwcc\b|Fair Work|Australian Consumer Law|\bABN\b|\bACN\b|\+61/,
   },
+  // ADR-172 — a safeguarding duty, threshold, agency or hotline never appears in code. `everywhere: true` is the
+  // whole point of this entry: it is the one rule the parked legacy tree is **not** exempt from, because that tree
+  // may hold stale marketing and may never hold a stale safety claim. `3d′` found `checkpoints.ts:147` telling a
+  // user she was a mandatory reporter under NSW law and to ring an Australian number about a child at risk.
+  //
+  // The England-and-Wales names are banned here too, and that is deliberate rather than over-reach: the correct
+  // route (who carries a duty, the threshold, local authority children's social care, the NSPCC line) is a
+  // safeguarding and legal decision for BAI with a solicitor, and when it lands it belongs in a **versioned
+  // document body** — `legal_documents`, seeded from SQL, outside these scan roots — never hardcoded in a
+  // component, an email template or a PDF. Typing a reporting route into code is exactly how the NSW one shipped.
+  //
+  // **Not here: `Service NSW`.** It is the NSW transaction portal, not a reporting agency — ADR-172's class is the
+  // agency, hotline, duty and threshold of a *report*. Putting it here would redden the legacy WWCC apply link and
+  // the WWCC evidence error message, which are F-d's data-model surfaces (`3d′`'s bucket (b)), and a safety rule
+  // that drags unrelated legacy copy with it is a rule that gets escaped. `WWCC` stays with the `jurisdiction` rule.
+  //
+  // The emergency numbers match only next to an instruction verb and never with a digit or comma against them, so
+  // `A$1,000`, `?? 999` and `20 000` stay green. A bare "Child Protection" (the training certificate nannies hold)
+  // is deliberately absent; only "Child Protection Helpline" is here.
+  {
+    rule: "safeguarding",
+    everywhere: true,
+    pattern: new RegExp(
+      [
+        "mandatory report(?:er|ers|ing)", // the duty, stated as a duty
+        "Reportable Conduct", // the NSW parallel scheme
+        "Risk of Significant Harm", // the threshold, spelled out
+        "\\bROSH\\b", // the threshold, abbreviated
+        "Child Protection Helpline",
+        "\\bDCJ\\b",
+        "Department of Communities and Justice",
+        "\\bNSPCC\\b",
+        "\\bChild\\s?line\\b",
+        "children[\\u2019']?s social care",
+        "\\b132\\s?111\\b",
+        "\\b1800\\s?55\\s?1800\\b",
+        // An emergency number given as the thing to ring. The guards around the digits exclude only a number
+        // the digits are PART OF — a digit against them, or a comma/period that is itself against a digit
+        // (`A$1,000`, `20 000`, `?? 999`). They deliberately do NOT exclude ordinary punctuation between the
+        // instruction and the number (`call, 999`, `ext.999`), which an earlier `(?<![\\d,.])` did: the
+        // security pass measured that a real instruction one comma away slipped through the one rule the
+        // parked tree is not exempt from.
+        "\\b(?:call|dial|phone|ring|contact)\\b[^\\n]{0,30}(?<!\\d)(?<!\\d[,.])(?:000|999|112)\\b(?!\\d)(?![,.]\\d)",
+      ].join("|"),
+      "i",
+    ),
+  },
 ];
+
+/** The rules that bite inside `literal-exclusions.json`'s parked legacy tree as well (ADR-172). */
+const EVERYWHERE_RULES = RULES.filter((rule) => rule.everywhere === true);
 
 function relPath(file) {
   return relative(REPO_ROOT, file).split("\\").join("/");
 }
 
-function scanFile(file) {
+function scanFile(file, rules) {
   const lines = readFileSync(file, "utf8").split("\n");
   const hits = [];
   let escapes = 0;
   lines.forEach((line, index) => {
-    const rules = RULES.filter(({ pattern }) => pattern.test(line)).map(
-      ({ rule }) => rule,
-    );
-    if (rules.length === 0) return;
+    const matched = rules
+      .filter(({ pattern }) => pattern.test(line))
+      .map(({ rule }) => rule);
+    if (matched.length === 0) return;
     if (ESCAPE.test(line)) {
       escapes += 1;
       return;
     }
     hits.push(
-      `${relPath(file)}:${index + 1}: [${[...new Set(rules)].join(", ")}] ${line.trim().slice(0, 120)}`,
+      `${relPath(file)}:${index + 1}: [${[...new Set(matched)].join(", ")}] ${line.trim().slice(0, 120)}`,
     );
   });
   return { hits, escapes };
@@ -116,34 +166,58 @@ function scanFile(file) {
 const isLegacyExcluded = loadExclusions(
   resolve(REPO_ROOT, "literal-exclusions.json"),
 );
-const isExcluded = (file) => {
-  const path = relPath(file);
-  return (
-    BUILT_IN_EXCLUSIONS.some((pattern) => pattern.test(path)) ||
-    isLegacyExcluded(path)
-  );
-};
+const isBuiltInExcluded = (path) =>
+  BUILT_IN_EXCLUSIONS.some((pattern) => pattern.test(path));
 
-const files = SCAN_ROOTS.flatMap((root) =>
-  listFiles(resolve(REPO_ROOT, root), { extensions: SOURCE_EXTENSIONS }),
-).filter((file) => !isExcluded(file));
-if (files.length === 0) {
-  console.error(
-    "check-config-literals: FAIL — scanned zero files; the scan roots or the exclusions are wrong",
-  );
-  process.exit(1);
-}
-const results = files.map(scanFile);
-const hits = results.flatMap((result) => result.hits);
-const escapes = results.reduce((sum, result) => sum + result.escapes, 0);
+/**
+ * One pass over the tree. Two populations, because ADR-172 carved one rule out of the parked-legacy exemption:
+ *   `filesScanned`            — not excluded at all; every rule applies.
+ *   `everywhereFilesScanned`  — parked legacy; only `EVERYWHERE_RULES` apply.
+ * Built-in exclusions (generated types, docs, and this folder, where the patterns themselves live) are exempt from
+ * both — a rule that reddened its own source would be unwritable.
+ * Exported so the tests can drive the gate rather than take its word (ADR-171's reason, applied again).
+ */
+export function scanRepo() {
+  const all = SCAN_ROOTS.flatMap((root) =>
+    listFiles(resolve(REPO_ROOT, root), { extensions: SOURCE_EXTENSIONS }),
+  ).filter((file) => !isBuiltInExcluded(relPath(file)));
+  const full = all.filter((file) => !isLegacyExcluded(relPath(file)));
+  const parked = all.filter((file) => isLegacyExcluded(relPath(file)));
 
-if (hits.length > 0) {
-  console.error(
-    `check-config-literals: FAIL — ${hits.length} literal(s) outside src/modules/config on ${files.length} file(s); ${escapes} inline escape(s)`,
-  );
-  for (const hit of hits) console.error(`  ${hit}`);
-  process.exit(1);
+  const results = [
+    ...full.map((file) => scanFile(file, RULES)),
+    ...parked.map((file) => scanFile(file, EVERYWHERE_RULES)),
+  ];
+  return {
+    hits: results.flatMap((result) => result.hits),
+    escapes: results.reduce((sum, result) => sum + result.escapes, 0),
+    filesScanned: full.length,
+    everywhereFilesScanned: parked.length,
+  };
 }
-console.log(
-  `check-config-literals: OK — ${files.length} file(s) scanned, 0 hits, ${escapes} inline escape(s) (config-literal-ok)`,
-);
+
+function main() {
+  const { hits, escapes, filesScanned, everywhereFilesScanned } = scanRepo();
+  if (filesScanned === 0) {
+    console.error(
+      "check-config-literals: FAIL — scanned zero files; the scan roots or the exclusions are wrong",
+    );
+    process.exit(1);
+  }
+  if (hits.length > 0) {
+    console.error(
+      `check-config-literals: FAIL — ${hits.length} literal(s) outside src/modules/config on ${filesScanned} file(s) (+${everywhereFilesScanned} parked file(s) scanned for safeguarding only); ${escapes} inline escape(s)`,
+    );
+    for (const hit of hits) console.error(`  ${hit}`);
+    process.exit(1);
+  }
+  console.log(
+    `check-config-literals: OK — ${filesScanned} file(s) scanned, +${everywhereFilesScanned} parked file(s) scanned for safeguarding only (ADR-172), 0 hits, ${escapes} inline escape(s) (config-literal-ok)`,
+  );
+}
+
+// Importing this module must not run the scan and must never call `process.exit` — `config.legal.test.ts` and
+// `config.safeguarding-literals.test.ts` import `RULES` / `scanRepo`, and a top-level failure would abort the whole
+// vitest process with exit 1 instead of reporting a failing test.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
+  main();

@@ -128,16 +128,17 @@ async function makeNanny(
 
 /** The AGR-04 row the identity section needs (I-V3): a `biometric-notice` consent of this user. */
 async function giveBiometricConsent(userId: string): Promise<string> {
-  await db.query(
-    `insert into public.legal_documents (document_id, version, effective_date, body_md, content_hash)
-     values ('biometric-notice', 1, current_date, 'placeholder body (test)', 'test-hash')
-     on conflict do nothing`,
-  );
+  // `0026` seeds v1 of every day-one document and ruling 5.1 binds a consent to the TRIPLE
+  // `(document_id, version, content_hash)`, so the fixture reads the seeded hash instead of inventing one —
+  // inventing one is precisely what the composite foreign key now refuses.
   const { rows } = await db.query<{ id: string }>(
     `insert into public.consent_records
        (user_id, party, agreement_id, checkpoint_id, checkpoint_text, document_id, document_version,
-        consent_given, purpose)
-     values ($1, 'nanny', 'AGR-04', 'agr04_biometric', 'I consent.', 'biometric-notice', 1, true, 'biometric-notice')
+        document_content_hash, consent_given, purpose)
+     select $1, 'nanny', 'AGR-04', 'agr04_biometric', 'I consent.', d.document_id, d.version,
+            d.content_hash, true, 'biometric-notice'
+       from public.legal_documents d
+      where d.document_id = 'biometric-notice' and d.version = 1
      returning id`,
     [userId],
   );

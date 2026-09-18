@@ -206,10 +206,6 @@ export default function CodeOfConductPage() {
         </p>
         <ul>
           <li>
-            To comply with mandatory reporting obligations (see Section 6)
-            &mdash; you MUST report child safety concerns to NSW DCJ at 132 111.
-          </li>
-          <li>
             To law enforcement or government agencies with proper legal
             authority (warrant, court order, subpoena).
           </li>
@@ -551,69 +547,6 @@ export default function CodeOfConductPage() {
 
         <hr />
 
-        <h2>6. Mandatory Reporting</h2>
-        <p>
-          You have legal obligations under <strong>two NSW frameworks</strong>:
-        </p>
-        <p>
-          <strong>
-            1. Children and Young Persons (Care and Protection) Act 1998 (NSW):
-          </strong>
-        </p>
-        <p>
-          If you become aware of any situation involving{" "}
-          <strong>Risk of Significant Harm (ROSH)</strong> to a child (such as
-          abuse, neglect, or exposure to domestic violence), you{" "}
-          <strong>must</strong> report it to the NSW Department of Communities
-          and Justice (DCJ) Child Protection Helpline:
-        </p>
-        <p>
-          <strong>NSW DCJ Child Protection Helpline: 132 111</strong> (available
-          24/7)
-        </p>
-        <p>
-          <strong>
-            2. Disability Inclusion Act 2014 (NSW) &mdash; If Applicable:
-          </strong>
-        </p>
-        <p>
-          If you provide childcare to a child with a disability and become aware
-          of abuse or misconduct involving that child, you may also have
-          obligations under the Disability Inclusion Act 2014 (NSW). Contact the
-          NSW Office of the Ombudsman if you are unsure:
-        </p>
-        <p>
-          <strong>NSW Ombudsman: 1800 451 524</strong>
-        </p>
-        <p>
-          <strong>Important:</strong>
-        </p>
-        <ul>
-          <li>
-            Logging an incident on Baby Bloom does <strong>not</strong> replace
-            your legal duty to report to government authorities.
-          </li>
-          <li>
-            You must report to the authorities listed above, even if you also
-            report to Baby Bloom.
-          </li>
-          <li>
-            You are protected by law from reprisal when reporting in good faith.
-          </li>
-          <li>
-            For more information on mandatory reporting:{" "}
-            <a
-              href="https://www.dcj.nsw.gov.au/children-and-families/protecting-children-and-young-people/mandatory-reporters"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              www.dcj.nsw.gov.au/children-and-families/protecting-children-and-young-people/mandatory-reporters
-            </a>
-          </li>
-        </ul>
-
-        <hr />
-
         <h2>7. Online Safety</h2>
         <p>
           Baby Bloom complies with the Online Safety Act 2021 (Cth). You must
@@ -732,8 +665,7 @@ export default function CodeOfConductPage() {
         </p>
         <ul>
           <li>
-            Child safety violations (mandatory reporting breach, recklessness in
-            care, endangering a child).
+            Child safety violations (recklessness in care, endangering a child).
           </li>
           <li>
             Fraud or identity falsification (knowingly or intentionally lying on
@@ -922,10 +854,10 @@ export default function CodeOfConductPage() {
             </ul>
             <p>
               However, appeals are <strong>not</strong> a re-trial. If Baby
-              Bloom found you breached mandatory reporting obligations or
-              endangered a child, the appeal cannot overturn that finding unless
-              you have <strong>compelling new evidence</strong> that the
-              original finding was factually wrong.
+              Bloom found you endangered a child, the appeal cannot overturn
+              that finding unless you have{" "}
+              <strong>compelling new evidence</strong> that the original finding
+              was factually wrong.
             </p>
             <p>
               A senior staff member (different from those involved in the
@@ -999,11 +931,10 @@ export default function CodeOfConductPage() {
         <p>
           <strong>&ldquo;Serious breach&rdquo;:</strong> A violation that poses
           a risk to child safety, involves dishonesty, or is a repeated
-          violation of a rule after prior warning. Examples include: breach of
-          mandatory reporting obligations, physical harm to a child, gross
-          negligence in supervision, deliberate deception about qualifications
-          or identity, reckless conduct that endangers a child, or criminal
-          conduct.
+          violation of a rule after prior warning. Examples include: physical
+          harm to a child, gross negligence in supervision, deliberate deception
+          about qualifications or identity, reckless conduct that endangers a
+          child, or criminal conduct.
         </p>
         <p>
           <strong>&ldquo;Fraud&rdquo;:</strong> Knowingly or intentionally
@@ -1023,12 +954,6 @@ export default function CodeOfConductPage() {
           <strong>&ldquo;Emergency&rdquo;:</strong> A genuine and unexpected
           event that prevents you from providing care, such as hospitalisation,
           serious illness with medical evidence, or death of a family member.
-        </p>
-        <p>
-          <strong>&ldquo;Risk of Significant Harm (ROSH)&rdquo;:</strong> As
-          defined under NSW law: a situation where a child is at serious risk of
-          significant harm due to abuse, neglect, or exposure to domestic
-          violence.
         </p>
 
         <hr />
@@ -1123,15 +1048,6 @@ export default function CodeOfConductPage() {
             https://babybloomsydney.com.au/legal
           </a>
         </p>
-        <p>
-          <strong>Mandatory Reporting:</strong>
-          <br />
-          NSW DCJ Child Protection Helpline: <strong>132 111</strong> (available
-          24/7)
-          <br />
-          NSW Ombudsman: <strong>1800 451 524</strong> (Monday-Friday 9am-5pm)
-        </p>
-
         <hr />
 
         <p>

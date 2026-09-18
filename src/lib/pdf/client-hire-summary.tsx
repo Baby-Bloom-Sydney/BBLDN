@@ -108,13 +108,6 @@ export function ClientHireSummaryPDF({
           AI-generated content is labelled and should be independently verified.
         </Text>
 
-        <Text style={styles.sectionTitle}>5. Mandatory Reporting</Text>
-        <Text style={styles.paragraph}>
-          If you become aware of any situation involving Risk of Significant
-          Harm (ROSH) to a child, contact the NSW DCJ Child Protection Helpline
-          immediately on 132 111.
-        </Text>
-
         <Text style={styles.sectionTitle}>
           6. Baby Bloom&apos;s Commitments
         </Text>
