@@ -70,7 +70,51 @@
 begin;
 
 -- ---------------------------------------------------------------------------
--- 1. The job
+-- 1. The money class's anchor, as a function — because it is asked twice and the second time matters
+-- ---------------------------------------------------------------------------
+--
+-- ★ **A batch's membership is not a licence to delete** (security pass, HIGH). The `money` arm is the one class
+-- whose window is a fact about a **subject** rather than about the row being deleted — 07 §6.2 row 9 counts six
+-- years from the *last transaction*, so one recent payment holds the whole set. The arm therefore selects the
+-- subjects whose newest transaction is out of window, and then deletes by subject id across four tables.
+--
+-- Under READ COMMITTED each of those DELETEs takes its own snapshot. A webhook writing a `payment_events` row for
+-- one of those subjects **between** the selection and the delete would have had that brand-new row deleted, along
+-- with the rest of the set, because the delete filtered on the subject and not on the date. That is the exact
+-- invariant the arm exists to protect, holding at select time and not at delete time — and the loss would be a
+-- live financial record, silently.
+--
+-- So every money DELETE re-asserts the window per subject, through this function, in its own snapshot. A
+-- concurrent transaction is then simply not visible or makes the predicate false; either way the subject's rows
+-- survive and the next run reconsiders them. It is the same union the arm's selection uses, narrowed to one
+-- subject, which is why it is a function rather than four copies of a five-line `not exists`.
+--
+-- `consent` (row 11) deliberately does **not** get the same treatment, and the difference is not an oversight:
+-- its anchor is `account_erasure_requests.completed_at` for a subject whose account is already scrubbed and
+-- banned. That value is written once onto an append-only ledger and no session exists that could add a consent
+-- row afterwards, so there is no later write for a second snapshot to reveal.
+create or replace function public.money_last_activity_at(p_user_id uuid)
+returns timestamptz
+language sql
+stable
+set search_path = ''
+as $$
+  select max(at) from (
+    select max(s.created_at) as at from public.parent_subscriptions s where s.parent_user_id = p_user_id
+    union all select max(e.received_at) from public.payment_events e where e.parent_user_id = p_user_id
+    union all select max(r.created_at) from public.refund_requests r where r.parent_user_id = p_user_id
+    union all select max(g.created_at) from public.guarantee_events g where g.parent_user_id = p_user_id
+  ) money;
+$$;
+
+comment on function public.money_last_activity_at(uuid) is
+  '07 §6.2 row 9''s anchor for one subject: the newest of her subscription, payment, refund and guarantee rows. retention_sweep_class()''s money arm re-asserts the window through this in every DELETE, so a transaction written after the batch was selected cannot be deleted with it (security pass, HIGH).';
+
+revoke all on function public.money_last_activity_at(uuid) from public;
+revoke all on function public.money_last_activity_at(uuid) from anon, authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- 2. The job
 -- ---------------------------------------------------------------------------
 create or replace function public.retention_sweep_class(
   p_class text,
@@ -168,13 +212,23 @@ begin
          limit p_limit;
 
       -- Children first: `guarantee_events` and `refund_requests` are `on delete restrict` from the spine.
-      delete from public.guarantee_events g where g.parent_user_id in (select parent_user_id from due_money);
+      -- ★ Each delete re-asserts the window in its own snapshot (item 1 above): membership in the batch is not
+      --   a licence, and a transaction written since the batch was selected keeps its whole set alive.
+      delete from public.guarantee_events g
+       where g.parent_user_id in (select parent_user_id from due_money)
+         and public.money_last_activity_at(g.parent_user_id) < v_cutoff;
       get diagnostics v_n = row_count; v_removed := v_removed + v_n;
-      delete from public.refund_requests r where r.parent_user_id in (select parent_user_id from due_money);
+      delete from public.refund_requests r
+       where r.parent_user_id in (select parent_user_id from due_money)
+         and public.money_last_activity_at(r.parent_user_id) < v_cutoff;
       get diagnostics v_n = row_count; v_removed := v_removed + v_n;
-      delete from public.payment_events e where e.parent_user_id in (select parent_user_id from due_money);
+      delete from public.payment_events e
+       where e.parent_user_id in (select parent_user_id from due_money)
+         and public.money_last_activity_at(e.parent_user_id) < v_cutoff;
       get diagnostics v_n = row_count; v_removed := v_removed + v_n;
-      delete from public.parent_subscriptions s where s.parent_user_id in (select parent_user_id from due_money);
+      delete from public.parent_subscriptions s
+       where s.parent_user_id in (select parent_user_id from due_money)
+         and public.money_last_activity_at(s.parent_user_id) < v_cutoff;
       get diagnostics v_n = row_count; v_removed := v_removed + v_n;
 
     -- 07 §6.2 row 11 — six years after the **account scrub**, in the row's own words. A living account's
@@ -287,7 +341,7 @@ comment on function public.retention_sweep_class(text, jsonb, integer) is
   '07 §6.2 (L-009 3h): one class of the retention schedule, one bounded batch, one transaction. Every window and anchor arrives in p_spec from config/retention.ts (ADR-179) — a missing window raises and an anchor column that does not exist raises, because a retention date this job knew by itself would be a second owner of a legal fact. Nulls where §6.2 nulls and deletes where it deletes; no safeguarding decision is removed by any arm (07 §6.2 row 4 and ADR-170 disagree about its window, and that is pinned, not chosen). Owned by bbldn_retention because rows 11, 12 and 14 touch append-only tables whose trigger exempts exactly that identity.';
 
 -- ---------------------------------------------------------------------------
--- 2. What the retention identity may touch, enumerated (`0028` / `0030`'s discipline)
+-- 3. What the retention identity may touch, enumerated (`0028` / `0030`'s discipline)
 -- ---------------------------------------------------------------------------
 -- ★ **These lists are documentation, not the authority, and saying so is the honest part.** `0016:288` grants
 -- `bbldn_retention` SELECT / INSERT / UPDATE / DELETE on **all tables in schema public** — so the enumerated
@@ -324,6 +378,7 @@ grant select, update (visitor_id, attribution, request_id) on table public.event
 -- A referential action runs with the privileges of the constraint, not of the caller — the deletes are the
 -- authority, and granting UPDATE on those tables would widen the role for no reason.
 
+alter function public.money_last_activity_at(uuid) owner to bbldn_retention;
 alter function public.retention_sweep_class(text, jsonb, integer) owner to bbldn_retention;
 
 revoke create on schema public from bbldn_retention;
@@ -331,6 +386,7 @@ revoke create on schema public from bbldn_retention;
 revoke all on function public.retention_sweep_class(text, jsonb, integer) from public;
 revoke all on function public.retention_sweep_class(text, jsonb, integer) from anon, authenticated;
 grant execute on function public.retention_sweep_class(text, jsonb, integer) to service_role;
+grant execute on function public.money_last_activity_at(uuid) to bbldn_retention;
 
 commit;
 
@@ -413,7 +469,17 @@ begin
     raise exception '0031: retention_sweep_class is executable by a client role';
   end if;
 
-  -- 10. ★ The safeguarding tables are reachable by this role for exactly one column, and not for DELETE.
+  -- 10. ★ The money arm's re-check is reachable, and by the job's identity alone (security pass, HIGH).
+  if not has_function_privilege('bbldn_retention', 'public.money_last_activity_at(uuid)', 'execute') then
+    raise exception '0031: the job cannot call the anchor it re-asserts the money window with';
+  end if;
+  if has_function_privilege('service_role', 'public.money_last_activity_at(uuid)', 'execute')
+     or has_function_privilege('authenticated', 'public.money_last_activity_at(uuid)', 'execute')
+     or has_function_privilege('anon', 'public.money_last_activity_at(uuid)', 'execute') then
+    raise exception '0031: money_last_activity_at is executable by a role other than bbldn_retention';
+  end if;
+
+  -- 11. ★ The safeguarding tables are reachable by this role for exactly one column, and not for DELETE.
   --     Ruling 3 as a privilege rather than as a comment: even a future arm that tried could not.
   if has_table_privilege('bbldn_retention', 'public.vetting_submissions', 'delete')
      or has_table_privilege('bbldn_retention', 'public.verifications', 'delete')

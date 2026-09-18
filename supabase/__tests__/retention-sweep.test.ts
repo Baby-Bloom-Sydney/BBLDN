@@ -544,6 +544,42 @@ describe("int.retention-sweep — the properties every class shares", () => {
     await db.query("rollback to savepoint s");
   });
 
+  it("★ the money arm's re-check reflects a write made after the batch would have been chosen", async () => {
+    // The security pass's HIGH: the money window is a fact about a **subject**, so membership in a batch is not
+    // a licence to delete. Each money DELETE re-asserts the window through `money_last_activity_at` in its own
+    // snapshot. A true two-transaction race cannot be driven here — the suite's fixtures live in one uncommitted
+    // transaction, `3f`'s limit for its own `nowait` probe — so what is asserted is the predicate itself: it is
+    // out of window, and then a later transaction makes it in window, which is exactly what the DELETE would see.
+    await db.query("savepoint s");
+    const id = await liveSubject();
+    await db.query(
+      `insert into public.parent_subscriptions (parent_user_id, status, created_at)
+       values ($1, 'cancelled', ${outside("money")})`,
+      [id],
+    );
+    const before = await db.query<{ due: boolean }>(
+      `select public.money_last_activity_at($1) < now() - interval '72 months' as due`,
+      [id],
+    );
+    expect(before.rows[0].due).toBe(true);
+
+    await db.query(
+      `insert into public.payment_events (parent_user_id, provider, provider_event_id, event_type, payload, received_at)
+       values ($1, 'stripe-uk', 'retention-late', 'invoice.paid', '{}'::jsonb, now())`,
+      [id],
+    );
+    const after = await db.query<{ due: boolean }>(
+      `select public.money_last_activity_at($1) < now() - interval '72 months' as due`,
+      [id],
+    );
+    expect(after.rows[0].due).toBe(false);
+
+    // And the arm agrees: nothing of hers goes.
+    expect((await sweep("money")).removed).toBe(0);
+
+    await db.query("rollback to savepoint s");
+  });
+
   it("★ no arm can reach a safeguarding decision: the identity holds no DELETE on those tables", async () => {
     const { rows } = await db.query<{ table_name: string; can: boolean }>(
       `select t as table_name, has_table_privilege('bbldn_retention', 'public.' || t, 'delete') as can

@@ -32,6 +32,7 @@
 begin;
 
 drop function if exists public.retention_sweep_class(text, jsonb, integer);
+drop function if exists public.money_last_activity_at(uuid);
 
 commit;
 
@@ -43,9 +44,9 @@ begin
   -- It did the thing it exists to do.
   if exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'public' and p.proname = 'retention_sweep_class'
+     where n.nspname = 'public' and p.proname in ('retention_sweep_class', 'money_last_activity_at')
   ) then
-    raise exception '0031 rollback: retention_sweep_class is still here';
+    raise exception '0031 rollback: a function this file creates is still here';
   end if;
 
   -- ★ The one clause it keeps.

@@ -65,6 +65,7 @@ describe("int.rollback-0031 — the twin", () => {
     await db.query(stripped.sql);
 
     expect(await functionExists("retention_sweep_class")).toBe(false);
+    expect(await functionExists("money_last_activity_at")).toBe(false);
     await db.query("rollback to savepoint s");
   });
 
