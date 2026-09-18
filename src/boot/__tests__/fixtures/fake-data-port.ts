@@ -120,6 +120,10 @@ export function fakeDataPort(seed: FakeTables = {}): FakeDataPort {
     },
     signUrl: async () =>
       err("INTERNAL", "signUrl is not exercised by these specs"),
+    putObject: async () =>
+      err("INTERNAL", "putObject is not exercised by these specs"),
+    removeObject: async () =>
+      err("INTERNAL", "removeObject is not exercised by these specs"),
   };
 
   return { port, calls, inserted, updated, keyedReads, rpcs, state };

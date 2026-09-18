@@ -5,7 +5,6 @@
   "katieChat": "07 §8 row 8 — Katie chat. The London Katie routes are not built; /api/chat/* is the legacy Sydney tree (F-d). The chat_cost_daily USD cap is the hard stop until then.",
   "katieUploads": "07 §8 row 8 — Katie uploads. Same surface as katieChat: not built in the London tree.",
   "agentRoute": "07 §8 row 9 — the ADMIN_API_TOKEN recruitment-agent route. /api/agent is the legacy Sydney route (F-d); the London one does not exist.",
-  "verificationSubmissions": "07 §8 row 11 — verification submissions. The verification port is deliberately unwired (ADR-117 Tier A; src/boot/unwired-ports.ts refuses every path), so there is no submission to limit.",
   "nannyApplications": "07 §8 row 12 — nanny applications on the self-serve path. No Phase 1 surface lets a nanny apply; connections' K rows are the admin path and carry their own preconditions.",
   "adminRoutes": "07 §8 row 14 — admin routes. Phase 1 added no London admin route: the one admin surface is a page (src/app/admin/calls/page.tsx) that gates itself with requireRole(\"admin\") and notFound()s. Wire the policy with the first admin route."
 }

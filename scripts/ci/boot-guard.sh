@@ -66,7 +66,10 @@ expect_no_stub_binding() {
     return
   fi
   local bound
-  bound="$(grep -o '"binding":"[^"]*"' <<< "$BOOT_SERVER_OUTPUT" | grep stub || true)"
+  # One named allowance (L-008 2b; ADR-154; 03 §4.4 / kickoff §4.4): `stub-manual` is the vetting provider config
+  # binds day one — a person deciding from the queue, whose only outcome is needs-admin — not a test double an
+  # env name selects, so the report may name it. Every other "stub" in a binding is still a failure.
+  bound="$(grep -o '"binding":"[^"]*"' <<< "$BOOT_SERVER_OUTPUT" | grep stub | grep -v 'stub-manual' || true)"
   if [[ -z "$bound" ]]; then
     echo "boot-guard: OK   — ${label}"
   else

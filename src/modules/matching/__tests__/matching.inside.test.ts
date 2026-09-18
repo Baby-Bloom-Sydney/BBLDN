@@ -142,6 +142,14 @@ describe("matching inside — the marketplace-safe read (07 §5.2 `nanny_public`
             ok: false as const,
             error: { code: "INTERNAL" as const, message: "down", details: {} },
           }),
+          putObject: async () => ({
+            ok: false as const,
+            error: { code: "INTERNAL" as const, message: "down", details: {} },
+          }),
+          removeObject: async () => ({
+            ok: false as const,
+            error: { code: "INTERNAL" as const, message: "down", details: {} },
+          }),
         },
       },
     });

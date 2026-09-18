@@ -1,10 +1,9 @@
 // The unconfigured `verification` binding, exercised as it actually ships (REVIEW-1, the ADR-117 Tier B sweep).
 //
-// `verification` is **ADR-117 Tier A**: its inside handles criminal-record checks, identity documents and
-// right-to-work evidence, and was deliberately not built. `verification.repo.test.ts` asserts the folder shape,
-// the one-export rule and the allowed-imports row — but nothing asserted that the shipped binding actually
-// refuses. That made the module's whole safety argument unexecuted. This file never calls
-// `configureVerification`, so every call below runs against the real `VERIFICATION_REGISTRY` default.
+// The inside exists since L-008 `2b` (ADR-154) and boot installs it (`src/boot/wire-verification.ts`); the
+// registry's DEFAULT still refuses every road, which is what this file proves — an importer that runs before
+// boot, or a test that never configures the module, gets a refusal and never a level from nowhere. It never
+// calls `configureVerification`, so every call below runs against the real `VERIFICATION_REGISTRY` default.
 import { describe, expect, it } from "vitest";
 import { verification } from "@/modules/verification";
 import type { UserId } from "@/modules/shared-types";

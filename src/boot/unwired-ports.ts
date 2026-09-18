@@ -1,5 +1,7 @@
 // The ports boot deliberately leaves on their fail-closed default — stated on the report rather than left out
-// of it (REVIEW-2, code-review HIGH-1).
+// of it (REVIEW-2, code-review HIGH-1). `verification` and `vetting-providers` left this list with L-008 `2b`
+// (`wire-verification.ts`, ADR-154): REVIEW-1 M-9's objection is answered by construction — `stub-manual`'s only
+// outcome is needs-admin, so binding it cannot make a nanny look verified.
 //
 // `wire-ports.ts`'s header carries the invariant: "a port left on its fail-closed default carries its reason on
 // the report, never silence." Four privileged ports broke it by omission — no `configure*` call anywhere in
@@ -24,18 +26,6 @@ export function unwiredPorts(): ReadonlyArray<PortWiring> {
       binding: "unconfigured",
       reason:
         "REVIEW-1 C-1 / FIX-1: the eight levers move real families. configureAdminOnBehalf now gates whatever it is handed (lib/gate-admin-on-behalf.ts), so a binding would be safe by construction — but the inside is a Tier A unit that has not landed, and S-A-04's four buttons therefore refuse with admin-on-behalf-not-configured",
-    }),
-    Object.freeze({
-      port: "verification" as const,
-      binding: "unconfigured",
-      reason:
-        "ADR-117 Tier A: DBS / criminal-record checks. The London inside is unwritten; the module refuses every exported path. NOTE the legacy Sydney WWCC pipeline under src/app/api/run-verification is a separate, live surface (REVIEW-1 H-4) and is not this port",
-    }),
-    Object.freeze({
-      port: "vetting-providers" as const,
-      binding: "unconfigured",
-      reason:
-        "ADR-117 Tier A: no live provider exists to bind. 03 §4.4's stub-manual reports every check as consistent and never-expiring, so binding it in any environment that matters would be a success indistinguishable from real work (REVIEW-1 M-9)",
     }),
     Object.freeze({
       port: "hire-docs" as const,

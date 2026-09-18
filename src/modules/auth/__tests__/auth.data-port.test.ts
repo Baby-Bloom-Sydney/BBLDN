@@ -372,24 +372,38 @@ describe("DataAccessPort.putObject / removeObject (ADR-155; 07 §5.3 rules 2–3
     ["/leading-slash.pdf", "an absolute object path"],
     ["../other-user/passport.pdf", "a traversal"],
     ["", "an empty path"],
-  ])("refuses %s (%s) for both writes, before the driver is touched", async (path) => {
-    const { driver, state } = fakeDriver();
-    const port = createAuth({ driver }).data;
-    const put = await port.putObject({ bucket: "verification-documents", path }, BYTES, {
-      contentType: "image/jpeg",
-    });
-    const removed = await port.removeObject({ bucket: "verification-documents", path });
-    expect(put.ok === false && put.error.code).toBe("VALIDATION");
-    expect(removed.ok === false && removed.error.code).toBe("VALIDATION");
-    expect(state.puts).toEqual([]);
-    expect(state.removes).toEqual([]);
-  });
+  ])(
+    "refuses %s (%s) for both writes, before the driver is touched",
+    async (path) => {
+      const { driver, state } = fakeDriver();
+      const port = createAuth({ driver }).data;
+      const put = await port.putObject(
+        { bucket: "verification-documents", path },
+        BYTES,
+        {
+          contentType: "image/jpeg",
+        },
+      );
+      const removed = await port.removeObject({
+        bucket: "verification-documents",
+        path,
+      });
+      expect(put.ok === false && put.error.code).toBe("VALIDATION");
+      expect(removed.ok === false && removed.error.code).toBe("VALIDATION");
+      expect(state.puts).toEqual([]);
+      expect(state.removes).toEqual([]);
+    },
+  );
 
   it("refuses an empty body — an object with no bytes is never a retained upload", async () => {
     const { driver, state } = fakeDriver();
-    const result = await createAuth({ driver }).data.putObject(A_REF, new Uint8Array(0), {
-      contentType: "image/jpeg",
-    });
+    const result = await createAuth({ driver }).data.putObject(
+      A_REF,
+      new Uint8Array(0),
+      {
+        contentType: "image/jpeg",
+      },
+    );
     expect(result.ok === false && result.error.code).toBe("VALIDATION");
     expect(state.puts).toEqual([]);
   });
@@ -401,7 +415,9 @@ describe("DataAccessPort.putObject / removeObject (ADR-155; 07 §5.3 rules 2–3
     });
     expect(put.ok).toBe(false);
     const { driver: driver2 } = fakeDriver({ throwOn: "removeObject" });
-    const removed = await createAuth({ driver: driver2 }).data.removeObject(A_REF);
+    const removed = await createAuth({ driver: driver2 }).data.removeObject(
+      A_REF,
+    );
     expect(removed.ok).toBe(false);
   });
 });
