@@ -158,6 +158,37 @@ describe("privacy.sweepRetention — 07 §6.2's daily pass", () => {
     expect(run.value.capped).toEqual(ACTING);
   });
 
+  it("★ emits `retention.applied` once per class that acted, and never for one that did not", async () => {
+    // 07 §6.2's own sentence: the sweep "emits `retention.applied` { table, count }". A class that removed and
+    // nulled nothing has nothing to record, and an event saying so would make the trail say work happened.
+    const emitted: ReadonlyArray<unknown>[] = [];
+    const store = memoryPrivacyStore();
+    let n = 0;
+
+    await createPrivacy({
+      store: {
+        ...store,
+        sweepRetentionClass: async (input) => {
+          n += 1;
+          return {
+            ok: true as const,
+            value: {
+              class: input.class,
+              removed: n === 1 ? 3 : 0,
+              nulled: 0,
+              capped: false,
+            },
+          };
+        },
+      },
+      onSwept: async (input) => {
+        emitted.push([input.class, input.rowCount]);
+      },
+    }).sweepRetention(NOW);
+
+    expect(emitted).toEqual([[ACTING[0], 3]]);
+  });
+
   it("passes the configured batch limit rather than an unbounded one", async () => {
     const limits: number[] = [];
     const store = memoryPrivacyStore();

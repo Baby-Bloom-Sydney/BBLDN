@@ -51,8 +51,13 @@ export async function sweepRetention(
       });
       continue;
     }
-    handled += run.value.removed + run.value.nulled;
+    const rowCount = run.value.removed + run.value.nulled;
+    handled += rowCount;
     if (run.value.capped) capped.push(run.value.class);
+    // 07 §6.2's `retention.applied`, per class that acted. A failed emit does not fail the sweep — the rows are
+    // already gone and the transaction is already committed, so pretending it can be retried would be a lie.
+    if (rowCount > 0 && deps.onSwept !== undefined)
+      await deps.onSwept({ class: entry.class, rowCount });
   }
 
   // `skipped` is every class the schedule carries and this run did not act on — the ★ windows waiting on BAI and

@@ -1179,6 +1179,40 @@ Prior: 2026-09-15T15:20+10:00 — BB-LDN-Planner-070926/S1 (S1 shipped locally).
 Prior: 2026-09-15T13:55+10:00 — BB-LDN-Planner-070926/S0 (seeded at bootstrap).
 -->
 
+## Files created / modified in the current unit (`3h` — `retention-sweep`, the third retention job; L-009 Phase 3)
+
+**One job, and it is the one that unblocks another.** `0000` names three retention identities. `0028` built the
+erasure and `0030` built the purge; `retention-sweep` — the job 07 §6.2 names in nearly every row — had a route,
+a cron declaration and no function. `3g` measured what that costs: with every window passed but the expired money
+and consent rows still present, `purge_scrubbed_user()` answered `rows-outstanding` **for ever**, because nothing
+else removes them. The integration suite asserts the close as behaviour — refused before the sweep, purged after.
+
+- **`config/retention.ts` → `RETENTION`** (ADR-179 widened). All seventeen rows of 07 §6.2 as a value: each with
+  its window (always `SECURITY.retention.*`, never typed), its anchor columns, its targets and its treatment.
+  **★ is the line between built and deferred**: 07 §6.2 marks a window ★ when the number still needs BAI's
+  confirmation, and a timer built on an unconfirmed number would delete real data on an unratified date. Ten
+  classes act; the rest carry a `deferred` or `none` entry naming its reason and its owner. Row 4 is `none` as a
+  **pin**: §6.2 says life of account + ★12 months, ADR-170 says six years as row 11 — two answers to one question.
+- **`0031_retention-sweep.sql`** — `retention_sweep_class(class, spec, limit)`, owned by `bbldn_retention`,
+  EXECUTE to `service_role` alone. One bounded batch of one class per transaction, because one transaction across
+  seventeen classes would hold locks on `events` while it worked through `admin_notifications`. Every date arrives
+  in `p_spec`; a spec with no window raises, and **an anchor column that does not exist raises** — `0030`'s
+  misspelled-anchor defect one layer up, validated as a column rather than as a word.
+- ★ **Measured, not read: the retention identity could delete a safeguarding record.** `bbldn_retention` held
+  DELETE on `verifications` and `vetting_submissions` (created by `0008`, before `0016:288` granted it DML on
+  every table then in existence) and not on `nanny_suspension_lifts` (created by `0025`, after). Same three
+  tables, same rule, and the difference was migration order; `prevent_safeguarding_record_loss()` exempts that
+  identity, so "no timer removes a safeguarding decision" rested on no arm having been written. The migration's
+  own verify block caught it on the first `db reset`. Revoked; the twin keeps it revoked. The enumerated grant
+  lists in `0027` / `0028` / `0030` / `0031` are documentation rather than a closed set, and `0031` says so.
+- **The route that had none.** `/api/cron/retention-sweep` has answered `no-handler-registered` since `1h`.
+  `skipped` means a third thing on it — a **class** no job acts on today, not a backlog and not a person — so
+  `failed` and `capped` are logged under their own names. `retention.applied` is emitted per class that acted.
+- **`check:retention-classes` gains its fourth and fifth sides**, driven both ways: every one of 07 §6.2's
+  seventeen rows must have a config entry, and `0031`'s arms must be exactly the schedule's acting classes.
+
+---
+
 ## Files created / modified in the current unit (`3g` — the consent surfaces, the renewal sweep, the gate re-bases and the purge; L-009 Phase 3)
 
 **Four things Phase 3 could still finish without BAI, and one measured defect that turned out to be underneath

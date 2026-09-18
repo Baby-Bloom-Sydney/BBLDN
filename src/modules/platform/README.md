@@ -107,9 +107,14 @@ which refuses a value the scrubber would change). Adding a fourth prose boundary
 `looksLikePii` directly.
 
 **Not here.** `platform/events/client.ts` (`track` → `POST /api/events`) lands with the route (F-c); the
-`vercel-analytics` and `meta` sinks land with Phase 4c; `platform/privacy` **is built** (L-009 `3f`, B-46): the Art 17 erasure, both roads and
-the sweep. `exportUser` (Art 15, 07 §6.1's last sentence) is deliberately **not** in it — no surface asks for it
-yet, and a connector method with no caller is a claim rather than a capability.
+`vercel-analytics` and `meta` sinks land with Phase 4c; `platform/privacy` **is built** and now carries all three
+retention jobs `0000` names: the Art 17 erasure with both roads and its re-attempt sweep (L-009 `3f`, B-46),
+`purgeScrubbedUsers` (07 §6.1 step 6, `3g`) and **`sweepRetention`** (07 §6.2, `3h`). The three are one capability
+on purpose: they share the `bbldn_retention` identity and the append-only exemption that identity carries, and
+splitting them would put one exemption in two homes. Their units of work differ and the types say so — an
+erasure and a purge are one **subject**, a retention sweep is one **class**. `exportUser` (Art 15, 07 §6.1's last
+sentence) is deliberately **not** in it — no surface asks for it yet, and a connector method with no caller is a
+claim rather than a capability.
 
 <!-- audit
 Last edited: 2026-09-17T12:10+10:00 — BB-LDN-Planner-070926/P1-WIRE

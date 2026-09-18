@@ -245,6 +245,16 @@ export type PrivacyDeps = {
     readonly objectCount: number;
   }) => Promise<void>;
   readonly sweepLimit?: number;
+  /**
+   * 07 §6.2's own sentence — the sweep "emits `retention.applied` { table, count }". One per class that actually
+   * acted: a class that removed and nulled nothing has nothing to record, and an event saying otherwise would
+   * make the audit trail claim work that did not happen (`run-erasure`'s rule for `account.deleted`, applied to
+   * a class instead of a person).
+   */
+  readonly onSwept?: (input: {
+    readonly class: string;
+    readonly rowCount: number;
+  }) => Promise<void>;
 };
 
 export type MemoryPrivacyStore = PrivacyStore & {
