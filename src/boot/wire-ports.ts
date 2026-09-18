@@ -24,6 +24,7 @@ import { wireEvents } from "./wire-events";
 import { wireMatching } from "./wire-matching";
 import { wireParentProfileStore } from "./wire-parent-profile-store";
 import { wireNannyOnboarding } from "./wire-nanny-onboarding";
+import { wireVerification } from "./wire-verification";
 import { wireApp } from "./wire-app";
 import { wirePayments } from "./wire-payments";
 import { wirePlacements } from "./wire-placements";
@@ -58,6 +59,9 @@ export function wirePorts(env: ParsedEnv): BootReport {
     // `onboarding-nanny`'s two stores (L-008 `2a`) — like the parent profile store, a feature module's binding whose
     // definers are a property of the applied schema, which is boot's to know.
     wireNannyOnboarding(),
+    // `verification` + `vetting-providers` after `onboarding-nanny`, whose account store it injects as the
+    // contact writer (L-008 `2b`, ADR-154); not load-bearing at wire time — the binding is read at call time.
+    ...wireVerification(),
     // `purchase-paths` before `payments` for readability only — `payments` holds the module-level provider
     // binding, not a provider object, so an unconfigured provider is a fail-closed `Result` at call time.
     wirePurchaseProvider(
@@ -71,7 +75,7 @@ export function wirePorts(env: ParsedEnv): BootReport {
     // money port is wired before it. Neither is load-bearing at wire time — both are closures over module-level
     // bindings, which fail closed at call time — but the reading order is the dependency order.
     wireApp(),
-    // Last, and they bind nothing: the four ports boot deliberately leaves on their fail-closed default, stated
+    // Last, and they bind nothing: the two ports boot deliberately leaves on their fail-closed default, stated
     // so the report can never be read as "boot forgot" (REVIEW-2, code-review HIGH-1).
     ...unwiredPorts(),
   ]);

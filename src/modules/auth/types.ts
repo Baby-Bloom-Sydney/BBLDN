@@ -111,10 +111,32 @@ export type StorageRef = {
   readonly path: string;
 };
 
+/** What travels with an object write (ADR-155): the sniffed MIME type and 07 §5.3 rule 3's object metadata. */
+export type PutObjectOptions = {
+  readonly contentType: string;
+  /** `{ uploaded_by, entity_kind, entity_id, scan }` — for the retention job; never content, never a URL */
+  readonly metadata?: Readonly<Record<string, string>>;
+};
+
 export interface DataAccessPort<DB extends DatabaseShape = AppDatabase> {
   run<T>(op: NamedOperation<T, DB>, opts?: RunOptions): Promise<Result<T>>;
   /** The one signed-URL minter (07 §5.3 rule 1); TTLs come from `SECURITY.signedUrlTtlSeconds`. */
   signUrl(ref: StorageRef, ttlSeconds: number): Promise<Result<Url>>;
+  /**
+   * ADR-155 — the one object writer. Runs at **session** scope, so the bucket's owner-prefix INSERT policy
+   * (`0015`) is a second check behind the calling action's own path rule (07 §5.3 rules 2–3).
+   */
+  putObject(
+    ref: StorageRef,
+    body: Uint8Array,
+    opts: PutObjectOptions,
+  ): Promise<Result<void>>;
+  /**
+   * ADR-155 — undoes an object whose scan or registry write failed. Runs at **service** scope: no user role
+   * holds DELETE on `verification-documents` (07 §5.3 rule 2), and the stack refuses a direct table delete for
+   * every role anyway. A named service-role use (07 §5.1 rule 5; module README).
+   */
+  removeObject(ref: StorageRef): Promise<Result<void>>;
 }
 
 // ── The connector (03 §1.4) ──
@@ -206,6 +228,15 @@ export interface AuthDriver<DB extends DatabaseShape = AppDatabase> {
   /** The narrow typed query surface for the given scope (03 §1.4). */
   query(scope: DataScope): Query<DB>;
   createSignedUrl(ref: StorageRef, ttlSeconds: number): Promise<string>;
+  /** The object write, at the scope the port names (ADR-155: session). Throws on a provider refusal. */
+  putObject(
+    ref: StorageRef,
+    body: Uint8Array,
+    opts: PutObjectOptions,
+    scope: DataScope,
+  ): Promise<void>;
+  /** The object delete, at the scope the port names (ADR-155: service). Throws on a provider refusal. */
+  removeObject(ref: StorageRef, scope: DataScope): Promise<void>;
 }
 
 /**

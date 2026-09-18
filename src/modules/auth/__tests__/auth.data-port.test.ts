@@ -340,6 +340,88 @@ describe("DataAccessPort.signUrl (07 §5.3 rule 1)", () => {
   });
 });
 
+describe("DataAccessPort.putObject / removeObject (ADR-155; 07 §5.3 rules 2–3)", () => {
+  const BYTES = new Uint8Array([0xff, 0xd8, 0xff]);
+
+  it("writes the object through the driver at SESSION scope, so the bucket's owner-prefix INSERT policy is the second check", async () => {
+    const { driver, state } = fakeDriver();
+    const result = await createAuth({ driver }).data.putObject(A_REF, BYTES, {
+      contentType: "image/jpeg",
+      metadata: { uploaded_by: "u-1", entity_kind: "verification" },
+    });
+    expect(result).toEqual({ ok: true, value: undefined });
+    expect(state.puts).toEqual([
+      {
+        ref: A_REF,
+        bytes: 3,
+        contentType: "image/jpeg",
+        metadata: { uploaded_by: "u-1", entity_kind: "verification" },
+        scope: "session",
+      },
+    ]);
+  });
+
+  it("removes the object through the driver at SERVICE scope — no user role holds DELETE on the bucket", async () => {
+    const { driver, state } = fakeDriver();
+    const result = await createAuth({ driver }).data.removeObject(A_REF);
+    expect(result).toEqual({ ok: true, value: undefined });
+    expect(state.removes).toEqual([{ ref: A_REF, scope: "service" }]);
+  });
+
+  it.each([
+    ["/leading-slash.pdf", "an absolute object path"],
+    ["../other-user/passport.pdf", "a traversal"],
+    ["", "an empty path"],
+  ])(
+    "refuses %s (%s) for both writes, before the driver is touched",
+    async (path) => {
+      const { driver, state } = fakeDriver();
+      const port = createAuth({ driver }).data;
+      const put = await port.putObject(
+        { bucket: "verification-documents", path },
+        BYTES,
+        {
+          contentType: "image/jpeg",
+        },
+      );
+      const removed = await port.removeObject({
+        bucket: "verification-documents",
+        path,
+      });
+      expect(put.ok === false && put.error.code).toBe("VALIDATION");
+      expect(removed.ok === false && removed.error.code).toBe("VALIDATION");
+      expect(state.puts).toEqual([]);
+      expect(state.removes).toEqual([]);
+    },
+  );
+
+  it("refuses an empty body — an object with no bytes is never a retained upload", async () => {
+    const { driver, state } = fakeDriver();
+    const result = await createAuth({ driver }).data.putObject(
+      A_REF,
+      new Uint8Array(0),
+      {
+        contentType: "image/jpeg",
+      },
+    );
+    expect(result.ok === false && result.error.code).toBe("VALIDATION");
+    expect(state.puts).toEqual([]);
+  });
+
+  it("maps a driver failure to a Result, never a throw", async () => {
+    const { driver } = fakeDriver({ throwOn: "putObject" });
+    const put = await createAuth({ driver }).data.putObject(A_REF, BYTES, {
+      contentType: "image/jpeg",
+    });
+    expect(put.ok).toBe(false);
+    const { driver: driver2 } = fakeDriver({ throwOn: "removeObject" });
+    const removed = await createAuth({ driver: driver2 }).data.removeObject(
+      A_REF,
+    );
+    expect(removed.ok).toBe(false);
+  });
+});
+
 describe("the module binding (03 §9.5 registry pattern)", () => {
   it("delegates every method to whatever configureAuth installed", async () => {
     const { driver, state } = fakeDriver();

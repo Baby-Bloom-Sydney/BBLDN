@@ -481,14 +481,10 @@ describe("boot — the position store, and the write road 0019 added", () => {
 // INTERNAL forever and the boot log has no line explaining why. Fail-closed on safety, fail-silent on
 // operability. Written RED first: `BootPort` did not admit the names, so the report could not contain the rows.
 describe("boot — every port boot leaves closed is on the report (REVIEW-2)", () => {
-  const CLOSED_ON_PURPOSE = [
-    "admin-on-behalf",
-    "verification",
-    "vetting-providers",
-    "hire-docs",
-  ] as const;
+  // `verification` and `vetting-providers` left this list with L-008 `2b` (ADR-154): they are bound over `0022`.
+  const CLOSED_ON_PURPOSE = ["admin-on-behalf", "hire-docs"] as const;
 
-  it("names the four privileged ports boot does not configure, each with a reason", async () => {
+  it("names the two privileged ports boot does not configure, each with a reason", async () => {
     const { wirePorts } = await import("@/boot/wire-ports");
     const { env } = await import("@/modules/config/server");
     const report = wirePorts(env);

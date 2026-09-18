@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-09-18T00:27:04.592Z",
+  "generated_at": "2026-09-18T00:45:33.130Z",
   "summary": {
     "route_count": 59,
     "page_count": 89,
     "cron_count": 23,
-    "migration_count": 22,
+    "migration_count": 23,
     "server_action_file_count": 41
   },
   "routes": [
@@ -987,6 +987,11 @@
       "filename": "0021_nanny-onboarding.sql",
       "bytes": 15926,
       "modified_at": "2026-09-17T23:42:26.337Z"
+    },
+    {
+      "filename": "0022_verification-wizard.sql",
+      "bytes": 32585,
+      "modified_at": "2026-09-18T00:44:07.915Z"
     }
   ],
   "server_actions": [

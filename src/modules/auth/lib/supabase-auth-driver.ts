@@ -13,6 +13,7 @@ import type {
   AuthDriver,
   DataScope,
   DriverUser,
+  PutObjectOptions,
   Role,
   SignInInput,
   SignUpInput,
@@ -181,6 +182,32 @@ export function supabaseAuthDriver(): AuthDriver<AppDatabase> {
         .createSignedUrl(ref.path, ttlSeconds);
       if (error !== null) throw new Error(error.message);
       return data.signedUrl;
+    },
+    // ADR-155. The port names the scope: `session` for the upload (the owner-prefix INSERT policy of `0015`
+    // applies as the caller — probed against the local stack: own prefix succeeds, a foreign prefix is refused,
+    // and the owner still cannot download the object), `service` for the undo (no user role holds DELETE).
+    // `upsert: false` — refs are write-once per attempt (I-V6): a path that already exists is a defect, not
+    // an overwrite.
+    putObject: async (
+      ref: StorageRef,
+      body: Uint8Array,
+      opts: PutObjectOptions,
+      scope: DataScope,
+    ) => {
+      const { error } = await (await clientFor(scope)).storage
+        .from(ref.bucket)
+        .upload(ref.path, body, {
+          contentType: opts.contentType,
+          upsert: false,
+          ...(opts.metadata === undefined ? {} : { metadata: opts.metadata }),
+        });
+      if (error !== null) throw new Error(error.message);
+    },
+    removeObject: async (ref: StorageRef, scope: DataScope) => {
+      const { error } = await (await clientFor(scope)).storage
+        .from(ref.bucket)
+        .remove([ref.path]);
+      if (error !== null) throw new Error(error.message);
     },
   });
 }
