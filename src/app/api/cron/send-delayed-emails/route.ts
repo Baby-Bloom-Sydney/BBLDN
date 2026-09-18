@@ -27,6 +27,12 @@ export async function GET(request: Request): Promise<Response> {
     const holds = await scheduling.expireHolds(now);
     const stale = await verification.sweepStaleProcessing(now);
     const reminders = await verification.sweepReminders(now);
+    // ★ REVIEW-4 H-1 — all three sweeps that can refuse fail the run the same way. `holds` used to be folded
+    // into `skipped: +1` while its two siblings returned their error, so a scheduling outage stopped every slot
+    // hold expiring behind an HTTP 200 and an `info` line — `run-cron.ts`'s `ALERT_CRON_FAILED` never fired,
+    // and `skipped` was indistinguishable from a hold that simply was not due. All four still RUN before any
+    // refusal is returned, so one sweep being down never costs the others their pass.
+    if (!holds.ok) return holds;
     if (!stale.ok) return stale;
     if (!reminders.ok) return reminders;
     return {
@@ -35,11 +41,10 @@ export async function GET(request: Request): Promise<Response> {
         handled:
           calls.overdue +
           calls.waiting +
-          (holds.ok ? holds.value.expired : 0) +
+          holds.value.expired +
           stale.value.handled +
           reminders.value.handled,
-        skipped:
-          stale.value.skipped + reminders.value.skipped + (holds.ok ? 0 : 1),
+        skipped: stale.value.skipped + reminders.value.skipped,
       },
     };
   });

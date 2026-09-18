@@ -77,6 +77,35 @@ describe("/api/cron/send-delayed-emails — the 5-minute run (01 §4f; ADR-161)"
     expect(s.sweepReminders).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * ★ REVIEW-4 H-1 — the four sweeps must fail the run the same way.
+   *
+   * `stale` and `reminders` return their error, which `runCron` turns into `log.error` + `ALERT_CRON_FAILED`
+   * and a non-200 (`run-cron.ts:57-68`, whose own comment says "a thrown-away error is how a silent cron
+   * becomes a week of unswept rows"). `holds` alone was folded into `skipped: +1` and the run answered `ok`, so
+   * a scheduling outage stopped every slot hold expiring — parents shown times that are not free — behind an
+   * HTTP 200 and an `info` line whose `skipped` is indistinguishable from a real skip.
+   *
+   * Written RED against the shipped handler, which answered 200 with `{ handled: 8, skipped: 2 }`.
+   */
+  it("a refused slot-hold sweep fails the run, like its two siblings (REVIEW-4 H-1)", async () => {
+    vi.resetModules();
+    const s = stubs();
+    s.expireHolds.mockResolvedValueOnce({
+      ok: false,
+      error: { code: "INTERNAL", message: "scheduling is down" },
+    } as never);
+    const { GET } = await import("../../cron/send-delayed-emails/route");
+
+    const response = await GET(request("/api/cron/send-delayed-emails"));
+
+    expect(response.status).not.toBe(200);
+    // and the other three still ran — the failure is reported, never a reason to skip the rest of the pass
+    expect(s.callDueSweep).toHaveBeenCalledTimes(1);
+    expect(s.sweepStaleProcessing).toHaveBeenCalledTimes(1);
+    expect(s.sweepReminders).toHaveBeenCalledTimes(1);
+  });
+
   it.fails(
     "delivers the queued email_logs rows that are due (08.20) — PINNED: no renderer exists until Phase 4a (08.01), owner Phase 4a",
     async () => {

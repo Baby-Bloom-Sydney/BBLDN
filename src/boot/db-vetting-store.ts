@@ -129,15 +129,26 @@ function columnsOf(evidence: Evidence): Record<string, unknown> {
         dbs_certificate_ref: ref,
         dbs_certificate_number: d.certificateNumber,
         dbs_issue_date: d.issueDate,
-        // REVIEW-3 M-5: the key's PRESENCE is the consent; the instant is the server's (0023 stamps now())
+        // REVIEW-3 M-5: the key's PRESENCE is the consent; the instant is the server's (0023 stamps now()).
+        //
+        // REVIEW-4 C-1 — the marker is `null`, not `true`. `verification_submission_columns` filters KEYS and
+        // passes VALUES through verbatim, and `submit_verification_evidence` then builds its update row with
+        // `jsonb_populate_record(v_row, …)` (`0023:926`), which casts every admitted key through the column's
+        // own type. `verifications.dbs_update_service_consent_at` is `timestamptz`, so a boolean raised
+        // `22007 invalid input syntax for type timestamp with time zone: "true"` — measured against the applied
+        // set — and EVERY DBS submission failed with it (`dbs-schema.ts:20` makes the tick mandatory), sixty
+        // lines before the stamp that was supposed to make the value irrelevant. `null` casts cleanly and still
+        // carries the presence: `p_columns ? 'dbs_update_service_consent_at'` is true for a key whose value is
+        // JSON null, which is what `0023:980-982` reads. Held from both sides by
+        // `supabase/__tests__/dbs-consent-marker.test.ts`.
         ...(d.updateServiceConsent === "true"
-          ? { dbs_update_service_consent_at: true }
+          ? { dbs_update_service_consent_at: null }
           : {}),
       };
     // REVIEW-3 L-4: the Update Service consent submitted as evidence of its own (03 §4.2's type) — the same
     // marker, never a silent `{}`
     case "dbs-update-service":
-      return { dbs_update_service_consent_at: true };
+      return { dbs_update_service_consent_at: null };
     case "right-to-work-passport":
     case "right-to-work-document":
       return { rtw_evidence_type: d.kind, rtw_document_ref: ref };

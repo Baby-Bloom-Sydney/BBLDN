@@ -256,6 +256,45 @@ describe("openNannyCall — the operator's queue row (ADR-160; 02 §4.6)", () =>
       },
     ]);
   });
+
+  /**
+   * ★ REVIEW-4 M-2 — ADR-160 says "the email is the delivery, the `admin_notifications` row the state", and the
+   * state is exactly the half that has to survive a missing address. `notifyAdmin` was appended **below** the
+   * `adminEmail === undefined` early return that existed when this function only sent email, so a boot with no
+   * admin address lost the operator's row as well as the notice: a nanny books her commission call and nothing
+   * anywhere says so. `ADMIN_EMAIL` is required in dev / preview / production
+   * (`config/lib/env-schema.ts:66-74`), which is why this is a misconfiguration path and not a live outage —
+   * but `adminEmail` is optional all the way down (`call-layer/types.ts:218`), so it is a modelled state.
+   *
+   * Written RED against the shipped function, which raised nothing at all.
+   */
+  it("raises the row even with no admin address configured — the row is the state, the email only the delivery", async () => {
+    configureCallLayer(
+      createCallLayer({
+        store: memoryCallMirrorStore([]),
+        scheduling,
+        comms,
+        clock: () => NOW,
+      }),
+    );
+    const slot = await firstSlot();
+
+    const booked = await callLayer.openNannyCall({
+      nannyId: NANNY,
+      slotId: slot.id,
+      actor: { kind: "user", id: NANNY, role: "nanny" },
+      idempotencyKey: "row-no-admin",
+    });
+
+    expect(booked.ok).toBe(true);
+    expect(comms.raised.map((r) => r.kind)).toEqual(["commission_call_booked"]);
+    // and the notice itself is correctly not invented — there is no address to send it to
+    expect(
+      comms.sent.some(
+        (message) => message.templateId === "admin-commission-booking",
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("findNannyBooking — 'have I already picked a time?'", () => {
