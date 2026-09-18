@@ -25,6 +25,8 @@ export { callRailLine } from "./lib/call-rail-line";
 export { callPageView } from "./lib/call-page-view";
 export { londonSlotWords } from "./lib/london-slot-words";
 export { groupSlotsByDay } from "./lib/group-slots-by-day";
+// The 14-day window both pickers ask for (ADR-076) — one definition, so S-N-02 cannot drift from S-P-02.
+export { slotRange } from "./lib/slot-range";
 export { RAIL_LABELS } from "./lib/rail-labels";
 
 // S-P-01 · S-P-02 · S-P-03 — the reads the route files call and the screens they render (01 §2.5 "thin").
@@ -33,6 +35,9 @@ export { loadParentJourney } from "./lib/load-parent-journey";
 export { holdSlotAction } from "./actions/hold-slot-action";
 export { chooseSlotAction } from "./actions/choose-slot-action";
 export { listSlotsAction } from "./actions/list-slots-action";
+// S-N-02's two (`2g`): the calendar read and the one write, both reached only by a signed-in nanny.
+export { listNannySlotsAction } from "./actions/list-nanny-slots-action";
+export { bookNannyCallAction } from "./actions/book-nanny-call-action";
 export { CallPage } from "./components/CallPage";
 export { CallUnavailable } from "./components/CallUnavailable";
 export { SlotPicker } from "./components/SlotPicker";

@@ -8,9 +8,14 @@
 import type { ClientResult } from "@/modules/platform";
 import type { TemplateId } from "@/modules/comms";
 import type {
+  SlotActions as CallLayerSlotActions,
+  SlotDay as CallLayerSlotDay,
+} from "@/modules/call-layer";
+import type {
   E164,
   Email,
   EnumValue,
+  ISO,
   ISODate,
   LeadId,
   NannyId,
@@ -348,6 +353,9 @@ export type NannyHubProps = {
   readonly verificationHref: string;
   readonly settingsHref: string;
   readonly childrenHref: string;
+  /** S-N-01 and S-N-02 (04 §4.4 c1) — shown to everyone but an isolated nanny (ADR-147). */
+  readonly addChildHref: string;
+  readonly commissionHref: string;
 };
 
 export type NannyProfileStepperProps = {
@@ -411,3 +419,47 @@ export type MemoryNannyAccountRow = NannyAccountInput &
 
 /** The two plain stops of N1 (04 §4.1 rows 2 and 4). */
 export type FunnelStopKind = "outside-london" | "no-dbs";
+
+// ── S-N-02 (`2g`) — the commission explainer + the book-a-call section (`03.37`; 04 §4.4 c2 / c3) ──
+
+/**
+ * The picker's day, re-exported through this module's own vocabulary so the S-N-02 route never has to reach
+ * into `call-layer`'s type barrel for a prop it is only passing through (01 §2.5). The shape is `call-layer`'s
+ * and stays `call-layer`'s — this is an alias, not a second definition.
+ */
+export type SlotDay = CallLayerSlotDay;
+
+/** The nanny half of `call-layer`'s picker actions: no position, no hold (03 §3.2). */
+export type NannySlotActions = Extract<
+  CallLayerSlotActions,
+  { readonly subject: "nanny" }
+>;
+
+export type NannyCommissionView = {
+  readonly firstName: string;
+  /** what we will ring — prefilled from her own row (04 §4.4 c3 "mobile prefilled"); `null` if she has none */
+  readonly mobile: E164 | null;
+  /** `null` = the calendar could not be read; the picker says so and offers a retry (04 §6.2 L·E·E) */
+  readonly days: ReadonlyArray<SlotDay> | null;
+  /** the time she already picked (`slot-chosen`), or `null` */
+  readonly chosen: { readonly start: ISO; readonly end: ISO } | null;
+};
+
+/**
+ * What the S-N-02 route gets back. `isolated` is ADR-147's rule at the door: an invited nanny's hub offers
+ * neither this page nor S-N-01 until she applies, so the page itself says the same thing rather than relying
+ * on the link being hidden.
+ */
+export type NannyCommissionLoad =
+  | { readonly kind: "no-nanny" }
+  | { readonly kind: "isolated" }
+  | { readonly kind: "page"; readonly view: NannyCommissionView };
+
+export type NannyCommissionPageProps = {
+  readonly view: NannyCommissionView;
+  readonly actions: NannySlotActions;
+  readonly hubHref: string;
+  readonly addChildHref: string;
+  /** `BRAND.name` — the route reads it from `config`, the component never carries it (L4). */
+  readonly brandName: string;
+};

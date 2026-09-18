@@ -128,6 +128,9 @@ export function stubCallLayer(seed: StubCallSeed = {}): CallLayer {
             ),
         ),
       ),
+    // The stub holds no calendar (`openNannyCall` refuses), so there is never an active nanny booking to
+    // find. `null` is the honest answer, and it is the one S-N-02 renders as "pick a time".
+    findNannyBooking: async () => ok(null),
     findOpenCall: async (parentId) => {
       const open = [...calls.entries()].find(
         ([, call]) => call.parentId === parentId && call.state !== "done",

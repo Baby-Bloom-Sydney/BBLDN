@@ -6,7 +6,9 @@
 import { err, toActionResult } from "@/modules/platform";
 import type { CallErrorDetails, ChooseSlotAction, OpenCall } from "../types";
 import { callLayer } from "../lib/default-call-layer";
+import { consumeBookingLimit } from "../lib/consume-booking-limit";
 import { parentActor } from "../lib/parent-actor";
+import { refuseBooking } from "../lib/refuse-booking";
 
 const notHers = () =>
   err<CallErrorDetails>("NOT_FOUND", "No call for this position", {
@@ -34,6 +36,9 @@ const chosenTime = async (call: OpenCall) => {
 export const chooseSlotAction: ChooseSlotAction = async (input) => {
   const actor = await parentActor();
   if (!actor.ok) return toActionResult(actor);
+  // 07 §8 row 6 (`2g`): the same door as the hold — "5 reschedules / day" is this action, not another one.
+  if (!(await consumeBookingLimit(actor.value.id, "chooseSlot")))
+    return toActionResult(refuseBooking());
   const call = await callLayer.findOpenCall(actor.value.id);
   if (!call.ok) return toActionResult(call);
   if (call.value === null || call.value.positionId !== input.positionId)

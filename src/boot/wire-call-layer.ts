@@ -20,13 +20,23 @@ import {
   registerCallLayerSlice,
 } from "@/modules/call-layer";
 import { comms } from "@/modules/comms";
+import { SENDERS } from "@/modules/config/server";
 import { scheduling } from "@/modules/scheduling";
 import { dbCallMirrorStore } from "./db-call-mirror-store";
 import type { PortWiring } from "./types";
 
 export function wireCallLayer(): PortWiring {
   const store = dbCallMirrorStore(auth.data);
-  configureCallLayer(createCallLayer({ store, scheduling, comms }));
+  // S-N-02's `admin-commission-booking` (04 §4.4 c3; `08.18`) goes to the admin mailbox, which is env through
+  // `config/server` — the module may not read env and may not carry an address literal (L4), so boot hands it in.
+  configureCallLayer(
+    createCallLayer({
+      store,
+      scheduling,
+      comms,
+      adminEmail: SENDERS.admin.address,
+    }),
+  );
   registerCallLayerSlice(createCallLayerSlice({ store, scheduling }));
   return {
     port: "call-layer",

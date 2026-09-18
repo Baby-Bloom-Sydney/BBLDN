@@ -45,7 +45,6 @@ export function CallPage({
       </section>
       <div className="mt-10">
         <SlotPicker
-          positionId={view.positionId}
           days={days}
           {...(view.chosen === undefined ? {} : { chosen: view.chosen })}
           actions={actions}

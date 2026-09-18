@@ -16,6 +16,8 @@ export default async function NannyHubPage() {
       verificationHref="/nanny/onboarding-verification"
       settingsHref="/nanny/settings"
       childrenHref="/nanny/children"
+      addChildHref="/nanny/onboarding/add-child"
+      commissionHref="/nanny/commission"
     />
   );
 }

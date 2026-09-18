@@ -615,9 +615,50 @@ stay, still imported by the Sydney hub) · `src/app/parent/position/page.tsx` (*
 4. **Three copies of the hashed rate-limit key helpers now exist** (`api/_lib/ip-key.ts`, `onboarding-parent`, `onboarding-nanny`) — the M-10 shape; one `platform/rate-limit` helper then a mechanical pass, for the checkpoint.
 5. **S-N-22's line says "your family"** — `child-linking` has no nanny-keyed read for the linked family's name; 04 §8's `{family}` waits on that read.
 
+## Files created / modified in the current unit (2g — the commission pitch by hand: S-N-01 + S-N-02; L-008 Phase 2)
+
+**No migration.** `0019` already carries the whole database half of S-N-01 (`children.created_by_user_id` + its stamp trigger, `user_has_child_access()`'s fourth arm, `create_child_invite()`'s creator branch). The kickoff's debt 8 was three module edits, and they are here.
+
+**S-N-01 `/nanny/onboarding/add-child` (`03.19` Rejig) — `app/child-linking`**
+
+- `actions/add-family-child-action.ts` (new, `"use server"`) — one submit for one decision: the AGR-14 guardian tick, then the unclaimed child, then the AGR-14 record **against that child**, then the `nanny_to_parent` token. Idempotent by the mint's own rule (no rotation, 02 §4.6).
+- `components/NannyAddChildPitch.tsx` (new) · `lib/record-guardian-permission.ts` (new — `recordInformedAction`, 07 §2.8) · `lib/child-creator-of.ts` (new — who a `createChild` writes the row _for_).
+- `lib/invite-authorisation.ts` · `lib/invite-methods.ts` · `lib/child-methods.ts` — the three edits the pin named, plus `createChild`'s unclaimed branch.
+- `src/app/nanny/onboarding/add-child/page.tsx` rewritten thin; the Sydney `AddChildOnboardingClient.tsx` (414 lines, bonus copy, kill switch, direct `createAdminClient`) **deleted**.
+- Suites: `child-linking.nanny-mint.test.ts` (12) · `child-linking.add-family-child.test.ts` (7), **both RED first**; `child-linking.pins.test.ts`'s nanny-mint `it.fails` **flipped**; `child-linking.inside.test.ts`'s "refuses a nanny" claim **re-argued to 04 §4.4 c1** (ADR-120 rule 2 — it encoded the code's limitation, never the document's rule) and joined by a new one for the admin with nobody named.
+
+**S-N-02 `/nanny/commission` (`03.37` NEW) — `call-layer` + `onboarding-nanny`**
+
+- `call-layer/actions/{list-nanny-slots-action,book-nanny-call-action}.ts` (new) · `lib/nanny-actor.ts` · `lib/consume-booking-limit.ts` · `lib/refuse-booking.ts` · `lib/send-nanny-call-messages.ts` (all new).
+- `call-layer/lib/create-call-layer.ts` — `openNannyCall` now sends both messages 03 §2.7 names; `findNannyBooking` added (connector extension, raised like `1d`'s `findOpenCall`). `types.ts` · `index.ts` · `call-layer.stub.ts` · the registry · `default-call-layer.ts` follow.
+- `components/SlotPicker.tsx` — `SlotActions` became a **tagged union** so S-P-02 is reused on S-N-02 rather than forked (04 §6.2); four parent-voiced sentences became props with defaults. `CallPage.tsx` and `src/app/parent/call/page.tsx` follow.
+- `actions/{hold-slot-action,choose-slot-action}.ts` — both now consume 07 §8 row 6 (`bookingHolds`), as does the nanny's write; `scripts/ci/limiter-call-sites.allow.json` loses its `bookingHolds` entry (it had outlived its reason — `1d` shipped two of those three callers).
+- `src/boot/wire-call-layer.ts` — `adminEmail` from `SENDERS.admin` (L4: the module carries no address and reads no env).
+- `onboarding-nanny/lib/load-commission-page.ts` (new) · `components/NannyCommissionPage.tsx` (new) · `components/NannyHub.tsx` (the two pitch links, hidden from an isolated nanny) · `types.ts` · `index.ts` · `src/app/nanny/{commission/page.tsx,page.tsx}`.
+- Suites: `call-layer.nanny-commission.test.ts` (11, **RED first**) · `call-layer.nanny-picker.test.tsx` (4, written after the generalisation to assert the reuse) · `onboarding-nanny.commission.test.tsx` (13, **RED first**) · `call-layer.screens.test.tsx` + `call-layer.swap.test.ts` + `app-gate.test.ts` re-shaped to the new prop / connector types.
+
+**Design decisions worth carrying**
+
+1. **The nanny's form never holds a slot, and that is the contract rather than a shortcut.** 03 §3.2 lists it among the callers that reach `book` with no hold. The parent holds because she is choosing between people's time on a page she may sit on; a hold the nanny cannot see expiring is worse than a `SLOT_TAKEN` she can act on.
+2. **The nanny is the session and there is nothing to check.** S-P-02's actions check `positionId` against the caller's own open call because a position id is forgeable; 03 §3.2's `Subject` for a `nanny-commission` booking _is_ the nanny, so taking it from the session is the whole authorisation and no shape exists in which a caller books somebody else's call.
+3. **The picker's actions are a tagged union, not an optional `hold`.** "This surface might hold" is not what either surface does; the tag says which one this is and the component cannot call the wrong road.
+4. **`createChild`'s unclaimed branch moves neither the trial nor the access window.** ADR-093 ties the trial to a family's first child and ADR-083 / 084 tie the window to a family's youngest — a child with `parent_user_id is null` has no family, so both move at the claim, inside `claimInvite`, where they already did.
+5. **`mayMint` and `create_child_invite()` now say the same sentence in two languages**, creator arm included, `parent_user_id is null` clause included. A divergence in either direction is the finding that matters on this surface, so the module test and `int.rpc-0019` assert the same four cases.
+
+**What the next unit must know**
+
+1. **03 §9.3 has no event name for "a nanny added an unclaimed child"**, and the taxonomy is append-only. `2g` emits none rather than borrowing `app.family-in` (whose subject is a parent who does not exist yet); the observable fact is the `invite.sent` one line later. **Question for the planner**, recorded in `app`'s README.
+2. **S-N-01's active / passive variant is not built.** 04 §4.1 row 8 drives it from the under-3 signal, which lives on `nanny_leads.lead_signals`; `nannyAccountStore.get()` does not answer it, so the pitch renders the active wording for everyone. Owner: whoever next widens that read (`2d`), or 04 §4.1 row 8 if the variant is dropped.
+3. **`admin_notifications` still has no writer.** 04 §4.4 c3's admin notification is the **email** (`admin-commission-booking`, `08.18`) and it is sent; the _row_ AC-A-41 also asks for has no owning module (01 §2.3 names none), which is the same gap `payments` pinned for `payment_due`. One connector closes both.
+4. **S-N-02 is gated at the door as well as at the link.** `loadCommissionPage` answers `isolated` and the route sends her to the hub, so hiding the hub link is not the only thing standing between an invited nanny and the pitch (ADR-147). S-N-01 is **not** gated that way: the mint is hers from Settings → Linked children too (04 §4.4 c1 names S-N-21), and isolation is about the matching pool, not about the family she already has.
+
 ## Next unit
 
 **`2b` is built (PR open, not merged); `2c` is next** — the status model, the silent hold, the admin verification queue (S-A-16) and the verification comms (+ `08.43` scheduled). **What `2c` must know:** (1) **the level has no writer** — `deriveLevel` → `syncNannyVerificationState` (the single writer of `nannies.verification_level` / `suspended_at`) reads `VETTING.requiredChecksByLevel` (right-to-work is in no level's list, ADR-153) and the section statuses `verification.getStatus` answers; nothing in `0022` writes `level`, `dbs_outcome`, the cross-check or the sweep-owned Update Service columns, and its verify block asserts that. (2) **The queue's reads exist:** `listSubmissions({ status: "needs-admin" })` (nanny, section, evidence type, submitted at), `readSubmission(id)`, `verification.getStatus(nannyId)` (the view answers an admin). (3) **The decision write exists** — `apply_vetting_check_result()` (`service_role`; status + reason + guidance key + expiry + `checked_by = 'admin'`); the admin road refuses by name until `2c` builds it (`verification.override` → `not-built`; the boot adapter's `recordDecision` → `decision-not-built`; `stub-manual.record` and the memory world already carry the shape). (4) Evidence opens are `auth.data.signUrl` (1 h) and must emit `vetting.evidence-viewed` (07 §4.32). (5) Named jobs still to write: the stale-`processing` sweep (I-V4) and `vetting-expiry`. (6) `2d` (Opus) can run beside `2c`: S-N-17 (the profile edit, the photo), the positions board, the nanny's name on parent surfaces (debt 2). (7) **Preview:** `0021` and `0022` are NOT on `bb-ldn-preview`; the eight commands for BAI are in the L-008 `2b` entry.
+
+**`2g` is also built (S-N-01 + S-N-02, no migration), on its own branch off `fc573cb`, with `2b`'s `main` merged down.** The two overlapped only additively — `onboarding-nanny/index.ts` (one export each way) and one key each out of `limiter-call-sites.allow.json`; both edits are kept on this branch. `2c` waits on `2b`; `2d` (Opus) can run beside it and owns the three reads this unit and `2a` both named: the nanny's name on parent surfaces (debt 2), the positions board, and the widened account read S-N-01's variant needs.
+
+Earlier, still true: **`2b` starts with §4.1's ruling** (kickoff §4.1: right-to-work as a level gate or a parallel section — 04 §10 item 22 and B-20 both carry "parallel section" as the default; rule it by 03 §4's connector shape, record the ADR, amend 04 §4 / 03 §4.2 one line each, then build the wizard behind `vetting-providers` / `stub-manual`). `2c` waits on `2b`; `2d` (Opus) can run beside `2b` — it owns S-N-17 (the profile edit, the photo) and the positions board, both named as this unit's gaps.
 
 **Superseded — `2a`'s "next unit" text:** `2a` is built; `2b` is next, and it starts with §4.1's ruling (done — ADR-153).
 
@@ -736,7 +777,12 @@ Twelve units merged with **no review battery** (1a, 1b, 1c, 1d, 1e, 1g, P1-FIX, 
 **Gates** — all local (B-42): `typecheck` · `lint` · `prettier --check .` · `vitest run` · `lint:boundaries` · `check:allowed-imports` · `check:config-literals` · `check:claude-md` · `check:boot-guard` (6/6) · `npm run build` — **all 0**. ★ **`build` and `check:boot-guard` need `scripts/ci/lib/smoke-env.sh` sourced**: a bare `npm run build` fails at page-data collection because the legacy Sydney `/api/verification-status` route constructs a Resend client at module scope, and boot-guard's two positive controls then fail for want of a complete `.next`. That is REVIEW-1's H-4 still open, and it is why `main` can look build-red when it is not.
 
 <!-- audit
-Last edited: 2026-09-18T05:10+10:00 — BB-LDN-Planner-070926/S5e
+Last edited: 2026-09-18T16:45+10:00 — BB-LDN-Planner-070926/2g
+Notes: 2g — one new files section (S-N-01 + S-N-02, no migration), five design decisions, four notes for the next
+unit, and the Next-unit paragraph rewritten to say what 2g leaves and what 2d owns. **Current state's Trunk /
+Open-branches / Phase rows deliberately NOT edited:** they are another unit's hot rows and 2b is open in parallel;
+BRANCHES.md carries this unit's row and PROGRESS.md carries its state.
+Prior: 2026-09-18T05:10+10:00 — BB-LDN-Planner-070926/S5e
 Notes: S5e — the Database row carries `0020` (ADR-146: `parent_leads.email`; `apply_payment_event()`'s fourth
 outcome `ignored`). One row edited; nothing else in this ledger touched. No CHANGELOG row: that is the merging
 agent's (CLAUDE.md §9) and this unit merges nothing.

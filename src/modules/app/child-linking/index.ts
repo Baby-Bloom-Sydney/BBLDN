@@ -19,6 +19,7 @@ export { inviteAuthorisation } from "./lib/invite-authorisation";
 // The screens of 04 §6.1 / §6.2 and their server reads + actions (05 §7 rule 5 — route files stay thin).
 export { InviteLandingPage } from "./components/InviteLandingPage";
 export { ChildrenCard } from "./components/ChildrenCard";
+export { NannyAddChildPitch } from "./components/NannyAddChildPitch";
 export { AppGateNotice } from "./components/AppGateNotice";
 export { loadInviteLanding } from "./lib/load-invite-landing";
 export { loadChildrenCard } from "./lib/load-children-card";
@@ -29,6 +30,7 @@ export { claimInviteAction } from "./actions/claim-invite-action";
 export { startInviteSignupAction } from "./actions/start-invite-signup-action";
 export { createChildAction } from "./actions/create-child-action";
 export { createChildInviteAction } from "./actions/create-child-invite-action";
+export { addFamilyChildAction } from "./actions/add-family-child-action";
 export { revokeChildInviteAction } from "./actions/revoke-child-invite-action";
 
 export type { AccessFacts, AppAccessView } from "./lib/app-access-view";

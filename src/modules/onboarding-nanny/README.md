@@ -45,8 +45,8 @@ reads or writes the level.
 3. **The positions board on S-N-11 is `2d`'s** (`07.29`; ADR-148 (3)); the hub's `open` state says so.
 4. **S-N-22's line says "your family"** — `child-linking` has no nanny-keyed read for the linked family's name
    (`loadChildrenCard` answers only a parent); 04 §8's "{family}" waits on that read (`2d` / Phase 5). Draft ☐ (B-25).
-5. **The nanny-mint pin** (`app/__tests__/child-linking.pins.test.ts`) stays RED and named: S-N-01 (the mint
-   surface) is `2g`'s, so `2a` did not own it.
+5. ~~**The nanny-mint pin**~~ — **closed by `2g`**: S-N-01 is built in `app/child-linking` and the pin is
+   flipped by behaviour (see that module's README).
 6. `start-invite-signup-action.ts` (`app`) sets the invite cookie by hand rather than through `carriedTokenCookie` —
    01 §2.3 gives `app` no arrow to `onboarding-nanny`; the helper belongs in `platform` when a third caller appears.
 7. The N1 capture's "has-account" branch returns after one query where the write branches run two — a timing
@@ -54,8 +54,22 @@ reads or writes the level.
 8. Three copies of the hashed rate-limit key helpers now exist (`api/_lib/ip-key.ts`, `onboarding-parent`, here) —
    the M-10 shape; one `platform/rate-limit` helper then a mechanical pass, for the checkpoint.
 
+**S-N-02 (`2g`; `03.37` NEW; 04 §4.4 c2 / c3).** `/nanny/commission` is `loadCommissionPage` + `NannyCommissionPage`:
+the explainer (no figure — D0.2; no ledger, no payout, no bonus — N-2 / ADR-099) and the book-a-call section on
+the same page. The calendar is reached **only** through `call-layer` (`listSlots` / `openNannyCall`, R3) and the
+picker is `call-layer`'s S-P-02 reused, not forked (04 §6.2). The hub (S-N-11) gained the two links to S-N-01 and
+S-N-02; an isolated nanny (S-N-22) sees neither, and `loadCommissionPage` answers `isolated` so the page says the
+same thing the hidden link does (ADR-147).
+
+**Gap 9 (recorded).** 04 §4.1 row 8 gives S-N-01 an **active / passive variant from the under-3 signal**. The
+signal is captured on `nanny_leads.lead_signals` and `nannyAccountStore.get()` does not answer it, so the pitch
+renders the active wording for everyone. Owner: whoever next widens the account read (`2d`), or 04 §4.1 row 8 if
+the variant is dropped.
+
 <!-- audit
-Last edited: 2026-09-18T09:40+10:00 — BB-LDN-Planner-070926/2a
+Last edited: 2026-09-18T16:20+10:00 — BB-LDN-Planner-070926/2g
+Notes: S-N-02 built (L-008 2g) — the explainer + book-a-call section over call-layer, the hub's two pitch links, gap 5 closed by 2g, gap 9 (the under-3 variant) recorded.
+Prior: 2026-09-18T09:40+10:00 — BB-LDN-Planner-070926/2a
 Notes: the inside built (L-008 2a): funnel + signup + profile + hub + portal; stores, adapters, service-role uses named; gaps 1–6.
 Prior: 2026-09-16T13:55+10:00 — BB-LDN-Planner-070926/F-b
 Notes: created at F-b — folder shape + the two stated types; the funnel waits on 04 §4. The "never scheduling" rule is stated here because it is the arrow most likely to be re-added by hand.

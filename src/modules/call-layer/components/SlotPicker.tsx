@@ -5,17 +5,28 @@
 // Tap = hold; the button = the write. A taken slot or a run-out hold says so in an assertive region that takes
 // focus, and she picks again (fix: a11y-1). The actions are props so this client bundle never reaches a
 // connector barrel (01 §2.5).
+//
+// **Reused on S-N-02, not forked (`2g`; 04 §6.2 "component, reused on S-N-02 / S-N-13 / S-N-14 / S-A-04").**
+// What differs between a parent's call and a nanny's commission call is exactly two things, and both are in
+// `SlotActions`: the nanny's form carries no `positionId` (03 §3.2's subject for her kind *is* the nanny) and
+// it **does not hold** — 03 §3.2 lists the nanny's form among the callers that write a slot with no hold. So
+// the tag decides which road a tap takes, and no surface can accidentally call the other one. The four
+// sentences that are parent-voiced are props carrying parent-voiced defaults.
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { HoldId, ISO, SlotId } from "@/modules/shared-types";
-import type { SlotDay, SlotPickerProps } from "../types";
+import type { SlotActions, SlotDay, SlotPickerProps } from "../types";
 import { londonSlotWords } from "../lib/london-slot-words";
 
 const GONE = "That time has just gone — pick another.";
 const RAN_OUT = "Your hold ran out — pick again.";
 const NOT_SET = "We couldn't set that time — try again.";
-const NONE = "No times to pick right now — your matchmaker will call you.";
-const LOAD_FAILED =
-  "We couldn't load the times — your matchmaker will still call you.";
+const DEFAULT_COPY = Object.freeze({
+  heading: "Pick a time for your call",
+  noSlotsLine: "No times to pick right now — your matchmaker will call you.",
+  loadFailedLine:
+    "We couldn't load the times — your matchmaker will still call you.",
+  backLabel: "Back to your steps",
+});
 
 const option =
   "cursor-pointer select-none rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 transition-colors peer-checked:border-violet-500 peer-checked:bg-violet-50 peer-checked:text-violet-700 peer-focus-visible:ring-2 peer-focus-visible:ring-violet-500 peer-focus-visible:ring-offset-2 peer-disabled:cursor-not-allowed peer-disabled:opacity-40 hover:border-slate-300";
@@ -90,10 +101,12 @@ function ChosenLine({
   start,
   onChange,
   dashboardHref,
+  backLabel,
 }: {
   readonly start: ISO;
   readonly onChange: () => void;
   readonly dashboardHref: string;
+  readonly backLabel: string;
 }) {
   const words = londonSlotWords(start);
   return (
@@ -107,20 +120,35 @@ function ChosenLine({
           Change time
         </button>
         <a href={dashboardHref} className={quiet}>
-          Back to your steps
+          {backLabel}
         </a>
       </div>
     </div>
   );
 }
 
+/** The tap: a hold on a position call, nothing but a selection on the nanny's form (03 §3.2). */
+const holdFor = async (actions: SlotActions, slotId: SlotId) =>
+  actions.subject === "position"
+    ? actions.hold(slotId, actions.positionId)
+    : null;
+
+const chooseWith = async (
+  actions: SlotActions,
+  picked: { readonly slotId: SlotId; readonly holdId?: HoldId },
+) =>
+  actions.subject === "position"
+    ? actions.choose({ positionId: actions.positionId, ...picked })
+    : actions.choose(picked);
+
 export function SlotPicker({
-  positionId,
   days: initialDays,
   chosen,
   actions,
   dashboardHref,
+  copy,
 }: SlotPickerProps) {
+  const words = { ...DEFAULT_COPY, ...copy };
   const [days, setDays] = useState<ReadonlyArray<SlotDay> | null>(initialDays);
   const [picked, setPicked] = useState<Picked | null>(null);
   const [gone, setGone] = useState<ReadonlySet<SlotId>>(() => new Set());
@@ -144,14 +172,15 @@ export function SlotPicker({
       return;
     }
     setDays(null);
-    setMessage(LOAD_FAILED);
-  }, [actions]);
+    setMessage(words.loadFailedLine);
+  }, [actions, words.loadFailedLine]);
 
   const pick = useCallback(
     async (slotId: SlotId) => {
       setMessage(null);
       setPicked({ slotId });
-      const held = await actions.hold(slotId, positionId);
+      const held = await holdFor(actions, slotId);
+      if (held === null) return;
       if (held.ok) {
         setPicked({ slotId, holdId: held.value.holdId });
         return;
@@ -160,13 +189,13 @@ export function SlotPicker({
       setGone((previous) => new Set([...previous, slotId]));
       setMessage(messageFor(held.error.details?.reason));
     },
-    [actions, positionId],
+    [actions],
   );
 
   const confirm = useCallback(async () => {
     if (picked === null) return;
     setBusy(true);
-    const result = await actions.choose({ positionId, ...picked });
+    const result = await chooseWith(actions, picked);
     setBusy(false);
     if (result.ok) {
       setDone(result.value.start);
@@ -179,7 +208,7 @@ export function SlotPicker({
       setGone((previous) => new Set([...previous, picked.slotId]));
     setPicked(null);
     setMessage(messageFor(reason));
-  }, [actions, picked, positionId]);
+  }, [actions, picked]);
 
   const standing = done ?? chosen?.start ?? null;
   if (standing !== null && !changing)
@@ -194,6 +223,7 @@ export function SlotPicker({
           start={standing}
           onChange={() => setChanging(true)}
           dashboardHref={dashboardHref}
+          backLabel={words.backLabel}
         />
       </div>
     );
@@ -204,7 +234,7 @@ export function SlotPicker({
         id="slot-picker-heading"
         className="text-lg font-semibold text-slate-900"
       >
-        Pick a time for your call
+        {words.heading}
       </h2>
       <p className="mt-1 text-sm text-slate-600">
         All times are London time. Tap a time to hold it, then confirm below.
@@ -222,7 +252,7 @@ export function SlotPicker({
       {days === null || days.length === 0 ? (
         <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5">
           <p className="text-sm text-slate-700">
-            {days === null ? LOAD_FAILED : NONE}
+            {days === null ? words.loadFailedLine : words.noSlotsLine}
           </p>
           <button
             type="button"

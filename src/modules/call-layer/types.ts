@@ -140,6 +140,16 @@ export type CallLayer = {
   readonly findOpenCall: (
     parentId: UserId,
   ) => Promise<CallLayerResult<OpenCall | null>>;
+  /**
+   * Connector extension (`2g`), the nanny's half of `findOpenCall` and raised for ratification the same way.
+   * S-N-02 must answer "have I already picked a time?" before it renders anything, and 03 §2.7's `getCallState`
+   * cannot: a `nanny-call` ref is keyed by `bookingId`, which is the very thing the page does not know. It is
+   * `scheduling.listForSubject({ kind: 'nanny' })` narrowed to the one **active** row I-10 allows, so a
+   * `done` / `no-answer` / `cancelled` row reads as `null` and she books afresh (R5).
+   */
+  readonly findNannyBooking: (
+    nannyId: UserId,
+  ) => Promise<CallLayerResult<Booking | null>>;
 };
 
 /** The C-row handlers this module registers with the stage model at boot (03 §2.1). */
@@ -200,6 +210,12 @@ export type CallLayerDeps = {
   readonly scheduling: Scheduling;
   readonly comms: Comms;
   readonly clock?: () => ISO;
+  /**
+   * Where `admin-commission-booking` goes (04 §4.4 c3; `08.18`). It is an address rather than a user id
+   * because the admin mailbox is `SENDERS.admin`, which comes from env through `config/server` — boot hands it
+   * in (L4: no literal here, and this module never reads env). Absent = the notice is logged, never invented.
+   */
+  readonly adminEmail?: string;
 };
 
 // ── Payloads the C rows carry (03 §2.4 "Preconditions / Side effects") ──
@@ -281,26 +297,67 @@ export type ListSlotsAction = () => Promise<
   ClientResult<ReadonlyArray<SlotDay>>
 >;
 
-export type SlotActions = {
-  readonly hold: HoldSlotAction;
-  readonly choose: ChooseSlotAction;
-  readonly list: ListSlotsAction;
+/**
+ * S-N-02's write (`2g`; 03 §2.7 `openNannyCall`). It takes no subject: 03 §3.2's subject for a
+ * `nanny-commission` booking **is** the nanny, so the action reads her from the session and a caller has
+ * nothing to supply but the slot. `holdId` exists for symmetry with `book`'s signature and is never sent by
+ * the form — 03 §3.2 puts the nanny's form among the callers that never hold.
+ */
+export type BookNannyCallAction = (input: {
+  readonly slotId: SlotId;
+  readonly holdId?: HoldId;
+}) => Promise<ClientResult<{ readonly start: ISO; readonly end: ISO }>>;
+
+/**
+ * Who the picker is picking for, and therefore what it may call (`2g` — S-P-02 is reused on S-N-02 rather
+ * than forked; 04 §6.2 "component, reused on S-N-02 / S-N-13 / S-N-14 / S-A-04").
+ *
+ * The union is the difference between the two surfaces, and both halves of it are the contract's:
+ *   - a **position** call carries its `positionId` to every call, because the parent's actions check it
+ *     against her own open call, and it **holds** on tap (04 §3.1 step 9 "tap = 5-minute hold");
+ *   - a **nanny** call carries nothing and does **not** hold — 03 §3.2 names the nanny's form among the
+ *     callers that book without holding.
+ *
+ * Making `hold` optional on one flat object would have said "this surface might hold", which is not what
+ * either surface does; a tagged union says which one this is and the component cannot call the wrong road.
+ */
+export type SlotActions =
+  | {
+      readonly subject: "position";
+      readonly positionId: PositionId;
+      readonly hold: HoldSlotAction;
+      readonly choose: ChooseSlotAction;
+      readonly list: ListSlotsAction;
+    }
+  | {
+      readonly subject: "nanny";
+      readonly choose: BookNannyCallAction;
+      readonly list: ListSlotsAction;
+    };
+
+/** The words that differ between the two surfaces. Every one has a parent-voiced default (04 §8). */
+export type SlotPickerCopy = {
+  readonly heading?: string;
+  /** shown when the calendar is empty, and again when the read failed */
+  readonly noSlotsLine?: string;
+  readonly loadFailedLine?: string;
+  readonly backLabel?: string;
 };
 
 export type SlotPickerProps = {
-  readonly positionId: PositionId;
   /** `null` = the first load failed; the picker shows the error + retry (04 §6.2 S-P-02 L·E·E) */
   readonly days: ReadonlyArray<SlotDay> | null;
   /** the time already chosen (`slot-chosen`): shown with "Change time", the days folded away */
   readonly chosen?: { readonly start: ISO; readonly end: ISO };
   readonly actions: SlotActions;
   readonly dashboardHref: string;
+  readonly copy?: SlotPickerCopy;
 };
 
 export type CallPageProps = {
   readonly view: CallPageView;
   readonly days: ReadonlyArray<SlotDay> | null;
-  readonly actions: SlotActions;
+  readonly actions: Extract<SlotActions, { readonly subject: "position" }>;
   readonly dashboardHref: string;
 };
 

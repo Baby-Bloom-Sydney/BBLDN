@@ -191,3 +191,23 @@ export type ChildLinkingLookups = {
 export type ChildLinking = ChildLinkingReads &
   ChildLinkingWrites &
   ChildLinkingLookups;
+
+// ── S-N-01 (`2g`) — the nanny's "add a family you already work for" surface ──
+
+/**
+ * `addFamilyChildAction`'s one state. `url` is the link she copies and passes to that family; `error` is the
+ * one line the form shows. Never both: a mint either happened or it did not (04 §6.3 S-N-01's two states).
+ */
+export type AddFamilyChildState = {
+  readonly url: string | null;
+  readonly error: string | null;
+};
+
+/** S-N-01's props. Every href is a prop and the pitch links on to S-N-02 (04 §4.4 c1 → c2). */
+export type NannyAddChildPitchProps = {
+  readonly commissionHref: string;
+  readonly skipHref: string;
+  readonly skipLabel: string;
+  /** `BRAND.name` — the route reads it from `config`, this file never carries it (L4). */
+  readonly brandName: string;
+};

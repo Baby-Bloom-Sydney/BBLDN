@@ -24,6 +24,11 @@ export { saveNannyProfileStepAction } from "./actions/save-nanny-profile-step-ac
 
 // Server reads the route files call (05 §7 rule 5) and the pure pieces other units may read.
 export { loadNannyHub } from "./lib/load-nanny-hub";
+// The hub's pure view (S-N-11 / S-N-22), so a caller can render a state without a session behind it.
+export { nannyHubView } from "./lib/nanny-hub-view";
+// S-N-02 (`03.37`): the explainer + the book-a-call section, and its one server read.
+export { loadCommissionPage } from "./lib/load-commission-page";
+export { NannyCommissionPage } from "./components/NannyCommissionPage";
 export { loadNannyProfile } from "./lib/load-nanny-profile";
 export { carriedTokenCookie } from "./lib/carried-token-cookie";
 export { isNannyProfileComplete } from "./lib/is-nanny-profile-complete";

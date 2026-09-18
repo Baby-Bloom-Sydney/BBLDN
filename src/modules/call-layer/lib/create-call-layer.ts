@@ -7,6 +7,7 @@
 // transaction until the mirror store lives inside the RPC opener (P1-WIRE, ADR-127; recorded).
 import { advance } from "@/modules/positions";
 import { Events, err, nowInstant, ok } from "@/modules/platform";
+import { ACTIVE_STATUSES } from "@/modules/shared-types";
 import type {
   Actor,
   Booking,
@@ -15,6 +16,7 @@ import type {
   PositionId,
   Result,
   StateAfter,
+  UserId,
 } from "@/modules/shared-types";
 import type {
   CallErrorDetails,
@@ -28,6 +30,7 @@ import type {
 } from "../types";
 import { deriveNannyCallState } from "./derive-nanny-call-state";
 import { sendCallMessages } from "./call-messages";
+import { sendNannyCallMessages } from "./send-nanny-call-messages";
 import { schedulingError } from "./scheduling-error";
 
 const notFound = (which: string) =>
@@ -232,7 +235,30 @@ async function openNannyCall(
   };
   await Events.emit({ ...shared, name: "call.requested" });
   await Events.emit({ ...shared, name: "call.slot-chosen" });
+  await sendNannyCallMessages({
+    comms: deps.comms,
+    nannyId: input.nannyId,
+    booking,
+    ...(deps.adminEmail === undefined ? {} : { adminEmail: deps.adminEmail }),
+  });
   return ok(booking);
+}
+
+/**
+ * Connector extension (`2g`): the nanny's one **active** booking, or `null`. I-10 allows at most one, so the
+ * narrowing is the invariant rather than a choice — and a `done` / `no-answer` / `cancelled` row reading as
+ * `null` is what lets S-N-02 offer her the calendar again after a no-answer (R5).
+ */
+async function findNannyBooking(
+  deps: CallLayerDeps,
+  nannyId: UserId,
+): Promise<CallLayerResult<Booking | null>> {
+  const rows = await deps.scheduling.listForSubject({ kind: "nanny", nannyId });
+  if (!rows.ok) return schedulingError(rows.error);
+  const active = rows.value.find((row) =>
+    (ACTIVE_STATUSES as ReadonlyArray<string>).includes(row.status),
+  );
+  return ok(active ?? null);
 }
 
 async function nannyOutcome(
@@ -399,6 +425,7 @@ export function createCallLayer(deps: CallLayerDeps): CallLayer {
         : positionOutcome(deps, ref.positionId, outcome, notes, actor),
     getCallState: (ref) => getCallState(deps, ref),
     findOpenCall: (parentId) => findOpenCall(deps, parentId),
+    findNannyBooking: (nannyId) => findNannyBooking(deps, nannyId),
     listOpenCalls: (): ReturnType<CallLayer["listOpenCalls"]> =>
       listOpenCalls(deps),
   });

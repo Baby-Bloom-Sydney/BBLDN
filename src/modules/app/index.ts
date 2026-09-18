@@ -22,6 +22,7 @@ export {
   inviteAuthorisation,
   InviteLandingPage,
   ChildrenCard,
+  NannyAddChildPitch,
   AppGateNotice,
   loadInviteLanding,
   loadChildrenCard,
@@ -32,6 +33,7 @@ export {
   startInviteSignupAction,
   createChildAction,
   createChildInviteAction,
+  addFamilyChildAction,
   revokeChildInviteAction,
 } from "./child-linking";
 // The two gate consumers (`07.09`, `07.59`). Both are pure and three-valued — a closed app and an app we

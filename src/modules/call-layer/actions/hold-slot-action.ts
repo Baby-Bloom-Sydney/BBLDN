@@ -15,6 +15,8 @@
 import { callLayer } from "../lib/default-call-layer";
 import { scheduling } from "@/modules/scheduling";
 import { err, toActionResult } from "@/modules/platform";
+import { consumeBookingLimit } from "../lib/consume-booking-limit";
+import { refuseBooking } from "../lib/refuse-booking";
 import type { PositionId, SlotId } from "@/modules/shared-types";
 import type { HoldSlotAction } from "../types";
 import { parentActor } from "../lib/parent-actor";
@@ -30,6 +32,10 @@ export const holdSlotAction: HoldSlotAction = async (
 ) => {
   const actor = await parentActor();
   if (!actor.ok) return toActionResult(actor);
+  // 07 §8 row 6 (`2g`): a hold is a calendar write, and I-1 bounds how many rows survive a loop rather than how
+  // many attempts are made. Fails closed — `bookingHolds` is not on the fail-open list (ADR-134).
+  if (!(await consumeBookingLimit(actor.value.id, "holdSlot")))
+    return toActionResult(refuseBooking());
   const open = await callLayer.findOpenCall(actor.value.id);
   if (!open.ok) return toActionResult(open);
   if (open.value === null || open.value.positionId !== positionId)

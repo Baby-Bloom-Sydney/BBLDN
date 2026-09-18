@@ -109,6 +109,7 @@ describe("the security review's closed findings (H1 · M1 · M3)", () => {
     expect(
       inviteAuthorisation.mayMint(bare, "parent_to_nanny", {
         parentUserId: null,
+        createdByUserId: null,
         linkedNannyUserIds: [],
       }),
     ).toBe(false);
@@ -116,6 +117,7 @@ describe("the security review's closed findings (H1 · M1 · M3)", () => {
     expect(
       inviteAuthorisation.mayMint(named, "parent_to_nanny", {
         parentUserId: "p1" as never,
+        createdByUserId: null,
         linkedNannyUserIds: [],
       }),
     ).toBe(true);
