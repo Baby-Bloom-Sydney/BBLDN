@@ -274,6 +274,10 @@ export function fakeSchemaPort(
     },
     signUrl: async () =>
       err("INTERNAL", "signUrl is not exercised by these specs"),
+    putObject: async () =>
+      err("INTERNAL", "putObject is not exercised by these specs"),
+    removeObject: async () =>
+      err("INTERNAL", "removeObject is not exercised by these specs"),
   };
 
   return {

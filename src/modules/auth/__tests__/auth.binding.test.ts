@@ -38,6 +38,8 @@ const spyingAuth = () => {
     data: {
       run: wrap("data.run", inner.data.run),
       signUrl: wrap("data.signUrl", inner.data.signUrl),
+      putObject: wrap("data.putObject", inner.data.putObject),
+      removeObject: wrap("data.removeObject", inner.data.removeObject),
     },
   } as unknown as Auth<AppDatabase>;
   return { spied, calls };
@@ -74,6 +76,15 @@ describe("the `auth` binding delegates every method", () => {
       { bucket: "profile-pictures", path: "parent/u/a.png" },
       60,
     );
+    await auth.data.putObject(
+      { bucket: "profile-pictures", path: "parent/u/a.png" },
+      new Uint8Array([1]),
+      { contentType: "image/png" },
+    );
+    await auth.data.removeObject({
+      bucket: "profile-pictures",
+      path: "parent/u/a.png",
+    });
 
     expect(calls.map((c) => c.split("(")[0])).toEqual([
       "getSession",
@@ -89,6 +100,8 @@ describe("the `auth` binding delegates every method", () => {
       "signOut",
       "data.run",
       "data.signUrl",
+      "data.putObject",
+      "data.removeObject",
     ]);
     expect(calls.find((c) => c.startsWith("requireRole"))).toContain("parent");
   });

@@ -32,6 +32,9 @@ export { PROFILE_STEPS } from "./lib/profile-steps";
 
 // Screens.
 export { NannyEntryContent } from "./components/NannyEntryContent";
+// The area picker, for S-N-04's slot in the verification wizard (`2b`): 01 §2.3 gives `verification` no arrow
+// here, so the route composes it.
+export { DistrictCombobox } from "./components/funnel/DistrictCombobox";
 export { NannyApplyFunnel } from "./components/NannyApplyFunnel";
 export { NannySignupForm } from "./components/NannySignupForm";
 export { NannyHub } from "./components/NannyHub";

@@ -139,6 +139,9 @@ export function memoryAuthDriver(
     rpc: async () => undefined,
   });
 
+  // The stub's object store (ADR-155): bucket/path → byte count.
+  const objects = new Map<string, number>();
+
   return Object.freeze({
     currentUser: async () => {
       const user = find(state.signedInUserId);
@@ -197,5 +200,16 @@ export function memoryAuthDriver(
     query,
     createSignedUrl: async (ref: StorageRef, ttlSeconds: number) =>
       `https://stub.storage.test/${ref.bucket}/${ref.path}?ttl=${ttlSeconds}`,
+    // ADR-155: the stub keeps the objects it is handed, so a write through the port is observable back through
+    // the port (a signed URL for a path that was never written is refused, as the real store would). Bytes are
+    // not kept — only that they were.
+    putObject: async (ref: StorageRef, body: Uint8Array) => {
+      if (body.byteLength === 0) throw new Error("empty object");
+      objects.set(`${ref.bucket}/${ref.path}`, body.byteLength);
+    },
+    removeObject: async (ref: StorageRef) => {
+      if (!objects.delete(`${ref.bucket}/${ref.path}`))
+        throw new Error("no such object");
+    },
   });
 }

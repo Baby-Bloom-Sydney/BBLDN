@@ -838,3 +838,103 @@ describe("db.constraints — what 0021 added (the nanny side's three definers; A
     expect(rows[0]?.kept).toEqual({ bio: "x" });
   });
 });
+
+describe("db.constraints — what 0022 added (the wizard's four definers + the ledger's idempotency key; ADR-154)", () => {
+  const SESSION_ROADS = [
+    "submit_verification_evidence",
+    "save_verification_contact",
+    "claim_verification_processing",
+  ] as const;
+
+  const oneFunction = async (name: string) => {
+    const { rows } = await db.query<{
+      secdef: boolean;
+      config: string | null;
+      anon: boolean;
+      auth: boolean;
+      service: boolean;
+    }>(
+      `select p.prosecdef as secdef, array_to_string(p.proconfig, ',') as config,
+              has_function_privilege('anon', p.oid, 'execute') as anon,
+              has_function_privilege('authenticated', p.oid, 'execute') as auth,
+              has_function_privilege('service_role', p.oid, 'execute') as service
+         from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+        where ns.nspname = 'public' and p.proname = $1`,
+      [name],
+    );
+    expect(rows.length, `${name} overload count`).toBe(1);
+    return rows[0]!;
+  };
+
+  // The three wizard writes act for auth.uid() — the authority is the session (0021's split).
+  it("the three wizard writes exist once, SECURITY DEFINER, search_path pinned, executable by authenticated and not by anon", async () => {
+    for (const name of SESSION_ROADS) {
+      const fn = await oneFunction(name);
+      expect(fn.secdef, `${name} SECURITY DEFINER`).toBe(true);
+      expect(fn.config, `${name} search_path`).toContain('search_path=""');
+      expect(fn.anon, `${name} anon`).toBe(false);
+      expect(fn.auth, `${name} authenticated`).toBe(true);
+    }
+  });
+
+  // The provider-side write moves a section on a check the nanny did not make (I-V2): service_role only.
+  it("apply_vetting_check_result exists once, SECURITY DEFINER, and only service_role may execute it", async () => {
+    const fn = await oneFunction("apply_vetting_check_result");
+    expect(fn.secdef).toBe(true);
+    expect(fn.config).toContain('search_path=""');
+    expect(fn.anon).toBe(false);
+    expect(fn.auth).toBe(false);
+    expect(fn.service).toBe(true);
+  });
+
+  it("vetting_submissions.evidence_id is NOT NULL and unique (03 §4.2's idempotency key)", async () => {
+    const { rows } = await db.query<{ is_nullable: string }>(
+      `select is_nullable from information_schema.columns
+        where table_schema = 'public' and table_name = 'vetting_submissions' and column_name = 'evidence_id'`,
+    );
+    expect(rows[0]).toEqual({ is_nullable: "NO" });
+    const { rows: idx } = await db.query<{ indexdef: string }>(
+      `select indexdef from pg_indexes where schemaname = 'public'
+        and tablename = 'vetting_submissions' and indexname = 'vetting_submissions_evidence_id_key'`,
+    );
+    expect(idx[0]?.indexdef ?? "").toMatch(/^CREATE UNIQUE INDEX/);
+  });
+
+  it("0022 added no client write policy to verifications or vetting_submissions — 0008's rule still holds (I-V2)", async () => {
+    const { rows } = await db.query<{ cmd: string }>(
+      "select cmd from pg_policies where schemaname = 'public' and tablename in ('verifications', 'vetting_submissions') and cmd <> 'SELECT'",
+    );
+    expect(rows).toEqual([]);
+  });
+
+  it("verification_submission_columns() is one static list per section, and drops every status / decision / level key", async () => {
+    const probe = {
+      identity_document_ref: "u/identity-document/x.jpg",
+      identity_status: "verified",
+      identity_checked_by: "admin",
+      level: "L4_FULLY_VERIFIED",
+      dbs_outcome: "cleared",
+      dbs_certificate_number: "001234567890",
+      rtw_share_code: "W1A2B3C4D",
+      cross_check_status: "passed",
+      dbs_update_service_last_result: "no_change",
+    };
+    const kept = async (section: string) =>
+      (
+        await db.query<{ kept: Record<string, unknown> }>(
+          `select public.verification_submission_columns($1::public.verification_section, $2::jsonb) as kept`,
+          [section, JSON.stringify(probe)],
+        )
+      ).rows[0]!.kept;
+    expect(await kept("identity")).toEqual({
+      identity_document_ref: "u/identity-document/x.jpg",
+    });
+    expect(await kept("dbs")).toEqual({
+      dbs_certificate_number: "001234567890",
+    });
+    expect(await kept("right_to_work")).toEqual({
+      rtw_share_code: "W1A2B3C4D",
+    });
+    expect(await kept("contact")).toEqual({});
+  });
+});

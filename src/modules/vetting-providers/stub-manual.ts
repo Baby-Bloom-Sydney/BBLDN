@@ -1,13 +1,12 @@
-// `stub-manual` (03 §4.4) — the day-one binding for every `EvidenceType`: the admin verifies by hand, and
-// nothing in the wizard, the status model or the queue knows it is a stub.
-//
-// **ADR-117 Tier A — this is the connector shell, not the inside.** It reads no document, opens no storage
-// path and calls no provider: `supports` answers from `config/vetting.ts` (pure), and every other method
-// delegates to the `VettingSubmissionStore` port, which is unconfigured until a reviewed unit installs it.
+// `stub-manual` (03 §4.4; kickoff §4.4) — the day-one binding for every `EvidenceType`: the admin verifies by
+// hand from the queue, and nothing in the wizard, the status model or the queue knows it is a stub. Its ONLY
+// outcome is `needs-admin` (ADR-154): it reads no document, opens no storage path, extracts nothing, and never
+// answers `verified` — so binding it cannot make a nanny look verified (REVIEW-1 M-9, answered by construction).
 import { VETTING } from "@/modules/config";
 import { err, nowInstant, ok } from "@/modules/platform";
 import type { EvidenceType } from "@/modules/shared-types";
 import type { ManualDecisionProvider, VettingErrorDetails } from "./types";
+import { emitVettingEvent } from "./lib/emit-vetting-event";
 import { VETTING_STORE_REGISTRY } from "./lib/vetting-store-registry";
 
 const PROVIDER_ID = "stub-manual";
@@ -24,16 +23,25 @@ export const stubManualProvider: ManualDecisionProvider = Object.freeze({
   supports: (evidenceType: EvidenceType) => ACCEPTED.has(evidenceType),
   submit: async (evidence) => {
     if (!ACCEPTED.has(evidence.type)) return unsupported();
-    const existing = await VETTING_STORE_REGISTRY.get().findByEvidence(
-      evidence.id,
-    );
+    const store = VETTING_STORE_REGISTRY.get();
+    const existing = await store.findByEvidence(evidence.id);
     if (!existing.ok) return existing;
     if (existing.value !== null) return ok(existing.value);
-    return VETTING_STORE_REGISTRY.get().upsert({
-      evidenceId: evidence.id,
+    const submitted = await store.upsert({
+      evidence,
       provider: PROVIDER_ID,
       status: { kind: "needs-admin" },
     });
+    if (!submitted.ok) return submitted;
+    const props = {
+      submissionId: submitted.value.submissionId,
+      evidenceType: evidence.type,
+      provider: PROVIDER_ID,
+      statusKind: "needs-admin",
+    };
+    await emitVettingEvent("vetting.submitted", evidence.nannyId, props);
+    await emitVettingEvent("vetting.needs-admin", evidence.nannyId, props);
+    return submitted;
   },
   check: async (submissionId) => {
     const stored = await VETTING_STORE_REGISTRY.get().read(submissionId);
@@ -50,5 +58,19 @@ export const stubManualProvider: ManualDecisionProvider = Object.freeze({
   extract: async () => ok({ consistency: [] }),
   expiry: async () =>
     ok({ expiresAt: null, renewable: false, source: "policy" as const }),
-  record: async (input) => VETTING_STORE_REGISTRY.get().recordDecision(input),
+  record: async (input) => {
+    const store = VETTING_STORE_REGISTRY.get();
+    const entry = await store.read(input.submissionId);
+    if (!entry.ok) return entry;
+    const recorded = await store.recordDecision(input);
+    if (!recorded.ok) return recorded;
+    if (entry.value !== null)
+      await emitVettingEvent("vetting.decision-recorded", entry.value.nannyId, {
+        submissionId: input.submissionId,
+        evidenceType: entry.value.evidenceType,
+        provider: PROVIDER_ID,
+        decision: input.decision,
+      });
+    return recorded;
+  },
 });

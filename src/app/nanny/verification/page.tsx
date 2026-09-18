@@ -1,38 +1,17 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getVerificationData } from "@/lib/actions/verification";
-import { VerificationPageClient } from "./VerificationPageClient";
+// S-N-09 `/nanny/verification` — resume / retry / status (04 §6.3). Thin by rule: one read, one component.
+import {
+  VerificationStatusPage,
+  loadVerificationStatus,
+} from "@/modules/verification";
+
+export const dynamic = "force-dynamic";
 
 export default async function NannyVerificationPage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: verification } = await getVerificationData();
-
-  // Fetch profile data for pre-filling identity fields
-  const admin = createAdminClient();
-  const { data: profile } = await admin
-    .from("user_profiles")
-    .select("first_name, last_name, date_of_birth")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
+  const state = await loadVerificationStatus();
   return (
-    <VerificationPageClient
-      initialData={verification}
-      profileData={
-        profile
-          ? {
-              firstName: profile.first_name ?? "",
-              lastName: profile.last_name ?? "",
-              dateOfBirth: profile.date_of_birth ?? "",
-            }
-          : null
-      }
+    <VerificationStatusPage
+      state={state}
+      hrefs={{ wizard: "/nanny/onboarding-verification", hub: "/nanny" }}
     />
   );
 }

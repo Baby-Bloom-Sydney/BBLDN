@@ -11,6 +11,7 @@ import type {
   AuthDriver,
   DataAccessPort,
   NamedOperation,
+  PutObjectOptions,
   RunOptions,
   StorageRef,
 } from "../types";
@@ -86,5 +87,48 @@ export function createDataAccessPort(
     }
   };
 
-  return Object.freeze({ run, signUrl });
+  // ADR-155: session scope, so `0015`'s owner-prefix INSERT policy is the second check behind the action's path
+  // rule. The path is judged by the minter's own rule first; an empty body is never a retained upload.
+  const putObject = async (
+    ref: StorageRef,
+    body: Uint8Array,
+    opts: PutObjectOptions,
+  ): Promise<Result<void>> => {
+    if (!isSafeObjectPath(ref.path))
+      return err("VALIDATION", "That file could not be saved.", {
+        reason: "invalid-object-path",
+      });
+    if (body.byteLength === 0)
+      return err("VALIDATION", "That file is empty.", {
+        reason: "empty-object",
+      });
+    try {
+      await driver.putObject(ref, body, opts, "session");
+      return ok(undefined);
+    } catch (thrown) {
+      return fromThrown(thrown, { module: "auth", action: "putObject" });
+    }
+  };
+
+  // ADR-155: service scope — no user role holds DELETE on the evidence bucket (07 §5.3 rule 2). Named in the
+  // module README as 07 §5.1 rule 5 asks; the same audit line `run` writes for a service-scope operation.
+  const removeObject = async (ref: StorageRef): Promise<Result<void>> => {
+    if (!isSafeObjectPath(ref.path))
+      return err("VALIDATION", "That file could not be found.", {
+        reason: "invalid-object-path",
+      });
+    log.info("service-scope data access", {
+      module: "auth",
+      action: "removeObject",
+      scope: "service",
+    });
+    try {
+      await driver.removeObject(ref, "service");
+      return ok(undefined);
+    } catch (thrown) {
+      return fromThrown(thrown, { module: "auth", action: "removeObject" });
+    }
+  };
+
+  return Object.freeze({ run, signUrl, putObject, removeObject });
 }
