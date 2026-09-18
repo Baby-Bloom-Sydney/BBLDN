@@ -75,6 +75,7 @@ describe("call-layer through the connector binding", () => {
       recordOutcome: async () => notConfigured,
       getCallState: async () => notConfigured,
       findOpenCall: async () => notConfigured,
+      findNannyBooking: async () => notConfigured,
       listOpenCalls: async () => notConfigured,
     });
 

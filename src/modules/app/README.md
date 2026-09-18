@@ -35,10 +35,25 @@ states a connector signature for `katie` or `child-development`, so both ship as
 invented interfaces; and `ChildLinkingReads.youngestChildDateOfBirth` is a **provisional** shape — ADR-083 / 084
 state the rule and 03 §5.2 puts `accessUntil` on `AccessState`, but no section names the method that computes it.
 
-**Suites.** `src/modules/app/__tests__/app.swap.test.ts` — the fail-closed default and the youngest-child read
-over `stubApp`.
+**S-N-01 (`2g`; 04 §4.4 c1).** `child-linking` now owns the nanny's "add a family you already work for" surface:
+`NannyAddChildPitch` (London copy — no bonus, no figure, ADR-099 / N-2) over `addFamilyChildAction`, which is
+one submit for one decision — the AGR-14 guardian tick, the unclaimed child, the AGR-14 record against that
+child, and the `nanny_to_parent` token, in that order. **The nanny-mint pin is flipped** (kickoff debt 8):
+`ChildFacts` carries `0019`'s `created_by_user_id`, `mayMint`'s `nanny_to_parent` arm reads it beside the links,
+`invite-methods` passes it, and `createChild` gained the unclaimed branch (`child-creator-of.ts`). Neither the
+trial nor the access window moves on that branch — there is no family until the token is claimed.
+
+**Recorded, for the planner.** 03 §9.3's event taxonomy has **no name** for "a nanny added an unclaimed child",
+and it is append-only, so `2g` emits none rather than borrowing `app.family-in` (whose subject is a parent who
+does not exist yet). The observable fact is the `invite.sent` that follows one line later. Owner: 03 §9.3.
+
+**Suites.** `app.swap.test.ts` (the fail-closed default and the youngest-child read over `stubApp`) ·
+`child-linking.nanny-mint.test.ts` (S-N-01's rules end to end) · `child-linking.add-family-child.test.ts` (the
+action: the tick, the order, every refusal).
 
 <!-- audit
-Last edited: 2026-09-16T16:15+10:00 — BB-LDN-Planner-070926/F-c
+Last edited: 2026-09-18T16:20+10:00 — BB-LDN-Planner-070926/2g
+Notes: S-N-01 built (L-008 2g) — the pitch, `addFamilyChildAction`, AGR-14; the nanny-mint pin flipped by behaviour (ChildFacts.createdByUserId, mayMint, invite-methods, createChild's unclaimed branch). The missing event name recorded for 03 §9.3.
+Prior: 2026-09-16T16:15+10:00 — BB-LDN-Planner-070926/F-c
 Notes: initial authoring — the parent connector, the three sub-module folders, `stubApp` and the swap test.
 -->

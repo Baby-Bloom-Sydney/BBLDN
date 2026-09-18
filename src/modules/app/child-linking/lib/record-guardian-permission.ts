@@ -5,13 +5,14 @@
 // document for her to accept — she is stating a fact about somebody else's authority, and the record exists so
 // that the fact has a date, an author and a child attached to it. `relatedEntityId` is that child, which is why
 // this runs after the row exists rather than before.
+import { BRAND } from "@/modules/config";
 import { consent } from "@/modules/platform";
 import type { ChildId, Result, UserId, Uuid } from "@/modules/shared-types";
 
 const AGREEMENT_ID = "AGR-14" as const;
 const CHECKPOINT_ID = "agr14_guardian_permission";
-const CHECKPOINT_TEXT =
-  "I have this family's permission to add their child and to invite them to BabyBloom.";
+// The tick's own wording, so the evidence reads as she saw it. The brand is `config`'s, never a literal (L4).
+const CHECKPOINT_TEXT = `I have this family's permission to add their child and to invite them to ${BRAND.name}.`;
 
 export async function recordGuardianPermission(
   userId: UserId,

@@ -137,7 +137,8 @@ describe("S-N-01 — a nanny adds an existing family's child (04 §4.4 c1)", () 
     );
 
     expect(first.ok && second.ok).toBe(true);
-    if (first.ok && second.ok) expect(second.value.token).toBe(first.value.token);
+    if (first.ok && second.ok)
+      expect(second.value.token).toBe(first.value.token);
   });
 
   it("leaves the parent's own path exactly as it was — her child is hers and the window moves", async () => {

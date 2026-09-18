@@ -42,7 +42,15 @@ const DAYS: ReadonlyArray<SlotDay> = [
   day("2026-01-14", "Wednesday 14 January", [LATER]),
 ];
 
-const actionsWith = (overrides: Partial<SlotActions> = {}): SlotActions => ({
+// `2g`: the picker's actions are a tagged union now (S-P-02 is reused on S-N-02), so the parent's fixture
+// names its tag and carries its position. The nanny's half is exercised in `call-layer.nanny-picker.test.tsx`.
+type PositionActions = Extract<SlotActions, { readonly subject: "position" }>;
+
+const actionsWith = (
+  overrides: Partial<PositionActions> = {},
+): PositionActions => ({
+  subject: "position",
+  positionId: POSITION,
   hold: vi.fn(async () => ({
     ok: true as const,
     value: { holdId: "h-1" as HoldId },
@@ -68,7 +76,6 @@ describe("SlotPicker (S-P-02)", () => {
   it("renders one radiogroup per day inside a fieldset whose legend is the full date, options named in full", () => {
     render(
       <SlotPicker
-        positionId={POSITION}
         days={DAYS}
         actions={actionsWith()}
         dashboardHref="/parent"
@@ -97,12 +104,7 @@ describe("SlotPicker (S-P-02)", () => {
   it("holds on tap, then the button writes with the hold, and the chosen time is announced", async () => {
     const actions = actionsWith();
     render(
-      <SlotPicker
-        positionId={POSITION}
-        days={DAYS}
-        actions={actions}
-        dashboardHref="/parent"
-      />,
+      <SlotPicker days={DAYS} actions={actions} dashboardHref="/parent" />,
     );
 
     await userEvent.click(
@@ -138,12 +140,7 @@ describe("SlotPicker (S-P-02)", () => {
   it("says a taken slot has gone, in an alert that takes focus, and marks the option unavailable", async () => {
     const actions = actionsWith({ hold: vi.fn(async () => taken()) });
     render(
-      <SlotPicker
-        positionId={POSITION}
-        days={DAYS}
-        actions={actions}
-        dashboardHref="/parent"
-      />,
+      <SlotPicker days={DAYS} actions={actions} dashboardHref="/parent" />,
     );
 
     await userEvent.click(
@@ -174,12 +171,7 @@ describe("SlotPicker (S-P-02)", () => {
       })),
     });
     render(
-      <SlotPicker
-        positionId={POSITION}
-        days={DAYS}
-        actions={actions}
-        dashboardHref="/parent"
-      />,
+      <SlotPicker days={DAYS} actions={actions} dashboardHref="/parent" />,
     );
 
     await userEvent.click(
@@ -196,14 +188,7 @@ describe("SlotPicker (S-P-02)", () => {
 
   it("with no slots in the window still says the matchmaker will call, and can try again", async () => {
     const actions = actionsWith();
-    render(
-      <SlotPicker
-        positionId={POSITION}
-        days={[]}
-        actions={actions}
-        dashboardHref="/parent"
-      />,
-    );
+    render(<SlotPicker days={[]} actions={actions} dashboardHref="/parent" />);
 
     expect(
       screen.getByText(
@@ -220,7 +205,6 @@ describe("SlotPicker (S-P-02)", () => {
   it("with the slots failed to load, says so and still says we will call", () => {
     render(
       <SlotPicker
-        positionId={POSITION}
         days={null}
         actions={actionsWith()}
         dashboardHref="/parent"
@@ -236,7 +220,6 @@ describe("SlotPicker (S-P-02)", () => {
   it("shows the chosen time with Change time while slot-chosen, and opens the days on request", async () => {
     render(
       <SlotPicker
-        positionId={POSITION}
         days={DAYS}
         chosen={{ start: START, end: START }}
         actions={actionsWith()}

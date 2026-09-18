@@ -25,8 +25,17 @@ row, retried as a **new** booking (R5).
 
 Methods (03 §2.7): `listSlots` · `chooseSlot` · `moveSlot` · `clearSlot` · `openNannyCall` · `recordOutcome` ·
 `getCallState` — plus **`findOpenCall(parentId)`**, a connector extension recorded in the `1d` PROGRESS entry
-(03 §2.7 has no "which call is mine" read; the call page cannot be reached without one). `CallResult` is a
+(03 §2.7 has no "which call is mine" read; the call page cannot be reached without one), and **
+`findNannyBooking(nannyId)`** (`2g`), its nanny half and raised the same way: S-N-02 must answer "have I already
+picked a time?" and a `nanny-call` ref is keyed by the `bookingId` the page does not know. `CallResult` is a
 **tagged** union, never `StateAfter | Booking` (fix: A-29).
+
+**S-N-02's half (`2g`).** `listNannySlotsAction` + `bookNannyCallAction` are the nanny's two server actions:
+she never holds (03 §3.2 names her form among the callers that reach `book` without one), the nanny is the
+session and never the form (03 §3.2's `Subject` for her kind _is_ the nanny), and both her write and the
+parent's two are bounded by 07 §8 row 6 (`bookingHolds`) — the policy had been declared with no consumer since
+Phase 1 and its allow-list entry is now removed. `SlotPicker`'s actions became a tagged union so S-P-02 is
+**reused** on S-N-02 rather than forked (04 §6.2); its four parent-voiced sentences are props with defaults.
 
 **How the inside works (1d).** `createCallLayer(deps)` is the orchestrator 03 §2.7 describes: a `scheduling`
 write, then `positions.advance` on the C row that names it, then the messages. `createCallLayerSlice(deps)` is
@@ -63,9 +72,11 @@ read fails the six labels still stand (P-2, never an empty room). `positions.get
 2. **`platform`'s `piiSafeString` refuses ~15 % of random uuids** (measured 2 944 / 20 000): a digit run of 9+
    across hyphens reads as a phone number. Under a `uow` that fails the C row. Pinned as `it.fails` in
    `call-layer.inside.test.ts`; the suites pin the uuid mint to stay deterministic. Owned by `platform`.
-3. **The nanny's `call-confirmation` + `admin-commission-booking` at `openNannyCall`** (03 §2.7) are not sent:
-   the module has no road to a nanny's email (03 §8.1 "the caller passes fully resolved data"); the parent's
-   recipient rides on the mirror, the nanny's has no home yet. Events are emitted.
+3. **CLOSED by `2g`.** Both messages are sent at `openNannyCall` (`lib/send-nanny-call-messages.ts`). The road
+   `1d` lacked is ADR-136: a `Recipient` may be `{ userId }` and `comms` resolves it inside its own send, so
+   the nanny's address never exists in this module at all — stricter than the mirror's `{ email }`, and the
+   reason no nanny recipient needed a home. The admin's address is not a user id, so boot hands it in
+   (`CallLayerDeps.adminEmail` ← `SENDERS.admin`; L4). Neither send can fail the booking (01 §4a rule 2).
 4. **`getJourneySteps` is keyed by `ParentId`; a session carries a `UserId`** (02 §4 gives `parents` its own
    id). `loadParentJourney` passes the user id through in one place until 1e settles the key.
 5. **The mirror store and the booking are not one transaction** until the store lives inside the RPC opener:
@@ -81,7 +92,9 @@ page read, signed out and in) · `call-layer.copy.test.ts` (05 §5.2 over every 
 allowlist row applied exactly).
 
 <!-- audit
-Last edited: 2026-09-17T13:40+10:00 — BB-LDN-Planner-070926/1d
+Last edited: 2026-09-18T16:20+10:00 — BB-LDN-Planner-070926/2g
+Notes: S-N-02's booking half (L-008 2g) — the two nanny actions, `findNannyBooking`, the two messages (gap 3 closed), the SlotPicker generalisation, and `bookingHolds` wired on all three calendar writes.
+Prior: 2026-09-17T13:40+10:00 — BB-LDN-Planner-070926/1d
 Notes: the inside (orchestrator + C-row slice + memory mirror store), the S-P-01 / S-P-02 / S-P-03 screens, the
 actions, the words; connector extension `findOpenCall` recorded; five gaps recorded (scheduling stub stays, the
 platform uuid defect, the nanny recipient, the journey key, the two-write seam).

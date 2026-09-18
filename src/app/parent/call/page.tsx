@@ -5,6 +5,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ROUTE_MAP, loginRedirectUrl } from "@/modules/auth";
+import type { CallPageView } from "@/modules/call-layer";
 import {
   CallPage,
   CallUnavailable,
@@ -21,11 +22,14 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-const ACTIONS = Object.freeze({
-  hold: holdSlotAction,
-  choose: chooseSlotAction,
-  list: listSlotsAction,
-});
+const actionsFor = (positionId: CallPageView["positionId"]) =>
+  Object.freeze({
+    subject: "position" as const,
+    positionId,
+    hold: holdSlotAction,
+    choose: chooseSlotAction,
+    list: listSlotsAction,
+  });
 
 export default async function ParentCallPage() {
   const load = await loadCallPage();
@@ -37,7 +41,7 @@ export default async function ParentCallPage() {
     <CallPage
       view={load.view}
       days={load.days}
-      actions={ACTIONS}
+      actions={actionsFor(load.view.positionId)}
       dashboardHref={ROUTE_MAP.dashboards.parent}
     />
   );

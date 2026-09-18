@@ -105,7 +105,9 @@ describe("S-N-01 — addFamilyChildAction", () => {
   it("stamps the AGR-14 record with the child it was given for", async () => {
     await addFamilyChildAction(null, form());
 
-    const record = consents.consents.find((row) => row.agreementId === "AGR-14");
+    const record = consents.consents.find(
+      (row) => row.agreementId === "AGR-14",
+    );
     expect(record?.purpose).toBe("agr14_nanny_child_add");
     expect(record?.consentGiven).toBe(true);
     expect(record?.relatedEntityId).toBe(store.state.children[0]?.id);
@@ -157,6 +159,8 @@ describe("S-N-01 — addFamilyChildAction", () => {
     expect(second.url).not.toBeNull();
     // two children (two families), one pending token each — never two tokens for one child
     expect(store.state.invites).toHaveLength(2);
-    expect(new Set(store.state.invites.map((row) => row.child_id)).size).toBe(2);
+    expect(new Set(store.state.invites.map((row) => row.child_id)).size).toBe(
+      2,
+    );
   });
 });

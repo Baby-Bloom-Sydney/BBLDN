@@ -14,6 +14,8 @@ export function NannyHub({
   verificationHref,
   settingsHref,
   childrenHref,
+  addChildHref,
+  commissionHref,
 }: NannyHubProps) {
   return (
     <div className="space-y-6" data-hub-state={view.state}>
@@ -68,6 +70,28 @@ export function NannyHub({
           Open the app
         </a>
       </section>
+      {/* 04 §4.4 c1 — the pitch again from the hub's children card, and the explainer one link on. An
+          isolated nanny sees neither until she applies (ADR-147): she has one family and is not in the pool,
+          so an invitation to bring more would be an offer she cannot act on. */}
+      {view.state !== "isolated" && (
+        <section aria-labelledby="commission-heading" className={TILE}>
+          <h2 id="commission-heading" className="font-medium text-slate-900">
+            Get paid for adding existing clients
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Already with a family? Add them here and we&rsquo;ll arrange a
+            commission with you personally.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-4">
+            <a href={addChildHref} className={LINK}>
+              Add a family
+            </a>
+            <a href={commissionHref} className={LINK}>
+              How commission works
+            </a>
+          </div>
+        </section>
+      )}
       <nav aria-label="Your account" className="flex flex-wrap gap-4 text-sm">
         <a href={profileHref} className={LINK}>
           My profile

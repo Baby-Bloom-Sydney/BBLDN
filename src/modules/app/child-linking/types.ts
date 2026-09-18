@@ -208,4 +208,6 @@ export type NannyAddChildPitchProps = {
   readonly commissionHref: string;
   readonly skipHref: string;
   readonly skipLabel: string;
+  /** `BRAND.name` — the route reads it from `config`, this file never carries it (L4). */
+  readonly brandName: string;
 };

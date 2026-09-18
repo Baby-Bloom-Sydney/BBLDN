@@ -7,6 +7,7 @@
 // on `nanny_leads.lead_signals` and `nannyAccountStore.get()` does not answer it — so the page renders the
 // active wording for everyone; recorded in the `2g` PROGRESS entry for the planner.
 import type { Metadata } from "next";
+import { BRAND } from "@/modules/config";
 import { NannyAddChildPitch } from "@/modules/app";
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function NannyAddChildPage() {
       commissionHref="/nanny/commission"
       skipHref="/nanny/onboarding-verification"
       skipLabel="Skip for now — verify my details"
+      brandName={BRAND.name}
     />
   );
 }

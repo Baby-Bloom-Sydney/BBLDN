@@ -3,7 +3,7 @@
 // S-N-01 `/nanny/onboarding/add-child` (`03.19` Rejig; 04 §4.1 row 8, §4.4 c1; 04 §8 anchor "Get paid for
 // adding existing clients.") — the contributions pitch and the mint that backs it.
 //
-// **What London removed** (ADR-099; N-2; 04 §6.3 S-N-01 "A$ bonus copy + 30-day mechanics removed"): every
+// **What London removed** (ADR-099; N-2; 04 §6.3 S-N-01 — the Sydney bonus copy and its 30-day window): every
 // amount, every bonus, every 30-day window, every payout. There is no figure on this screen and there will not
 // be one until the money model sets it (D0.2). What replaces it is the truth she can act on — she brings a
 // family she already works for, the terms are agreed with her by voice on a call, and the explainer is one
@@ -38,6 +38,7 @@ export function NannyAddChildPitch({
   commissionHref,
   skipHref,
   skipLabel,
+  brandName,
 }: NannyAddChildPitchProps) {
   const [state, action] = useFormState(addFamilyChildAction, {
     url: null,
@@ -130,7 +131,7 @@ export function NannyAddChildPitch({
                 className="text-sm text-slate-700"
               >
                 I have this family&rsquo;s permission to add their child and to
-                invite them to BabyBloom. Only a parent or legal guardian can
+                invite them to {brandName}. Only a parent or legal guardian can
                 agree to their child being on the app.
               </label>
             </div>

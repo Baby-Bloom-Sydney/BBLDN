@@ -19,13 +19,17 @@ import type { CallMirror } from "@/modules/call-layer";
 import { unconfiguredComms } from "@/modules/comms";
 import {
   configureEvents,
+  configureRateLimiter,
   configureUnitOfWork,
   createEvents,
+  createRateLimiter,
   createUnitOfWork,
   log,
   memoryEventLogStore,
+  memoryRateLimitStore,
   memoryTransactionOpener,
 } from "@/modules/platform";
+import { SECURITY } from "@/modules/config";
 import {
   configureScheduling,
   createSchedulingStub,
@@ -108,6 +112,14 @@ beforeEach(() => {
   vi.spyOn(crypto, "randomUUID").mockImplementation(deterministicUuid);
   configureUnitOfWork(createUnitOfWork(memoryTransactionOpener()));
   configureEvents(createEvents({ store: memoryEventLogStore(), log }));
+  // `2g`: both actions now consume 07 §8 row 6. A fresh store per test keeps the suite from spending one
+  // caller's hourly allowance across `it`s — the limit is the subject of its own test, not of these.
+  configureRateLimiter(
+    createRateLimiter({
+      store: memoryRateLimitStore(),
+      burstAlertMultiple: SECURITY.burstAlertMultiple,
+    }),
+  );
   scheduling = createSchedulingStub({ clock: () => NOW, rules });
   configureScheduling(scheduling);
   const store = memoryCallMirrorStore([mirror]);
