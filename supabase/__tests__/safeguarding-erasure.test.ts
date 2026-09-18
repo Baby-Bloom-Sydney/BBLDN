@@ -191,6 +191,25 @@ describe("int.safeguarding — the four person keys no longer cascade (ADR-170)"
   });
 });
 
+describe("int.safeguarding — REVIEW-4 M-15, taken with the file (kickoff §2 debt 2)", () => {
+  it("verifications carries a partial index on rtw_status, the same shape as its two siblings", async () => {
+    const { rows } = await db.query<{ indexname: string; indexdef: string }>(
+      `select indexname, indexdef from pg_indexes
+        where schemaname = 'public' and tablename = 'verifications'
+          and indexname in ('verifications_identity_status_idx', 'verifications_dbs_status_idx',
+                            'verifications_rtw_status_idx')
+        order by indexname`,
+    );
+    // All three, or the cron's third statement is the only one still sequentially scanning the nanny table
+    // 288 times a day — which is what the register measured with `enable_seqscan=off`.
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      expect(row.indexdef).toContain("WHERE");
+      expect(row.indexdef).toContain("'review'");
+    }
+  });
+});
+
 describe("int.safeguarding — the product path: the nannies row goes, the decisions stay (07 §6.1 step 3)", () => {
   it("★ deleting the nanny leaves all three safeguarding rows, with their decisions intact", async () => {
     await db.query("savepoint product_path");
@@ -306,6 +325,31 @@ describe("int.safeguarding — the product path: the nannies row goes, the decis
     // delete that does not write one fails". This is the case that proves the CHECK is load-bearing rather
     // than decorative — with every trigger removed, the row is still never detached from a subject.
     expect(message).toMatch(/subject_present_check/);
+  });
+
+  it("★ an erasure never waits on a decision in flight — it refuses, so no deadlock can form (database pass, HIGH)", async () => {
+    // A `delete from nannies` holds the parent lock before any row trigger fires, so the pseudonymiser takes
+    // the children after the parent — the reverse of every other writer's order, and an AB-BA deadlock with
+    // `record_vetting_decision`. The trigger therefore probes `for update nowait`: the erasure is refused
+    // immediately rather than waiting, which makes a cycle impossible and makes the winner deterministic.
+    //
+    // **Asserted on the source, and that limit is stated rather than dressed up.** A true two-transaction race
+    // needs a fixture both connections can see, which means committing rows into a database every other suite
+    // counts and then deleting them back out through the very guards this file installs — more moving parts
+    // than the claim is worth, and a failed cleanup would corrupt other suites. What is checkable, and what
+    // the defect actually was, is whether the probe is there at all: with NOWAIT the erasure can never be the
+    // waiting side, and a cycle needs two waiters. The fixture race is recorded in PROGRESS as the one claim
+    // in this unit proved by construction rather than by invocation.
+    const { rows } = await db.query<{ src: string }>(
+      `select prosrc as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'pseudonymise_safeguarding_subject'`,
+    );
+    // Comments stripped, or the prose above the probes would be counted as probes.
+    const code = rows[0].src.replace(/--[^\n]*/g, "");
+    expect(code).toContain("for update nowait");
+    expect(code).toContain("lock_not_available");
+    // and all three children are probed, not just the first
+    expect(code.match(/for update nowait/g)).toHaveLength(3);
   });
 
   it("a verifications row cannot be deleted, so the second path to the ledger never opens", async () => {

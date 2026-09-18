@@ -165,6 +165,24 @@ describe("int.rollback-0027 — a twin restores a feature, never a hole (ADR-165
     expect(message).toMatch(/ADR-170/);
   });
 
+  it("★ the carve-out is narrow in IDENTITY too: a LIVE nanny's lift cannot be detached (database pass, HIGH)", async () => {
+    // The first draft checked only the column shape, which accepts that shape from anyone — so `supabase_admin`
+    // or any role with UPDATE could have nulled `nanny_id` on a lift whose subject was still there, silently
+    // detaching a safeguarding decision from a living person. The nanny below is NOT deleted.
+    await db.query("savepoint live_detach");
+    let message = "";
+    try {
+      await db.query(
+        `update public.nanny_suspension_lifts set nanny_id = null where id = $1`,
+        [LIFT],
+      );
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    await db.query("rollback to savepoint live_detach");
+    expect(message).toMatch(/ADR-170/);
+  });
+
   it("★ clause 2, the narrow half — the exemption is still bbldn_retention alone", async () => {
     const { rows } = await db.query<{ src: string }>(
       `select prosrc as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace

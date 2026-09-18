@@ -58,7 +58,7 @@ env:
   # 07 §7: real values live in Vercel env + the keychain, never here). Kept in step with .env.test — the config.env
   # suite parses this block. Names: src/modules/config/lib/env-schema.ts (50; .env.example is generated from it).
   NEXT_PUBLIC_APP_URL: http://localhost:3000
-  CRON_SECRET: placeholder-cron-secret
+  CRON_SECRET: placeholder-cron-secret-0000000000000
   ADMIN_API_TOKEN: placeholder-admin-token
   SYSTEM_PARENT_ID: 00000000-0000-4000-8000-000000000000
   ADMIN_EMAIL: admin@example.test

@@ -78,7 +78,7 @@ describe("POST /api/legal/cookie-consent — the visitor id is ours (ruling (a))
     const header = response.headers.get("set-cookie") ?? "";
     expect(header).toContain(`${SECURITY.visitorCookie.name}=`);
     expect(header).toContain("HttpOnly");
-    expect(header).toContain("SameSite=Lax");
+
     expect(header).toContain(`Max-Age=${SECURITY.visitorCookie.maxAgeSeconds}`);
     // signed: `<uuid>.<mac>`, and the mac is not the id
     const value = decodeURIComponent(header.split("=")[1].split(";")[0]);
@@ -103,6 +103,24 @@ describe("POST /api/legal/cookie-consent — the visitor id is ours (ruling (a))
 
     expect(response.status).toBe(200);
     expect(cookieFrom(response)).not.toBe(forged);
+  });
+
+  it("★ a cookie that cannot even be URL-decoded does not 500 the endpoint (security pass, HIGH)", async () => {
+    // `decodeURIComponent` throws `URIError` on a malformed percent-sequence, and a cookie header is caller
+    // input. Unguarded, `Cookie: bb_visitor=%` answered 500 — and kept answering 500 on every later request,
+    // because the browser goes on sending the cookie it has. A value we cannot decode is a value we did not
+    // write, which is already the "no cookie" case.
+    const response = await POST(
+      post(ACCEPT, { ...CALLER, cookie: `${SECURITY.visitorCookie.name}=%` }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(cookieFrom(response)).not.toContain("%");
+  });
+
+  it("the cookie is SameSite=Strict — it is never read on the arriving navigation", async () => {
+    const header = (await POST(post(ACCEPT))).headers.get("set-cookie") ?? "";
+    expect(header).toContain("SameSite=Strict");
   });
 
   it("the cookie it issued is accepted back, so a returning visitor keeps one identity", async () => {

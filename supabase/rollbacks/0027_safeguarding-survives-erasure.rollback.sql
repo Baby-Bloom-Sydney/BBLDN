@@ -87,10 +87,18 @@ $$;
 -- `nanny_suspension_lifts` is the one genuinely append-only table of the three, and it keeps the full guard —
 -- with one carve-out for the same reason, stated exactly: with the pseudonymiser gone, the foreign key's own
 -- `set null` is an UPDATE, and an unqualified append-only guard would refuse it and make a `nannies` row
--- undeletable. The carve-out is the narrowest one that can be written: **only** an UPDATE whose sole effect is
--- `nanny_id` going from a value to null passes. Every other edit — the reason, the decider, the outcome — is
--- refused for every role exactly as before. `to_jsonb(...) - 'nanny_id'` compares the whole rest of the row, so
--- an UPDATE that nulls the subject *and* quietly rewrites the reason does not slip through the gap.
+-- undeletable. The carve-out is narrow in **two** dimensions, and the first draft of this file had only one of
+-- them (database pass, HIGH — caught before this twin ever ran anywhere):
+--
+--   * narrow in *columns* — `to_jsonb(...) - 'nanny_id'` compares the whole rest of the row, so an UPDATE that
+--     nulls the subject *and* quietly rewrites the reason does not slip through the gap;
+--   * narrow in *identity* — and this is the one that was missing. A column-shape check alone accepts the shape
+--     from **any** caller, so `supabase_admin` (or anyone holding UPDATE) could have run
+--     `update nanny_suspension_lifts set nanny_id = null` against a **live** nanny and silently detached a
+--     lift from its subject: precisely the failure ADR-170 exists to prevent, and precisely the role section
+--     4(e) of the forward file excludes on purpose. The `not exists` below is the fix: the branch passes only
+--     when the parent is genuinely gone, which is true of a referential `set null` and of nothing a hand-written
+--     statement can arrange without first deleting the nanny.
 create or replace function public.prevent_safeguarding_row_modification()
 returns trigger
 language plpgsql
@@ -104,7 +112,8 @@ begin
   if tg_op = 'UPDATE'
      and old.nanny_id is not null
      and new.nanny_id is null
-     and (to_jsonb(new) - 'nanny_id') = (to_jsonb(old) - 'nanny_id') then
+     and (to_jsonb(new) - 'nanny_id') = (to_jsonb(old) - 'nanny_id')
+     and not exists (select 1 from public.nannies n where n.id = old.nanny_id) then
     return new;
   end if;
 
@@ -135,6 +144,11 @@ alter table public.nanny_suspension_lifts drop column if exists subject_pseudony
 
 -- `vetting_submissions_nanny_idx` is KEPT: `set null` on that key still needs it (clause 1), and an index that
 -- stops a nanny deletion seq-scanning the ledger is not part of what this file reverts.
+--
+-- `verifications_rtw_status_idx` is KEPT for the same kind of reason and a different one. `0027` §1a added it to
+-- close REVIEW-4 M-15 — a measured sequential scan on a five-minute cron — which has nothing to do with ADR-170
+-- and nothing to do with whatever made someone run this twin. Dropping an index that only makes an existing
+-- query fast would be reverting a defect fix as collateral.
 
 -- ---------------------------------------------------------------------------
 -- 4. Verify — ADR-165 (3): the hole is still shut AFTER the twin
@@ -179,9 +193,20 @@ begin
   if not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'is_safeguarding_retention_job'
-       and p.prosrc !~ 'supabase_admin'
+       and regexp_replace(p.prosrc, '--[^\n]*', '', 'g') !~ 'supabase_admin'
   ) then
     raise exception '0027 twin: is_safeguarding_retention_job() widened — the exemption must stay bbldn_retention alone';
+  end if;
+
+  -- ★ And the carve-out this file introduces is narrow in identity as well as in columns. Asserting the shape
+  --   of the source is not enough on its own, but it is what stops a later "simplification" of this twin from
+  --   dropping the clause and re-opening the detach — the behaviour itself is driven in `int.rollback-0027`.
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'prevent_safeguarding_row_modification'
+       and p.prosrc ~ 'not exists'
+  ) then
+    raise exception '0027 twin: the detach carve-out has no identity check — a live nanny''s lift could be detached';
   end if;
 
   -- And what the twin DID undo, so a half-run file is loud rather than silent.

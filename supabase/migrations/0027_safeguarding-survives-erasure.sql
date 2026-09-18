@@ -151,6 +151,20 @@ create index if not exists nanny_suspension_lifts_subject_pseudonym_idx
   where subject_pseudonym is not null;
 
 -- ---------------------------------------------------------------------------
+-- 1a. REVIEW-4 **M-15**, taken because this is the unit that next opens `verifications` (ADR-123's standing
+--     model, L-009 kickoff §2 debt 2).
+-- ---------------------------------------------------------------------------
+-- The register measured it with `enable_seqscan=off`: `sweep_stale_verification_processing`'s third statement
+-- (`0023:573`) plans a **sequential scan at cost 10000000000**, because `verifications` carries partial indexes
+-- on `identity_status` and `dbs_status` (`0008:141-144`) and none on `rtw_status` — linear in the nanny table,
+-- 288 times a day, for ever. One index matching its two siblings exactly closes it. It is unrelated to ADR-170
+-- and is here for one reason: the debt lands with the unit that touches the file, and leaving a measured,
+-- one-line defect in a table this migration is rewriting would be a choice to leave it.
+create index if not exists verifications_rtw_status_idx
+  on public.verifications (rtw_status)
+  where rtw_status in ('pending', 'processing', 'review');
+
+-- ---------------------------------------------------------------------------
 -- 2. ★ The four cascades (ADR-170; this is the clause the twin keeps)
 -- ---------------------------------------------------------------------------
 -- `set null` needs to FIND the child rows, so every one of these keys needs an index leading with its column.
@@ -216,6 +230,31 @@ security definer
 set search_path = ''
 as $$
 begin
+  -- ★ LOCK ORDER, and the reason this is `nowait` rather than a plain lock (database pass, HIGH — driven, not
+  -- argued). A `delete from nannies` holds the `nannies` row lock BEFORE any row trigger fires, so this
+  -- function unavoidably takes the children **after** the parent — the reverse of the order every other writer
+  -- uses. `record_vetting_decision` locks `vetting_submissions` (`0023:393`), then `verifications`, then
+  -- `nannies` through the sync; `0025:196-204` had to be corrected once for exactly this reason and calls
+  -- children-then-parent "the schema's effective global order". An erasure racing an admin recording a DBS
+  -- decision on the same nanny is therefore a textbook AB-BA deadlock, and it is not a theoretical race: the
+  -- incident in which someone is deleting an account is precisely when an admin may be deciding her case.
+  --
+  -- The fix is not a lock, it is a **refusal to wait**. Probing the children `for update nowait` means the
+  -- erasure never becomes the waiting side of a cycle, so no cycle can form — and it makes the winner
+  -- deterministic rather than whichever side Postgres's detector picks: **a safeguarding decision in flight
+  -- always beats an erasure**, which is also the right policy. The erasure fails loudly with a retryable error
+  -- instead of silently aborting somebody's DBS decision.
+  begin
+    perform 1 from public.verifications where nanny_id = old.id for update nowait;
+    perform 1 from public.vetting_submissions where nanny_id = old.id for update nowait;
+    perform 1 from public.nanny_suspension_lifts where nanny_id = old.id for update nowait;
+  exception
+    when lock_not_available then
+      raise exception
+        'erasure of nanny %: a safeguarding decision is being recorded right now — retry (ADR-170)', old.id
+        using errcode = 'lock_not_available';
+  end;
+
   -- `coalesce(subject_pseudonym, old.id)` rather than a bare assignment: a row that already carries a pseudonym
   -- belonged to an earlier subject and must not be re-stamped. `nanny_id` is nulled HERE, in the same statement,
   -- so the foreign key's own `set null` finds nothing left to do — which is what keeps the referential action
@@ -240,6 +279,28 @@ end;
 $$;
 
 alter function public.pseudonymise_safeguarding_subject() owner to bbldn_retention;
+
+-- ...and the `create` half of that grant goes straight back (database pass, MEDIUM). Postgres needs the NEW
+-- owner to hold `create` on the schema **at the moment of** `alter ... owner to`; it needs nothing afterwards.
+-- Leaving a standing schema-wide `create` on the one role whose whole design is a tightly enumerated privilege
+-- set would be an oversight wearing the shape of a decision. `usage` stays: the definer resolves
+-- `public.verifications` and friends every time it runs. Re-applying this file re-grants and re-revokes, so it
+-- is still idempotent.
+revoke create on schema public from bbldn_retention;
+
+-- ★ The operator's escape hatch, made explicit rather than inherited (database pass, MEDIUM). `0000:184` grants
+-- `bbldn_retention` to `current_user` — whichever role happened to run that migration. Section 4 excludes
+-- `supabase_admin` from the safeguarding exemption on purpose, so if the role a human uses at the console is
+-- ever NOT the role that ran `0000`, there is no path at all to a legitimate correction of a bad audit row —
+-- not a security property, a trap. `postgres` is the role Supabase's SQL editor connects as, so it is named
+-- here instead of being assumed. Guarded, because the role name is Supabase's convention and not a law.
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'postgres') then
+    execute 'grant bbldn_retention to postgres';
+  end if;
+end
+$$;
 
 comment on function public.pseudonymise_safeguarding_subject() is
   'ADR-170: before a nannies row is deleted — by the delete-account job, by an admin, or by the auth.users cascade — every safeguarding record about her keeps its decision and swaps its subject for the pseudonym. Owned by bbldn_retention, which is what exempts it from the guards in section 4; nothing else is.';
@@ -434,16 +495,37 @@ begin
     end if;
   end loop;
 
+  -- 5b'. REVIEW-4 M-15: the rtw index exists and is the SAME shape as its two siblings. Asserted on the
+  --      definition rather than on a plan, because a plan on an empty database says nothing — the register's
+  --      measurement (`enable_seqscan=off`, cost 10000000000) is the evidence, and this keeps the fix in place.
+  if not exists (
+    select 1 from pg_indexes
+     where schemaname = 'public' and tablename = 'verifications'
+       and indexname = 'verifications_rtw_status_idx'
+       and indexdef like '%rtw_status%' and indexdef like '%WHERE%'
+  ) then
+    raise exception '0027: verifications_rtw_status_idx is missing or is not partial (REVIEW-4 M-15)';
+  end if;
+
   -- 5c. ★ The exemption is the NARROW one. A guard that called is_retention_job() would leave
   --     `supabase_admin` — the dashboard's delete-user role — able to edit a DBS decision, which is the whole
   --     defect. Asserted on the SOURCE, because that is the half a later `create or replace` can quietly move.
+  -- ★ Anchored on the EXPRESSION, not on the bare string (database pass, LOW): `prosrc` carries the body's
+  --   comments too, so banning `supabase_admin` anywhere in it would redden the day someone wrote
+  --   `-- never supabase_admin` above the select. What must be true is that the comparison names one role.
   if not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'is_safeguarding_retention_job'
-       and p.prosrc ~ 'current_user\s*=\s*''bbldn_retention'''
-       and p.prosrc !~ 'supabase_admin'
+       and regexp_replace(p.prosrc, '--[^\n]*', '', 'g') ~ 'current_user\s*=\s*''bbldn_retention'''
+       and regexp_replace(p.prosrc, '--[^\n]*', '', 'g') !~ 'supabase_admin'
   ) then
     raise exception '0027: is_safeguarding_retention_job() must be bbldn_retention alone (ADR-170)';
+  end if;
+
+  -- The operator's escape hatch exists (the grant above). Without it, a genuinely bad audit row — a typo in a
+  -- lift's reason — would be uncorrectable by anyone, which is not the control this file is trying to build.
+  if not pg_has_role('postgres', 'bbldn_retention', 'MEMBER') then
+    raise exception '0027: postgres is not a member of bbldn_retention — a legitimate correction would have no path';
   end if;
   foreach v_tbl in array array['prevent_safeguarding_row_modification', 'prevent_safeguarding_record_loss'] loop
     if not exists (

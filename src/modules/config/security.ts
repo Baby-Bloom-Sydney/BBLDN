@@ -185,8 +185,12 @@ export const SECURITY = Object.freeze({
   // mints on first contact: a body value is ignored, a tampered cookie is treated as no cookie, and a fresh id
   // is minted rather than an error returned, because the visitor's actual request is to record a choice.
   //
-  // `SameSite=Lax`, not `Strict`: the banner must work on a first visit that arrived from a link, and this
-  // cookie authorises nothing — it names a row. `Secure` is set outside development.
+  // `SameSite=Strict`, and the first draft's `Lax` was wrong for a stated reason that did not survive the
+  // security pass (LOW, 2026-09-19): the justification given was "the banner must work on a first visit that
+  // arrived from a link", but this cookie is never read on the arriving navigation — it does not exist until
+  // the page's own same-origin `fetch` POST sets it, and a same-origin request is same-site whatever the
+  // referrer. `Strict` is therefore equally functional and closes `Lax`'s top-level-navigation carve-out.
+  // `Secure` is set outside development.
   //
   // It is **strictly necessary** in PECR's sense only insofar as it carries a consent record; ADR-175 (a) is
   // explicit that the analytics `visitor_id` is NOT claimed strictly necessary, and this is not that value's
