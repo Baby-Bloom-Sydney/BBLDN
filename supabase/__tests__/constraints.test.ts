@@ -778,8 +778,9 @@ describe("db.constraints — what 0020 added (ADR-146)", () => {
 });
 
 describe("db.constraints — what 0021 added (the nanny side's three definers; ADR-152)", () => {
+  // ADR-163 (0023): `create_nanny_account` left the session roads — it is service_role only now; the 0023 block
+  // asserts that. The two that still act for `auth.uid()` stay here.
   const SESSION_ROADS = [
-    "create_nanny_account",
     "update_nanny_profile",
     "lift_nanny_isolation",
   ] as const;
@@ -941,6 +942,7 @@ describe("db.constraints — what 0022 added (the wizard's four definers + the l
 
 describe("db.constraints — what 0023 added (the level's one writer + the decision definers; ADR-157, ADR-156 folded)", () => {
   const SERVICE_ROADS = [
+    "create_nanny_account",
     "sync_nanny_verification_state",
     "record_vetting_decision",
     "record_update_service_check",
@@ -994,7 +996,9 @@ describe("db.constraints — what 0023 added (the level's one writer + the decis
       `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.prosrc ~ 'verification_level\\s*='`,
     );
-    expect(rows.map((r) => r.proname)).toEqual(["sync_nanny_verification_state"]);
+    expect(rows.map((r) => r.proname)).toEqual([
+      "sync_nanny_verification_state",
+    ]);
     const { rows: level } = await db.query<{ proname: string }>(
       `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.prosrc ~ '\\ylevel\\s*=' and p.prosrc ~ 'public\\.verifications'
@@ -1012,8 +1016,12 @@ describe("db.constraints — what 0023 added (the level's one writer + the decis
         where table_schema = 'public' and table_name = 'payment_events' and column_name = 'outcome'`,
     );
     expect(rows[0]).toEqual({ data_type: "text", is_nullable: "YES" });
-    expect(await checkDef("payment_events_outcome_check")).toMatch(/applied.*ignored.*unresolved/);
-    expect(await indexDef("payment_events_unprocessed_idx")).toMatch(/WHERE \(outcome IS NULL\)/);
+    expect(await checkDef("payment_events_outcome_check")).toMatch(
+      /applied.*ignored.*unresolved/,
+    );
+    expect(await indexDef("payment_events_unprocessed_idx")).toMatch(
+      /WHERE \(outcome IS NULL\)/,
+    );
   });
 
   it("0023 added no client write policy to verifications, vetting_submissions or connection_requests", async () => {

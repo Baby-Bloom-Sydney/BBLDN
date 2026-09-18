@@ -111,9 +111,13 @@ export function memoryVettingStore(): MemoryVettingStore {
         entry.submittedAt > row.submittedAt,
     );
     if (later)
-      return err<VettingErrorDetails>("CONFLICT", "That attempt was superseded", {
-        reason: "unsupported-evidence",
-      });
+      return err<VettingErrorDetails>(
+        "CONFLICT",
+        "That attempt was superseded",
+        {
+          reason: "unsupported-evidence",
+        },
+      );
     const sectionStatus = sectionStatusOf(status);
     replaceRow({ ...row, status, checkedAt: nowInstant() });
     patchSections(row.nannyId, (current) => ({

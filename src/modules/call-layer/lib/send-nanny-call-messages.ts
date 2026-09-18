@@ -62,5 +62,9 @@ export async function sendNannyCallMessages(input: {
     dueAt: booking.start,
   });
   if (!row.ok)
-    warn("admin_notifications:commission_call_booked", booking.id as string, row.error.code);
+    warn(
+      "admin_notifications:commission_call_booked",
+      booking.id as string,
+      row.error.code,
+    );
 }

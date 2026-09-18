@@ -82,9 +82,9 @@ describe("deriveLevel (ADR-157 (1))", () => {
   });
 
   it("right-to-work never moves the level (ADR-153)", () => {
-    expect(derive(facts(verified("not_started", "not_started", "verified")))).toBe(
-      "L0_SIGNED_UP",
-    );
+    expect(
+      derive(facts(verified("not_started", "not_started", "verified"))),
+    ).toBe("L0_SIGNED_UP");
     const l3 = facts({
       ...verified("verified", "verified", "rejected"),
       dbsOutcome: "cleared",
@@ -115,9 +115,9 @@ describe("requiredSectionsByLevel — the config's evidence types as sections", 
     expect(sections.L3_PROVISIONALLY_VERIFIED).toEqual(["dbs", "identity"]);
     expect(sections.L4_FULLY_VERIFIED).toEqual(["dbs", "identity"]);
     expect(sections.L0_SIGNED_UP).toEqual([]);
-    for (const level of Object.keys(VETTING.requiredChecksByLevel) as ReadonlyArray<
-      keyof typeof VETTING.requiredChecksByLevel
-    >) {
+    for (const level of Object.keys(
+      VETTING.requiredChecksByLevel,
+    ) as ReadonlyArray<keyof typeof VETTING.requiredChecksByLevel>) {
       const expected = [
         ...new Set(
           VETTING.requiredChecksByLevel[level].map(sectionOfEvidenceType),

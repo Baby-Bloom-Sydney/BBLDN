@@ -64,13 +64,13 @@ const signIn = (userId: UserId) =>
         { id: NANNY, email: "amara@example.test" as Email, role: "nanny" },
         {
           id: ADMIN,
-          email: "admin@example.test" as Email,
+          email: "reviewer@example.test" as Email,
           role: "admin",
           mfaVerified: true,
         },
         {
           id: ADMIN_NO_MFA,
-          email: "admin2@example.test" as Email,
+          email: "reviewer-no-mfa@example.test" as Email,
           role: "admin",
           mfaVerified: false,
         },
@@ -288,10 +288,9 @@ describe("decide — the admin is the check (ADR-157 (2); ADR-159)", () => {
     const changed = events.rows.filter(
       (row) => row.name === "verification.level-changed",
     );
-    expect(changed.map((row) => (row.props as { toLevel: string }).toLevel)).toEqual([
-      "L1_REGISTERED",
-      "L2_ID_VERIFIED",
-    ]);
+    expect(
+      changed.map((row) => (row.props as { toLevel: string }).toLevel),
+    ).toEqual(["L1_REGISTERED", "L2_ID_VERIFIED"]);
     expect(changed[1]?.props).toMatchObject({
       nannyId: NANNY,
       fromLevel: "L1_REGISTERED",
@@ -368,7 +367,10 @@ describe("decide — the admin is the check (ADR-157 (2); ADR-159)", () => {
       `verification-action-needed:${NANNY}:dbs`,
     );
     expect(needed[0]?.sendAt).toBeDefined();
-    expect(needed[0]?.data).toEqual({ section: "dbs", guidanceKey: "document-unreadable" });
+    expect(needed[0]?.data).toEqual({
+      section: "dbs",
+      guidanceKey: "document-unreadable",
+    });
     expect(comms.sent.map((m) => m.templateId)).not.toContain(
       "verification-approved",
     );
@@ -402,7 +404,9 @@ describe("decide — the admin is the check (ADR-157 (2); ADR-159)", () => {
       }),
     );
     // no reason enumeration reaches her: the barred template carries the nanny, nothing about why
-    const toHer = comms.sent.find((m) => m.templateId === "verification-barred");
+    const toHer = comms.sent.find(
+      (m) => m.templateId === "verification-barred",
+    );
     expect(JSON.stringify(toHer?.data ?? {})).not.toMatch(/adverse|barred/);
   });
 
@@ -435,6 +439,7 @@ describe("decide — the admin is the check (ADR-157 (2); ADR-159)", () => {
 });
 
 describe("recordUpdateServiceCheck — the level-4 action (04 §4.1 row 15; ADR-157 (3); ADR-158)", () => {
+  let dbsSubmission: QueueEntry["submissionId"];
   async function toL3(): Promise<void> {
     await submitEverything();
     await verification.decide({
@@ -442,8 +447,9 @@ describe("recordUpdateServiceCheck — the level-4 action (04 §4.1 row 15; ADR-
         .submissionId,
       decision: "verified",
     });
+    dbsSubmission = entryOf(await queue("dbs"), "dbs-certificate").submissionId;
     await verification.decide({
-      submissionId: entryOf(await queue("dbs"), "dbs-certificate").submissionId,
+      submissionId: dbsSubmission,
       decision: "verified",
     });
   }
@@ -452,7 +458,7 @@ describe("recordUpdateServiceCheck — the level-4 action (04 §4.1 row 15; ADR-
     await toL3();
     ledger.patchSections(NANNY, (row) => ({ ...row, heldConnections: 2 }));
     const out = await verification.recordUpdateServiceCheck({
-      nannyId: NANNY,
+      submissionId: dbsSubmission,
       result: "no_change",
       subscribed: true,
     });
@@ -471,7 +477,7 @@ describe("recordUpdateServiceCheck — the level-4 action (04 §4.1 row 15; ADR-
   it("new_information returns the DBS section to review and the level to L2; a nanny cannot record it", async () => {
     await toL3();
     const out = await verification.recordUpdateServiceCheck({
-      nannyId: NANNY,
+      submissionId: dbsSubmission,
       result: "new_information",
       subscribed: true,
     });
@@ -479,7 +485,7 @@ describe("recordUpdateServiceCheck — the level-4 action (04 §4.1 row 15; ADR-
     expect(ledger.sectionsOf(NANNY)?.dbs.status).toBe("review");
     signIn(NANNY);
     const refused = await verification.recordUpdateServiceCheck({
-      nannyId: NANNY,
+      submissionId: dbsSubmission,
       result: "no_change",
       subscribed: true,
     });

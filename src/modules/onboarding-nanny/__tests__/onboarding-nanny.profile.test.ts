@@ -53,7 +53,12 @@ beforeEach(async () => {
   configureAuth(stubAuth({ users, signedInUserId: NANNY }));
   accounts = memoryNannyAccountStore();
   configureNannyAccountStore(accounts);
-  await accounts.create({ firstName: "Bea", lastName: "Lin", isolated: true });
+  await accounts.create({
+    userId: NANNY as never,
+    firstName: "Bea",
+    lastName: "Lin",
+    isolated: true,
+  });
 });
 
 describe("onboarding-nanny — saveNannyProfileStepAction (S-N-18)", () => {

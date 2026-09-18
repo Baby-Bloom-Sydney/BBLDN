@@ -38,7 +38,8 @@ export async function GET(request: Request): Promise<Response> {
           (holds.ok ? holds.value.expired : 0) +
           stale.value.handled +
           reminders.value.handled,
-        skipped: stale.value.skipped + reminders.value.skipped + (holds.ok ? 0 : 1),
+        skipped:
+          stale.value.skipped + reminders.value.skipped + (holds.ok ? 0 : 1),
       },
     };
   });

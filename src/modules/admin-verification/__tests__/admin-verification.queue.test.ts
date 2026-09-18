@@ -1,117 +1,108 @@
-// S-A-16 through the module's own read and actions (ADR-159), over the memory world: the queue view carries the
-// rows with a name beside each (03 §3.6), the counters and the open row; a nanny's session renders the forbidden
-// state, never an empty queue; the decision action parses at the boundary (a rejection without a reason names
-// the field), records through `verification.decide`, and answers the level the sync left; the reveal action
-// answers signed URLs and emits `vetting.evidence-viewed`; the Update Service action is the level-4 step.
-// Written RED first — the module was types only.
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+// S-A-16 through the module's own read and actions (ADR-159): the module decorates, parses at the boundary and
+// gates — the road itself (`verification.decide` / `openEvidence` / `recordUpdateServiceCheck`) is
+// `verification`'s and is proven in its own suites, so the connector is stubbed here (05 §3 rule 2; 01 §2.3 gives
+// this module no arrow to `vetting-providers`, whose memory world the road needs). The claims: the queue view
+// carries the rows with a name from `auth` beside each (03 §3.6), the counters and the open row; a refusal
+// renders as forbidden, never as an empty queue; the decision action parses (a rejection without a reason names
+// the field) and forwards; the reveal and Update Service actions validate their ids and enums. Written RED first.
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { configureAuth, stubAuth } from "@/modules/auth";
-import { configureComms, unconfiguredComms } from "@/modules/comms";
-import { LOCALE, SECURITY } from "@/modules/config";
-import {
-  configureConsent,
-  configureEvents,
-  configureRateLimiter,
-  consent,
-  createConsent,
-  createEvents,
-  createRateLimiter,
-  log,
-  memoryConsentStore,
-  memoryEventLogStore,
-  memoryRateLimitStore,
-  ok,
-} from "@/modules/platform";
-import type { ConsentRecordId, Email, UserId } from "@/modules/shared-types";
-import {
-  configureVerification,
-  createVerification,
-  memoryVerificationStore,
-  verification,
-} from "@/modules/verification";
-import {
-  configureVettingStore,
-  memoryVettingStore,
-} from "@/modules/vetting-providers";
-import {
+import { err, ok } from "@/modules/platform";
+import type { Email, SubmissionId, UserId } from "@/modules/shared-types";
+import type { QueueEntry, QueueRecord } from "@/modules/verification";
+
+const NANNY = "11111111-1111-4111-8111-111111111111" as UserId;
+const ADMIN = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" as UserId;
+const SUBMISSION = "33333333-3333-4333-8333-333333333333" as SubmissionId;
+
+const entry: QueueEntry = {
+  submissionId: SUBMISSION,
+  nannyId: NANNY,
+  section: "dbs",
+  evidenceType: "dbs-certificate",
+  status: "needs-admin",
+  submittedAt: "2026-09-18T09:00:00.000Z" as never,
+};
+const record: QueueRecord = {
+  entry,
+  state: {
+    nannyId: NANNY,
+    level: "L1_REGISTERED",
+    suspended: false,
+    sections: [
+      { section: "contact", status: "verified" },
+      { section: "identity", status: "review", attempts: 1 },
+      { section: "dbs", status: "review" },
+      { section: "right-to-work", status: "not_started" },
+    ],
+  },
+  record: {
+    nannyId: NANNY,
+    level: "L1_REGISTERED",
+    suspended: false,
+    declared: { certificateNumber: "123456789012" },
+    documents: [],
+    dbsOutcome: "unset",
+    crossCheckPassed: false,
+    updateService: {},
+  },
+};
+
+const notPermitted = () =>
+  err("FORBIDDEN", "You do not have access to this.", {
+    reason: "not-permitted" as const,
+  });
+
+const road = {
+  listQueue: vi.fn(async () => ok([entry])),
+  adminOverview: vi.fn(async () =>
+    ok({ pending: 1, verifiedToday: 0, rejectedToday: 0, fullyVerified: 2 }),
+  ),
+  readQueueRecord: vi.fn(async () => ok(record)),
+  decide: vi.fn(async () =>
+    ok({
+      nannyId: NANNY,
+      section: "dbs" as const,
+      status: "verified" as const,
+      sync: {
+        fromLevel: "L2_ID_VERIFIED" as const,
+        toLevel: "L3_PROVISIONALLY_VERIFIED" as const,
+        suspended: false,
+        released: 0,
+      },
+    }),
+  ),
+  openEvidence: vi.fn(async () =>
+    ok({
+      documents: [
+        {
+          section: "dbs-certificate" as const,
+          url: "https://stub.storage.test/x" as never,
+          expiresAt: "2026-09-18T10:00:00.000Z" as never,
+        },
+      ],
+      declared: { certificateNumber: "123456789012" },
+    }),
+  ),
+  recordUpdateServiceCheck: vi.fn(async () =>
+    ok({
+      fromLevel: "L3_PROVISIONALLY_VERIFIED" as const,
+      toLevel: "L4_FULLY_VERIFIED" as const,
+      suspended: false,
+      released: 1,
+    }),
+  ),
+};
+
+vi.mock("@/modules/verification", () => ({ verification: road }));
+
+const {
   decideSubmissionAction,
   loadVerificationQueue,
   openEvidenceAction,
   parseQueueQuery,
   recordUpdateServiceAction,
-} from "../index";
-
-const NANNY = "11111111-1111-4111-8111-111111111111" as UserId;
-const ADMIN = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" as UserId;
-const PDF = new TextEncoder().encode("%PDF-1.4 test");
-let JPEG: Uint8Array;
-let events: ReturnType<typeof memoryEventLogStore>;
-
-beforeAll(async () => {
-  const { tinyJpeg } = await import(
-    "@/modules/verification/__tests__/fixtures/tiny-jpeg"
-  );
-  JPEG = await tinyJpeg();
-});
-
-const signIn = (userId: UserId) =>
-  configureAuth(
-    stubAuth({
-      users: [
-        { id: NANNY, email: "amara@example.test" as Email, role: "nanny" },
-        {
-          id: ADMIN,
-          email: "admin@example.test" as Email,
-          role: "admin",
-          mfaVerified: true,
-        },
-      ],
-      signedInUserId: userId,
-      tables: {
-        user_profiles: [
-          { user_id: NANNY, first_name: "Amara", last_name: "Okafor" },
-        ],
-      },
-    }),
-  );
-
-async function submitAsNanny(): Promise<void> {
-  signIn(NANNY);
-  const recorded = await consent.recordConsent({
-    userId: NANNY,
-    party: "nanny",
-    agreementId: "AGR-04",
-    checkpointId: "agr04_biometric",
-    checkpointText: "I consent.",
-    context: {},
-    purpose: "biometric-notice",
-    document: { id: "biometric-notice", version: 1 },
-    consentGiven: true,
-  });
-  if (!recorded.ok) throw new Error("consent");
-  await verification.submitContact(NANNY, {
-    mobile: `${LOCALE.phonePrefix}7700900123` as never,
-    district: "SW4",
-    area: "Clapham",
-  });
-  await verification.submitIdentity(NANNY, {
-    idType: "passport",
-    document: { bytes: JPEG },
-    selfie: { bytes: JPEG },
-    surname: "Okafor",
-    givenNames: "Amara",
-    dateOfBirth: "1990-04-12" as never,
-    consentRecordId: recorded.value.id as ConsentRecordId,
-  });
-  await verification.submitDbs(NANNY, {
-    certificate: { bytes: PDF },
-    certificateNumber: "123456789012",
-    issueDate: "2026-01-10" as never,
-    updateServiceConsent: true,
-  });
-  await verification.process(NANNY);
-  signIn(ADMIN);
-}
+} = await import("../index");
 
 const form = (fields: Record<string, string>): FormData => {
   const data = new FormData();
@@ -120,32 +111,23 @@ const form = (fields: Record<string, string>): FormData => {
 };
 
 beforeEach(() => {
-  configureConsent(
-    createConsent({
-      store: memoryConsentStore({
-        documents: { "biometric-notice": { version: 1 } } as never,
-      }),
-      cookieExpiryDays: SECURITY.retention.cookieExpiryDays,
-    }),
-  );
-  configureRateLimiter(
-    createRateLimiter({
-      store: memoryRateLimitStore(),
-      burstAlertMultiple: SECURITY.burstAlertMultiple,
-      failOpenOnLimiterOutage: SECURITY.failOpenOnLimiterOutage,
-    }),
-    "shared",
-  );
-  events = memoryEventLogStore();
-  configureEvents(createEvents({ store: events, log }));
-  // comms fails closed here on purpose: a decision never depends on a message going (01 §4a rule 2)
-  configureComms(unconfiguredComms);
-  const ledger = memoryVettingStore();
-  configureVettingStore(ledger);
-  configureVerification(
-    createVerification({
-      store: memoryVerificationStore(ledger),
-      contactWriter: async () => ok(undefined),
+  vi.clearAllMocks();
+  configureAuth(
+    stubAuth({
+      users: [
+        {
+          id: ADMIN,
+          email: "reviewer@example.test" as Email,
+          role: "admin",
+          mfaVerified: true,
+        },
+      ],
+      signedInUserId: ADMIN,
+      tables: {
+        user_profiles: [
+          { user_id: NANNY, first_name: "Amara", last_name: "Okafor" },
+        ],
+      },
     }),
   );
 });
@@ -159,113 +141,165 @@ describe("parseQueueQuery", () => {
     });
     expect(
       parseQueueQuery({ tab: "dbs", filter: "stale-pending", open: "nope" }),
-    ).toEqual({ tab: "dbs", filter: "stale-pending", open: null });
-    expect(parseQueueQuery({ tab: ["right-to-work"] }).tab).toBe("right-to-work");
+    ).toEqual({
+      tab: "dbs",
+      filter: "stale-pending",
+      open: null,
+    });
+    expect(
+      parseQueueQuery({ tab: ["right-to-work"], open: SUBMISSION }).open,
+    ).toBe(SUBMISSION);
   });
 });
 
 describe("loadVerificationQueue (S-A-16's read)", () => {
   it("lists the tab's rows with the nanny's name beside each, the counters, and the open row", async () => {
-    await submitAsNanny();
+    const view = await loadVerificationQueue({
+      tab: "dbs",
+      filter: "needs-admin",
+      open: SUBMISSION,
+    });
+    expect(view.kind).toBe("queue");
+    if (view.kind !== "queue") return;
+    expect(view.rows).toEqual([{ ...entry, nannyName: "Amara Okafor" }]);
+    expect(view.overview.fullyVerified).toBe(2);
+    expect(view.open?.nannyName).toBe("Amara Okafor");
+    expect(view.open?.record.declared.certificateNumber).toBe("123456789012");
+    expect(road.listQueue).toHaveBeenCalledWith({
+      tab: "dbs",
+      filter: "needs-admin",
+      open: SUBMISSION,
+    });
+  });
+
+  it("a profile that cannot be read shows the id's short form, never an error on the list", async () => {
+    configureAuth(
+      stubAuth({
+        users: [
+          {
+            id: ADMIN,
+            email: "a@example.test" as Email,
+            role: "admin",
+            mfaVerified: true,
+          },
+        ],
+        signedInUserId: ADMIN,
+      }),
+    );
     const view = await loadVerificationQueue({
       tab: "dbs",
       filter: "needs-admin",
       open: null,
     });
-    expect(view.kind).toBe("queue");
-    if (view.kind !== "queue") return;
-    expect(view.rows).toHaveLength(1);
-    expect(view.rows[0]?.nannyName).toBe("Amara Okafor");
-    expect(view.overview.pending).toBe(3);
-    const opened = await loadVerificationQueue({
-      tab: "dbs",
-      filter: "needs-admin",
-      open: view.rows[0]!.submissionId,
-    });
-    expect(opened.kind === "queue" && opened.open?.nannyName).toBe("Amara Okafor");
-    expect(opened.kind === "queue" && opened.open?.record.declared.certificateNumber).toBe(
-      "123456789012",
+    expect(view.kind === "queue" && view.rows[0]?.nannyName).toBe(
+      `Nanny ${NANNY.slice(0, 8)}`,
     );
   });
 
-  it("renders the forbidden state for a nanny's session — never an empty queue", async () => {
-    await submitAsNanny();
-    signIn(NANNY);
+  it("renders the forbidden state when the road refuses — never an empty queue", async () => {
+    road.listQueue.mockResolvedValueOnce(notPermitted() as never);
     const view = await loadVerificationQueue({
       tab: "dbs",
       filter: "needs-admin",
       open: null,
     });
     expect(view).toEqual({ kind: "forbidden" });
+    road.adminOverview.mockResolvedValueOnce(
+      err("INTERNAL", "x", { reason: "store-failed" as const }) as never,
+    );
+    const down = await loadVerificationQueue({
+      tab: "dbs",
+      filter: "needs-admin",
+      open: null,
+    });
+    expect(down).toEqual({ kind: "unavailable" });
   });
 });
 
-describe("the three actions", () => {
-  it("decideSubmissionAction: a rejection without a reason names the field; a decision records and answers the level", async () => {
-    await submitAsNanny();
-    const view = await loadVerificationQueue({
-      tab: "identity",
-      filter: "needs-admin",
-      open: null,
-    });
-    if (view.kind !== "queue") throw new Error("no queue");
-    const document = view.rows.find((r) => r.evidenceType === "identity-document")!;
+describe("the three actions (01 §4a: validate once at the boundary)", () => {
+  it("decideSubmissionAction: a rejection without a reason names the field; a decision forwards and answers the level", async () => {
     const noReason = await decideSubmissionAction(
       null,
-      form({ submissionId: document.submissionId, decision: "rejected" }),
+      form({ submissionId: SUBMISSION, decision: "rejected" }),
     );
-    expect(!noReason.ok && noReason.error.details?.reason).toBe("invalid-input");
-    expect(!noReason.ok && (noReason.error.details as { field?: string }).field).toBe(
-      "reason",
+    expect(!noReason.ok && noReason.error.details?.reason).toBe(
+      "invalid-input",
     );
+    expect(
+      !noReason.ok && (noReason.error.details as { field?: string }).field,
+    ).toBe("reason");
+    expect(road.decide).not.toHaveBeenCalled();
     const verified = await decideSubmissionAction(
       null,
-      form({ submissionId: document.submissionId, decision: "verified", note: "clear scan" }),
-    );
-    expect(verified.ok && verified.value.sync.toLevel).toBe("L2_ID_VERIFIED");
-    expect(events.rows.map((r) => r.name)).toContain("vetting.decision-recorded");
-  });
-
-  it("openEvidenceAction: signed URLs for the section and one vetting.evidence-viewed; a malformed id is refused", async () => {
-    await submitAsNanny();
-    const view = await loadVerificationQueue({
-      tab: "identity",
-      filter: "needs-admin",
-      open: null,
-    });
-    if (view.kind !== "queue") throw new Error("no queue");
-    const bad = await openEvidenceAction(null, form({ submissionId: "x" }));
-    expect(!bad.ok && bad.error.details?.reason).toBe("invalid-input");
-    const opened = await openEvidenceAction(
-      null,
-      form({ submissionId: view.rows[0]!.submissionId }),
-    );
-    expect(opened.ok && opened.value.documents.length).toBe(2);
-    expect(events.rows.filter((r) => r.name === "vetting.evidence-viewed")).toHaveLength(1);
-  });
-
-  it("recordUpdateServiceAction: the level-4 step after L3", async () => {
-    await submitAsNanny();
-    const identity = await loadVerificationQueue({ tab: "identity", filter: "needs-admin", open: null });
-    const dbs = await loadVerificationQueue({ tab: "dbs", filter: "needs-admin", open: null });
-    if (identity.kind !== "queue" || dbs.kind !== "queue") throw new Error("no queue");
-    await decideSubmissionAction(
-      null,
       form({
-        submissionId: identity.rows.find((r) => r.evidenceType === "identity-document")!.submissionId,
+        submissionId: SUBMISSION,
         decision: "verified",
+        note: "clear scan",
       }),
     );
-    await decideSubmissionAction(
-      null,
-      form({ submissionId: dbs.rows[0]!.submissionId, decision: "verified" }),
+    expect(verified.ok && verified.value.sync.toLevel).toBe(
+      "L3_PROVISIONALLY_VERIFIED",
     );
+    expect(road.decide).toHaveBeenCalledWith({
+      submissionId: SUBMISSION,
+      decision: "verified",
+      note: "clear scan",
+    });
+  });
+
+  it("a refusal the panel can act on passes through; anything else is the generic line", async () => {
+    road.decide.mockResolvedValueOnce(notPermitted() as never);
+    const refused = await decideSubmissionAction(
+      null,
+      form({ submissionId: SUBMISSION, decision: "verified" }),
+    );
+    expect(!refused.ok && refused.error.details?.reason).toBe("not-permitted");
+    road.decide.mockResolvedValueOnce(
+      err("INTERNAL", "provider said no", {
+        reason: "provider-unavailable" as const,
+      }) as never,
+    );
+    const generic = await decideSubmissionAction(
+      null,
+      form({ submissionId: SUBMISSION, decision: "verified" }),
+    );
+    expect(!generic.ok && generic.error.message).not.toMatch(
+      /provider said no/,
+    );
+    expect(!generic.ok && generic.error.code).toBe("INTERNAL");
+  });
+
+  it("openEvidenceAction: a malformed id is refused before the road; a uuid opens", async () => {
+    const bad = await openEvidenceAction(null, form({ submissionId: "x" }));
+    expect(!bad.ok && bad.error.details?.reason).toBe("invalid-input");
+    expect(road.openEvidence).not.toHaveBeenCalled();
+    const opened = await openEvidenceAction(
+      null,
+      form({ submissionId: SUBMISSION }),
+    );
+    expect(opened.ok && opened.value.documents).toHaveLength(1);
+    expect(road.openEvidence).toHaveBeenCalledWith(SUBMISSION);
+  });
+
+  it("recordUpdateServiceAction: the result is 02 §3's enum, subscribed a boolean; the level-4 answer comes back", async () => {
+    const bad = await recordUpdateServiceAction(
+      null,
+      form({ submissionId: SUBMISSION, result: "maybe" }),
+    );
+    expect(!bad.ok && bad.error.details?.reason).toBe("invalid-input");
     const l4 = await recordUpdateServiceAction(
       null,
-      form({ nannyId: NANNY, result: "no_change", subscribed: "true" }),
+      form({
+        submissionId: SUBMISSION,
+        result: "no_change",
+        subscribed: "true",
+      }),
     );
     expect(l4.ok && l4.value.toLevel).toBe("L4_FULLY_VERIFIED");
-    const bad = await recordUpdateServiceAction(null, form({ nannyId: NANNY, result: "maybe" }));
-    expect(!bad.ok && bad.error.details?.reason).toBe("invalid-input");
+    expect(road.recordUpdateServiceCheck).toHaveBeenCalledWith({
+      submissionId: SUBMISSION,
+      result: "no_change",
+      subscribed: true,
+    });
   });
 });

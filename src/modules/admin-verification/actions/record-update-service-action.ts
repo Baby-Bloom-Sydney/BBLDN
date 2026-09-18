@@ -1,6 +1,6 @@
 "use server";
 // The level-4 action (04 §4.1 row 15; ADR-157 (3)): what the Update Service said about the certificate, recorded
-// by the session's admin. The nanny is named by user id from the open row; the result is 02 §3's enum.
+// by the session's admin. The open DBS submission names the nanny (never a form field); the result is 02 §3's enum.
 import { z } from "zod";
 import { err, toActionResult } from "@/modules/platform";
 import { ENUMS } from "@/modules/shared-types";
@@ -9,7 +9,7 @@ import type { ActionDetails, RecordUpdateServiceAction } from "../types";
 import { refuseAdminAction } from "../lib/refuse-admin-action";
 
 const schema = z.object({
-  nannyId: z.string().uuid(),
+  submissionId: z.string().uuid(),
   result: z.enum(ENUMS.update_service_result),
   subscribed: z.enum(["true", "false"]),
 });
@@ -19,7 +19,7 @@ export const recordUpdateServiceAction: RecordUpdateServiceAction = async (
   formData,
 ) => {
   const parsed = schema.safeParse({
-    nannyId: formData.get("nannyId"),
+    submissionId: formData.get("submissionId"),
     result: formData.get("result"),
     subscribed: formData.get("subscribed") ?? "false",
   });
@@ -33,7 +33,7 @@ export const recordUpdateServiceAction: RecordUpdateServiceAction = async (
   return refuseAdminAction(
     "recordUpdateService",
     await verification.recordUpdateServiceCheck({
-      nannyId: parsed.data.nannyId as never,
+      submissionId: parsed.data.submissionId as never,
       result: parsed.data.result,
       subscribed: parsed.data.subscribed === "true",
     }),

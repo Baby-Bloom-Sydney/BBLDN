@@ -12,9 +12,12 @@ import type {
 import { requireAdmin } from "./require-admin";
 
 const londonDay = (instant: string, now: Date): boolean =>
-  new Intl.DateTimeFormat("en-GB", { timeZone: LOCALE.timezone }).format(
+  new Intl.DateTimeFormat(LOCALE.locale, { timeZone: LOCALE.timezone }).format(
     new Date(instant),
-  ) === new Intl.DateTimeFormat("en-GB", { timeZone: LOCALE.timezone }).format(now);
+  ) ===
+  new Intl.DateTimeFormat(LOCALE.locale, { timeZone: LOCALE.timezone }).format(
+    now,
+  );
 
 export async function adminOverview(
   deps: VerificationDeps,

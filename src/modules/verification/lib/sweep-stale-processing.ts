@@ -14,7 +14,10 @@ export async function sweepStaleProcessing(
   deps: VerificationDeps,
   now: Instant,
 ): Promise<Result<SweepResult, VerificationErrorDetails>> {
-  const swept = await deps.store.sweepStale(VETTING.staleProcessingMinutes, now);
+  const swept = await deps.store.sweepStale(
+    VETTING.staleProcessingMinutes,
+    now,
+  );
   if (!swept.ok) return swept;
   return ok({ handled: swept.value, skipped: 0 });
 }

@@ -4188,6 +4188,7 @@ export type Database = {
           p_lead_id?: string
           p_mobile?: string
           p_profile?: Json
+          p_user_id?: string
         }
         Returns: Json
       }
@@ -4283,11 +4284,19 @@ export type Database = {
       is_privileged_writer: { Args: never; Returns: boolean }
       is_retention_job: { Args: never; Returns: boolean }
       lift_nanny_isolation: { Args: never; Returns: boolean }
+      nanny_is_visible: { Args: { p_nanny_id: string }; Returns: boolean }
       nanny_leave_child: {
         Args: { p_child_id: string; p_reason: string }
         Returns: string
       }
       nanny_profile_columns: { Args: { p_profile: Json }; Returns: Json }
+      nanny_visible: {
+        Args: {
+          p_is_isolated: boolean
+          p_level: Database["public"]["Enums"]["verification_level"]
+        }
+        Returns: boolean
+      }
       open_dfy_access: {
         Args: {
           p_parent_user_id: string

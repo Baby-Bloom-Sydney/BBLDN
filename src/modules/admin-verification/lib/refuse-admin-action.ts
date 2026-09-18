@@ -28,8 +28,12 @@ export function refuseAdminAction<T>(
     reason: result.error.details?.reason ?? null,
   });
   return toActionResult(
-    err<ActionDetails>("INTERNAL", "That could not be recorded just now. Try again in a moment.", {
-      reason: "store-failed",
-    }),
+    err<ActionDetails>(
+      "INTERNAL",
+      "That could not be recorded just now. Try again in a moment.",
+      {
+        reason: "store-failed",
+      },
+    ),
   );
 }

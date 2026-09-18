@@ -8,7 +8,10 @@ import { refuseAdminAction } from "../lib/refuse-admin-action";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const openEvidenceAction: OpenEvidenceAction = async (_previous, formData) => {
+export const openEvidenceAction: OpenEvidenceAction = async (
+  _previous,
+  formData,
+) => {
   const submissionId = formData.get("submissionId");
   if (typeof submissionId !== "string" || !UUID.test(submissionId))
     return toActionResult(

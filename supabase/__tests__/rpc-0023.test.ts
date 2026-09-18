@@ -85,7 +85,12 @@ const asNanny = <T extends Record<string, unknown>>(
   sql: string,
   params: ReadonlyArray<unknown> = [],
 ) =>
-  asRole<T>("authenticated", { sub: userId, role: "authenticated" }, sql, params);
+  asRole<T>(
+    "authenticated",
+    { sub: userId, role: "authenticated" },
+    sql,
+    params,
+  );
 const asService = <T extends Record<string, unknown>>(
   sql: string,
   params: ReadonlyArray<unknown> = [],
@@ -120,10 +125,17 @@ async function makeNanny(userId: string, email: string): Promise<string> {
   const { rows } = await db.query<{ district: string }>(
     "select district from public.areas order by district limit 1",
   );
-  const out = await asNanny<{ out: { nanny_id: string } }>(
-    userId,
-    `select public.create_nanny_account($1, $2, false, $3, $4, $5, null, '{}'::jsonb) as out`,
-    ["Amara", "Okafor", "+447700900002", rows[0]!.district, "Test Area"],
+  // ADR-163 (0023): the definer is service_role only and acts for p_user_id
+  const out = await asService<{ out: { nanny_id: string } }>(
+    `select public.create_nanny_account($1, $2, false, $3, $4, $5, null, '{}'::jsonb, $6::uuid) as out`,
+    [
+      "Amara",
+      "Okafor",
+      "+447700900002",
+      rows[0]!.district,
+      "Test Area",
+      userId,
+    ],
   );
   return out[0]!.out.nanny_id;
 }
@@ -216,14 +228,20 @@ async function verifyToL3(userId: string): Promise<{
   dbs: string;
 }> {
   const consent = await giveBiometricConsent(userId);
-  const identity = await submit(userId, EV(1), "identity", "identity-document", {
-    identity_evidence_type: "passport",
-    identity_document_ref: `${userId}/identity-document/doc.jpg`,
-    surname: "Okafor",
-    given_names: "Amara",
-    date_of_birth: "1990-04-12",
-    biometric_consent_id: consent,
-  });
+  const identity = await submit(
+    userId,
+    EV(1),
+    "identity",
+    "identity-document",
+    {
+      identity_evidence_type: "passport",
+      identity_document_ref: `${userId}/identity-document/doc.jpg`,
+      surname: "Okafor",
+      given_names: "Amara",
+      date_of_birth: "1990-04-12",
+      biometric_consent_id: consent,
+    },
+  );
   await submit(userId, EV(2), "identity", "selfie", {
     identity_selfie_ref: `${userId}/identity-selfie/selfie.jpg`,
     biometric_consent_id: consent,
@@ -281,14 +299,20 @@ describe("sync_nanny_verification_state() — the level's one writer (ADR-157 (1
 
   it("identity submitted → L1; identity verified → L2; both written to nannies and verifications with level_changed_at", async () => {
     const consent = await giveBiometricConsent(NANNY);
-    const identity = await submit(NANNY, EV(1), "identity", "identity-document", {
-      identity_evidence_type: "passport",
-      identity_document_ref: `${NANNY}/identity-document/doc.jpg`,
-      surname: "Okafor",
-      given_names: "Amara",
-      date_of_birth: "1990-04-12",
-      biometric_consent_id: consent,
-    });
+    const identity = await submit(
+      NANNY,
+      EV(1),
+      "identity",
+      "identity-document",
+      {
+        identity_evidence_type: "passport",
+        identity_document_ref: `${NANNY}/identity-document/doc.jpg`,
+        surname: "Okafor",
+        given_names: "Amara",
+        date_of_birth: "1990-04-12",
+        biometric_consent_id: consent,
+      },
+    );
     expect((await sync(nannyId)).to_level).toBe("L1_REGISTERED");
     expect((await levels(nannyId)).v_level).toBe("L1_REGISTERED");
 
@@ -301,7 +325,9 @@ describe("sync_nanny_verification_state() — the level's one writer (ADR-157 (1
 
   it("refuses a malformed list and an emptied L2–L4 list rather than granting a level (ADR-157 (1))", async () => {
     expect(
-      await refusalOf(() => sync(nannyId, JSON.stringify({ L2_ID_VERIFIED: ["dbs"] }))),
+      await refusalOf(() =>
+        sync(nannyId, JSON.stringify({ L2_ID_VERIFIED: ["dbs"] })),
+      ),
     ).toMatch(/must require at least one section|L3_PROVISIONALLY_VERIFIED/);
     expect(
       await refusalOf(() =>
@@ -323,16 +349,27 @@ describe("sync_nanny_verification_state() — the level's one writer (ADR-157 (1
   });
 
   it("right-to-work verified alone never moves the level (ADR-153)", async () => {
-    const rtw = await submit(NANNY, EV(4), "right_to_work", "right-to-work-passport", {
-      rtw_evidence_type: "british_irish_passport",
-      rtw_document_ref: `${NANNY}/rtw-document/passport.jpg`,
-    });
+    const rtw = await submit(
+      NANNY,
+      EV(4),
+      "right_to_work",
+      "right-to-work-passport",
+      {
+        rtw_evidence_type: "british_irish_passport",
+        rtw_document_ref: `${NANNY}/rtw-document/passport.jpg`,
+      },
+    );
     await decide(rtw.submission_id, "verified");
     expect((await levels(nannyId)).n_level).toBe("L0_SIGNED_UP");
   });
 
   it("agrees with the TypeScript deriveLevel over the whole matrix (the two cannot drift)", async () => {
-    const statuses = ["not_started", "pending", "verified", "rejected"] as const;
+    const statuses = [
+      "not_started",
+      "pending",
+      "verified",
+      "rejected",
+    ] as const;
     const outcomes = ["unset", "cleared", "barred"] as const;
     const crossChecks = ["not_started", "passed"] as const;
     const usResults = [null, "no_change", "new_information"] as const;
@@ -358,7 +395,16 @@ describe("sync_nanny_verification_state() — the level's one writer (ADR-157 (1
                    dbs_update_service_last_result = excluded.dbs_update_service_last_result,
                    dbs_update_service_checked_by = excluded.dbs_update_service_checked_by,
                    level = 'L0_SIGNED_UP', suspended_at = excluded.suspended_at`,
-                [nannyId, identity, dbs, outcome, cross, us, us === null ? null : fx.admin, consent],
+                [
+                  nannyId,
+                  identity,
+                  dbs,
+                  outcome,
+                  cross,
+                  us,
+                  us === null ? null : fx.admin,
+                  consent,
+                ],
               );
               const out = await sync(nannyId);
               const facts: LevelFacts = {
@@ -386,14 +432,20 @@ describe("record_vetting_decision() — the admin's one write (ADR-157 (2); ADR-
 
   it("is service_role only", async () => {
     const consent = await giveBiometricConsent(NANNY);
-    const identity = await submit(NANNY, EV(1), "identity", "identity-document", {
-      identity_evidence_type: "passport",
-      identity_document_ref: `${NANNY}/identity-document/doc.jpg`,
-      surname: "Okafor",
-      given_names: "Amara",
-      date_of_birth: "1990-04-12",
-      biometric_consent_id: consent,
-    });
+    const identity = await submit(
+      NANNY,
+      EV(1),
+      "identity",
+      "identity-document",
+      {
+        identity_evidence_type: "passport",
+        identity_document_ref: `${NANNY}/identity-document/doc.jpg`,
+        surname: "Okafor",
+        given_names: "Amara",
+        date_of_birth: "1990-04-12",
+        biometric_consent_id: consent,
+      },
+    );
     expect(
       await refusalOf(() =>
         asNanny(
@@ -411,7 +463,11 @@ describe("record_vetting_decision() — the admin's one write (ADR-157 (2); ADR-
     expect(row.n_level).toBe("L3_PROVISIONALLY_VERIFIED");
     expect(row.dbs_outcome).toBe("cleared");
     expect(row.cross_check).toBe("passed");
-    const { rows } = await db.query<{ checked_by: string; status: string; note: string | null }>(
+    const { rows } = await db.query<{
+      checked_by: string;
+      status: string;
+      note: string | null;
+    }>(
       `select v.dbs_checked_by::text as checked_by, s.status::text, s.raw_response ->> 'note' as note
          from public.vetting_submissions s join public.verifications v on v.id = s.verification_id
         where s.id = $1`,
@@ -422,12 +478,21 @@ describe("record_vetting_decision() — the admin's one write (ADR-157 (2); ADR-
 
   it("a rejection needs a reason; the note lands on the ledger; the outcome returns to unset and the level drops", async () => {
     const { dbs } = await verifyToL3(NANNY);
-    expect(
-      await refusalOf(() => decide(dbs, "rejected", null)),
-    ).toMatch(/needs a reason/);
+    expect(await refusalOf(() => decide(dbs, "rejected", null))).toMatch(
+      /needs a reason/,
+    );
     // a later DBS submission is refused while the section is verified (0022) — so the re-decision is on the same row
-    const out = await decide(dbs, "rejected", "mismatch", "name differs from the passport");
-    expect(out).toMatchObject({ section: "dbs", status: "rejected", to_level: "L2_ID_VERIFIED" });
+    const out = await decide(
+      dbs,
+      "rejected",
+      "mismatch",
+      "name differs from the passport",
+    );
+    expect(out).toMatchObject({
+      section: "dbs",
+      status: "rejected",
+      to_level: "L2_ID_VERIFIED",
+    });
     const row = await levels(nannyId);
     expect(row.dbs_outcome).toBe("unset");
     expect(row.cross_check).toBe("not_started");
@@ -487,9 +552,9 @@ describe("record_vetting_decision() — the admin's one write (ADR-157 (2); ADR-
       date_of_birth: "1990-04-12",
       biometric_consent_id: consent,
     });
-    expect(await refusalOf(() => decide(first.submission_id, "verified"))).toMatch(
-      /STALE_SUBMISSION/,
-    );
+    expect(
+      await refusalOf(() => decide(first.submission_id, "verified")),
+    ).toMatch(/STALE_SUBMISSION/);
   });
 });
 
@@ -515,7 +580,12 @@ describe("record_update_service_check() — the level-4 action (ADR-157 (3); B-1
     await db.query(
       `insert into public.connection_requests (id, position_id, parent_id, nanny_id, stage, origin, held_for_verification, held_at)
        values ($1, $2, $3, $4, 'REQUEST_SENT', 'parent_request', true, now())`,
-      ["00230000-0000-4000-8000-000000000011", fx.positionA, fx.parentAId, nannyId],
+      [
+        "00230000-0000-4000-8000-000000000011",
+        fx.positionA,
+        fx.parentAId,
+        nannyId,
+      ],
     );
     const out = await updateService(nannyId, "no_change", true, fx.admin);
     expect(out).toMatchObject({ to_level: "L4_FULLY_VERIFIED", released: 1 });
@@ -524,21 +594,30 @@ describe("record_update_service_check() — the level-4 action (ADR-157 (3); B-1
       [nannyId],
     );
     expect(rows[0]).toEqual({ held: false, held_at: null });
-    const { rows: us } = await db.query<{ by: string; result: string; subscribed: boolean }>(
+    const { rows: us } = await db.query<{
+      by: string;
+      result: string;
+      subscribed: boolean;
+    }>(
       `select dbs_update_service_checked_by::text as by, dbs_update_service_last_result::text as result,
               dbs_update_service_subscribed as subscribed from public.verifications where nanny_id = $1`,
       [nannyId],
     );
-    expect(us[0]).toEqual({ by: fx.admin, result: "no_change", subscribed: true });
+    expect(us[0]).toEqual({
+      by: fx.admin,
+      result: "no_change",
+      subscribed: true,
+    });
   });
 
   it("not_subscribed and check_failed confirm nothing (L3 stays); new_information returns the section to review (L2)", async () => {
-    expect((await updateService(nannyId, "not_subscribed", false, fx.admin)).to_level).toBe(
-      "L3_PROVISIONALLY_VERIFIED",
-    );
-    expect((await updateService(nannyId, "check_failed", true, fx.admin)).to_level).toBe(
-      "L3_PROVISIONALLY_VERIFIED",
-    );
+    expect(
+      (await updateService(nannyId, "not_subscribed", false, fx.admin))
+        .to_level,
+    ).toBe("L3_PROVISIONALLY_VERIFIED");
+    expect(
+      (await updateService(nannyId, "check_failed", true, fx.admin)).to_level,
+    ).toBe("L3_PROVISIONALLY_VERIFIED");
     const out = await updateService(nannyId, "new_information", true, fx.admin);
     expect(out.to_level).toBe("L2_ID_VERIFIED");
     expect((await levels(nannyId)).dbs_status).toBe("review");
@@ -643,15 +722,137 @@ describe("apply_payment_event() writes payment_events.outcome (ADR-156, folded i
       `insert into public.parent_subscriptions (parent_user_id, status) values ($1, 'lapsed')`,
       [fx.parentA],
     );
-    expect((await apply("evt_ignored", fx.parentA, null)).outcome).toBe("ignored");
+    expect((await apply("evt_ignored", fx.parentA, null)).outcome).toBe(
+      "ignored",
+    );
     expect(await outcomeOf("evt_ignored")).toBe("ignored");
-    expect((await apply("evt_unresolved", null, { status: "trial" })).outcome).toBe("unresolved");
+    expect(
+      (await apply("evt_unresolved", null, { status: "trial" })).outcome,
+    ).toBe("unresolved");
     expect(await outcomeOf("evt_unresolved")).toBe("unresolved");
-    expect((await apply("evt_applied", fx.parentA, { status: "trial" })).outcome).toBe("applied");
+    expect(
+      (await apply("evt_applied", fx.parentA, { status: "trial" })).outcome,
+    ).toBe("applied");
     expect(await outcomeOf("evt_applied")).toBe("applied");
     const { rows } = await db.query<{ provider_event_id: string }>(
       `select provider_event_id from public.payment_events where outcome is null`,
     );
     expect(rows).toHaveLength(0);
+  });
+});
+
+// --------------------------------------------------------------------------- REVIEW-3 folded: ADR-162 · ADR-163 · M-5
+
+describe("one visibility predicate (ADR-162; REVIEW-3 C-1 / R-1)", () => {
+  let nannyId: string;
+  beforeEach(async () => {
+    nannyId = await makeNanny(NANNY, "amara-0023@example.test");
+  });
+
+  it("an applied L0 nanny is not active, reads no open position and no child's care needs; at L3 she is and does", async () => {
+    const before = await asNanny<{ active: boolean }>(
+      NANNY,
+      "select public.is_active_nanny() as active",
+    );
+    expect(before[0]).toEqual({ active: false });
+    expect(
+      await asNanny(NANNY, "select id from public.nanny_positions"),
+    ).toEqual([]);
+    expect(
+      await asNanny(
+        NANNY,
+        "select needs_details from public.position_children",
+      ),
+    ).toEqual([]);
+    await verifyToL3(NANNY);
+    const after = await asNanny<{ active: boolean }>(
+      NANNY,
+      "select public.is_active_nanny() as active",
+    );
+    expect(after[0]).toEqual({ active: true });
+    expect(
+      await asNanny(NANNY, "select id from public.nanny_positions"),
+    ).toHaveLength(1);
+  });
+
+  it("nanny_public, is_active_nanny() and the matching index all read nanny_visible(); the row form is immutable", async () => {
+    const { rows } = await db.query<{ src: string }>(
+      `select p.prosrc as src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'is_active_nanny'`,
+    );
+    expect(rows[0]!.src).toMatch(/nanny_visible/);
+    const view = await db.query<{ def: string }>(
+      "select pg_get_viewdef('public.nanny_public'::regclass) as def",
+    );
+    expect(view.rows[0]!.def).toMatch(/nanny_visible/);
+    const idx = await db.query<{ def: string }>(
+      `select pg_get_indexdef(i.indexrelid) as def from pg_index i join pg_class c on c.oid = i.indexrelid
+        where c.relname = 'nannies_matching_idx'`,
+    );
+    expect(idx.rows[0]!.def).toMatch(/nanny_visible/);
+    const vol = await db.query<{ v: string }>(
+      `select p.provolatile as v from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'nanny_visible'`,
+    );
+    expect(vol.rows[0]!.v).toBe("i");
+    const visible = await asService<{ v: boolean }>(
+      `select public.nanny_is_visible($1::uuid) as v`,
+      [nannyId],
+    );
+    expect(visible[0]!.v).toBe(false);
+  });
+});
+
+describe("create_nanny_account() is service_role, acting for p_user_id (ADR-163; REVIEW-3 R-2)", () => {
+  it("a signed-in user's own session is refused; the service road names the user and honours p_isolated", async () => {
+    await makeAuthUser(NANNY, "amara-0023@example.test");
+    expect(
+      await refusalOf(() =>
+        asNanny(
+          NANNY,
+          `select public.create_nanny_account('A', 'B', false, null, null, null, null, '{}'::jsonb, $1::uuid)`,
+          [NANNY],
+        ),
+      ),
+    ).toMatch(/permission denied/);
+    expect(
+      await refusalOf(() =>
+        asService(
+          `select public.create_nanny_account('A', 'B', false, null, null, null, null, '{}'::jsonb, null)`,
+        ),
+      ),
+    ).toMatch(/p_user_id is required/);
+    const out = await asService<{ out: { nanny_id: string } }>(
+      `select public.create_nanny_account('A', 'B', true, null, null, null, null, '{}'::jsonb, $1::uuid) as out`,
+      [NANNY],
+    );
+    const { rows } = await db.query<{ is_isolated: boolean }>(
+      `select is_isolated from public.nannies where id = $1`,
+      [out[0]!.out.nanny_id],
+    );
+    expect(rows[0]).toEqual({ is_isolated: true });
+    const overloads = await db.query<{ n: string }>(
+      `select count(*)::text as n from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+        where ns.nspname = 'public' and p.proname = 'create_nanny_account'`,
+    );
+    expect(overloads.rows[0]!.n).toBe("1");
+  });
+});
+
+describe("the Update Service consent instant is the server's (REVIEW-3 M-5)", () => {
+  it("a client-authored value is ignored: the key's presence stamps now()", async () => {
+    const nannyId = await makeNanny(NANNY, "amara-0023@example.test");
+    await submit(NANNY, EV(3), "dbs", "dbs-certificate", {
+      dbs_certificate_ref: `${NANNY}/dbs-certificate/cert.pdf`,
+      dbs_certificate_number: "123456789012",
+      dbs_issue_date: "2026-01-10",
+      dbs_update_service_consent_at: "1999-01-01T00:00:00Z",
+    });
+    const { rows } = await db.query<{ ago: number }>(
+      `select extract(epoch from (now() - dbs_update_service_consent_at))::float as ago
+         from public.verifications where nanny_id = $1`,
+      [nannyId],
+    );
+    expect(rows[0]!.ago).toBeLessThan(5);
   });
 });

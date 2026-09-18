@@ -32,6 +32,7 @@ describe("dbNannyAccountStore — 0021's definers at session scope (ADR-152)", (
     const fake = fakeDataPort();
     fake.state.rpcAnswer = () => ({ nanny_id: "n-1", lead_converted: true });
     const result = await dbNannyAccountStore(fake.port, currentUser).create({
+      userId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" as never,
       firstName: "Amara",
       lastName: "Okafor",
       isolated: false,
@@ -49,6 +50,7 @@ describe("dbNannyAccountStore — 0021's definers at session scope (ADR-152)", (
       {
         name: "create_nanny_account",
         args: {
+          p_user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
           p_first_name: "Amara",
           p_last_name: "Okafor",
           p_isolated: false,
@@ -64,7 +66,8 @@ describe("dbNannyAccountStore — 0021's definers at session scope (ADR-152)", (
         },
       },
     ]);
-    expect(fake.calls[0]?.scope).toBe("session");
+    // ADR-163: the definer is service_role only and acts for p_user_id
+    expect(fake.calls[0]?.scope).toBe("service");
     expect(fake.inserted).toEqual([]);
   });
 
@@ -72,11 +75,13 @@ describe("dbNannyAccountStore — 0021's definers at session scope (ADR-152)", (
     const fake = fakeDataPort();
     fake.state.rpcAnswer = () => ({ nanny_id: "n-2", lead_converted: false });
     await dbNannyAccountStore(fake.port, currentUser).create({
+      userId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" as never,
       firstName: "Bea",
       lastName: "Lin",
       isolated: true,
     });
     expect(fake.rpcs[0]?.args).toEqual({
+      p_user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       p_first_name: "Bea",
       p_last_name: "Lin",
       p_isolated: true,

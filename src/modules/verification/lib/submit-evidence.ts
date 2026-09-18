@@ -65,7 +65,9 @@ export async function submitEvidence(
     }
   }
   // 03 §8.2 row 30: "cancelled on resubmission" — a queued action-needed nudge for this section is withdrawn
-  const cancelled = await comms.cancel(REMINDER_KEYS.actionNeeded(nannyId, section));
+  const cancelled = await comms.cancel(
+    REMINDER_KEYS.actionNeeded(nannyId, section),
+  );
   if (!cancelled.ok)
     log.warn("verification-action-needed not cancelled", {
       module: "verification",

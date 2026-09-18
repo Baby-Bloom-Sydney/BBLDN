@@ -14,6 +14,7 @@ import type {
   VerificationErrorDetails,
   VerificationSection,
 } from "../types";
+import { consumeAdminRouteLimit } from "./consume-admin-route-limit";
 import { emitVerificationEvent } from "./emit-verification-event";
 import { requireAdmin } from "./require-admin";
 import { sectionOfLedger } from "./section-of-ledger";
@@ -34,7 +35,9 @@ function declaredFor(
   switch (section) {
     case "identity":
       return {
-        ...(declared.surname === undefined ? {} : { surname: declared.surname }),
+        ...(declared.surname === undefined
+          ? {}
+          : { surname: declared.surname }),
         ...(declared.givenNames === undefined
           ? {}
           : { givenNames: declared.givenNames }),
@@ -45,7 +48,9 @@ function declaredFor(
       };
     case "dbs":
       return {
-        ...(declared.surname === undefined ? {} : { surname: declared.surname }),
+        ...(declared.surname === undefined
+          ? {}
+          : { surname: declared.surname }),
         ...(declared.certificateNumber === undefined
           ? {}
           : { certificateNumber: declared.certificateNumber }),
@@ -55,7 +60,9 @@ function declaredFor(
       };
     default:
       return {
-        ...(declared.rtwKind === undefined ? {} : { rtwKind: declared.rtwKind }),
+        ...(declared.rtwKind === undefined
+          ? {}
+          : { rtwKind: declared.rtwKind }),
         ...(declared.shareCode === undefined
           ? {}
           : { shareCode: declared.shareCode }),
@@ -72,6 +79,8 @@ export async function openEvidence(
 ): Promise<Result<EvidenceOpen, VerificationErrorDetails>> {
   const admin = await requireAdmin();
   if (!admin.ok) return admin;
+  const limited = await consumeAdminRouteLimit(admin.value);
+  if (!limited.ok) return limited;
   const entry = await readSubmission(submissionId);
   if (!entry.ok) return entry as Result<never, VerificationErrorDetails>;
   const section =

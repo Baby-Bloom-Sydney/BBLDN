@@ -1,5 +1,5 @@
-// A timestamp as the admin reads it: Europe/London, en-GB, date + time (04 §6.4 "Europe/London" on every admin
-// screen). Pure; the zone and locale are config, never literals.
+// A timestamp as the admin reads it: the config zone and locale, date + time (04 §6.4: every admin screen shows
+// the London wall clock). Pure; the zone and locale are `LOCALE`'s, never literals.
 import { LOCALE } from "@/modules/config";
 
 const FORMAT = new Intl.DateTimeFormat(LOCALE.locale, {

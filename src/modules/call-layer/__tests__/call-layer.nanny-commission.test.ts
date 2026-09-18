@@ -91,7 +91,10 @@ type Sent = {
   readonly sent: Message[];
   readonly scheduled: Message[];
   /** ADR-160 — the operator's queue rows the seam was asked to raise */
-  readonly raised: Array<{ readonly kind: string; readonly subject?: { readonly type: string; readonly id: string } }>;
+  readonly raised: Array<{
+    readonly kind: string;
+    readonly subject?: { readonly type: string; readonly id: string };
+  }>;
 };
 
 const fakeComms = (): Comms & Sent => {

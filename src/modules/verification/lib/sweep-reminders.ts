@@ -19,9 +19,7 @@ export async function sweepReminders(
   deps: VerificationDeps,
   now: Instant,
 ): Promise<Result<SweepResult, VerificationErrorDetails>> {
-  const stalled = await deps.store.listRemindable(
-    "L3_PROVISIONALLY_VERIFIED",
-  );
+  const stalled = await deps.store.listRemindable("L3_PROVISIONALLY_VERIFIED");
   if (!stalled.ok) return stalled;
   const at = Date.parse(now);
   let handled = 0;

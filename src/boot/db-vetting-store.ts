@@ -72,12 +72,16 @@ const checkStatusOf = (row: LedgerRow): CheckStatus => {
         kind: "verified",
         at: (row.checked_at ?? row.submitted_at) as Instant,
       };
-    case "failed":
+    case "failed": {
+      // REVIEW-3 M-8: a rejected section always carries a copy key — the recorded key, else the reason itself
+      // (SectionCard maps a reason to its line), never an empty string a screen would render as nothing
+      const reason = row.raw_response?.reject_reason ?? "mismatch";
       return {
         kind: "rejected",
-        reason: (row.raw_response?.reject_reason ?? "mismatch") as never,
-        guidanceKey: (row.raw_response?.guidance_key ?? "") as never,
+        reason: reason as never,
+        guidanceKey: (row.raw_response?.guidance_key || reason) as never,
       };
+    }
     case "needs_admin":
       return { kind: "needs-admin" };
     default:
@@ -96,7 +100,9 @@ const entryOf = (row: LedgerRow): VettingLedgerEntry => ({
   evidenceType: row.evidence_type as EvidenceType,
   submittedAt: row.submitted_at as Instant,
   ...(row.checked_at === null ? {} : { checkedAt: row.checked_at as Instant }),
-  ...(row.raw_response?.note === undefined ? {} : { note: row.raw_response.note }),
+  ...(row.raw_response?.note === undefined
+    ? {}
+    : { note: row.raw_response.note }),
 });
 
 /** Evidence → the section's submission columns `0022` admits (ADR-154 (2)); a key outside the list is dropped there. */
@@ -123,17 +129,24 @@ function columnsOf(evidence: Evidence): Record<string, unknown> {
         dbs_certificate_ref: ref,
         dbs_certificate_number: d.certificateNumber,
         dbs_issue_date: d.issueDate,
+        // REVIEW-3 M-5: the key's PRESENCE is the consent; the instant is the server's (0023 stamps now())
         ...(d.updateServiceConsent === "true"
-          ? { dbs_update_service_consent_at: evidence.submittedAt }
+          ? { dbs_update_service_consent_at: true }
           : {}),
       };
+    // REVIEW-3 L-4: the Update Service consent submitted as evidence of its own (03 §4.2's type) — the same
+    // marker, never a silent `{}`
+    case "dbs-update-service":
+      return { dbs_update_service_consent_at: true };
     case "right-to-work-passport":
     case "right-to-work-document":
       return { rtw_evidence_type: d.kind, rtw_document_ref: ref };
     case "right-to-work-share-code":
       return { rtw_evidence_type: d.kind, rtw_share_code: d.shareCode };
-    default:
-      return {};
+    default: {
+      const never: never = evidence.type;
+      throw new Error(`columnsOf: unmapped evidence type ${String(never)}`);
+    }
   }
 }
 

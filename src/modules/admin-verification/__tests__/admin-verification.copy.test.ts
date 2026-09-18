@@ -11,7 +11,14 @@ const listFiles = (dir: string): string[] =>
     const full = join(dir, entry);
     return statSync(full).isDirectory() ? listFiles(full) : [full];
   });
-const BANNED = [/\bWWCC\b/, /\bOCG\b/, /\bSydney\b/, /\bNSW\b/, /\$\s?\d/, /\bpolice check\b/i];
+const BANNED = [
+  /\bWWCC\b/,
+  /\bOCG\b/,
+  /\bSydney\b/,
+  /\bNSW\b/,
+  /\$\s?\d/,
+  /\bpolice check\b/i,
+];
 /** the copy, not the comments — a comment may name what the screen replaced */
 const copyOf = (file: string): string =>
   readFileSync(file, "utf8")
@@ -25,7 +32,8 @@ describe("admin-verification — copy", () => {
     "%s carries no Sydney check name, city or currency sign",
     (rel) => {
       const text = copyOf(join(COMPONENTS, rel));
-      for (const pattern of BANNED) expect(text, `${rel} matches ${pattern}`).not.toMatch(pattern);
+      for (const pattern of BANNED)
+        expect(text, `${rel} matches ${pattern}`).not.toMatch(pattern);
     },
   );
   it("the queue says a person decides and a reveal is recorded (07 §2.6; §4.32)", () => {

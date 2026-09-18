@@ -8,22 +8,30 @@ import { ENUMS } from "@/modules/shared-types";
 import { QueueTable } from "./QueueTable";
 import { SubmissionPanel } from "./SubmissionPanel";
 
-const TABS: ReadonlyArray<{ readonly key: QueueTab; readonly label: string }> = [
-  { key: "identity", label: "ID" },
-  { key: "dbs", label: "DBS" },
-  { key: "right-to-work", label: "Right to work" },
-];
+const TABS: ReadonlyArray<{ readonly key: QueueTab; readonly label: string }> =
+  [
+    { key: "identity", label: "ID" },
+    { key: "dbs", label: "DBS" },
+    { key: "right-to-work", label: "Right to work" },
+  ];
 
 const FILTERS = [
   { key: "needs-admin", label: "Needs a person" },
   { key: "stale-pending", label: "Stuck pending" },
 ] as const;
 
-export function VerificationQueue({ view, actions, basePath }: VerificationQueueProps) {
+export function VerificationQueue({
+  view,
+  actions,
+  basePath,
+}: VerificationQueueProps) {
   if (view.kind !== "queue")
     return (
       <section aria-labelledby="verification-queue-heading">
-        <h1 id="verification-queue-heading" className="text-2xl font-bold text-slate-900">
+        <h1
+          id="verification-queue-heading"
+          className="text-2xl font-bold text-slate-900"
+        >
           Verification queue
         </h1>
         <p role="alert" className="mt-2 text-sm text-slate-700">
@@ -41,25 +49,36 @@ export function VerificationQueue({ view, actions, basePath }: VerificationQueue
   return (
     <section aria-labelledby="verification-queue-heading" className="space-y-6">
       <header>
-        <h1 id="verification-queue-heading" className="text-2xl font-bold text-slate-900">
+        <h1
+          id="verification-queue-heading"
+          className="text-2xl font-bold text-slate-900"
+        >
           Verification queue
         </h1>
         <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
           <div className="rounded-lg border border-slate-200 bg-white p-3">
             <dt className="text-slate-500">Needs a person</dt>
-            <dd className="text-lg font-semibold text-slate-900">{overview.pending}</dd>
+            <dd className="text-lg font-semibold text-slate-900">
+              {overview.pending}
+            </dd>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white p-3">
             <dt className="text-slate-500">Verified today</dt>
-            <dd className="text-lg font-semibold text-slate-900">{overview.verifiedToday}</dd>
+            <dd className="text-lg font-semibold text-slate-900">
+              {overview.verifiedToday}
+            </dd>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white p-3">
             <dt className="text-slate-500">Rejected today</dt>
-            <dd className="text-lg font-semibold text-slate-900">{overview.rejectedToday}</dd>
+            <dd className="text-lg font-semibold text-slate-900">
+              {overview.rejectedToday}
+            </dd>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white p-3">
             <dt className="text-slate-500">Fully verified</dt>
-            <dd className="text-lg font-semibold text-slate-900">{overview.fullyVerified}</dd>
+            <dd className="text-lg font-semibold text-slate-900">
+              {overview.fullyVerified}
+            </dd>
           </div>
         </dl>
       </header>
@@ -98,7 +117,10 @@ export function VerificationQueue({ view, actions, basePath }: VerificationQueue
         ))}
       </nav>
 
-      <QueueTable rows={rows} href={(id) => link(query.tab, query.filter, id)} />
+      <QueueTable
+        rows={rows}
+        href={(id) => link(query.tab, query.filter, id)}
+      />
 
       {open !== null && (
         <SubmissionPanel

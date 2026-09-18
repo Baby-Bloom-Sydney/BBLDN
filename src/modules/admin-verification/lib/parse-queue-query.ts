@@ -7,7 +7,11 @@ const TABS: ReadonlyArray<QueueTab> = ["identity", "dbs", "right-to-work"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const one = (value: string | string[] | undefined): string | undefined =>
-  typeof value === "string" ? value : Array.isArray(value) ? value[0] : undefined;
+  typeof value === "string"
+    ? value
+    : Array.isArray(value)
+      ? value[0]
+      : undefined;
 
 export function parseQueueQuery(
   params: Readonly<Record<string, string | string[] | undefined>>,

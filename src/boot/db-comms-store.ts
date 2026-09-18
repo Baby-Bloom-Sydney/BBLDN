@@ -188,7 +188,8 @@ export function dbCommsStore(
               const existing = open.find(
                 (row) =>
                   row.acknowledged_at === null &&
-                  (row.subject_type ?? null) === (input.subject?.type ?? null) &&
+                  (row.subject_type ?? null) ===
+                    (input.subject?.type ?? null) &&
                   (row.subject_id ?? null) === (input.subject?.id ?? null),
               );
               if (existing !== undefined) return { id: existing.id as Uuid };

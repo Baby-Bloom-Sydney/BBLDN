@@ -88,7 +88,11 @@ describe("sweepReminders (`08.11`; 03 §8.2 row 32; ADR-161)", () => {
     ledger.patchSections(NANNY, (row) => ({
       ...row,
       level: "L1_REGISTERED",
-      identity: { ...row.identity, status: "rejected", statusAt: minutesAgo(6) },
+      identity: {
+        ...row.identity,
+        status: "rejected",
+        statusAt: minutesAgo(6),
+      },
     }));
     const first = await verification.sweepReminders(NOW);
     expect(first.ok && first.value.handled).toBe(
@@ -100,13 +104,17 @@ describe("sweepReminders (`08.11`; 03 §8.2 row 32; ADR-161)", () => {
         (_, i) => `verification-reminder:${NANNY}:${i}`,
       ),
     );
-    expect(comms.scheduled.every((m) => m.templateId === "verification-reminder")).toBe(true);
+    expect(
+      comms.scheduled.every((m) => m.templateId === "verification-reminder"),
+    ).toBe(true);
     expect(comms.scheduled[0]?.sendAt).toBe(
       new Date(
         Date.parse(minutesAgo(6)) + VETTING.reminderOffsetsMinutes[0] * 60_000,
       ).toISOString(),
     );
-    expect(comms.scheduled.map((m) => (m.data as { step: number }).step)).toEqual([1, 2, 3, 4]);
+    expect(
+      comms.scheduled.map((m) => (m.data as { step: number }).step),
+    ).toEqual([1, 2, 3, 4]);
 
     // a second pass asks comms for the same four keys; the dedupe answers the existing rows (03 §8.1) and no
     // fifth row appears — `handled` counts the offsets still ahead, idempotency is the seam's
@@ -119,13 +127,21 @@ describe("sweepReminders (`08.11`; 03 §8.2 row 32; ADR-161)", () => {
     ledger.patchSections(OTHER, (row) => ({
       ...row,
       level: "L3_PROVISIONALLY_VERIFIED",
-      identity: { ...row.identity, status: "verified", statusAt: minutesAgo(6) },
+      identity: {
+        ...row.identity,
+        status: "verified",
+        statusAt: minutesAgo(6),
+      },
       dbs: { ...row.dbs, status: "verified", statusAt: minutesAgo(6) },
     }));
     ledger.patchSections(NANNY, (row) => ({
       ...row,
       level: "L1_REGISTERED",
-      identity: { ...row.identity, status: "rejected", statusAt: minutesAgo(60) },
+      identity: {
+        ...row.identity,
+        status: "rejected",
+        statusAt: minutesAgo(60),
+      },
     }));
     const swept = await verification.sweepReminders(NOW);
     // the 30-minute one is behind us and is not sent late; the other three are queued

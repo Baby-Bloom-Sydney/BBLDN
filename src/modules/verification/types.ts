@@ -265,7 +265,9 @@ export type Verification = {
   sweepReminders(
     now: Instant,
   ): Promise<Result<SweepResult, VerificationErrorDetails>>;
-  sweepExpiry(now: Instant): Promise<Result<SweepResult, VerificationErrorDetails>>;
+  sweepExpiry(
+    now: Instant,
+  ): Promise<Result<SweepResult, VerificationErrorDetails>>;
 };
 
 export type VerificationRegistry = {
@@ -513,8 +515,9 @@ export type DecisionOutcome = {
   readonly sync: LevelSync;
 };
 
+/** The level-4 step names the open DBS submission; the nanny is read from it (ADR-159 — never a caller's id). */
 export type UpdateServiceInput = {
-  readonly nannyId: UserId;
+  readonly submissionId: SubmissionId;
   readonly result: UpdateServiceResult;
   readonly subscribed: boolean;
 };
@@ -565,11 +568,16 @@ export type VerificationDecisionStore = {
     nannyId: UserId,
   ): Promise<Result<AdminRecord | null, VerificationErrorDetails>>;
   /** `sync_nanny_verification_state()` — idempotent; the memory double derives with `deriveLevel` */
-  syncLevel(nannyId: UserId): Promise<Result<LevelSync, VerificationErrorDetails>>;
-  /** `record_update_service_check()` — the level-4 action; `checkedBy` is the session's admin */
-  recordUpdateServiceCheck(
-    input: UpdateServiceInput & { readonly checkedBy: UserId },
+  syncLevel(
+    nannyId: UserId,
   ): Promise<Result<LevelSync, VerificationErrorDetails>>;
+  /** `record_update_service_check()` — the level-4 action; `nannyId` from the submission, `checkedBy` the session's admin */
+  recordUpdateServiceCheck(input: {
+    readonly nannyId: UserId;
+    readonly result: UpdateServiceResult;
+    readonly subscribed: boolean;
+    readonly checkedBy: UserId;
+  }): Promise<Result<LevelSync, VerificationErrorDetails>>;
   /** `expire_verification_section()` */
   expireSection(
     submissionId: SubmissionId,
@@ -586,6 +594,9 @@ export type VerificationDecisionStore = {
     belowLevel: VerificationLevel,
   ): Promise<Result<ReadonlyArray<RemindableNanny>, VerificationErrorDetails>>;
   countByLevel(): Promise<
-    Result<Readonly<Record<VerificationLevel, number>>, VerificationErrorDetails>
+    Result<
+      Readonly<Record<VerificationLevel, number>>,
+      VerificationErrorDetails
+    >
   >;
 };

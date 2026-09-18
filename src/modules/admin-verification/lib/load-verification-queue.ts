@@ -22,7 +22,9 @@ export async function loadVerificationQueue(
     log.warn("verification queue could not be read", {
       module: "admin-verification",
       action: "loadVerificationQueue",
-      reason: error.ok ? "unknown" : (error.error.details?.reason ?? error.error.code),
+      reason: error.ok
+        ? "unknown"
+        : (error.error.details?.reason ?? error.error.code),
     });
     return { kind: "unavailable" };
   }
@@ -36,7 +38,10 @@ export async function loadVerificationQueue(
   if (query.open !== null) {
     const record = await verification.readQueueRecord(query.open);
     if (record.ok)
-      open = { ...record.value, nannyName: await nannyNameOf(record.value.entry.nannyId) };
+      open = {
+        ...record.value,
+        nannyName: await nannyNameOf(record.value.entry.nannyId),
+      };
     else
       log.warn("verification submission could not be opened", {
         module: "admin-verification",

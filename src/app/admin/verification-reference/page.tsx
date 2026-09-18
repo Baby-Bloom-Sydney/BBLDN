@@ -13,7 +13,9 @@ export default async function AdminVerificationReferencePage() {
   if (!session.ok) notFound();
   return (
     <main aria-labelledby="reference-heading">
-      <VerificationReference minVerificationLevel={MATCHING.minVerificationLevel} />
+      <VerificationReference
+        minVerificationLevel={MATCHING.minVerificationLevel}
+      />
     </main>
   );
 }

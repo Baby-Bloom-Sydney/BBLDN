@@ -95,6 +95,7 @@ describe("onboarding-nanny — applyFromPortalAction (S-N-19)", () => {
   beforeEach(async () => {
     signedInAs(NANNY);
     await accounts.create({
+      userId: NANNY as never,
       firstName: "Bea",
       lastName: "Lin",
       isolated: true,

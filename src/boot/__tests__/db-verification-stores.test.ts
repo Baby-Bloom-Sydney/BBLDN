@@ -145,7 +145,7 @@ describe("dbVettingStore — the ledger over 0022 (ADR-154)", () => {
       p_columns: {
         dbs_certificate_number: "001234567890",
         dbs_issue_date: "2025-06-01",
-        dbs_update_service_consent_at: "2026-09-18T00:00:00.000Z",
+        dbs_update_service_consent_at: true, // REVIEW-3 M-5: the key's presence; 0023 stamps now()
       },
     });
     expect(columns[2]).toMatchObject({
@@ -378,7 +378,8 @@ describe("dbVerificationStore — the decision side over 0023 (ADR-157)", () => 
 
   it("recordUpdateServiceCheck → record_update_service_check with the session's admin as checked_by; expireSection and sweepStale are service-scope rpcs", async () => {
     const fake = fakeDataPort({ nannies: [NANNY_ROW] });
-    fake.state.rpcAnswer = (name) => (name === "sweep_stale_verification_processing" ? 3 : sync);
+    fake.state.rpcAnswer = (name) =>
+      name === "sweep_stale_verification_processing" ? 3 : sync;
     const store = dbVerificationStore(fake.port);
     await store.recordUpdateServiceCheck({
       nannyId: USER,
@@ -387,9 +388,16 @@ describe("dbVerificationStore — the decision side over 0023 (ADR-157)", () => 
       checkedBy: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" as never,
     });
     await store.expireSection(SUBMISSION);
-    const swept = await store.sweepStale(5, "2026-09-18T10:00:00.000Z" as never);
+    const swept = await store.sweepStale(
+      5,
+      "2026-09-18T10:00:00.000Z" as never,
+    );
     expect(swept.ok && swept.value).toBe(3);
-    expect(fake.calls.map((c) => c.scope)).toEqual(["service", "service", "service"]);
+    expect(fake.calls.map((c) => c.scope)).toEqual([
+      "service",
+      "service",
+      "service",
+    ]);
     expect(fake.rpcs.map((r) => r.name)).toEqual([
       "record_update_service_check",
       "expire_verification_section",
@@ -445,14 +453,21 @@ describe("dbVerificationStore — the decision side over 0023 (ADR-157)", () => 
           dbs_status_at: null,
         },
       ],
-      verification_status: [{ level: "L2_ID_VERIFIED" }, { level: "L4_FULLY_VERIFIED" }],
+      verification_status: [
+        { level: "L2_ID_VERIFIED" },
+        { level: "L4_FULLY_VERIFIED" },
+      ],
     });
     const store = dbVerificationStore(fake.port);
     const record = await store.readAdminRecord(USER);
     expect(record.ok && record.value).toMatchObject({
       nannyId: USER,
       level: "L2_ID_VERIFIED",
-      declared: { surname: "Okafor", certificateNumber: "123456789012", idType: "passport" },
+      declared: {
+        surname: "Okafor",
+        certificateNumber: "123456789012",
+        idType: "passport",
+      },
       dbsOutcome: "unset",
       crossCheckPassed: false,
       updateService: { consentAt: "2026-09-18T00:00:00.000Z" },

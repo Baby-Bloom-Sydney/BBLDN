@@ -113,14 +113,20 @@ const recordOf = (userId: UserId, row: AdminRow): AdminRecord => ({
   crossCheckPassed: row.cross_check_status === "passed",
   updateService: {
     ...opt("consentAt", row.dbs_update_service_consent_at as Instant | null),
-    ...opt("lastCheckedAt", row.dbs_update_service_last_checked_at as Instant | null),
+    ...opt(
+      "lastCheckedAt",
+      row.dbs_update_service_last_checked_at as Instant | null,
+    ),
     ...opt("lastResult", row.dbs_update_service_last_result),
     ...opt("subscribed", row.dbs_update_service_subscribed),
   },
 });
 
 /** A verified section's expiry, as the expiry job walks it: the decided submission (`_provider_ref`) + `_expires_at`. */
-const expiriesOf = (row: AdminRow, userId: UserId): ReadonlyArray<SectionExpiry> => {
+const expiriesOf = (
+  row: AdminRow,
+  userId: UserId,
+): ReadonlyArray<SectionExpiry> => {
   const one = (
     section: VerificationSection,
     status: SectionState["status"],
@@ -128,17 +134,40 @@ const expiriesOf = (row: AdminRow, userId: UserId): ReadonlyArray<SectionExpiry>
     expiresAt: string | null,
   ): ReadonlyArray<SectionExpiry> =>
     status === "verified" && ref !== null && expiresAt !== null
-      ? [{ nannyId: userId, section, submissionId: ref as SubmissionId, expiresAt: expiresAt as Instant }]
+      ? [
+          {
+            nannyId: userId,
+            section,
+            submissionId: ref as SubmissionId,
+            expiresAt: expiresAt as Instant,
+          },
+        ]
       : [];
   return [
-    ...one("identity", row.identity_status, row.identity_provider_ref, row.identity_document_expiry),
+    ...one(
+      "identity",
+      row.identity_status,
+      row.identity_provider_ref,
+      row.identity_document_expiry,
+    ),
     ...one("dbs", row.dbs_status, row.dbs_provider_ref, row.dbs_expires_at),
-    ...one("right-to-work", row.rtw_status, row.rtw_provider_ref, row.rtw_expires_at),
+    ...one(
+      "right-to-work",
+      row.rtw_status,
+      row.rtw_provider_ref,
+      row.rtw_expires_at,
+    ),
   ];
 };
 
-const OPEN: ReadonlySet<string> = new Set(["not_started", "rejected", "failed", "expired"]);
-const rank = (level: VerificationLevel): number => ENUMS.verification_level.indexOf(level);
+const OPEN: ReadonlySet<string> = new Set([
+  "not_started",
+  "rejected",
+  "failed",
+  "expired",
+]);
+const rank = (level: VerificationLevel): number =>
+  ENUMS.verification_level.indexOf(level);
 
 const session = { scope: "session" as const };
 const service = { scope: "service" as const };
@@ -172,7 +201,6 @@ type StatusRow = {
   readonly rtw_rejection_reason: string | null;
   readonly contact_status: SectionState["status"];
 };
-
 
 const stateOf = (userId: UserId, row: StatusRow): VerificationState => ({
   nannyId: userId,
@@ -218,18 +246,31 @@ export function dbVerificationStore(
   /** `verifications` rows joined to their party row's user id — service scope, the sweeps' read (07 §5.1 rule 5). */
   const readAll = async (
     name: `verification.${string}`,
-  ): Promise<Result<ReadonlyArray<{ readonly userId: UserId; readonly row: AdminRow }>, VerificationErrorDetails>> =>
+  ): Promise<
+    Result<
+      ReadonlyArray<{ readonly userId: UserId; readonly row: AdminRow }>,
+      VerificationErrorDetails
+    >
+  > =>
     asVerification(
-      await port.run<ReadonlyArray<{ readonly userId: UserId; readonly row: AdminRow }>>(
+      await port.run<
+        ReadonlyArray<{ readonly userId: UserId; readonly row: AdminRow }>
+      >(
         {
           name,
           exec: async (q) => {
-            const rows = (await q.from("verifications").select()) as unknown as ReadonlyArray<AdminRow>;
-            const nannies = (await q.from("nannies").select()) as unknown as ReadonlyArray<{
+            const rows = (await q
+              .from("verifications")
+              .select()) as unknown as ReadonlyArray<AdminRow>;
+            const nannies = (await q
+              .from("nannies")
+              .select()) as unknown as ReadonlyArray<{
               readonly id: string;
               readonly user_id: string;
             }>;
-            const userOf = new Map(nannies.map((n) => [n.id, n.user_id as UserId]));
+            const userOf = new Map(
+              nannies.map((n) => [n.id, n.user_id as UserId]),
+            );
             return rows.flatMap((row) => {
               const userId = userOf.get(row.nanny_id);
               return userId === undefined ? [] : [{ userId, row }];
@@ -251,7 +292,9 @@ export function dbVerificationStore(
   };
   const rpcSync = (
     name: `verification.${string}`,
-    call: (q: Parameters<Parameters<DataAccessPort["run"]>[0]["exec"]>[0]) => Promise<unknown>,
+    call: (
+      q: Parameters<Parameters<DataAccessPort["run"]>[0]["exec"]>[0],
+    ) => Promise<unknown>,
   ) =>
     port.run<LevelSync>(
       {
@@ -384,7 +427,12 @@ export function dbVerificationStore(
         await rpcSync("verification.syncLevel", async (q) => {
           const nannyId = await nannyIdOf(q, userId);
           if (nannyId === null)
-            return { from_level: "L0_SIGNED_UP", to_level: "L0_SIGNED_UP", suspended: false, released: 0 };
+            return {
+              from_level: "L0_SIGNED_UP",
+              to_level: "L0_SIGNED_UP",
+              suspended: false,
+              released: 0,
+            };
           return q.rpc("sync_nanny_verification_state", {
             p_nanny_id: nannyId,
             p_required: REQUIRED as never,
@@ -431,21 +479,40 @@ export function dbVerificationStore(
     listExpiries: async () => {
       const all = await readAll("verification.listExpiries");
       if (!all.ok) return all;
-      return ok(all.value.flatMap(({ userId, row }) => expiriesOf(row, userId)));
+      return ok(
+        all.value.flatMap(({ userId, row }) => expiriesOf(row, userId)),
+      );
     },
     listRemindable: async (belowLevel) => {
       const all = await readAll("verification.listRemindable");
       if (!all.ok) return all;
       return ok(
         all.value.flatMap(({ userId, row }) => {
-          if (rank(row.level) >= rank(belowLevel) || row.suspended_at !== null) return [];
-          const statuses = [row.identity_status, row.dbs_status, row.rtw_status];
+          if (rank(row.level) >= rank(belowLevel) || row.suspended_at !== null)
+            return [];
+          const statuses = [
+            row.identity_status,
+            row.dbs_status,
+            row.rtw_status,
+          ];
           if (!statuses.some((s) => OPEN.has(s))) return [];
-          const last = [row.identity_status_at, row.dbs_status_at, row.rtw_status_at]
+          const last = [
+            row.identity_status_at,
+            row.dbs_status_at,
+            row.rtw_status_at,
+          ]
             .filter((at): at is string => at !== null)
             .sort()
             .at(-1);
-          return last === undefined ? [] : [{ nannyId: userId, level: row.level, lastChangeAt: last as Instant }];
+          return last === undefined
+            ? []
+            : [
+                {
+                  nannyId: userId,
+                  level: row.level,
+                  lastChangeAt: last as Instant,
+                },
+              ];
         }),
       );
     },
@@ -456,7 +523,9 @@ export function dbVerificationStore(
           {
             name: "verification.countByLevel",
             exec: async (q) => {
-              const rows = (await q.from("verification_status").select()) as unknown as ReadonlyArray<{
+              const rows = (await q
+                .from("verification_status")
+                .select()) as unknown as ReadonlyArray<{
                 readonly level: VerificationLevel;
               }>;
               const counts = Object.fromEntries(

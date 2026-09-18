@@ -16,12 +16,13 @@ const REASONS = [
   { key: "adverse", label: "Adverse disclosure — bars the account" },
 ] as const;
 
-const SECTION_LABEL: Readonly<Record<SectionState["section"], string>> = Object.freeze({
-  contact: "Contact",
-  identity: "Identity",
-  dbs: "DBS",
-  "right-to-work": "Right to work",
-});
+const SECTION_LABEL: Readonly<Record<SectionState["section"], string>> =
+  Object.freeze({
+    contact: "Contact",
+    identity: "Identity",
+    dbs: "DBS",
+    "right-to-work": "Right to work",
+  });
 
 const RESULT_LABEL: Readonly<Record<string, string>> = Object.freeze({
   no_change: "No change — certificate stands",
@@ -44,7 +45,11 @@ function Submit({ label }: { readonly label: string }) {
   );
 }
 
-function Outcome({ state }: { readonly state: ClientResult<unknown, ActionDetails> | null }) {
+function Outcome({
+  state,
+}: {
+  readonly state: ClientResult<unknown, ActionDetails> | null;
+}) {
   if (state === null) return null;
   if (state.ok)
     return (
@@ -59,11 +64,19 @@ function Outcome({ state }: { readonly state: ClientResult<unknown, ActionDetail
   );
 }
 
-export function SubmissionPanel({ record, actions, updateServiceResults }: SubmissionPanelProps) {
+export function SubmissionPanel({
+  record,
+  actions,
+  updateServiceResults,
+}: SubmissionPanelProps) {
   const [reveal, revealAction] = useFormState(actions.openEvidence, null);
   const [decided, decideAction] = useFormState(actions.decide, null);
-  const [updateService, updateServiceAction] = useFormState(actions.recordUpdateService, null);
-  const opened: EvidenceOpen | null = reveal !== null && reveal.ok ? reveal.value : null;
+  const [updateService, updateServiceAction] = useFormState(
+    actions.recordUpdateService,
+    null,
+  );
+  const opened: EvidenceOpen | null =
+    reveal !== null && reveal.ok ? reveal.value : null;
   const { entry, state, record: facts, note, nannyName } = record;
 
   return (
@@ -73,12 +86,16 @@ export function SubmissionPanel({ record, actions, updateServiceResults }: Submi
       data-submission={entry.submissionId}
     >
       <header>
-        <h2 id="submission-heading" className="text-lg font-semibold text-slate-900">
+        <h2
+          id="submission-heading"
+          className="text-lg font-semibold text-slate-900"
+        >
           {nannyName} — {SECTION_LABEL[entry.section]}
         </h2>
         <p className="text-sm text-slate-600">
           Level: {state.level}
-          {state.suspended ? " · suspended" : ""} · DBS outcome: {facts.dbsOutcome} · cross-check:{" "}
+          {state.suspended ? " · suspended" : ""} · DBS outcome:{" "}
+          {facts.dbsOutcome} · cross-check:{" "}
           {facts.crossCheckPassed ? "passed" : "not yet"}
         </p>
       </header>
@@ -96,7 +113,11 @@ export function SubmissionPanel({ record, actions, updateServiceResults }: Submi
         <h3 className="font-medium text-slate-900">Evidence</h3>
         {opened === null ? (
           <form action={revealAction} className="mt-2">
-            <input type="hidden" name="submissionId" value={entry.submissionId} />
+            <input
+              type="hidden"
+              name="submissionId"
+              value={entry.submissionId}
+            />
             <Submit label="Reveal documents and details" />
             <p className="mt-1 text-xs text-slate-500">
               Each reveal is recorded against your admin login.
@@ -144,15 +165,26 @@ export function SubmissionPanel({ record, actions, updateServiceResults }: Submi
         <fieldset className="space-y-1">
           <legend className="text-sm text-slate-700">Outcome</legend>
           <label className="block text-sm">
-            <input type="radio" name="decision" value="verified" defaultChecked /> Verified
+            <input
+              type="radio"
+              name="decision"
+              value="verified"
+              defaultChecked
+            />{" "}
+            Verified
           </label>
           <label className="block text-sm">
             <input type="radio" name="decision" value="rejected" /> Rejected
           </label>
         </fieldset>
         <label className="block text-sm">
-          <span className="text-slate-700">Reason (required for a rejection)</span>
-          <select name="reason" className="mt-1 block rounded-md border border-slate-300 px-2 py-1">
+          <span className="text-slate-700">
+            Reason (required for a rejection)
+          </span>
+          <select
+            name="reason"
+            className="mt-1 block rounded-md border border-slate-300 px-2 py-1"
+          >
             <option value="">—</option>
             {REASONS.map((reason) => (
               <option key={reason.key} value={reason.key}>
@@ -170,7 +202,9 @@ export function SubmissionPanel({ record, actions, updateServiceResults }: Submi
           />
         </label>
         <label className="block text-sm">
-          <span className="text-slate-700">Expires (optional, ISO instant)</span>
+          <span className="text-slate-700">
+            Expires (optional, ISO instant)
+          </span>
           <input
             name="expiresAt"
             type="text"
@@ -184,17 +218,23 @@ export function SubmissionPanel({ record, actions, updateServiceResults }: Submi
 
       {entry.section === "dbs" && (
         <form action={updateServiceAction} className="space-y-3" noValidate>
-          <h3 className="font-medium text-slate-900">Update Service check (the level-4 step)</h3>
+          <h3 className="font-medium text-slate-900">
+            Update Service check (the level-4 step)
+          </h3>
           <p className="text-sm text-slate-600">
-            Consent given: {facts.updateService.consentAt === undefined ? "no" : "yes"}
+            Consent given:{" "}
+            {facts.updateService.consentAt === undefined ? "no" : "yes"}
             {facts.updateService.lastResult === undefined
               ? ""
               : ` · last result: ${RESULT_LABEL[facts.updateService.lastResult] ?? facts.updateService.lastResult}`}
           </p>
-          <input type="hidden" name="nannyId" value={entry.nannyId} />
+          <input type="hidden" name="submissionId" value={entry.submissionId} />
           <label className="block text-sm">
             <span className="text-slate-700">Result</span>
-            <select name="result" className="mt-1 block rounded-md border border-slate-300 px-2 py-1">
+            <select
+              name="result"
+              className="mt-1 block rounded-md border border-slate-300 px-2 py-1"
+            >
               {updateServiceResults.map((result) => (
                 <option key={result} value={result}>
                   {RESULT_LABEL[result] ?? result}
@@ -203,8 +243,13 @@ export function SubmissionPanel({ record, actions, updateServiceResults }: Submi
             </select>
           </label>
           <label className="block text-sm">
-            <input type="checkbox" name="subscribed" value="true" defaultChecked /> Subscribed to the
-            Update Service
+            <input
+              type="checkbox"
+              name="subscribed"
+              value="true"
+              defaultChecked
+            />{" "}
+            Subscribed to the Update Service
           </label>
           <Submit label="Record Update Service check" />
           <Outcome state={updateService} />

@@ -12,7 +12,13 @@ const schema = z
     submissionId: UUID,
     decision: z.enum(["verified", "rejected"]),
     reason: z
-      .enum(["document-unreadable", "mismatch", "expired", "adverse", "unsupported-evidence"])
+      .enum([
+        "document-unreadable",
+        "mismatch",
+        "expired",
+        "adverse",
+        "unsupported-evidence",
+      ])
       .optional(),
     note: z.string().trim().max(NOTE_MAX).optional(),
     expiresAt: z.string().datetime().optional(),
@@ -36,7 +42,10 @@ export function parseDecisionForm(
   };
   const parsed = schema.safeParse(raw);
   if (!parsed.success)
-    return { ok: false, field: String(parsed.error.issues[0]?.path[0] ?? "decision") };
+    return {
+      ok: false,
+      field: String(parsed.error.issues[0]?.path[0] ?? "decision"),
+    };
   const v = parsed.data;
   return {
     ok: true,

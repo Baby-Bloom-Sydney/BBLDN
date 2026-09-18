@@ -11,10 +11,24 @@ const request = (path: string) =>
   });
 
 const stubs = () => {
-  const sweepStaleProcessing = vi.fn(async () => ({ ok: true, value: { handled: 2, skipped: 0 } }));
-  const sweepReminders = vi.fn(async () => ({ ok: true, value: { handled: 3, skipped: 1 } }));
-  const sweepExpiry = vi.fn(async () => ({ ok: true, value: { handled: 1, skipped: 4 } }));
-  const callDueSweep = vi.fn(async () => ({ kind: "swept", overdue: 1, waiting: 2, notified: true }));
+  const sweepStaleProcessing = vi.fn(async () => ({
+    ok: true,
+    value: { handled: 2, skipped: 0 },
+  }));
+  const sweepReminders = vi.fn(async () => ({
+    ok: true,
+    value: { handled: 3, skipped: 1 },
+  }));
+  const sweepExpiry = vi.fn(async () => ({
+    ok: true,
+    value: { handled: 1, skipped: 4 },
+  }));
+  const callDueSweep = vi.fn(async () => ({
+    kind: "swept",
+    overdue: 1,
+    waiting: 2,
+    notified: true,
+  }));
   const expireHolds = vi.fn(async () => ({ ok: true, value: { expired: 5 } }));
   vi.doMock("@/modules/config/server", () => ({
     env: { environment: "test", public: {}, server: { CRON_SECRET: SECRET } },
@@ -25,7 +39,13 @@ const stubs = () => {
   }));
   vi.doMock("@/modules/admin", () => ({ callDueSweep }));
   vi.doMock("@/modules/scheduling", () => ({ scheduling: { expireHolds } }));
-  return { sweepStaleProcessing, sweepReminders, sweepExpiry, callDueSweep, expireHolds };
+  return {
+    sweepStaleProcessing,
+    sweepReminders,
+    sweepExpiry,
+    callDueSweep,
+    expireHolds,
+  };
 };
 
 afterEach(() => {
@@ -40,10 +60,12 @@ describe("/api/cron/send-delayed-emails — the 5-minute run (01 §4f; ADR-161)"
   it("runs the call-due sweep, the slot-hold sweep, the stale sweep and the reminder funnel, and sums their counts", async () => {
     vi.resetModules();
     const s = stubs();
-    const { GET } = await import("../send-delayed-emails/route");
+    const { GET } = await import("../../cron/send-delayed-emails/route");
     const response = await GET(request("/api/cron/send-delayed-emails"));
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { data: { handled: number; skipped: number } };
+    const body = (await response.json()) as {
+      data: { handled: number; skipped: number };
+    };
     expect(body.data).toEqual({ handled: 1 + 2 + 5 + 2 + 3, skipped: 1 });
     expect(s.callDueSweep).toHaveBeenCalledWith(
       { kind: "system", id: "admin-call-due" },
@@ -60,7 +82,7 @@ describe("/api/cron/send-delayed-emails — the 5-minute run (01 §4f; ADR-161)"
     async () => {
       vi.resetModules();
       stubs();
-      const route = await import("../send-delayed-emails/route");
+      const route = await import("../../cron/send-delayed-emails/route");
       expect("deliverDue" in route).toBe(true);
     },
   );
@@ -70,10 +92,12 @@ describe("/api/cron/vetting-expiry (03 §4.3; ADR-157 (4))", () => {
   it("hands the run's instant to verification.sweepExpiry and answers its counts", async () => {
     vi.resetModules();
     const s = stubs();
-    const { GET } = await import("../vetting-expiry/route");
+    const { GET } = await import("../../cron/vetting-expiry/route");
     const response = await GET(request("/api/cron/vetting-expiry"));
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { data: { handled: number; skipped: number } };
+    const body = (await response.json()) as {
+      data: { handled: number; skipped: number };
+    };
     expect(body.data).toEqual({ handled: 1, skipped: 4 });
     expect(s.sweepExpiry).toHaveBeenCalledWith(expect.any(String));
   });

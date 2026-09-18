@@ -53,7 +53,10 @@ export function commsDouble(): CommsDouble {
       return { ok: true, value: { cancelled: had } };
     },
     status: async () => ({ ok: true, value: { status: "sent" } }),
-    createInboxMessage: async () => ({ ok: true, value: { id: newId<Uuid>() } }),
+    createInboxMessage: async () => ({
+      ok: true,
+      value: { id: newId<Uuid>() },
+    }),
     notifyAdmin: async (input) => {
       adminNotices.push({
         kind: input.kind,

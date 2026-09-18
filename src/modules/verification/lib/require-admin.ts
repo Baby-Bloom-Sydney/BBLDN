@@ -17,7 +17,9 @@ export async function requireAdmin(): Promise<
   const session = await auth.requireRole("admin");
   if (!session.ok)
     return err(
-      session.error.code === "UNAUTHENTICATED" ? "UNAUTHENTICATED" : "FORBIDDEN",
+      session.error.code === "UNAUTHENTICATED"
+        ? "UNAUTHENTICATED"
+        : "FORBIDDEN",
       "You do not have access to this.",
       { reason: "not-permitted" },
     );

@@ -11,15 +11,17 @@ import type { RequiredSectionsByLevel, VerificationLevel } from "../types";
  * import nothing that reaches `config`'s env reader — `int.rpc-0023` imports it into a project that boots no
  * environment. `verification.pure.test.ts` pins the two maps equal.
  */
-const SECTION_OF: Readonly<Record<EvidenceType, LedgerSection>> = Object.freeze({
-  "identity-document": "identity",
-  selfie: "identity",
-  "dbs-certificate": "dbs",
-  "dbs-update-service": "dbs",
-  "right-to-work-passport": "right_to_work",
-  "right-to-work-share-code": "right_to_work",
-  "right-to-work-document": "right_to_work",
-});
+const SECTION_OF: Readonly<Record<EvidenceType, LedgerSection>> = Object.freeze(
+  {
+    "identity-document": "identity",
+    selfie: "identity",
+    "dbs-certificate": "dbs",
+    "dbs-update-service": "dbs",
+    "right-to-work-passport": "right_to_work",
+    "right-to-work-share-code": "right_to_work",
+    "right-to-work-document": "right_to_work",
+  },
+);
 
 export function requiredSectionsByLevel(
   requiredChecks: Readonly<

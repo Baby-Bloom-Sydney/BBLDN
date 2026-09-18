@@ -14,12 +14,13 @@ const EVIDENCE_LABEL: Readonly<Record<string, string>> = Object.freeze({
   "right-to-work-document": "Immigration document",
 });
 
-const STATUS_LABEL: Readonly<Record<QueueRow["status"], string>> = Object.freeze({
-  "needs-admin": "Needs a person",
-  pending: "Pending",
-  verified: "Verified",
-  rejected: "Rejected",
-});
+const STATUS_LABEL: Readonly<Record<QueueRow["status"], string>> =
+  Object.freeze({
+    "needs-admin": "Needs a person",
+    pending: "Pending",
+    verified: "Verified",
+    rejected: "Rejected",
+  });
 
 export function QueueTable({
   rows,
@@ -43,7 +44,11 @@ export function QueueTable({
             <th scope="col" className="py-2 pr-4 font-medium">
               Evidence
             </th>
-            <th scope="col" className="py-2 pr-4 font-medium" aria-sort="ascending">
+            <th
+              scope="col"
+              className="py-2 pr-4 font-medium"
+              aria-sort="ascending"
+            >
               Submitted (London)
             </th>
             <th scope="col" className="py-2 pr-4 font-medium">
@@ -73,7 +78,9 @@ export function QueueTable({
                   {EVIDENCE_LABEL[row.evidenceType] ?? row.evidenceType}
                 </td>
                 <td className="py-2 pr-4">
-                  <time dateTime={row.submittedAt}>{formatLondon(row.submittedAt)}</time>
+                  <time dateTime={row.submittedAt}>
+                    {formatLondon(row.submittedAt)}
+                  </time>
                 </td>
                 <td className="py-2 pr-4">{STATUS_LABEL[row.status]}</td>
                 <td className="py-2">
