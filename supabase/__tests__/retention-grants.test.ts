@@ -239,9 +239,46 @@ type ColRow = {
   readonly privs: string;
 };
 
+/**
+ * ★ The **effective** privilege — what the database would actually allow, not what was written down.
+ *
+ * `database-reviewer` HIGH, demonstrated live: reading `aclexplode(relacl) where grantee = 'bbldn_retention'`
+ * sees only grants made to that role **by name**. Two routes go round it, and the reviewer drove both — the
+ * role could `SELECT` from `rate_limit_buckets`, a table with no enumerated privilege, while this suite's
+ * relation count stayed at 33:
+ *
+ *   (a) `grant ... on all tables ... to some_helper_role; grant some_helper_role to bbldn_retention;`
+ *   (b) `grant ... on all tables in schema public to PUBLIC;`
+ *
+ * Neither is a far-fetched attack — (a) is what a future unit adding a helper role for an unrelated feature
+ * does "for convenience", which is a much more likely mistake than somebody retyping `0016:288`. So the gate
+ * asks `has_table_privilege` / `has_any_column_privilege`, which follow role membership, `PUBLIC` and
+ * ownership, and the direct-ACL cases below stay as well: the ACL query says *where* a stray grant was written,
+ * the effective query says *whether the role can do it at all*, and a hole needs to pass both.
+ */
+type EffectiveRow = {
+  readonly rel: string;
+  /** table-level privileges only — `has_table_privilege` does not count a column grant. */
+  readonly effective: string;
+  /** true if any column of the relation is reachable for SELECT / INSERT / UPDATE / REFERENCES. */
+  readonly anyColumn: boolean;
+};
+
+const PRIVILEGES = [
+  "SELECT",
+  "INSERT",
+  "UPDATE",
+  "DELETE",
+  "TRUNCATE",
+  "REFERENCES",
+  "TRIGGER",
+] as const;
+
 let db: Client;
 let tableAcl: readonly AclRow[];
 let columnAcl: readonly ColRow[];
+let effective: readonly EffectiveRow[];
+let memberships: readonly string[];
 
 beforeAll(async () => {
   db = await connect();
@@ -269,10 +306,75 @@ beforeAll(async () => {
       order by 1, 2`,
   );
   columnAcl = columns.rows;
+
+  const reachable = await db.query<EffectiveRow>(
+    `select c.relnamespace::regnamespace::text || '.' || c.relname as rel,
+            coalesce(
+              string_agg(p.priv, ',' order by p.priv)
+                filter (where has_table_privilege('bbldn_retention', c.oid, p.priv)),
+              '') as effective,
+            bool_or(has_any_column_privilege('bbldn_retention', c.oid, p.priv))
+              filter (where p.priv in ('SELECT','INSERT','UPDATE','REFERENCES')) as "anyColumn"
+       from pg_class c
+       cross join unnest($1::text[]) as p(priv)
+      where c.relkind in ('r','p','v','m','f')
+        and c.relnamespace::regnamespace::text in ('public','storage')
+      group by 1
+      order by 1`,
+    [[...PRIVILEGES]],
+  );
+  effective = reachable.rows;
+
+  const member = await db.query<{ role: string }>(
+    `select r.rolname as role
+       from pg_auth_members m
+       join pg_roles r on r.oid = m.roleid
+      where m.member = 'bbldn_retention'::regrole
+      order by 1`,
+  );
+  memberships = member.rows.map((r) => r.role);
 });
 
 afterAll(async () => {
   await db?.end();
+});
+
+describe("int.retention-grants — what the role can actually do (effective privilege)", () => {
+  it("★ can reach exactly the relations the enumerated set names, by any route — membership, PUBLIC or ownership included", () => {
+    const reachable = effective
+      .filter((r) => r.effective !== "" || r.anyColumn)
+      .map((r) => r.rel)
+      .sort();
+    expect(reachable).toEqual(NAMED);
+  });
+
+  it("★ holds exactly the table-level privileges the set lists, per relation, effectively", () => {
+    const actual: Record<string, string[]> = {};
+    for (const row of effective) {
+      if (row.effective === "") continue;
+      actual[row.rel] = row.effective.split(",").sort();
+    }
+    const expected: Record<string, string[]> = {};
+    for (const rel of NAMED) expected[rel] = [...ENUMERATED[rel]!.table].sort();
+    expect(actual).toEqual(expected);
+  });
+
+  it("★ is a member of no other role — the route round a direct-grant check (database pass, HIGH)", () => {
+    expect(memberships).toEqual([]);
+  });
+
+  it("★ reaches no column of a relation the set does not name", () => {
+    const withColumns = effective
+      .filter((r) => r.anyColumn)
+      .map((r) => r.rel)
+      .sort();
+    for (const rel of withColumns) {
+      expect(
+        NAMED,
+        `${rel} is reachable per column and is not in the set`,
+      ).toContain(rel);
+    }
+  });
 });
 
 describe("int.retention-grants — the enumerated set is the authority (ADR-185)", () => {

@@ -168,6 +168,15 @@ grant select, delete on table public.parents                 to bbldn_retention;
 -- see section 2h.
 grant select, delete, update (id) on table public.nannies    to bbldn_retention;
 
+-- ★ **`precheck_notifications` is deliberately absent, and it is the case worth reading** (database pass, LOW).
+-- `0028` granted it `select, update` and **no statement in any of the three jobs touches it.** It is reached
+-- only by the `nannies.id → precheck_notifications.nanny_id` key, which `0028` itself moved to
+-- `on delete set null` — and **a referential action runs with the privileges of the constraint, not of the
+-- caller**, so the erasure needs no grant here at all. `0031`'s own comment says exactly this about the money
+-- and placement deletes; the same reasoning had simply not been applied to this table. Driven rather than
+-- reasoned: `int.account-erasure`'s existing precheck-notifications case passes with the grant gone. A future
+-- reader diffing `0028`'s list against this one should read this paragraph and not go looking for a bug.
+
 -- 2d. The money and consent rows: the purge counts them, the sweep removes them ------------------------------
 --
 -- `0028` only ever READS these — an erasure refuses while a subscription is live, and 07 §6.1 says money and
