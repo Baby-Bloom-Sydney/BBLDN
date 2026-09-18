@@ -67,7 +67,7 @@ beforeEach(() => {
 
 describe("sweepStaleProcessing (I-V4; ADR-157 (5))", () => {
   it("moves a section processing longer than VETTING.staleProcessingMinutes to review and leaves a fresh one", async () => {
-    ledger.patchSections(NANNY, (row) => ({
+    ledger.patchSections(ledger.partyIdOf(NANNY), (row) => ({
       ...row,
       identity: {
         ...row.identity,
@@ -78,14 +78,18 @@ describe("sweepStaleProcessing (I-V4; ADR-157 (5))", () => {
     }));
     const swept = await verification.sweepStaleProcessing(NOW);
     expect(swept.ok && swept.value).toEqual({ handled: 1, skipped: 0 });
-    expect(ledger.sectionsOf(NANNY)?.identity.status).toBe("review");
-    expect(ledger.sectionsOf(NANNY)?.dbs.status).toBe("processing");
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.identity.status).toBe(
+      "review",
+    );
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.dbs.status).toBe(
+      "processing",
+    );
   });
 });
 
 describe("sweepReminders (`08.11`; 03 §8.2 row 32; ADR-161)", () => {
   it("schedules LCY-1…4 from the last change for a nanny below the pool with a section open, keyed per step; a second pass adds nothing", async () => {
-    ledger.patchSections(NANNY, (row) => ({
+    ledger.patchSections(ledger.partyIdOf(NANNY), (row) => ({
       ...row,
       level: "L1_REGISTERED",
       identity: {
@@ -124,7 +128,7 @@ describe("sweepReminders (`08.11`; 03 §8.2 row 32; ADR-161)", () => {
   });
 
   it("schedules nothing for a nanny in the pool, and skips an offset already in the past", async () => {
-    ledger.patchSections(OTHER, (row) => ({
+    ledger.patchSections(ledger.partyIdOf(OTHER), (row) => ({
       ...row,
       level: "L3_PROVISIONALLY_VERIFIED",
       identity: {
@@ -134,7 +138,7 @@ describe("sweepReminders (`08.11`; 03 §8.2 row 32; ADR-161)", () => {
       },
       dbs: { ...row.dbs, status: "verified", statusAt: minutesAgo(6) },
     }));
-    ledger.patchSections(NANNY, (row) => ({
+    ledger.patchSections(ledger.partyIdOf(NANNY), (row) => ({
       ...row,
       level: "L1_REGISTERED",
       identity: {
@@ -189,7 +193,7 @@ describe("sweepExpiry (`vetting-expiry`; 03 §4.3; ADR-157 (4))", () => {
       at: minutesAgo(30),
       expiresAt: daysAhead(-1),
     });
-    ledger.patchSections(NANNY, (row) => ({
+    ledger.patchSections(ledger.partyIdOf(NANNY), (row) => ({
       ...row,
       level: "L3_PROVISIONALLY_VERIFIED",
       dbsOutcome: "cleared",
@@ -201,8 +205,14 @@ describe("sweepExpiry (`vetting-expiry`; 03 §4.3; ADR-157 (4))", () => {
     expect(names).toContain("vetting.expiry-approaching");
     expect(names).toContain("vetting.expired");
     expect(names).toContain("verification.level-changed");
-    expect(ledger.sectionsOf(NANNY)?.dbs.status).toBe("expired");
-    expect(ledger.sectionsOf(NANNY)?.level).toBe("L2_ID_VERIFIED");
-    expect(ledger.sectionsOf(NANNY)?.identity.status).toBe("verified");
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.dbs.status).toBe(
+      "expired",
+    );
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.level).toBe(
+      "L2_ID_VERIFIED",
+    );
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.identity.status).toBe(
+      "verified",
+    );
   });
 });

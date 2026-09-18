@@ -5,12 +5,24 @@
 // write at service scope. The functions' behaviour is `int.rpc-0022`'s; this is the wiring. Written after the
 // adapters (recorded as such in the L-008 entry), against `db-nanny-stores.test.ts`'s pattern.
 import { describe, expect, it } from "vitest";
-import type { Evidence, SubmissionId, UserId } from "@/modules/shared-types";
+import type {
+  Evidence,
+  NannyId,
+  SubmissionId,
+  UserId,
+} from "@/modules/shared-types";
 import { dbVerificationStore } from "../db-verification-store";
 import { dbVettingStore } from "../db-vetting-store";
 import { fakeDataPort } from "./fixtures/fake-data-port";
 
 const USER = "22222222-2222-4222-8222-222222222222" as UserId;
+/**
+ * ★ ADR-169 — the PARTY row's id, and deliberately not `USER`. `vetting_submissions.nanny_id` and
+ * `verifications.nanny_id` both reference `nannies (id)`, so the ledger reads and every decision-side write are
+ * keyed by this; only the wizard's own reads are keyed by `USER`. These fixtures used one value for both, which
+ * is why they were green while the whole admin road was dead (REVIEW-4 C-3).
+ */
+const PARTY = "n-1" as NannyId;
 const SUBMISSION = "33333333-3333-4333-8333-333333333333" as SubmissionId;
 
 const evidenceOf = (over: Partial<Evidence>): Evidence => ({
@@ -38,7 +50,7 @@ const evidenceOf = (over: Partial<Evidence>): Evidence => ({
 
 const LEDGER_ROW = {
   id: SUBMISSION,
-  nanny_id: USER,
+  nanny_id: PARTY as string,
   evidence_id: "ev-1",
   section: "dbs",
   evidence_type: "dbs-certificate",
@@ -169,7 +181,8 @@ describe("dbVettingStore — the ledger over 0022 (ADR-154)", () => {
     const one = await store.read(SUBMISSION);
     expect(one.ok && one.value).toMatchObject({
       submissionId: SUBMISSION,
-      nannyId: USER,
+      // ★ ADR-169 — the ledger answers the PARTY row's id, which is what the column holds.
+      nannyId: PARTY,
       section: "dbs",
       evidenceType: "dbs-certificate",
       status: {
@@ -181,9 +194,9 @@ describe("dbVettingStore — the ledger over 0022 (ADR-154)", () => {
     });
     const byEvidence = await store.findByEvidence("ev-1" as Evidence["id"]);
     expect(byEvidence.ok && byEvidence.value?.submissionId).toBe(SUBMISSION);
-    const listed = await store.list({ nannyId: USER, status: "rejected" });
+    const listed = await store.list({ nannyId: PARTY, status: "rejected" });
     expect(listed.ok && listed.value).toHaveLength(1);
-    const none = await store.list({ nannyId: USER, status: "verified" });
+    const none = await store.list({ nannyId: PARTY, status: "verified" });
     expect(none.ok && none.value).toEqual([]);
     expect(fake.calls.every((call) => call.scope === "service")).toBe(true);
     expect(fake.keyedReads.map((read) => read.column)).toEqual([
@@ -203,7 +216,7 @@ describe("dbVettingStore — the ledger over 0022 (ADR-154)", () => {
       to_level: "L2_ID_VERIFIED",
       suspended: false,
       released: 0,
-      nanny_id: USER,
+      nanny_id: PARTY as string,
     });
     const result = await dbVettingStore(fake.port).recordDecision({
       submissionId: SUBMISSION,
@@ -361,7 +374,7 @@ describe("dbVerificationStore — the view read + 0022's definers (ADR-154)", ()
 });
 
 describe("dbVerificationStore — the decision side over 0023 (ADR-157)", () => {
-  const NANNY_ROW = { id: "n-1", user_id: USER };
+  const NANNY_ROW = { id: PARTY as string, user_id: USER };
   const sync = {
     from_level: "L2_ID_VERIFIED",
     to_level: "L3_PROVISIONALLY_VERIFIED",
@@ -372,7 +385,7 @@ describe("dbVerificationStore — the decision side over 0023 (ADR-157)", () => 
   it("syncLevel → sync_nanny_verification_state at SERVICE scope for the party row, answering from → to", async () => {
     const fake = fakeDataPort({ nannies: [NANNY_ROW] });
     fake.state.rpcAnswer = () => sync;
-    const result = await dbVerificationStore(fake.port).syncLevel(USER);
+    const result = await dbVerificationStore(fake.port).syncLevel(PARTY);
     expect(result.ok && result.value).toEqual({
       fromLevel: "L2_ID_VERIFIED",
       toLevel: "L3_PROVISIONALLY_VERIFIED",
@@ -392,7 +405,7 @@ describe("dbVerificationStore — the decision side over 0023 (ADR-157)", () => 
       name === "sweep_stale_verification_processing" ? 3 : sync;
     const store = dbVerificationStore(fake.port);
     await store.recordUpdateServiceCheck({
-      nannyId: USER,
+      nannyId: PARTY,
       result: "no_change",
       subscribed: true,
       checkedBy: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" as never,
@@ -469,9 +482,10 @@ describe("dbVerificationStore — the decision side over 0023 (ADR-157)", () => 
       ],
     });
     const store = dbVerificationStore(fake.port);
-    const record = await store.readAdminRecord(USER);
+    const record = await store.readAdminRecord(PARTY);
     expect(record.ok && record.value).toMatchObject({
-      nannyId: USER,
+      nannyId: PARTY,
+      userId: USER,
       level: "L2_ID_VERIFIED",
       declared: {
         surname: "Okafor",

@@ -206,7 +206,8 @@ describe("listQueue (S-A-16; 03 §4.3)", () => {
       "identity-document",
       "selfie",
     ]);
-    expect(identity[0]?.nannyId).toBe(NANNY);
+    // ★ ADR-169 — the queue carries the PARTY row, never the session id.
+    expect(identity[0]?.nannyId).toBe(ledger.partyIdOf(NANNY));
     expect(identity[0]?.status).toBe("needs-admin");
     expect(await queue("dbs")).toHaveLength(1);
     expect(await queue("right-to-work")).toHaveLength(1);
@@ -278,7 +279,7 @@ describe("decide — the admin is the check (ADR-157 (2); ADR-159)", () => {
     expect(decided.ok).toBe(true);
     if (!decided.ok) return;
     expect(decided.value).toMatchObject({
-      nannyId: NANNY,
+      nannyId: ledger.partyIdOf(NANNY),
       section: "identity",
       status: "verified",
       sync: { fromLevel: "L1_REGISTERED", toLevel: "L2_ID_VERIFIED" },
@@ -321,8 +322,12 @@ describe("decide — the admin is the check (ADR-157 (2); ADR-159)", () => {
     expect(decided.ok && decided.value.sync.toLevel).toBe(
       "L3_PROVISIONALLY_VERIFIED",
     );
-    expect(ledger.sectionsOf(NANNY)?.dbsOutcome).toBe("cleared");
-    expect(ledger.sectionsOf(NANNY)?.crossCheckPassed).toBe(true);
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.dbsOutcome).toBe(
+      "cleared",
+    );
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.crossCheckPassed).toBe(
+      true,
+    );
     expect(eventNames()).toContain("verification.held");
     const approved = comms.sent.filter(
       (m) => m.templateId === "verification-approved",
@@ -456,7 +461,10 @@ describe("recordUpdateServiceCheck — the level-4 action (04 §4.1 row 15; ADR-
 
   it("no_change → L4, the held connections released (verification.released), Fully verified approved once", async () => {
     await toL3();
-    ledger.patchSections(NANNY, (row) => ({ ...row, heldConnections: 2 }));
+    ledger.patchSections(ledger.partyIdOf(NANNY), (row) => ({
+      ...row,
+      heldConnections: 2,
+    }));
     const out = await verification.recordUpdateServiceCheck({
       submissionId: dbsSubmission,
       result: "no_change",
@@ -466,8 +474,10 @@ describe("recordUpdateServiceCheck — the level-4 action (04 §4.1 row 15; ADR-
       toLevel: "L4_FULLY_VERIFIED",
       released: 2,
     });
-    expect(ledger.sectionsOf(NANNY)?.heldConnections).toBe(0);
-    expect(ledger.sectionsOf(NANNY)?.updateService?.checkedBy).toBe(ADMIN);
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.heldConnections).toBe(0);
+    expect(
+      ledger.sectionsOf(ledger.partyIdOf(NANNY))?.updateService?.checkedBy,
+    ).toBe(ADMIN);
     expect(eventNames()).toContain("verification.released");
     expect(
       comms.sent.filter((m) => m.templateId === "verification-approved"),
@@ -482,7 +492,9 @@ describe("recordUpdateServiceCheck — the level-4 action (04 §4.1 row 15; ADR-
       subscribed: true,
     });
     expect(out.ok && out.value.toLevel).toBe("L2_ID_VERIFIED");
-    expect(ledger.sectionsOf(NANNY)?.dbs.status).toBe("review");
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.dbs.status).toBe(
+      "review",
+    );
     signIn(NANNY);
     const refused = await verification.recordUpdateServiceCheck({
       submissionId: dbsSubmission,

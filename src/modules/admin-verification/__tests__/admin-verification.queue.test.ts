@@ -8,16 +8,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { configureAuth, stubAuth } from "@/modules/auth";
 import { err, ok } from "@/modules/platform";
-import type { Email, SubmissionId, UserId } from "@/modules/shared-types";
+import type {
+  Email,
+  NannyId,
+  SubmissionId,
+  UserId,
+} from "@/modules/shared-types";
 import type { QueueEntry, QueueRecord } from "@/modules/verification";
 
 const NANNY = "11111111-1111-4111-8111-111111111111" as UserId;
+/**
+ * ★ ADR-169 — her PARTY row, a different value from her session id. The queue carries this one (it comes
+ * straight off `vetting_submissions.nanny_id`), and her name is reached by resolving it to `NANNY` first. These
+ * fixtures used one value for both, which made `nannyNameOf(entry.nannyId)` resolve in the double while every
+ * production row rendered `Nanny 11111111` (REVIEW-4 C-3).
+ */
+const NANNY_PARTY = "99999999-9999-4999-8999-999999999999" as NannyId;
 const ADMIN = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" as UserId;
 const SUBMISSION = "33333333-3333-4333-8333-333333333333" as SubmissionId;
 
 const entry: QueueEntry = {
   submissionId: SUBMISSION,
-  nannyId: NANNY,
+  nannyId: NANNY_PARTY,
   section: "dbs",
   evidenceType: "dbs-certificate",
   status: "needs-admin",
@@ -37,7 +49,8 @@ const record: QueueRecord = {
     ],
   },
   record: {
-    nannyId: NANNY,
+    nannyId: NANNY_PARTY,
+    userId: NANNY,
     level: "L1_REGISTERED",
     suspended: false,
     declared: { certificateNumber: "123456789012" },
@@ -124,6 +137,8 @@ beforeEach(() => {
       ],
       signedInUserId: ADMIN,
       tables: {
+        // ADR-169: the party row is what the queue carries, and the name is one resolution away from it.
+        nannies: [{ id: NANNY_PARTY, user_id: NANNY }],
         user_profiles: [
           { user_id: NANNY, first_name: "Amara", last_name: "Okafor" },
         ],
@@ -191,8 +206,9 @@ describe("loadVerificationQueue (S-A-16's read)", () => {
       filter: "needs-admin",
       open: null,
     });
+    // ADR-169: with no `nannies` row to resolve, the fallback names the id the queue actually carries.
     expect(view.kind === "queue" && view.rows[0]?.nannyName).toBe(
-      `Nanny ${NANNY.slice(0, 8)}`,
+      `Nanny ${(NANNY_PARTY as string).slice(0, 8)}`,
     );
   });
 

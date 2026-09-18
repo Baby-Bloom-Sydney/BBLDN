@@ -248,7 +248,7 @@ describe("db.constraints — the schema-wide conventions", () => {
     expect(rows.map((r) => r.proname)).toEqual([]);
   });
 
-  it("the schema is the 58 tables and 9 views of 02 §4 and §7 (56 + rate_limit_buckets 0017 + position_call_mirror 0018)", async () => {
+  it("the schema is the 59 tables and 9 views of 02 §4 and §7 (56 + rate_limit_buckets 0017 + position_call_mirror 0018 + nanny_suspension_lifts 0025)", async () => {
     const { rows } = await db.query<{ tables: string; views: string }>(
       `select
          (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -256,7 +256,7 @@ describe("db.constraints — the schema-wide conventions", () => {
          (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
           where n.nspname = 'public' and c.relkind = 'v') as views`,
     );
-    expect(Number(rows[0].tables)).toBe(58);
+    expect(Number(rows[0].tables)).toBe(59);
     expect(Number(rows[0].views)).toBe(9);
   });
 

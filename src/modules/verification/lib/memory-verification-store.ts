@@ -240,11 +240,7 @@ export function memoryVerificationStore(
     // ── the decision side (ADR-157) ──
     readAdminRecord: async (nannyId) =>
       ok(
-        recordOf(
-          nannyId,
-          ledger.userIdOf(nannyId),
-          ledger.sectionsOf(nannyId),
-        ),
+        recordOf(nannyId, ledger.userIdOf(nannyId), ledger.sectionsOf(nannyId)),
       ),
     syncLevel: async (nannyId) =>
       ledger.sectionsOf(nannyId) === undefined

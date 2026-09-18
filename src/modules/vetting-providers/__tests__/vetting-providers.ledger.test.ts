@@ -20,6 +20,10 @@ import {
 } from "../index";
 import type { MemoryVettingStore } from "../types";
 
+// ★ ADR-169 — two id spaces, and the double now models both. `NANNY` / `OTHER` are SESSION ids (what the
+// wizard submits under); the ledger rows and the section world are keyed by the PARTY row the definer resolves
+// them to, which `ledger.partyIdOf` is the double's copy of. A test that used one string for both is how
+// REVIEW-4 C-3 survived a phase of green suites.
 const NANNY = "11111111-1111-4111-8111-111111111111" as UserId;
 const OTHER = "22222222-2222-4222-8222-222222222222" as UserId;
 
@@ -60,9 +64,15 @@ describe("stub-manual over the memory ledger (03 §4.4)", () => {
     if (!submitted.ok) return;
     expect(submitted.value.status).toEqual({ kind: "needs-admin" });
     expect(submitted.value.provider).toBe("stub-manual");
-    expect(ledger.sectionsOf(NANNY)?.identity.status).toBe("pending");
-    expect(ledger.sectionsOf(NANNY)?.identity.attempts).toBe(1);
-    expect(ledger.sectionsOf(NANNY)?.dbs.status).toBe("not_started");
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.identity.status).toBe(
+      "pending",
+    );
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.identity.attempts).toBe(
+      1,
+    );
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.dbs.status).toBe(
+      "not_started",
+    );
   });
 
   it("is idempotent on the evidence id — a second submit answers the same submission and adds no row", async () => {
@@ -85,7 +95,9 @@ describe("stub-manual over the memory ledger (03 §4.4)", () => {
       "identity",
       "identity",
     ]);
-    expect(ledger.sectionsOf(NANNY)?.identity.attempts).toBe(1);
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.identity.attempts).toBe(
+      1,
+    );
   });
 
   it("check answers the stored status; an unknown id is unsupported-evidence", async () => {
@@ -126,7 +138,9 @@ describe("stub-manual over the memory ledger (03 §4.4)", () => {
       expiresAt: "2030-01-01T00:00:00.000Z" as never,
     });
     expect(recorded.ok && recorded.value.status.kind).toBe("verified");
-    expect(ledger.sectionsOf(NANNY)?.dbs.status).toBe("verified");
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.dbs.status).toBe(
+      "verified",
+    );
     const rejected = await stubManualProvider.record({
       submissionId: submitted.value.submissionId,
       decision: "rejected",
@@ -137,7 +151,9 @@ describe("stub-manual over the memory ledger (03 §4.4)", () => {
       kind: "rejected",
       reason: "document-unreadable",
     });
-    expect(ledger.sectionsOf(NANNY)?.dbs.status).toBe("rejected");
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.dbs.status).toBe(
+      "rejected",
+    );
   });
 });
 
@@ -150,18 +166,21 @@ describe("the two ledger reads the wizard and the queue share", () => {
         nannyId: OTHER,
       }),
     );
-    const mine = await listSubmissions({ nannyId: NANNY });
+    const mine = await listSubmissions({ nannyId: ledger.partyIdOf(NANNY) });
     expect(mine.ok && mine.value.map((row) => row.section)).toEqual([
       "identity",
     ]);
     const needsAdmin = await listSubmissions({ status: "needs-admin" });
     expect(needsAdmin.ok && needsAdmin.value).toHaveLength(2);
-    const dbs = await listSubmissions({ nannyId: OTHER, section: "dbs" });
+    const dbs = await listSubmissions({
+      nannyId: ledger.partyIdOf(OTHER),
+      section: "dbs",
+    });
     expect(dbs.ok && dbs.value[0]?.evidenceType).toBe("dbs-certificate");
     const one = await readSubmission(
       dbs.ok ? dbs.value[0]!.submissionId : ("" as SubmissionId),
     );
-    expect(one.ok && one.value?.nannyId).toBe(OTHER);
+    expect(one.ok && one.value?.nannyId).toBe(ledger.partyIdOf(OTHER));
   });
 
   it("getProvider still binds every accepted type to stub-manual (05 §3 rule 1)", () => {

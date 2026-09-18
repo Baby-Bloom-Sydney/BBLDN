@@ -53,10 +53,13 @@
 // use one opaque string for both id spaces, so the two are indistinguishable there; the integration suites
 // drive the SQL and never the adapters. The seam again.
 //
-// The pin below asserts the property the whole road assumes: **the id the ledger hands the application is one
-// a `nannies.user_id` lookup can resolve.** It is schema-level on purpose, so it flips whichever way the owner
-// closes it — a join in `entryOf`, or a distinct `NannyPartyId` brand with the conversion made explicit at the
-// module seam. **Owner: `2c` / `03 §4.2`'s connector shape.** REVIEW-4 §8 R-4.
+// ★ **ADR-169 answered it (R-4): the column is right, the label is wrong.** Verification is a fact about the
+// nanny's PROFILE — which is where `nanny_public`, the matching index and ADR-166's reasoning already live — so
+// the id space is `nannies.id` and the brand became `NannyId` through the connector, the store, the queue and
+// the ledger. The boundary is where `auth.uid()` resolves to `nannies.id`: inside each definer, once and named,
+// never in a caller and never by passing whichever id was to hand. The pin below is therefore RESTATED rather
+// than flipped — its original form asked the schema to make the two id spaces interchangeable, which is exactly
+// what the ruling refuses.
 //
 // One transaction, rolled back, like `int.rls`.
 import type { Client } from "pg";
@@ -345,7 +348,7 @@ describe("int.decision — lifting a bar is its own act, recorded (ADR-168 (b))"
   });
 });
 
-describe("int.decision — the ledger hands the application an id its own stores can resolve", () => {
+describe("int.decision — the ledger's id space, as ADR-169 rules it", () => {
   it("the ledger's nanny_id is the party row's id, as `0008`'s foreign key says", async () => {
     const { rows } = await db.query<{ matches: boolean }>(
       `select exists (select 1 from public.nannies n
@@ -357,22 +360,54 @@ describe("int.decision — the ledger hands the application an id its own stores
   });
 
   /**
-   * PINNED — REVIEW-4 C-1. `db-vetting-store.ts:98` labels that value `UserId` and hands it to stores that
-   * resolve it through `nannies.user_id = $1`, which matches nothing. Asserted at the schema so it flips on
-   * either fix — a join in `entryOf`, or a distinct brand with the conversion made explicit at the seam.
+   * ★ REVIEW-4 C-3's pin, RESTATED rather than flipped — because ADR-169 ruled the other way and a pin that
+   * asserts the opposite of the ruling can only ever go green by breaking the schema.
    *
-   * **Owner: `2c` / 03 §4.2's connector shape.**
+   * The pin asked that the ledger's id ALSO resolve as a session user id, so it would flip on either fix — a
+   * join in `entryOf`, or a distinct brand. ADR-169 picked the brand and said why: **the column is right and
+   * the label is wrong.** Verification is a fact about the nanny's profile, which is where `nanny_public`, the
+   * matching index and ADR-166's reasoning already live. So the property to hold is the INVERSE of the pin:
+   * the two id spaces are distinct, and nothing may quietly treat one as the other.
+   *
+   * The half of ADR-169 that lives in TypeScript — that a session id can no longer be ACCEPTED where a profile
+   * id belongs — is `src/modules/verification/__tests__/verification.id-space.test.ts`, held by the compiler.
+   * This is the half that lives in the database.
    */
-  it.fails(
-    "★ PINNED — that id also resolves as a session user id, which is what every 2c admin road assumes (owner: `2c`)",
-    async () => {
-      const { rows } = await db.query<{ resolves: boolean }>(
-        `select exists (select 1 from public.nannies n
-                         where n.user_id = (select s.nanny_id from public.vetting_submissions s where s.id = $1)
-        ) as resolves`,
-        [submissionId],
-      );
-      expect(rows[0].resolves).toBe(true);
-    },
-  );
+  it("★ the two id spaces are distinct, so a session id resolves nothing in the ledger's place (ADR-169)", async () => {
+    const { rows } = await db.query<{
+      party_is_user: boolean;
+      user_resolves: boolean;
+    }>(
+      `select (n.id = n.user_id) as party_is_user,
+              exists (select 1 from public.vetting_submissions s where s.nanny_id = n.user_id) as user_resolves
+         from public.nannies n where n.user_id = $1`,
+      [NANNY],
+    );
+
+    expect(rows[0].party_is_user).toBe(false);
+    expect(rows[0].user_resolves).toBe(false);
+  });
+
+  it("★ and the ledger's id is the one the decision-side writes are keyed by, on every road `2c` built", async () => {
+    const { rows } = await db.query<{
+      verifications: boolean;
+      sync: boolean;
+      update_service: boolean;
+    }>(
+      `with party as (
+         select s.nanny_id as id from public.vetting_submissions s where s.id = $1
+       )
+       select exists (select 1 from public.verifications v, party p where v.nanny_id = p.id) as verifications,
+              exists (select 1 from public.nannies n, party p where n.id = p.id) as sync,
+              exists (select 1 from public.nannies n, party p
+                       where n.id = p.id and n.user_id is not null) as update_service`,
+      [submissionId],
+    );
+
+    expect(rows[0]).toEqual({
+      verifications: true,
+      sync: true,
+      update_service: true,
+    });
+  });
 });
