@@ -346,7 +346,19 @@ Local exit codes, in this sweep's own worktree, against a stack built from `0000
 
 Baseline at `6551ddc` before any change: unit **295 files, 4,211 → 4,448 passed | 7 expected fail**; integration **15 files, 376 passed | 0 expected fail**. This branch adds 1 unit file, 3 integration files, 8 passing cases, 4 pins, and no red.
 
-`banned-literals` is red on `main` by construction (ADR-124 — the legacy Sydney `subscription` / `suburb` literals under `src/app/parent/**`), and `build`'s size-limit step and `test`'s legacy Playwright journeys are red for the reasons ADR-124 and REVIEW-3 §9 record. Measured against `main`'s own state, not this branch's, and not this sweep's.
+**CI on PR #47: all seven required checks pass** — `typecheck` · `lint` · `gitleaks` · `allowed-imports` · `types-drift` · `limiter-call-sites` · **`integration`** (3 m 25 s, the three new integration files run against a stack CI built from empty).
+
+The three red jobs are `main`'s own, and this was measured rather than assumed. `banned-literals` fails on the legacy Sydney `subscription` / `suburb` literals under `src/app/parent/**` (ADR-124). `build` fails at its **size-limit** step, which the workflow itself labels _"red until the Phase-1-exit baseline lands a `.size-limit` config"_. `test` is not a required check and fails at five steps — and the failing-step list on `main`'s own run at `6551ddc` is **identical, step for step**:
+
+```
+unit + coverage (05 §9 stage 3)
+changed-line coverage ≥ 80 % (05 §9 stage 3; 07 §10.2)
+contract suites — red until S2 adds the `contract` vitest project
+e2e — E1 shell smoke — green
+e2e — legacy Sydney journeys — red until F-d / Phase 1 rewrites them
+```
+
+Not this branch's, and not this sweep's.
 
 ---
 
