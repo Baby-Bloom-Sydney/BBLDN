@@ -48,9 +48,10 @@ describe("identitySchema (S-N-05)", () => {
 
   it("accepts the three UK id types of config and needs both files, the declared names, a DOB and the tick", () => {
     expect(identitySchema.safeParse(good).success).toBe(true);
-    expect(identitySchema.safeParse({ ...good, idType: "wwcc" }).success).toBe(
-      false,
-    );
+    const auCheckName = "wwcc"; // config-literal-ok: the REJECTED input — the refusal is the assertion
+    expect(
+      identitySchema.safeParse({ ...good, idType: auCheckName }).success,
+    ).toBe(false);
     expect(
       identitySchema.safeParse({ ...good, consent: undefined }).success,
     ).toBe(false);

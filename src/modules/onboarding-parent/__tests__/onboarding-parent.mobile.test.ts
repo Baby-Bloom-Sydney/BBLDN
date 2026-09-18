@@ -27,7 +27,7 @@ describe("onboarding-parent — normaliseUkMobile (ADR-102)", () => {
   it.each([
     ["020 7946 0000", "a London landline"],
     ["0412 345 678", "an Australian mobile"],
-    ["+61 412 345 678", "an Australian mobile in E.164"],
+    ["+61 412 345 678", "an Australian mobile in E.164"], // config-literal-ok: the case is that it is REFUSED
     ["0770 090012", "too short"],
     ["07700 9001234", "too long"],
     ["seven seven", "not a number"],

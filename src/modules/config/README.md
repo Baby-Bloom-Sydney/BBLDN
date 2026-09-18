@@ -1,18 +1,18 @@
 # config
 
 **What it does.** The single constants / config layer (01 §3; build-standard L4; ADR-033): brand, domain, senders,
-URLs, currency, locale, timezone, area source, prices, offer values, flags, scheduling / matching / connections /
-vetting seed values, Meta event map, test-user domain, crons, security controls, upload caps, app / Katie / launch
-values, and the typed environment. **Every file exports one frozen `as const` value** (build-standard L1; the config
+URLs, currency, locale, timezone, **the jurisdiction** (ADR-171), area source, prices, offer values, flags,
+scheduling / matching / connections / vetting seed values, Meta event map, test-user domain, crons, security controls,
+upload caps, app / Katie / launch values, and the typed environment. **Every file exports one frozen `as const` value** (build-standard L1; the config
 tests count the exports). Values come from the foundations, never invented; a value BAI has not yet ruled carries
 `@pending:B-nn` (DECISIONS §2 "default running now") and a Sydney-carried seed carries `[unverified]`.
 
 **Two connectors.**
 
-| Import                    | Who                                        | What                                                                                                                                                                                                                                                                                |
-| ------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@/modules/config`        | anything, including client components      | everything that reads no server env — `BRAND` · `LOCALE` · `DOMAIN` · `URLS` · `PRICES` · `OFFER` · `SCHEDULING` · `MATCHING` · `CONNECTIONS` · `VETTING` · `META_EVENTS` · `TEST_USER_DOMAIN` · `CRONS` · `SECURITY` · `UPLOADS` · `APP` · `LAUNCH` · `publicEnv` · `PUBLIC_FLAGS` |
-| `@/modules/config/server` | server files only (`import "server-only"`) | the above plus `env` · `FLAGS` · `SENDERS` · `AREAS_SOURCE` · `KATIE`                                                                                                                                                                                                               |
+| Import                    | Who                                        | What                                                                                                                                                                                                                                                                                          |
+| ------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@/modules/config`        | anything, including client components      | everything that reads no server env — `BRAND` · `LOCALE` · `LEGAL` · `DOMAIN` · `URLS` · `PRICES` · `OFFER` · `SCHEDULING` · `MATCHING` · `CONNECTIONS` · `VETTING` · `META_EVENTS` · `TEST_USER_DOMAIN` · `CRONS` · `SECURITY` · `UPLOADS` · `APP` · `LAUNCH` · `publicEnv` · `PUBLIC_FLAGS` |
+| `@/modules/config/server` | server files only (`import "server-only"`) | the above plus `env` · `FLAGS` · `SENDERS` · `AREAS_SOURCE` · `KATIE`                                                                                                                                                                                                                         |
 
 Why two: `env.ts` must carry `import "server-only"` (01 §3.3) and the server names must never reach a client chunk
 (07 §7 item 3 — the bundle string scan). A single barrel re-exporting `env` would put every server name into any client
@@ -43,6 +43,8 @@ date).
 **Named service-role uses.** None.
 
 <!-- audit
-Last edited: 2026-09-15T17:10+10:00 — BB-LDN-Planner-070926/S2
+Last edited: 2026-09-19T13:05+10:00 — BB-LDN-Planner-070926/3d-prime
+Notes: 3d' — `legal.ts` → `LEGAL` added to the universal surface (ADR-171, row `12.08`): governing law, courts, the ICO + its registration number, 07 §2.3's statutes, the entity. `companyNumber` / `registeredOffice` / `registrationNumber` are `@pending:B-35` and `config.legal` asserts they are STILL the sentinel. Currency and timezone stay in `LOCALE`.
+Prior: 2026-09-15T17:10+10:00 — BB-LDN-Planner-070926/S2
 Notes: created at S2 — two connectors (universal / server), two readers (env / public-env), registry-generated .env.example, crons → vercel.json.
 -->
