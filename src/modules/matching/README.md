@@ -16,6 +16,15 @@ one Connect entry point of ADR-126. The screens are S-X-02 (`QuickMatchResults`)
 `WIZARD_QUESTIONS`, one question per screen, progressive save) and S-X-04 (`PreAuthResults`); `NannyPreviewCard`,
 `DbsBadge` and the ARIA `AreaCombobox` are reused by `public-site` on S-X-01 / S-X-10 / S-X-11.
 
+**What `2d` added: one read, for a name.** `publicNannyName(auth, nannyId)` answers a nanny's **first name** from
+`nanny_public` and nothing else (07 §5.1 rule 4 keeps contact detail out of that view; 07 §5.2 makes it a
+parent's only road to her). It exists because 04 §7.1 writes `{nanny}` on three surfaces that had no road to a
+person — the parent rail's rows 4-6 (`positions`), S-P-08's cards (`connections`) and the admin call drawer
+(`admin`) — and none of the three may import this module. Boot injects it into `connections` as the
+`nannyNameOf` port and all three read it back through `connections.nannyNameOf`; **this module gains no new
+caller and no new arrow.** Session scope, so it joins no service-role list. `null` when the view has no row for
+her (isolated, below the pool), and every caller's fallback is the nameless line it already had.
+
 **Connector** (`index.ts` + `types.ts`, written and reviewed before the inside — L2):
 
 | Area        | Values                                                                                                               | Types                                                                                               |
@@ -74,20 +83,30 @@ by `scoring.topN` at `config.matching.precheckN`, the lever written through `pos
 and S-P-04 cannot drift; `Wizard` takes an optional `onComplete` + `header` + `submitLabel` so S-P-04 reuses the
 same component rather than a second copy.
 
-**`autofire` does not run the blast (recorded, `it.fails` in `matching.autofire.test.ts`).** §7.4 also has it
-notify each ranked nanny with `precheck-nanny`. A `comms` `Recipient` needs an `Email`; the only nanny read this
-module has is the marketplace-safe `nanny_public` (07 §5.2 — first name, no address), and no document authorises
-a service-scope read of nanny contact details. It wants a recipient port wired at boot.
+**`autofire` runs the blast (ADR-136).** §7.4 also has it notify each ranked nanny with `precheck-nanny`, and
+`1e` could not: a `comms` `Recipient` needed an `Email`, the only nanny read this module has is the
+marketplace-safe `nanny_public` (07 §5.2 — first name, no address), and no document authorised a service-scope
+read of nanny contact details, so the behaviour was pinned `it.fails`. ADR-136 moved the address resolution
+inside `comms`, and the blast is now a **port** (`PrecheckBlast`) handed in at boot — the same inversion
+`connections` uses for its `AdvanceFn`. The pin is gone because the behaviour is built, and four live claims in
+`matching.autofire.test.ts` hold it: each ranked nanny is notified, **ids and nothing else cross the port** (no
+address appears in what is handed over), a blast that refuses does not fail the pre-check (§7.4's own rule — the
+lever and the ranking stand), and with no port wired the result is honestly `notified: 0`.
 
 **Suites.** `__tests__/matching.swap.test.ts` (the connector swapped, `scoring` swapped underneath it) ·
 `matching.inside.test.ts` (the view read, the snapshot mapping, quick + pre-auth through `scoring`, the lead's
 progressive save, the Connect decisions, `not-built`) · `matching.screens.test.tsx` (S-X-02 / S-X-03 / S-X-04
 states and a11y claims) · `matching.copy.test.ts` (05 §5.2 over every surface, no allowlist) ·
 `matching.fail-closed.test.ts` · `matching.autofire.test.ts` (`1e`: the lever, the rail row, the `precheckN`
-cap, `precheck.failed`, and the blast pinned).
+cap, `precheck.failed`; and the blast itself, built under ADR-136 and asserted — not pinned).
 
 <!-- audit
-Last edited: 2026-09-17T18:10+10:00 — BB-LDN-Planner-070926/1e
+Last edited: 2026-09-19T11:40+10:00 — BB-LDN-Planner-070926/2d
+Notes: two stale prose claims corrected against the code (ADR-123 rule 2 — a README claim with no test behind it
+is the decay the pins exist to prevent). The blast is built (ADR-136, the PrecheckBlast port) and
+matching.autofire.test.ts carries no `it.fails`; the README said it was pinned. Also records `publicNannyName`,
+the one `nanny_public` read that answers a name for the three 04 §7.1 `{nanny}` surfaces (2d, kickoff debt 2).
+Prior: 2026-09-17T18:10+10:00 — BB-LDN-Planner-070926/1e
 Notes: 1e — `autofire` built (lever + ranking + `precheck.fired`; the blast pinned), `positionDetailOf`, the `Wizard` generalisation S-P-04 reuses.
 Prior: 2026-09-17T15:40+10:00 — BB-LDN-Planner-070926/1b
 Notes: 1b — the inside (`createMatching` over `nanny_public` + `parent_leads`), the five connector extensions raised for ratification, the ADR-126 entry point, S-X-02 / S-X-03 / S-X-04, the shared card / badge / combobox, the recorded gaps (keyed read, boot wiring, silent hold, client event seam).

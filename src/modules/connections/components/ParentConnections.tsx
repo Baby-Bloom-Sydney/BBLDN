@@ -5,8 +5,9 @@
 // **visible text** rather than colour, the failed read shown as an error line with the labels still standing
 // rather than an empty screen, and the empty case saying what to do instead of reading as a blank room.
 //
-// No nanny name appears, and that is a recorded gap rather than an oversight: no connector puts a person behind
-// these reads (see `connection-card-view.ts`). A raw id in front of a family would be worse.
+// `2d` closed kickoff debt 2: each card is headed by the nanny it is about (04 §7.1 `{nanny}`), with the stage
+// phrase underneath. A card whose name could not be read keeps the shape it had before — the stage phrase as the
+// heading — rather than showing a raw id.
 import type { ParentConnectionsProps } from "../types";
 
 function Card({
@@ -16,7 +17,20 @@ function Card({
 }) {
   return (
     <li className="rounded-lg border border-slate-200 bg-white p-4">
-      <p className="text-sm font-semibold text-slate-900">{card.state}</p>
+      {card.nannyFirstName !== undefined && (
+        <p className="text-base font-semibold text-slate-900">
+          {card.nannyFirstName}
+        </p>
+      )}
+      <p
+        className={
+          card.nannyFirstName === undefined
+            ? "text-sm font-semibold text-slate-900"
+            : "mt-1 text-sm font-medium text-slate-700"
+        }
+      >
+        {card.state}
+      </p>
       {card.detail !== undefined && (
         <p className="mt-1 text-sm text-slate-600">
           {card.meetingAt === undefined ? (

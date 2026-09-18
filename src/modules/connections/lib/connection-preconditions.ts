@@ -6,6 +6,10 @@
 // ADR-058 — an invited nanny belongs to the family that invited her and is out of every candidate set), and
 // **no live duplicate** (one row per nanny per position, which `0007`'s partial unique index enforces
 // underneath but which must refuse cleanly here rather than as a driver error the caller cannot read).
+//
+// `2d` gave the outcome a value: the creating rows already read the nanny's facts to check the floor, and the
+// **silent hold** (ADR-158 (2); 02 §4.2 row 7) is decided from the same read. The facts are handed back rather
+// than read a second time — one read, two decisions, and no way for the two to disagree.
 import { CONNECTIONS, MATCHING } from "@/modules/config";
 import { ok } from "@/modules/platform";
 import { ENUMS } from "@/modules/shared-types";
@@ -19,6 +23,11 @@ const CREATES: ReadonlySet<string> = new Set(["K-1", "K-2", "K-3"]);
 
 /** The rows that need availability before a meeting can be arranged (K-4 / K-5: "≥ config availability slots"). */
 const NEEDS_SLOTS: ReadonlySet<string> = new Set(["K-4", "K-5"]);
+
+/** What a creating row learned on the way through; empty for every other row. */
+export type PreconditionOutcome = { readonly nanny?: NannyFacts };
+
+const NOTHING_LEARNED: PreconditionOutcome = Object.freeze({});
 
 /**
  * `MATCHING.minVerificationLevel` is the **ordinal** 3 ("visible in matching from L3_PROVISIONALLY_VERIFIED"),
@@ -68,7 +77,7 @@ function checkPendingCap(
     : ok(undefined);
 }
 
-export async function checkPreconditions(input: {
+type Input = {
   readonly deps: ConnectionsDeps;
   readonly id: TransitionId;
   readonly positionStage: string;
@@ -76,64 +85,76 @@ export async function checkPreconditions(input: {
   readonly parentId: string;
   readonly positionId: string;
   readonly availabilitySlots?: number;
-}): Promise<Result<void>> {
-  const { deps, id } = input;
+};
 
-  if (CREATES.has(id)) {
-    // "position live" — 03 §2.2's live set for a position is everything before `ENDED` / `CLOSED`
-    if (input.positionStage === "ENDED" || input.positionStage === "CLOSED")
-      return CONNECTION_GUARDS.precondition("POSITION_NOT_LIVE");
+/** K-1 / K-2 / K-3 — the three checks about the nanny herself, plus K-1's cap. */
+async function checkCreate(input: Input): Promise<Result<PreconditionOutcome>> {
+  const { deps } = input;
+  // "position live" — 03 §2.2's live set for a position is everything before `ENDED` / `CLOSED`
+  if (input.positionStage === "ENDED" || input.positionStage === "CLOSED")
+    return CONNECTION_GUARDS.precondition("POSITION_NOT_LIVE");
 
-    const nanny = await deps.nannyFacts(
-      input.nannyId as Parameters<ConnectionsDeps["nannyFacts"]>[0],
+  const nanny = await deps.nannyFacts(
+    input.nannyId as Parameters<ConnectionsDeps["nannyFacts"]>[0],
+  );
+  if (!nanny.ok) return nanny;
+  if (nanny.value === null)
+    return CONNECTION_GUARDS.precondition("NANNY_NOT_FOUND");
+  const allowed = checkNanny(nanny.value);
+  if (!allowed.ok) return allowed;
+
+  const onPosition = await deps.store.forPosition(
+    input.positionId as Parameters<ConnectionsDeps["positionFacts"]>[0],
+  );
+  if (!onPosition.ok) return onPosition;
+  const duplicate = checkDuplicate(onPosition.value, input.nannyId);
+  if (!duplicate.ok) return duplicate;
+
+  if (input.id === "K-1") {
+    const held = await deps.store.forParent(
+      input.parentId as ConnectionRecord["parentId"],
     );
-    if (!nanny.ok) return nanny;
-    if (nanny.value === null)
-      return CONNECTION_GUARDS.precondition("NANNY_NOT_FOUND");
-    const allowed = checkNanny(nanny.value);
-    if (!allowed.ok) return allowed;
-
-    const onPosition = await deps.store.forPosition(
-      input.positionId as Parameters<ConnectionsDeps["positionFacts"]>[0],
-    );
-    if (!onPosition.ok) return onPosition;
-    const duplicate = checkDuplicate(onPosition.value, input.nannyId);
-    if (!duplicate.ok) return duplicate;
-
-    if (id === "K-1") {
-      const held = await deps.store.forParent(
-        input.parentId as ConnectionRecord["parentId"],
-      );
-      if (!held.ok) return held;
-      const cap = checkPendingCap(held.value);
-      if (!cap.ok) return cap;
-    }
-    return ok(undefined);
+    if (!held.ok) return held;
+    const cap = checkPendingCap(held.value);
+    if (!cap.ok) return cap;
   }
+  return ok(Object.freeze({ nanny: nanny.value }));
+}
 
-  if (NEEDS_SLOTS.has(id)) {
+/**
+ * K-17: "no other connection on this position at `OFFERED` / `CONFIRMED`" — the one-offer rule `0007`'s second
+ * partial unique index enforces. Checked here so the refusal reads as a rule, not as a constraint.
+ */
+async function checkOneOffer(
+  input: Input,
+): Promise<Result<PreconditionOutcome>> {
+  const onPosition = await input.deps.store.forPosition(
+    input.positionId as Parameters<ConnectionsDeps["positionFacts"]>[0],
+  );
+  if (!onPosition.ok) return onPosition;
+  const taken = onPosition.value.some(
+    (each) =>
+      (each.nannyId as string) !== input.nannyId &&
+      (each.stage === "OFFERED" || each.stage === "CONFIRMED"),
+  );
+  return taken
+    ? CONNECTION_GUARDS.precondition("ANOTHER_NANNY_OFFERED")
+    : ok(NOTHING_LEARNED);
+}
+
+export async function checkPreconditions(
+  input: Input,
+): Promise<Result<PreconditionOutcome>> {
+  if (CREATES.has(input.id)) return checkCreate(input);
+
+  if (NEEDS_SLOTS.has(input.id)) {
     const given = input.availabilitySlots ?? 0;
     return given >= CONNECTIONS.minAvailabilitySlots
-      ? ok(undefined)
+      ? ok(NOTHING_LEARNED)
       : CONNECTION_GUARDS.precondition("NOT_ENOUGH_AVAILABILITY");
   }
 
-  // K-17: "no other connection on this position at `OFFERED` / `CONFIRMED`" — the one-offer rule `0007`'s
-  // second partial unique index enforces. Checked here so the refusal reads as a rule, not as a constraint.
-  if (id === "K-17") {
-    const onPosition = await deps.store.forPosition(
-      input.positionId as Parameters<ConnectionsDeps["positionFacts"]>[0],
-    );
-    if (!onPosition.ok) return onPosition;
-    const taken = onPosition.value.some(
-      (each) =>
-        (each.nannyId as string) !== input.nannyId &&
-        (each.stage === "OFFERED" || each.stage === "CONFIRMED"),
-    );
-    return taken
-      ? CONNECTION_GUARDS.precondition("ANOTHER_NANNY_OFFERED")
-      : ok(undefined);
-  }
+  if (input.id === "K-17") return checkOneOffer(input);
 
-  return ok(undefined);
+  return ok(NOTHING_LEARNED);
 }

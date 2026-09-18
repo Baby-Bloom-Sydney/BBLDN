@@ -618,3 +618,96 @@ describe("connections — the nanny is reachable", () => {
     expect(Object.keys(toNanny?.to ?? {})).not.toContain("email");
   });
 });
+
+/**
+ * ADR-158 (2) — the silent hold's **connections arm**, and the flip of the pin `2c` left behind.
+ *
+ * `2c` built and proved the *release* (`sync_nanny_verification_state()` clears every held row at L4) and
+ * measured that nothing ever set the flag: `ConnectionRecord` carried no held pair and `upsert_connection()`
+ * inserted none. Its pin (`connections.hold.pin.test.ts`) is **retired rather than left to decay** — the claim it
+ * encoded is now false, and it could never have turned green on its own because its assertion was made against a
+ * hand-built record literal rather than against the module. These are the claims that replace it.
+ *
+ * The rule (02 §4.2 row 7, R-14: "held rows withhold parent notification until L4"): a connection created for a
+ * nanny who is not yet L4 is created `held_for_verification` with `held_at`; `0007`'s CHECK ties the two. The
+ * hold is **silent** — nothing on a nanny-facing or family-facing surface names it (ADR-157; 04 §4.1 row 14).
+ */
+describe("connections — the silent hold is written at K-row creation (ADR-158 (2); 02 §4.2 row 7)", () => {
+  const created = async (
+    level: string,
+    transition: "K-1" | "K-2" | "K-3",
+    id: ConnectionId,
+  ) => {
+    const w = world([], { level });
+    const actor = transition === "K-1" ? parentActor : nannyA;
+    await w.advance({
+      entity: { kind: "connection", id },
+      transition,
+      actor,
+      payload: { positionId: POSITION, nannyId: NANNY_A, availabilitySlots: 5 },
+      expectedFrom: null,
+      idempotencyKey: `hold-${transition}-${level}`,
+    });
+    const stored = await w.deps.store.get(id);
+    return stored.ok ? stored.value : null;
+  };
+
+  it("K-1 for a nanny below L4 creates the row held, with the instant", async () => {
+    const row = await created("L3_PROVISIONALLY_VERIFIED", "K-1", C1);
+
+    expect(row?.stage).toBe("REQUEST_SENT");
+    expect(row?.heldForVerification).toBe(true);
+    expect(row?.heldAt).toBe(NOW);
+  });
+
+  it("K-1 for an L4 nanny is not held and carries no instant", async () => {
+    const row = await created("L4_FULLY_VERIFIED", "K-1", C1);
+
+    expect(row?.heldForVerification).toBe(false);
+    expect(row?.heldAt).toBeUndefined();
+  });
+
+  it("K-2 and K-3 hold on the same rule — every road that puts her in front of a family", async () => {
+    const accepted = await created("L3_PROVISIONALLY_VERIFIED", "K-2", C1);
+    const applied = await created("L3_PROVISIONALLY_VERIFIED", "K-3", C2);
+
+    expect(accepted?.heldForVerification).toBe(true);
+    expect(applied?.heldForVerification).toBe(true);
+  });
+
+  it("`held_at` is present exactly when the flag is — `0007`'s CHECK, in the module's own terms", async () => {
+    for (const level of [
+      "L3_PROVISIONALLY_VERIFIED",
+      "L4_FULLY_VERIFIED",
+    ] as const) {
+      const row = await created(level, "K-1", C1);
+      expect(row?.heldForVerification === true).toBe(row?.heldAt !== undefined);
+    }
+  });
+
+  it("a later K row does not disturb the pair — only the L4 sync releases it (ADR-158)", async () => {
+    const w = world([], { level: "L3_PROVISIONALLY_VERIFIED" });
+    await w.advance({
+      entity: { kind: "connection", id: C1 },
+      transition: "K-1",
+      actor: parentActor,
+      payload: { positionId: POSITION, nannyId: NANNY_A },
+      expectedFrom: null,
+      idempotencyKey: "hold-carry-1",
+    });
+    await w.advance({
+      entity: { kind: "connection", id: C1 },
+      transition: "K-5",
+      actor: nannyA,
+      payload: { availabilitySlots: 5 },
+      expectedFrom: "REQUEST_SENT",
+      idempotencyKey: "hold-carry-2",
+    });
+
+    const stored = await w.deps.store.get(C1);
+
+    expect(stored.ok && stored.value?.stage).toBe("ACCEPTED");
+    expect(stored.ok && stored.value?.heldForVerification).toBe(true);
+    expect(stored.ok && stored.value?.heldAt).toBe(NOW);
+  });
+});

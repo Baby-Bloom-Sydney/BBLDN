@@ -28,6 +28,7 @@ import type {
   ConnectionRecord,
   ConnectionsDeps,
   ConnectionsSlice,
+  NannyFacts,
 } from "../types";
 import { CONNECTION_TRANSITIONS } from "./connection-transitions";
 import { CONNECTION_GUARDS } from "./connection-guards";
@@ -75,6 +76,20 @@ const stateAfter = (
     events: Object.freeze([...events]),
   });
 
+/**
+ * ADR-158 (2) / 02 §4.2 row 7 — the **silent hold**, decided at creation from the level `checkPreconditions`
+ * already read. A connection made for a nanny who is not yet L4 is created held: `0007`'s parent SELECT policy
+ * hides such a row, so the family is not notified until `sync_nanny_verification_state()` releases it at L4.
+ * Nothing names the hold anywhere — the flag is the mechanism and the copy has no word for it (ADR-157).
+ *
+ * A row created without facts (no `nannyFacts` port in a test double) is **not** held: the module never invents
+ * a hold it has no evidence for, and `0007`'s CHECK ties `held_at` to the flag either way.
+ */
+const heldPair = (nanny: NannyFacts | undefined, now: Instant) =>
+  nanny === undefined || nanny.verificationLevel === "L4_FULLY_VERIFIED"
+    ? { heldForVerification: false }
+    : { heldForVerification: true, heldAt: now };
+
 /** K-1 / K-2 / K-3 — the row creates the connection from the payload plus the position's own parent. */
 function created(
   spec: TransitionSpec,
@@ -82,8 +97,10 @@ function created(
   payload: CreatePayload,
   parentId: ConnectionRecord["parentId"],
   now: Instant,
+  nanny: NannyFacts | undefined,
 ): ConnectionRecord {
   return Object.freeze({
+    ...heldPair(nanny, now),
     connectionId: input.entity.id as ConnectionId,
     positionId: payload.positionId,
     parentId,
@@ -156,6 +173,105 @@ async function commit(
   return ok(stateAfter(next, events.value, context.now, cascaded.value));
 }
 
+/**
+ * The actor rule's create-time half, and it is a real hole without it. `CONNECTION_GUARDS.checkActor` compares a
+ * user against the **record's** party, and a creating row has no record — so a signed-in parent could otherwise
+ * post K-1 with a stranger's `positionId` and file a connection against that family's position. The position's
+ * own parent is the authority (the created row already takes its `parentId` from there), so the comparison is
+ * made against it, before anything is written.
+ *
+ * The same class as `1f`'s CRITICAL on `holdSlotAction`: a client-supplied subject id written onto a row without
+ * checking whose it is.
+ */
+function checkPositionParty(
+  input: Input,
+  parentId: ConnectionRecord["parentId"],
+): Result<void> {
+  if (
+    input.actor.kind === "user" &&
+    input.actor.role === "parent" &&
+    (parentId as string) !== (input.actor.id as string)
+  )
+    return err("FORBIDDEN", "This actor may not move the connection", {
+      reason: "E_ACTOR_FORBIDDEN" as const,
+      which: "not-party" as const,
+    });
+  return ok(undefined);
+}
+
+/** The row the K row writes: a creating row builds one, every other row patches the one it read. */
+function nextRecordFor(
+  spec: TransitionSpec,
+  input: Input,
+  record: ConnectionRecord | null,
+  parentId: ConnectionRecord["parentId"],
+  now: Instant,
+  nanny: NannyFacts | undefined,
+): ConnectionRecord | null {
+  if (record !== null)
+    return CONNECTION_STEPS.nextRecord(
+      spec.id,
+      spec.to as ConnectionStage,
+      record,
+      input.payload as StepPayload,
+    );
+  return isCreatePayload(input.payload)
+    ? created(spec, input, input.payload, parentId, now, nanny)
+    : null;
+}
+
+/**
+ * The half of a K row that happens before anything is written: the position's own facts, the create-time actor
+ * rule and the row's preconditions, then the next record. Split out of `run` so each piece stays readable and
+ * under the 50-line gate; the order is unchanged and every refusal is the one it always was.
+ */
+async function prepared(
+  deps: ConnectionsDeps,
+  spec: TransitionSpec,
+  input: Input,
+  record: ConnectionRecord | null,
+  now: Instant,
+): Promise<
+  Result<{ readonly next: ConnectionRecord; readonly positionStage: string }>
+> {
+  const payload = input.payload as StepPayload & Partial<CreatePayload>;
+  const positionId = record?.positionId ?? payload.positionId;
+  if (positionId === undefined)
+    return CONNECTION_GUARDS.invalidPayload("positionId");
+  const facts = await deps.positionFacts(positionId);
+  if (!facts.ok) return facts;
+  if (facts.value === null)
+    return CONNECTION_GUARDS.precondition("POSITION_NOT_FOUND");
+
+  const party = checkPositionParty(input, facts.value.parentId);
+  if (!party.ok) return party;
+
+  const nannyId = record?.nannyId ?? payload.nannyId;
+  const checked = await checkPreconditions({
+    deps,
+    id: spec.id,
+    positionStage: facts.value.stage,
+    nannyId: (nannyId ?? "") as string,
+    parentId: facts.value.parentId as string,
+    positionId: positionId as string,
+    ...(payload.availabilitySlots === undefined
+      ? {}
+      : { availabilitySlots: payload.availabilitySlots }),
+  });
+  if (!checked.ok) return checked;
+
+  const next = nextRecordFor(
+    spec,
+    input,
+    record,
+    facts.value.parentId,
+    now,
+    checked.value.nanny,
+  );
+  if (next === null) return CONNECTION_GUARDS.invalidPayload(spec.id);
+  return ok({ next, positionStage: facts.value.stage });
+}
+
 function handlerFor(deps: ConnectionsDeps, spec: TransitionSpec) {
   const clock = deps.clock ?? nowInstant;
   return Object.freeze({
@@ -180,67 +296,21 @@ function handlerFor(deps: ConnectionsDeps, spec: TransitionSpec) {
       if (from.value === "noop")
         return ok(stateAfter(record as ConnectionRecord, [], now, []));
 
-      const payload = input.payload as StepPayload & Partial<CreatePayload>;
-      const positionId = record?.positionId ?? payload.positionId;
-      if (positionId === undefined)
-        return CONNECTION_GUARDS.invalidPayload("positionId");
-      const facts = await deps.positionFacts(positionId);
-      if (!facts.ok) return facts;
-      if (facts.value === null)
-        return CONNECTION_GUARDS.precondition("POSITION_NOT_FOUND");
+      const ready = await prepared(deps, spec, input, record, now);
+      if (!ready.ok) return ready;
 
-      /**
-       * The actor rule's create-time half, and it is a real hole without it. `CONNECTION_GUARDS.checkActor`
-       * compares a user against the **record's** party, and a creating row has no record — so a signed-in
-       * parent could otherwise post K-1 with a stranger's `positionId` and file a connection against that
-       * family's position. The position's own parent is the authority (the created row already takes its
-       * `parentId` from there), so the comparison is made against it, before anything is written.
-       *
-       * The same class as `1f`'s CRITICAL on `holdSlotAction`: a client-supplied subject id written onto a row
-       * without checking whose it is.
-       */
-      if (
-        input.actor.kind === "user" &&
-        input.actor.role === "parent" &&
-        (facts.value.parentId as string) !== (input.actor.id as string)
-      )
-        return err("FORBIDDEN", "This actor may not move the connection", {
-          reason: "E_ACTOR_FORBIDDEN" as const,
-          which: "not-party" as const,
-        });
-
-      const nannyId = record?.nannyId ?? payload.nannyId;
-      const checked = await checkPreconditions({
+      return commit(
         deps,
-        id: spec.id,
-        positionStage: facts.value.stage,
-        nannyId: (nannyId ?? "") as string,
-        parentId: facts.value.parentId as string,
-        positionId: positionId as string,
-        ...(payload.availabilitySlots === undefined
-          ? {}
-          : { availabilitySlots: payload.availabilitySlots }),
-      });
-      if (!checked.ok) return checked;
-
-      const next =
-        record === null
-          ? isCreatePayload(input.payload)
-            ? created(spec, input, input.payload, facts.value.parentId, now)
-            : null
-          : CONNECTION_STEPS.nextRecord(
-              spec.id,
-              spec.to as ConnectionStage,
-              record,
-              payload,
-            );
-      if (next === null) return CONNECTION_GUARDS.invalidPayload(spec.id);
-
-      return commit(deps, spec, input, next, record?.stage ?? null, {
-        uow,
-        now,
-        positionStage: facts.value.stage,
-      });
+        spec,
+        input,
+        ready.value.next,
+        record?.stage ?? null,
+        {
+          uow,
+          now,
+          positionStage: ready.value.positionStage,
+        },
+      );
     },
   });
 }

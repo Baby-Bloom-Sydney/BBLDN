@@ -8,6 +8,11 @@
 //   **`positionFacts`** — K-1 / K-2 / K-3's "position live" precondition and the P-row cascades' conditions are
 //   facts about a row this module does not own. `positions.getForMatching` is the connector that answers them.
 //
+// `2d` injects a third for the same reason (kickoff debt 2): **`nannyNameOf`** — the one `nanny_public` read that
+// answers a first name (`matching.publicNannyName`; 07 §5.1 rule 4 keeps contact detail out of that view). 01
+// §2.3 gives `connections` no arrow to `matching`, and neither `positions` nor `admin` has one either — so this
+// is the single place the read exists and all three `{nanny}` surfaces (04 §7.1) reach it through `connections`.
+//
 // The slice is registered over the **same store instance** the reads use, for the reason `wire-call-layer.ts`
 // gives: two stores would let `advance` write one row and a read see another.
 import { auth } from "@/modules/auth";
@@ -19,6 +24,7 @@ import {
   createConnections,
   createConnectionsSlice,
 } from "@/modules/connections";
+import { publicNannyName } from "@/modules/matching";
 import { parentProfileStore } from "@/modules/onboarding-parent";
 import { ok } from "@/modules/platform";
 import { advance, registerSlice } from "@/modules/positions";
@@ -51,7 +57,12 @@ async function recipientOf(parentId: ParentId) {
 export function wireConnections(): PortWiring {
   const store = dbConnectionStore(auth.data);
   configureConnectionsDispatch(advance);
-  configureConnections(createConnections({ store }));
+  configureConnections(
+    createConnections({
+      store,
+      nannyNameOf: (nannyId: NannyId) => publicNannyName(auth, nannyId),
+    }),
+  );
   registerSlice(
     connectionsSliceRegistration(
       createConnectionsSlice({
@@ -71,7 +82,7 @@ export function wireConnections(): PortWiring {
   return {
     port: "connections",
     binding:
-      "the 25 K rows over connection_requests, plus the two 03 §7.5 reads",
+      "the 25 K rows over connection_requests, the two 03 §7.5 reads, and the one nanny_public name read",
     reason:
       "advance and positionFacts are injected rather than imported: 01 §2.3 gives connections no arrow to positions, and boot is the one place that may hold both",
   };

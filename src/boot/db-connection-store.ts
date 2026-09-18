@@ -46,6 +46,8 @@ type Row = {
   readonly trial_date: string | null;
   readonly fill_initiated_by: string | null;
   readonly availability_slots: unknown;
+  readonly held_for_verification: boolean | null;
+  readonly held_at: string | null;
 };
 
 const slotCount = (slots: unknown): number | undefined =>
@@ -90,6 +92,12 @@ const recordOf = (row: Row): ConnectionRecord =>
     ...(slotCount(row.availability_slots) === undefined
       ? {}
       : { availabilitySlots: slotCount(row.availability_slots) }),
+    // ADR-158 (2) — the silent hold. Read back so a later K row rewrites what is already there rather than
+    // clearing it; the release at L4 is `sync_nanny_verification_state()`'s and never this store's.
+    heldForVerification: row.held_for_verification === true,
+    ...(row.held_at === null
+      ? {}
+      : { heldAt: row.held_at as ConnectionRecord["createdAt"] }),
   });
 
 const patchOf = (record: ConnectionRecord) => ({
@@ -116,46 +124,59 @@ const patchOf = (record: ConnectionRecord) => ({
   ...(record.fillInitiatedBy === undefined
     ? {}
     : { fill_initiated_by: record.fillInitiatedBy }),
+  // 02 §4.2 row 7 / R-14. `0024` is what makes these two reach the row: `0019`'s INSERT column list did not
+  // carry them, which is what `2c` measured. The pair travels together because `0007`'s CHECK ties them.
+  ...(record.heldForVerification === undefined
+    ? {}
+    : { held_for_verification: record.heldForVerification }),
+  ...(record.heldAt === undefined ? {} : { held_at: record.heldAt as string }),
 });
 
-export function dbConnectionStore(port: DataAccessPort): ConnectionStore {
-  const list = (
-    name: string,
-    column: "position_id" | "parent_id",
-    value: string,
-  ): Promise<Result<ReadonlyArray<ConnectionRecord>>> =>
-    port.run(
-      {
-        name: `connections.${name}`,
-        exec: async (q) => {
-          const rows = (await q
-            .from("connection_requests")
-            .eq(column, value)
-            .select()) as ReadonlyArray<Row>;
-          return Object.freeze(rows.map(recordOf));
-        },
+const listBy = (
+  port: DataAccessPort,
+  name: string,
+  column: "position_id" | "parent_id",
+  value: string,
+): Promise<Result<ReadonlyArray<ConnectionRecord>>> =>
+  port.run(
+    {
+      name: `connections.${name}`,
+      exec: async (q) => {
+        const rows = (await q
+          .from("connection_requests")
+          .eq(column, value)
+          .select()) as ReadonlyArray<Row>;
+        return Object.freeze(rows.map(recordOf));
       },
-      { scope: "service" },
-    );
+    },
+    { scope: "service" },
+  );
 
+const getById = (
+  port: DataAccessPort,
+  connectionId: ConnectionId,
+): Promise<Result<ConnectionRecord | null>> =>
+  port.run(
+    {
+      name: "connections.get",
+      exec: async (q) => {
+        const row = (await q
+          .from("connection_requests")
+          .eq("id", connectionId)
+          .single()) as Row | null;
+        return row === null ? null : recordOf(row);
+      },
+    },
+    { scope: "service" },
+  );
+
+export function dbConnectionStore(port: DataAccessPort): ConnectionStore {
   return Object.freeze({
-    get: async (connectionId: ConnectionId) =>
-      port.run(
-        {
-          name: "connections.get",
-          exec: async (q) => {
-            const row = (await q
-              .from("connection_requests")
-              .eq("id", connectionId)
-              .single()) as Row | null;
-            return row === null ? null : recordOf(row);
-          },
-        },
-        { scope: "service" },
-      ),
+    get: (connectionId: ConnectionId) => getById(port, connectionId),
     forPosition: (positionId: PositionId) =>
-      list("forPosition", "position_id", positionId),
-    forParent: (parentId: ParentId) => list("forParent", "parent_id", parentId),
+      listBy(port, "forPosition", "position_id", positionId),
+    forParent: (parentId: ParentId) =>
+      listBy(port, "forParent", "parent_id", parentId),
     put: async (record: ConnectionRecord, uow?: UnitOfWork) =>
       port.run(
         {
