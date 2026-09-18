@@ -54,4 +54,13 @@ export async function sendNannyCallMessages(input: {
   });
   if (!notice.ok)
     warn("admin-commission-booking", booking.id as string, notice.error.code);
+  // ADR-160: the email is the delivery, the `admin_notifications` row the state (02 §4.6) — one writer, `comms`.
+  const row = await comms.notifyAdmin({
+    kind: "commission_call_booked",
+    subject: { type: "booking", id: booking.id as string as Uuid },
+    summary: "A nanny booked a commission call.",
+    dueAt: booking.start,
+  });
+  if (!row.ok)
+    warn("admin_notifications:commission_call_booked", booking.id as string, row.error.code);
 }

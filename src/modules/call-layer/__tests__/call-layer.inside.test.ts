@@ -122,6 +122,7 @@ const fakeComms = (): Comms & Sent => {
     cancel: async () => ok({ cancelled: 0 }),
     status: async () => ok({ status: "sent" as const }),
     createInboxMessage: async () => ok({ id: "i-1" as never }),
+    notifyAdmin: async () => ok({ id: "n-1" as never }),
   };
 };
 

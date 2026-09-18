@@ -47,6 +47,17 @@ const KEY: Readonly<
   right_to_work: "rightToWork",
 });
 
+/** 02 §8's object-section names, from the evidence type (the same split `evidenceObjectPath` makes). */
+const OBJECT_SECTION: Readonly<Record<EvidenceType, string>> = Object.freeze({
+  "identity-document": "identity-document",
+  selfie: "identity-selfie",
+  "dbs-certificate": "dbs-certificate",
+  "dbs-update-service": "dbs-certificate",
+  "right-to-work-passport": "rtw-document",
+  "right-to-work-share-code": "rtw-document",
+  "right-to-work-document": "rtw-document",
+});
+
 const sectionStatusOf = (status: CheckStatus): LedgerSectionStatus =>
   status.kind === "needs-admin"
     ? "review"
@@ -91,6 +102,18 @@ export function memoryVettingStore(): MemoryVettingStore {
     if (row === undefined) return unknown();
     const key = KEY[row.section as keyof typeof KEY];
     if (key === undefined) return unknown();
+    // 0022's STALE_SUBMISSION guard: a result for an older attempt of the same evidence type never lands
+    const later = state.rows.some(
+      (entry) =>
+        entry.nannyId === row.nannyId &&
+        entry.section === row.section &&
+        entry.evidenceType === row.evidenceType &&
+        entry.submittedAt > row.submittedAt,
+    );
+    if (later)
+      return err<VettingErrorDetails>("CONFLICT", "That attempt was superseded", {
+        reason: "unsupported-evidence",
+      });
     const sectionStatus = sectionStatusOf(status);
     replaceRow({ ...row, status, checkedAt: nowInstant() });
     patchSections(row.nannyId, (current) => ({
@@ -99,8 +122,12 @@ export function memoryVettingStore(): MemoryVettingStore {
         ...current[key],
         status: sectionStatus,
         statusAt: nowInstant(),
+        submissionId,
         ...(status.kind === "rejected"
           ? { rejectionReason: status.reason, guidanceKey: status.guidanceKey }
+          : {}),
+        ...(status.kind === "verified" && status.expiresAt !== undefined
+          ? { expiresAt: status.expiresAt }
           : {}),
       },
     }));
@@ -135,6 +162,10 @@ export function memoryVettingStore(): MemoryVettingStore {
         submittedAt: nowInstant(),
       });
       state.rows = [...state.rows, entry];
+      const paths = evidence.documents.map((doc) => ({
+        section: OBJECT_SECTION[evidence.type],
+        path: doc.path,
+      }));
       patchSections(evidence.nannyId, (row) => ({
         ...row,
         [key]: {
@@ -146,6 +177,18 @@ export function memoryVettingStore(): MemoryVettingStore {
             row[key].attempts +
             (evidence.type === ("identity-document" as EvidenceType) ? 1 : 0),
         },
+        // what 0022's definer keeps from the evidence beside the section (the admin's read, 2c)
+        declared: { ...(row.declared ?? {}), ...evidence.declared },
+        documents: [...(row.documents ?? []), ...paths],
+        ...(evidence.type === "dbs-certificate" &&
+        evidence.declared.updateServiceConsent === "true"
+          ? {
+              updateService: {
+                ...(row.updateService ?? {}),
+                consentAt: evidence.submittedAt,
+              },
+            }
+          : {}),
       }));
       return ok(entry);
     },
@@ -162,7 +205,16 @@ export function memoryVettingStore(): MemoryVettingStore {
             (filter.status === undefined || row.status.kind === filter.status),
         ),
       ),
+    // `record_vetting_decision()` in the memory world (ADR-157 (2)): the result, the note, and for dbs the outcome
+    // and the cross-check the admin IS under stub-manual. The level itself is `verification`'s to derive
+    // (`syncLevel`), because the rule lives there and this module may not import it (01 §2.3).
     recordDecision: async (input) => {
+      if (input.decision === "rejected" && input.reason === undefined)
+        return err<VettingErrorDetails>(
+          "VALIDATION",
+          "A rejection needs a reason",
+          { reason: "mismatch" },
+        );
       const status: CheckStatus =
         input.decision === "verified"
           ? {
@@ -177,8 +229,24 @@ export function memoryVettingStore(): MemoryVettingStore {
               reason: input.reason ?? "mismatch",
               guidanceKey: `${input.reason ?? "mismatch"}` as never,
             };
+      const before = state.rows.find(
+        (entry) => entry.submissionId === input.submissionId,
+      );
       const applied = applyResult(input.submissionId, status);
       if (!applied.ok) return applied;
+      if (input.note !== undefined && before !== undefined)
+        replaceRow({
+          ...state.rows.find((e) => e.submissionId === input.submissionId)!,
+          note: input.note,
+        });
+      if (before !== undefined && before.section === "dbs")
+        patchSections(before.nannyId, (row) =>
+          input.decision === "verified"
+            ? { ...row, dbsOutcome: "cleared", crossCheckPassed: true }
+            : input.reason === "adverse"
+              ? { ...row, dbsOutcome: "barred", crossCheckPassed: false }
+              : { ...row, dbsOutcome: "unset", crossCheckPassed: false },
+        );
       const result: CheckResult = {
         submissionId: input.submissionId,
         status,
@@ -188,6 +256,7 @@ export function memoryVettingStore(): MemoryVettingStore {
     },
     rows: () => state.rows,
     sectionsOf: (nannyId) => state.world.get(nannyId),
+    nannyIds: () => [...state.world.keys()],
     patchSections,
     applyResult,
   });

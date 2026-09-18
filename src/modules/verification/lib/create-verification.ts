@@ -8,8 +8,17 @@ import type {
   VerificationDeps,
   VerificationErrorDetails,
 } from "../types";
+import { adminOverview } from "./admin-overview";
+import { decide } from "./decide";
 import { emptyVerificationState } from "./empty-verification-state";
+import { listQueue } from "./list-queue";
+import { openEvidence } from "./open-evidence";
 import { processSections } from "./process-sections";
+import { readQueueRecord } from "./read-queue-record";
+import { recordUpdateServiceCheck } from "./record-update-service-check";
+import { sweepExpiry } from "./sweep-expiry";
+import { sweepReminders } from "./sweep-reminders";
+import { sweepStaleProcessing } from "./sweep-stale-processing";
 import { requireOwnNanny } from "./require-own-nanny";
 import { submitContact } from "./submit-contact";
 import { submitDbs } from "./submit-dbs";
@@ -71,12 +80,23 @@ export function createVerification(deps: VerificationDeps): Verification {
       if (!applied.ok) return applied;
       return getStatus(entry.value.nannyId);
     },
+    // 03 §4.3's arm for a provider that is not a `ManualDecisionProvider` — none is bound (03 §4.4), so it stays
+    // refused by name; `decide` is the road the queue takes (ADR-159).
     override: async () =>
       err<VerificationErrorDetails>(
         "INTERNAL",
         "That decision road is not built yet.",
         { reason: "not-built" },
       ),
+    listQueue: (query) => listQueue(query),
+    readQueueRecord: (submissionId) => readQueueRecord(deps, submissionId),
+    openEvidence: (submissionId) => openEvidence(deps, submissionId),
+    decide: (input) => decide(deps, input),
+    recordUpdateServiceCheck: (input) => recordUpdateServiceCheck(deps, input),
+    adminOverview: () => adminOverview(deps),
+    sweepStaleProcessing: (now) => sweepStaleProcessing(deps, now),
+    sweepReminders: (now) => sweepReminders(deps, now),
+    sweepExpiry: (now) => sweepExpiry(deps, now),
   };
   return Object.freeze(inside);
 }

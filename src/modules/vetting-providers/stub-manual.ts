@@ -65,12 +65,22 @@ export const stubManualProvider: ManualDecisionProvider = Object.freeze({
     const recorded = await store.recordDecision(input);
     if (!recorded.ok) return recorded;
     if (entry.value !== null)
-      await emitVettingEvent("vetting.decision-recorded", entry.value.nannyId, {
-        submissionId: input.submissionId,
-        evidenceType: entry.value.evidenceType,
-        provider: PROVIDER_ID,
-        decision: input.decision,
-      });
+      await emitVettingEvent(
+        "vetting.decision-recorded",
+        entry.value.nannyId,
+        {
+          submissionId: input.submissionId,
+          evidenceType: entry.value.evidenceType,
+          provider: PROVIDER_ID,
+          decision: input.decision,
+        },
+        // 03 §9.3 / 07 §5.4 row 6: the actor is the admin who decided, the subject the submission's nanny
+        {
+          kind: "admin",
+          id: input.actor.id,
+          onBehalfOf: { role: "nanny", id: entry.value.nannyId },
+        },
+      );
     return recorded;
   },
 });

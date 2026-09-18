@@ -4,7 +4,7 @@
 // produces the same `p_required` the sync validates. Pure.
 import type { EvidenceType } from "@/modules/shared-types";
 import type { LedgerSection } from "@/modules/vetting-providers";
-import type { VerificationLevel } from "../types";
+import type { RequiredSectionsByLevel, VerificationLevel } from "../types";
 
 /**
  * The same map as `vetting-providers`' `sectionOfEvidenceType` (03 §4.3), restated here because this file must
@@ -20,10 +20,6 @@ const SECTION_OF: Readonly<Record<EvidenceType, LedgerSection>> = Object.freeze(
   "right-to-work-share-code": "right_to_work",
   "right-to-work-document": "right_to_work",
 });
-
-export type RequiredSectionsByLevel = Readonly<
-  Record<VerificationLevel, ReadonlyArray<LedgerSection>>
->;
 
 export function requiredSectionsByLevel(
   requiredChecks: Readonly<

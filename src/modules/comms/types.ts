@@ -154,6 +154,19 @@ export type ResolvedMessage<Id extends TemplateId = TemplateId> = Omit<
 /** 02 §3 leaves `inbox_messages.type` deliberately **text, open set** — so does this. */
 export type InboxType = string;
 
+/**
+ * ADR-160 — `admin_notifications` (02 §4.6), the operator's own queue, has one writer: this seam. The kind is
+ * 02 §3's enum (validated before the store is reached); the subject is what the row is about (a nanny, a
+ * booking, a message…); one OPEN row per (kind, subject) is the table's own index, so a repeat is answered, not
+ * duplicated.
+ */
+export type AdminNotificationInput = {
+  readonly kind: EnumValue<"admin_notification_kind">;
+  readonly subject?: { readonly type: string; readonly id: Uuid };
+  readonly summary: string;
+  readonly dueAt?: IsoInstant;
+};
+
 export type InboxMessage = {
   readonly userId: Uuid;
   readonly type: InboxType;
@@ -174,6 +187,8 @@ export type CommsReason =
   | "attachment-missing"
   | "template-schema"
   | "provider-rejected"
+  /** `notifyAdmin` with a kind outside 02 §3's `admin_notification_kind` (ADR-160) */
+  | "unknown-kind"
   | "comms-not-configured"
   | "store-not-configured"
   | "renderer-not-configured"
@@ -209,6 +224,10 @@ export type Comms = {
   createInboxMessage(
     msg: InboxMessage,
     opts?: { readonly uow?: UnitOfWork },
+  ): Promise<Result<{ readonly id: Uuid }, CommsErrorDetails>>;
+  /** ADR-160: the one writer of `admin_notifications`; idempotent on the open-row index */
+  notifyAdmin(
+    input: AdminNotificationInput,
   ): Promise<Result<{ readonly id: Uuid }, CommsErrorDetails>>;
 };
 
@@ -293,6 +312,10 @@ export type CommsStore = {
   createInboxMessage(
     msg: InboxMessage,
     opts?: { readonly uow?: UnitOfWork },
+  ): Promise<Result<{ readonly id: Uuid }, CommsErrorDetails>>;
+  /** ADR-160: one `admin_notifications` insert at service scope; an open row for the same (kind, subject) is answered */
+  createAdminNotification(
+    input: AdminNotificationInput,
   ): Promise<Result<{ readonly id: Uuid }, CommsErrorDetails>>;
 };
 

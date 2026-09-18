@@ -9,7 +9,7 @@ booking, and it never decides which message fires — that is the calling module
 
 | Area      | Values                                                                                     | Types                                                                                   |
 | --------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| seam      | `comms` · `configureComms` · `createComms` · `unconfiguredComms`                           | `Comms` · `Message` · `Recipient` · `MessageStatus` · `MessageState` · `InboxMessage`   |
+| seam      | `comms` · `configureComms` · `createComms` · `unconfiguredComms`                           | `Comms` · `Message` · `Recipient` · `MessageStatus` · `MessageState` · `InboxMessage` · `AdminNotificationInput` (ADR-160: `notifyAdmin` — the one writer of `admin_notifications`, at service scope through the store; the kind is 02 §3's enum, validated at the seam; one open row per (kind, subject) is the table's own index) |
 | registry  | `TEMPLATE_IDS`                                                                             | `TemplateRegistry` · `TemplateId` · `TemplateData`                                      |
 | providers | `emailProviderFor` · `stubEmailProvider` (`comms/email`) · `nullSmsProvider` (`comms/sms`) | `EmailProvider` · `SmsProvider` · `RenderedEmail` · `EmailProviderId` · `SmsProviderId` |
 | ports     | —                                                                                          | `CommsStore` · `TemplateRenderer` · `CommsDeps` · `CommsErrorDetails`                   |

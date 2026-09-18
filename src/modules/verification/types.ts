@@ -4,6 +4,7 @@
 // silent hold, the admin decision and the sweeps are `2c`'s and are named here as such.
 import type { ClientResult } from "@/modules/platform";
 import type {
+  AdminId,
   CheckResult,
   CheckStatus,
   ConsentRecordId,
@@ -20,7 +21,7 @@ import type {
   UserId,
 } from "@/modules/shared-types";
 import type { StorageRef } from "@/modules/auth";
-import type { CheckedBy } from "@/modules/vetting-providers";
+import type { CheckedBy, LedgerSection } from "@/modules/vetting-providers";
 
 /** 02 §3 `verification_level` — the five levels of `05.22`, in order. */
 export type VerificationLevel = EnumValue<"verification_level">;
@@ -88,8 +89,10 @@ export type VerificationReason =
   | "too-many-attempts"
   | "store-failed"
   | "verification-not-configured"
-  /** `2c`'s roads (the admin decision, the level) */
-  | "not-built";
+  /** 03 §4.3's `override` arm — reachable only when a non-manual provider is bound, and none is (03 §4.4) */
+  | "not-built"
+  /** ADR-159: a rejection without a reason (04 §5.3; 05 AC-A-17) */
+  | "reason-required";
 
 export type VerificationErrorDetails = {
   readonly reason: VerificationReason;
@@ -533,7 +536,7 @@ export type SectionExpiry = {
 };
 
 /** A nanny still below the pool with a section open — what the reminder funnel walks (`08.11`; ADR-161). */
-export type ReminderCandidate = {
+export type RemindableNanny = {
   readonly nannyId: UserId;
   readonly level: VerificationLevel;
   readonly lastChangeAt: Instant;
@@ -543,6 +546,17 @@ export type SweepResult = {
   readonly handled: number;
   readonly skipped: number;
 };
+
+/** What `requireAdmin` answers (ADR-159): the session's admin, as the brand and as the user id the audit writes. */
+export type AdminSession = {
+  readonly adminId: AdminId;
+  readonly userId: UserId;
+};
+
+/** `VETTING.requiredChecksByLevel` as sections per level — the sync's `p_required` (ADR-157 (1)). */
+export type RequiredSectionsByLevel = Readonly<
+  Record<VerificationLevel, ReadonlyArray<LedgerSection>>
+>;
 
 /** The decision-side port (ADR-157) — the `0023` definers at service scope, plus the admin's reads. */
 export type VerificationDecisionStore = {
@@ -560,16 +574,17 @@ export type VerificationDecisionStore = {
   expireSection(
     submissionId: SubmissionId,
   ): Promise<Result<LevelSync, VerificationErrorDetails>>;
-  /** `sweep_stale_verification_processing()` — answers the count moved to review */
+  /** `sweep_stale_verification_processing()` — answers the count moved to review; the SQL judges by its own clock */
   sweepStale(
     staleMinutes: number,
+    now: Instant,
   ): Promise<Result<number, VerificationErrorDetails>>;
   listExpiries(): Promise<
     Result<ReadonlyArray<SectionExpiry>, VerificationErrorDetails>
   >;
-  listReminderCandidates(
+  listRemindable(
     belowLevel: VerificationLevel,
-  ): Promise<Result<ReadonlyArray<ReminderCandidate>, VerificationErrorDetails>>;
+  ): Promise<Result<ReadonlyArray<RemindableNanny>, VerificationErrorDetails>>;
   countByLevel(): Promise<
     Result<Readonly<Record<VerificationLevel, number>>, VerificationErrorDetails>
   >;

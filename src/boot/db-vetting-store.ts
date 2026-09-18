@@ -4,8 +4,11 @@
 // service-role only (02 §4.3 row 2) and the wizard's processing step and the queue both read it — named in the
 // module README (07 §5.1 rule 5). `recordDecision` is the admin road `2c` builds and refuses by name until then.
 import type { DataAccessPort } from "@/modules/auth";
-import { err, ok } from "@/modules/platform";
+import { VETTING } from "@/modules/config";
+import { nowInstant, ok } from "@/modules/platform";
+import { requiredSectionsByLevel } from "@/modules/verification";
 import type {
+  CheckResult,
   CheckStatus,
   Evidence,
   EvidenceType,
@@ -47,6 +50,7 @@ type LedgerRow = {
   readonly raw_response: {
     reject_reason?: string;
     guidance_key?: string;
+    note?: string;
   } | null;
   readonly submitted_at: string;
   readonly checked_at: string | null;
@@ -92,6 +96,7 @@ const entryOf = (row: LedgerRow): VettingLedgerEntry => ({
   evidenceType: row.evidence_type as EvidenceType,
   submittedAt: row.submitted_at as Instant,
   ...(row.checked_at === null ? {} : { checkedAt: row.checked_at as Instant }),
+  ...(row.raw_response?.note === undefined ? {} : { note: row.raw_response.note }),
 });
 
 /** Evidence → the section's submission columns `0022` admits (ADR-154 (2)); a key outside the list is dropped there. */
@@ -132,15 +137,10 @@ function columnsOf(evidence: Evidence): Record<string, unknown> {
   }
 }
 
+/** ADR-157 (1): the sync's `p_required` — `VETTING.requiredChecksByLevel` as sections, computed once at boot. */
+const REQUIRED = requiredSectionsByLevel(VETTING.requiredChecksByLevel);
+
 export function dbVettingStore(port: DataAccessPort): VettingSubmissionStore {
-  const notBuilt = (): Result<never, VettingErrorDetails> =>
-    err<VettingErrorDetails>(
-      "INTERNAL",
-      "That decision road is not built yet.",
-      {
-        reason: "decision-not-built",
-      },
-    );
   const readRows = async (
     name: `vetting-providers.${string}`,
     where: {
@@ -232,9 +232,49 @@ export function dbVettingStore(port: DataAccessPort): VettingSubmissionStore {
           ),
       );
     },
-    // ADR-154 (5): the admin decision (`record`) is `2c`'s road — the ledger + section write exists
-    // (`apply_vetting_check_result`), the actor, the note and the level derivation do not. Refused by name.
-    recordDecision: async () => notBuilt(),
+    // ADR-157 (2) / ADR-159: the admin decision in one transaction — `record_vetting_decision()` at service
+    // scope (named in the module README, 07 §5.1 rule 5): the ledger + the section through
+    // `apply_vetting_check_result(…, 'admin')`, the note, for DBS the outcome and the cross-check, then the sync.
+    // The actor's authority was checked by the action (`auth.requireRole`) before this adapter was reached; the
+    // definer never sees an admin id for the decision itself — the event carries it (03 §9.3).
+    recordDecision: async (input) =>
+      asVetting(
+        await port.run<CheckResult>(
+          {
+            name: "vetting-providers.recordDecision",
+            exec: async (q) => {
+              await q.rpc("record_vetting_decision", {
+                p_submission_id: input.submissionId,
+                p_decision: input.decision,
+                p_reject_reason: input.reason,
+                p_note: input.note,
+                p_expires_at: input.expiresAt,
+                p_required: REQUIRED as never,
+              });
+              const status: CheckStatus =
+                input.decision === "verified"
+                  ? {
+                      kind: "verified",
+                      at: nowInstant(),
+                      ...(input.expiresAt === undefined
+                        ? {}
+                        : { expiresAt: input.expiresAt }),
+                    }
+                  : {
+                      kind: "rejected",
+                      reason: input.reason ?? "mismatch",
+                      guidanceKey: (input.reason ?? "mismatch") as never,
+                    };
+              return {
+                submissionId: input.submissionId,
+                status,
+                checkedAt: nowInstant(),
+              };
+            },
+          },
+          service,
+        ),
+      ),
   };
   return Object.freeze(store);
 }

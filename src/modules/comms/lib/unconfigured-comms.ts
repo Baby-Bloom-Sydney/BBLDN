@@ -16,4 +16,5 @@ export const unconfiguredComms: Comms = Object.freeze({
   cancel: async () => refuse(),
   status: async () => refuse(),
   createInboxMessage: async () => refuse(),
+  notifyAdmin: async () => refuse(),
 });

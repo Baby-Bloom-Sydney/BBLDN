@@ -3,6 +3,7 @@
 import { err, newId } from "@/modules/platform";
 import type { MessageId, Result, Uuid } from "@/modules/shared-types";
 import type {
+  AdminNotificationInput,
   CommsErrorDetails,
   CommsStore,
   InboxMessage,
@@ -26,6 +27,8 @@ export type StoredRow = RenderedEmail &
 export type MemoryCommsStore = CommsStore & {
   readonly rows: ReadonlyArray<StoredRow>;
   readonly inbox: ReadonlyArray<InboxMessage>;
+  /** ADR-160 — the operator's queue rows this double recorded */
+  readonly adminNotifications: ReadonlyArray<AdminNotificationInput>;
   /** ADR-136 — the directory this double resolves `{ userId }` against. */
   readonly directory: Map<string, ResolvedRecipient>;
 };
@@ -40,6 +43,7 @@ export function memoryCommsStore(
 ): MemoryCommsStore {
   let rows: ReadonlyArray<StoredRow> = [];
   let inbox: ReadonlyArray<InboxMessage> = [];
+  let adminNotifications: ReadonlyArray<AdminNotificationInput> = [];
   const replace = (id: MessageId, next: (row: StoredRow) => StoredRow) => {
     rows = rows.map((row) => (row.messageId === id ? next(row) : row));
   };
@@ -49,6 +53,9 @@ export function memoryCommsStore(
     },
     get inbox() {
       return inbox;
+    },
+    get adminNotifications() {
+      return adminNotifications;
     },
     directory,
     resolveRecipient: async (userId) => {
@@ -90,6 +97,10 @@ export function memoryCommsStore(
     },
     createInboxMessage: async (msg) => {
       inbox = [...inbox, msg];
+      return okOf({ id: newId<Uuid>() });
+    },
+    createAdminNotification: async (input) => {
+      adminNotifications = [...adminNotifications, input];
       return okOf({ id: newId<Uuid>() });
     },
   };

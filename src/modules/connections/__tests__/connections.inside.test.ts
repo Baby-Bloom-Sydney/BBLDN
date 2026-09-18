@@ -112,6 +112,7 @@ const recordingComms = (sent: Array<string>): Comms =>
     cancel: async () => ok({ cancelled: 0 }),
     status: async () => ok({ status: "sent" as const }),
     createInboxMessage: async () => ok({ id: "i1" as never }),
+    notifyAdmin: async () => ok({ id: "n-1" as never }),
   }) as unknown as Comms;
 
 const POSITION = "00000000-0000-4000-8000-0000000000p1" as PositionId;

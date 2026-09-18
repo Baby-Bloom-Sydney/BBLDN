@@ -87,14 +87,21 @@ const rules: ReadonlyArray<AvailabilityRule> = [0, 1, 2, 3, 4].map(
   }),
 );
 
-type Sent = { readonly sent: Message[]; readonly scheduled: Message[] };
+type Sent = {
+  readonly sent: Message[];
+  readonly scheduled: Message[];
+  /** ADR-160 — the operator's queue rows the seam was asked to raise */
+  readonly raised: Array<{ readonly kind: string; readonly subject?: { readonly type: string; readonly id: string } }>;
+};
 
 const fakeComms = (): Comms & Sent => {
   const sent: Message[] = [];
   const scheduled: Message[] = [];
+  const raised: Sent["raised"] = [];
   return {
     sent,
     scheduled,
+    raised,
     send: async (message) => {
       sent.push(message);
       return ok("m-1" as never);
@@ -107,6 +114,13 @@ const fakeComms = (): Comms & Sent => {
     cancel: async () => ok({ cancelled: 0 }),
     status: async () => ok({ status: "sent" as const }),
     createInboxMessage: async () => ok({ id: "i-1" as never }),
+    notifyAdmin: async (input) => {
+      raised.push({
+        kind: input.kind,
+        ...(input.subject === undefined ? {} : { subject: input.subject }),
+      });
+      return ok({ id: "n-1" as never });
+    },
   };
 };
 
@@ -219,6 +233,25 @@ describe("openNannyCall — the two messages 03 §2.7 names (call-layer gap 3, c
     });
 
     expect(booked.ok).toBe(true);
+  });
+});
+
+describe("openNannyCall — the operator's queue row (ADR-160; 02 §4.6)", () => {
+  it("raises commission_call_booked for the booking beside the admin email — one writer, comms", async () => {
+    const slot = await firstSlot();
+    const booked = await callLayer.openNannyCall({
+      nannyId: NANNY,
+      slotId: slot.id,
+      actor: { kind: "user", id: NANNY, role: "nanny" },
+      idempotencyKey: "row-1",
+    });
+    expect(booked.ok).toBe(true);
+    expect(comms.raised).toEqual([
+      {
+        kind: "commission_call_booked",
+        subject: { type: "booking", id: booked.ok ? booked.value.id : "" },
+      },
+    ]);
   });
 });
 

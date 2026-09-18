@@ -1,6 +1,7 @@
 // The road the four submit paths share once the inputs are assembled (03 §4.3 "each calls
 // `getProvider(type).submit(evidence)`"): every evidence goes to the provider config binds; a refusal after an
 // upload removes what was uploaded; a success emits `verification.submitted` and answers the section's state.
+import { comms } from "@/modules/comms";
 import { Events, err, log } from "@/modules/platform";
 import type { Evidence, Result, UserId } from "@/modules/shared-types";
 import { getProvider } from "@/modules/vetting-providers";
@@ -12,6 +13,7 @@ import type {
   VerificationSection,
   VerificationStore,
 } from "../types";
+import { REMINDER_KEYS } from "./reminder-keys";
 import { sectionStateOf } from "./section-state-of";
 
 const CHECK_OF: Readonly<
@@ -62,6 +64,15 @@ export async function submitEvidence(
       );
     }
   }
+  // 03 §8.2 row 30: "cancelled on resubmission" — a queued action-needed nudge for this section is withdrawn
+  const cancelled = await comms.cancel(REMINDER_KEYS.actionNeeded(nannyId, section));
+  if (!cancelled.ok)
+    log.warn("verification-action-needed not cancelled", {
+      module: "verification",
+      action: "submitSection",
+      section,
+      errorCode: cancelled.error.code as never,
+    });
   const emitted = await Events.emit({
     name: "verification.submitted",
     actor: { kind: "user", id: nannyId, role: "nanny" },
