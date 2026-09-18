@@ -6,6 +6,7 @@
 //
 // **Nothing here says anything about a hold** (ADR-157): every word about verification comes from
 // `nannyVerificationSummary`, whose whole input is her level and her four section statuses.
+import { DeleteMyAccount } from "@/modules/auth";
 import type { NannySettingsProps } from "../types";
 import { AccountPanel } from "./settings/AccountPanel";
 
@@ -45,6 +46,7 @@ export function NannySettings({
   profile,
   options,
   action,
+  deleteAction,
   verificationHref,
   hubHref,
   passwordHref,
@@ -72,6 +74,9 @@ export function NannySettings({
               action={action}
               passwordHref={passwordHref}
             />
+          ) : null}
+          {section.id === "close" ? (
+            <DeleteMyAccount action={deleteAction} />
           ) : null}
         </Section>
       ))}

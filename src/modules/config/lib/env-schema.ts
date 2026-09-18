@@ -43,6 +43,17 @@ const SERVER_ENV_ENTRIES = {
     prod: "●",
     secret: true,
   },
+  VISITOR_COOKIE_SECRET: {
+    group: "App",
+    scope: "server",
+    kind: "string",
+    purpose:
+      "HMAC key for the signed visitor cookie (07 §2.9; ADR-178) — its own secret, rotatable alone",
+    dev: "●",
+    preview: "●",
+    prod: "●",
+    secret: true,
+  },
   ADMIN_API_TOKEN: {
     group: "App",
     scope: "server",

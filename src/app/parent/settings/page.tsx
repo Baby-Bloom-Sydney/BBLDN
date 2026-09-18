@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { DeleteMyAccount, deleteMyAccountAction } from "@/modules/auth";
 import { ParentSettingsClient } from "./ParentSettingsClient";
 import type { ChildClient } from "@/types/bapp";
 
@@ -41,6 +42,7 @@ export default async function ParentSettingsPage() {
         postcode: profileRes.data?.postcode || "",
       }}
       managedChildren={(childrenRes.data ?? []) as ChildClient[]}
+      deleteAccount={<DeleteMyAccount action={deleteMyAccountAction} />}
     />
   );
 }

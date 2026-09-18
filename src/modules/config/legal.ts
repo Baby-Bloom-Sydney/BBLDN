@@ -33,4 +33,40 @@ export const LEGAL = Object.freeze({
     companyNumber: "@pending:B-35",
     registeredOffice: "@pending:B-35",
   }),
+  // **What an erasure keeps, and why** — 07 §6.1's promise as a value rather than a sentence somebody has to
+  // remember to write, and ADR-179's home for it: a legal fact with one owner (07 §6.2's table), read by the
+  // erasure job, by the confirmation the person sees and by any future subject-access answer, so the three
+  // cannot drift apart. The *wording* is copy and is reviewed as copy; the *list* is the fact.
+  //
+  // `class` is the key the gate joins on: `scripts/ci/check-retention-classes.mjs` compares these names against
+  // the classes `erase_account()` actually preserves, so a class added to one side and not the other fails
+  // `config-gates` rather than being discovered by a data subject. `specRow` is its row in 07 §6.2.
+  //
+  // The third row is the one `0027` made true and the one most likely to be left out, because it applies to
+  // nannies only and it is the least comfortable to say. It is said anyway: she is told that a vetting decision
+  // about her is kept, that her identity is removed from it, and why. Art 17(3) is what makes keeping these rows
+  // lawful; Art 12 is what makes telling her about them mandatory.
+  erasureRetains: Object.freeze([
+    Object.freeze({
+      class: "money",
+      specRow: 9,
+      what: "Payment and subscription records",
+      why: "UK tax and company law require us to keep them, and they may be needed to settle a dispute.",
+      lawfulBasis: "Art 17(3)(b) and (e)",
+    }),
+    Object.freeze({
+      class: "consent",
+      specRow: 11,
+      what: "A record of the permissions you gave, and when",
+      why: "We have to be able to show what you agreed to and when you agreed to it.",
+      lawfulBasis: "Art 17(3)(b)",
+    }),
+    Object.freeze({
+      class: "safeguarding",
+      specRow: 4,
+      what: "Safeguarding decisions made about you, with your name and contact details removed",
+      why: "Where a background-check decision has been made about someone who cares for children, we are accountable for that decision and have to be able to show who made it and why. Your identity is removed from the record; the decision itself is kept.",
+      lawfulBasis: "Art 17(3)(b) and (e)",
+    }),
+  ] as const),
 });

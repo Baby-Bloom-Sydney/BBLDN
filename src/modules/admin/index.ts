@@ -29,3 +29,12 @@ export { LEADS_PANEL } from "./leads";
 export { USERS_PANEL } from "./users";
 export { SUPPORT_PANEL } from "./support";
 export { GUARANTEES_PANEL } from "./guarantees";
+
+// S-A-xx — the erasure road for a request that arrived by email (07 §6.1; B-46). Not a ninth panel: it is a
+// legal obligation with a surface, not a place an admin works, and `ADMIN_PANELS` is the nav.
+export {
+  openErasureRequestAction,
+  runErasureRequestAction,
+  loadErasureRequests,
+  ErasurePanel,
+} from "./erasure";

@@ -134,3 +134,51 @@ describe("config/legal — no Australian jurisdiction fact is reachable (row `12
       expect(pattern.test(benign)).toBe(false);
   });
 });
+
+/**
+ * ADR-179 — **retention facts are config; the sentence a person reads is copy.**
+ *
+ * 07 §6.1 promises that an erasure confirmation states what is retained and why. `3e` put that list in
+ * `SECURITY.retention.erasureRetains`, beside the *windows*; ADR-179 moved it here, beside `LEGAL`, because the
+ * list is a **legal fact with one owner** (07 §6.2's table) and three surfaces have to read the same one: the
+ * erasure job, the confirmation screen and any future subject-access answer. A class named in 07 §6.2 with no
+ * entry here is a gate failure, not a documentation choice — `scripts/ci/check-retention-classes.mjs` is the gate
+ * and `config.repo.test.ts` proves it runs in `config-gates`.
+ */
+describe("config/legal — what an erasure keeps, and why (07 §6.1; ADR-170, ADR-179)", () => {
+  const retained = LEGAL.erasureRetains;
+
+  it("names the three classes 07 §6.1 keeps, in the order the person reads them", () => {
+    expect(retained.map((row) => row.class)).toEqual([
+      "money",
+      "consent",
+      "safeguarding",
+    ]);
+  });
+
+  it("★ names the safeguarding class — the one `0027` made true and the one most easily left out", () => {
+    const safeguarding = retained.find((row) => row.class === "safeguarding");
+    expect(safeguarding).toBeDefined();
+    // It has to say the identity goes, because that is the whole difference between "we keep a decision about
+    // you" and "we keep your file". ADR-170's pseudonymisation is what makes the sentence true.
+    expect(safeguarding?.what).toMatch(/removed/);
+    expect(safeguarding?.why).toMatch(/accountable/);
+  });
+
+  it("every class carries its 07 §6.2 row, a lawful basis and a reason a person can read", () => {
+    for (const row of retained) {
+      expect([4, 9, 11]).toContain(row.specRow);
+      expect(row.lawfulBasis).toMatch(/^Art 17\(3\)/);
+      // A reason, not a label: one short sentence at least, ending like a sentence.
+      expect(row.why.length).toBeGreaterThan(40);
+      expect(row.why.endsWith(".")).toBe(true);
+    }
+  });
+
+  it("is not also in SECURITY — one list, one owner (ADR-179)", async () => {
+    const { SECURITY } = await import("@/modules/config");
+    expect(
+      (SECURITY.retention as Record<string, unknown>).erasureRetains,
+    ).toBeUndefined();
+  });
+});

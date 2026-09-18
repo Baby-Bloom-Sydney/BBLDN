@@ -60,6 +60,11 @@
       "reason": "07 §8 row 14 is consumed one boundary in, in verification/lib/lift-suspension.ts — ADR-168 (b)'s road takes the same role gate, the same budget and the same order (role, budget, work) as its three siblings.",
       "delegatesTo": "src/modules/verification/lib/lift-suspension.ts",
       "helper": "consumeAdminRouteLimit"
+    },
+    "src/modules/auth/actions/delete-my-account-action.ts": {
+      "reason": "07 §8 row 20 is consumed one boundary in, in auth/lib/delete-my-account.ts — the action takes no input at all (the subject is the session's), so there is nothing for the boundary to do before the road does the gate, the budget and the job. The delegate and its helper are named so this gate checks the claim rather than reading it (REVIEW-4 M-5).",
+      "delegatesTo": "src/modules/auth/lib/delete-my-account.ts",
+      "helper": "consumeAccountErasureLimit"
     }
   }
 }

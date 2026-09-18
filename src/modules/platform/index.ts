@@ -32,6 +32,7 @@ export { normaliseUkMobile } from "./lib/normalise-uk-mobile";
 export * from "./log";
 export * from "./events";
 export * from "./consent";
+export * from "./privacy";
 export * from "./rate-limit";
 export * from "./upload-scan";
 export * from "./unit-of-work";

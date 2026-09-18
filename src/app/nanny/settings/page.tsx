@@ -7,6 +7,7 @@
 // nothing else, and the contact fields are S-N-18's own location step through `update_nanny_profile(p_contact)`.
 import { redirect } from "next/navigation";
 import { LOCALE, MATCHING, SECURITY } from "@/modules/config";
+import { deleteMyAccountAction } from "@/modules/auth";
 import {
   NannySettings,
   loadNannySettings,
@@ -23,6 +24,7 @@ export default async function NannySettingsPage() {
       view={loaded.view}
       profile={loaded.profile}
       action={saveNannyProfileStepAction}
+      deleteAction={deleteMyAccountAction}
       options={{
         qualifications: MATCHING.qualificationLadder,
         minPasswordLength: SECURITY.password.minLength,

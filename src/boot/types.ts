@@ -7,6 +7,7 @@ export type BootPort =
   | "auth"
   | "events"
   | "consent"
+  | "privacy"
   | "rate-limit"
   | "areas"
   | "comms"

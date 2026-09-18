@@ -5,6 +5,7 @@
 //
 // Types only; every value lives in its own one-export file (L1). The two stores are ports (ADR-127): the account
 // side is `0021`'s three definers (ADR-152), the lead side is `nanny_leads` at service scope (07 §5.1 rule 5).
+import type { DeleteMyAccountAction } from "@/modules/auth";
 import type { ClientResult } from "@/modules/platform";
 import type { TemplateId } from "@/modules/comms";
 import type {
@@ -366,6 +367,8 @@ export type NannySettingsProps = {
   readonly hubHref: string;
   /** S-X-09 — "set your password" by email; no password field on this screen */
   readonly passwordHref: string;
+  /** 07 §6.1's self-service erasure road, rendered inside the Close account section (B-46) */
+  readonly deleteAction: DeleteMyAccountAction;
 };
 
 // ── Actions (01 §4e; the client component never imports the connector barrel — 01 §2.5) ──

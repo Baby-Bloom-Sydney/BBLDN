@@ -39,10 +39,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  updateParentAccountSettings,
-  deactivateParentAccount,
-} from "@/lib/actions/parent";
+import { updateParentAccountSettings } from "@/lib/actions/parent";
 import { requestPasswordChange } from "@/lib/actions/account-security";
 import { ChildManagementCard } from "@/components/bapp/ChildManagementCard";
 import type { ChildClient } from "@/types/bapp";
@@ -71,6 +68,13 @@ interface Props {
     postcode: string;
   };
   managedChildren?: ChildClient[];
+  /**
+   * 07 §6.1 / B-46 — the London erasure road, rendered by the server component and handed down as an element.
+   * It arrives as a slot rather than an import because this file is `"use client"` and importing the `auth`
+   * barrel from here drags `server-only` into the client graph (`client-server-boundary` is the gate that says
+   * so). The same rule the London screens already follow: the action is a prop, never an import.
+   */
+  deleteAccount: React.ReactNode;
 }
 
 function formatDate(iso: string): string {
@@ -113,7 +117,11 @@ function buildTree(childCount: number): SettingsNode[] {
   ];
 }
 
-export function ParentSettingsClient({ profile, managedChildren = [] }: Props) {
+export function ParentSettingsClient({
+  profile,
+  managedChildren = [],
+  deleteAccount,
+}: Props) {
   const params = useSearchParams();
   const activeId = params.get("s") ?? "";
   const fullName = `${profile.first_name} ${profile.last_name}`.trim();
@@ -156,7 +164,7 @@ export function ParentSettingsClient({ profile, managedChildren = [] }: Props) {
           case "contact-us":
             return <ContactSection />;
           case "close-account":
-            return <CloseAccountSection fullName={fullName} />;
+            return <CloseAccountSection slot={deleteAccount} />;
           default:
             return null;
         }
@@ -519,129 +527,20 @@ function SubscriptionLinkSection() {
   );
 }
 
-// ── Close account (danger leaf) ──────────────────────────────
+// ── Delete my account (07 §6.1; B-46) ────────────────────────
+//
+// **This section used to call `deactivateParentAccount()`, and it was not an erasure.** That road closed
+// positions, cancelled connections, wrote an `activity_logs` row and signed her out; it deleted nothing, kept
+// her name, her mobile and her date of birth, and told her on the way out that she would "need to contact
+// support to reactivate" — which is a sentence about a deactivation offered under a heading about closing an
+// account. 07 §6.1 names `/parent/settings` as a road that **calls the job** (Art 17), so it now does, through
+// the same component `/nanny/settings` renders: one list of what is kept and why, read from `LEGAL.erasureRetains`
+// (ADR-179), and one confirmation.
+//
+// The file around it is still the legacy Sydney screen (`eslint.legacy-paths.json`), and this is a deliberate
+// mixed file: F-d rewrites the page, and until it does, the right to erasure is not something to leave behind a
+// rewrite that has not been scheduled.
 
-function CloseAccountSection({ fullName }: { fullName: string }) {
-  const router = useRouter();
-  const [showModal, setShowModal] = useState(false);
-  const [confirmName, setConfirmName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const nameMatches = confirmName.toLowerCase() === fullName.toLowerCase();
-
-  const handleDeactivate = () => {
-    setError(null);
-    startTransition(async () => {
-      const r = await deactivateParentAccount();
-      if (r.success) {
-        router.push("/login");
-      } else {
-        setError(r.error);
-      }
-    });
-  };
-
-  return (
-    <>
-      <div className="overflow-hidden rounded-xl border border-rose-200 bg-rose-50/40 p-5">
-        <div className="flex items-start gap-3">
-          <AlertTriangle
-            className="mt-0.5 h-5 w-5 shrink-0 text-rose-600"
-            aria-hidden="true"
-          />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-rose-900">
-              Closing your account is permanent
-            </p>
-            <p className="mt-1 text-sm text-rose-700">
-              This closes any active positions, cancels pending connections, and
-              signs you out of every device. You will need to contact support to
-              reactivate your account.
-            </p>
-            <Button
-              variant="outline"
-              onClick={() => setShowModal(true)}
-              className="mt-4 border-rose-300 text-rose-700 hover:bg-rose-100 hover:text-rose-800"
-            >
-              Close my account
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-rose-500" />
-                <h3 className="text-lg font-semibold text-slate-900">
-                  Close your account
-                </h3>
-              </div>
-              <button
-                onClick={() => {
-                  setShowModal(false);
-                  setConfirmName("");
-                  setError(null);
-                }}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            {error && (
-              <p className="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                {error}
-              </p>
-            )}
-            <p className="mb-4 text-sm text-slate-600">
-              This is permanent. You&apos;ll lose access immediately and need to
-              contact support to reactivate.
-            </p>
-            <div className="mb-2">
-              <p className="mb-1 text-xs text-slate-500">
-                Type{" "}
-                <span className="font-semibold text-slate-700">{fullName}</span>{" "}
-                to confirm
-              </p>
-              <Input
-                value={confirmName}
-                onChange={(e) => setConfirmName(e.target.value)}
-                placeholder="Your full name"
-                autoFocus
-              />
-            </div>
-            <div className="mt-4 flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  setShowModal(false);
-                  setConfirmName("");
-                }}
-                disabled={isPending}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="flex-1 bg-rose-600 text-white hover:bg-rose-700"
-                disabled={!nameMatches || isPending}
-                onClick={handleDeactivate}
-              >
-                {isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Closing…
-                  </>
-                ) : (
-                  "Confirm & close"
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
+function CloseAccountSection({ slot }: { slot: React.ReactNode }) {
+  return <>{slot}</>;
 }

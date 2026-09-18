@@ -45,6 +45,7 @@ describe("platform — one export per file (L1; 05 §7 rule 4)", () => {
       "log",
       "events",
       "consent",
+      "privacy",
       "rate-limit",
       "upload-scan",
       "unit-of-work",
@@ -53,6 +54,7 @@ describe("platform — one export per file (L1; 05 §7 rule 4)", () => {
       expect(files.map(rel)).toContain(`${sub}/types.ts`);
     }
     expect(files.map(rel)).toContain("consent/consent.stub.ts");
+    expect(files.map(rel)).toContain("privacy/privacy.stub.ts");
     expect(files.map(rel)).toContain("upload-scan/upload-scan.stub.ts");
   });
 });

@@ -12,7 +12,7 @@ import { listFiles } from "./lib/list-files.mjs";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CLIENT_CHUNKS = resolve(REPO_ROOT, ".next/static");
 const STUB_PROVIDER = "stub-stripe";
-// The ten server-only names of 07 §7 item 3.
+// The eleven server-only names of 07 §7 item 3 (ADR-178 added `VISITOR_COOKIE_SECRET`).
 const SERVER_ONLY_NAMES = [
   "SUPABASE_SERVICE_ROLE_KEY",
   "STRIPE_SECRET_KEY",
@@ -21,6 +21,7 @@ const SERVER_ONLY_NAMES = [
   "GOOGLE_AI_API_KEY",
   "META_CAPI_ACCESS_TOKEN",
   "CRON_SECRET",
+  "VISITOR_COOKIE_SECRET",
   "ADMIN_API_TOKEN",
   "STRIPE_WEBHOOK_SECRET",
   "STUB_EVENT_SECRET",

@@ -1179,7 +1179,58 @@ Prior: 2026-09-15T15:20+10:00 — BB-LDN-Planner-070926/S1 (S1 shipped locally).
 Prior: 2026-09-15T13:55+10:00 — BB-LDN-Planner-070926/S0 (seeded at bootstrap).
 -->
 
-## Files created / modified in the current unit (`3e` — ADR-170's safeguarding half, the gate split, the cookie route; L-009 Phase 3)
+## Files created / modified in the current unit (`3f` — the erasure job end to end; L-009 Phase 3, B-46)
+
+**The right to erasure now runs.** 07 §6.1 has specified it since Phase 0; `3e` made the schema safe for it; nothing
+executed it. This unit is the job, both roads, the cron's inside, the two settings surfaces and ADR-178 / ADR-179's
+wiring.
+
+- **`supabase/migrations/0028_erasure-job.sql`** (new) — `file_retention_log` (07 §6.2 row 16, named as a new table
+  since Phase 0 and never created) · `account_erasure_requests` (the ledger 01 §4f implies and the opaque id ADR-145
+  needs) · `collect_erasure_objects()` (read-only, before the transaction) · **`erase_account()`** (every database
+  step of §6.1 in ONE transaction, idempotent on §6.1 step 5's own tombstone, refusing rather than half-running) ·
+  `scrub_auth_user()` (the step-5 escalation, see below) · **six person→history keys off `cascade`**.
+- **★ `3e`'s contradiction one class over.** §6.1 step 3 hard-deletes the `parents` / `nannies` row and in the same
+  sentence says positions and connections are anonymised with "the other party's history keeps ids" — unreachable
+  under `cascade`. **Measured:** with the keys as `main` has them a parent's erasure left **0** surviving hire
+  records; with `0028` the row survives with the nanny's id and without hers. No pseudonym column, deliberately
+  unlike `0027`: a safeguarding decision must stay correlatable (Art 5(2)), a class-B row must not.
+- **★ Two platform facts found by running it, not by reading.** (1) The `auth` schema is owned by
+  `supabase_auth_admin` and the deploying role holds its privileges **without grant option**, so
+  `grant … to bbldn_retention` reports `GRANT` and grants nothing — step 5 is therefore its own narrow definer,
+  executable by `bbldn_retention` alone. (2) `is_privileged_writer()` named the retention jobs (`0002:96`) and did
+  not admit the role they run as, so the `user_profiles` tombstone was refused. Both were caught by the verify
+  block's **invocation**, which is why it calls the job instead of reading a catalogue (`0019`'s standing lesson).
+- **`supabase/rollbacks/0028_erasure-job.rollback.sql`** + **`int.rollback-0028`** (15) — ADR-165 (1): the six keys
+  and the two evidence tables stay; what goes is the job itself, announced.
+- **`src/modules/platform/privacy/**`** (new sub-capability, the home `platform/README.md`named in Phase 1) —
+connector, port, registry (fails closed: for an erasure that means *refuses*, never "did nothing and said yes"),
+the orchestration (collect → remove → one transaction →`account.deleted`), the sweep, and `privacy.stub.ts`.
+- **`src/boot/privacy-request-ops.ts` · `privacy-erasure-ops.ts` · `db-privacy-store.ts` · `emit-account-deleted.ts`
+  · `erasure-request-from-row.ts` · `erasure-outcome-of.ts` · `wire-privacy.ts`** — the port over `auth.data`, with
+  the retryable SQLSTATEs classified in one place so the sweep can tell contention from failure.
+- **`src/modules/auth/`** — `deleteMyAccountAction` + `deleteMyAccount` + `consumeAccountErasureLimit` +
+  `DeleteMyAccount.tsx`. The account is `auth`'s subject and the session is the only authority the road takes, so
+  ADR-145 is satisfied by the signature rather than by a guard: there is no argument to put another person's id in.
+- **`src/modules/admin/erasure/**`** + **`src/app/admin/erasure/page.tsx`** — the email road, two steps. Step 1
+records the address (erases nothing, so a typo costs a row); step 2 names a **request id** and the subject is read
+off the row. MFA'd in each action, because `src/app/admin/layout.tsx` carries no guard at all.
+- **`src/app/api/cron/delete-account/route.ts`** — the shell gets its inside: a re-attempt sweep, since both roads
+  run synchronously and what reaches the cron is what the transaction refused to commit.
+- **`/nanny/settings`** had a mailto dead end whose written justification ("it would delete a verification history
+  by accident") `0027` had already made untrue; **`/parent/settings`** called a legacy deactivation that deleted
+  nothing and told her to contact support to reactivate. Both now call the job and show `LEGAL.erasureRetains`
+  before she confirms.
+- **ADR-178** — `VISITOR_COOKIE_SECRET` in the env schema, required everywhere; the cookie's key no longer derives
+  from `CRON_SECRET`. Two cases discriminate: rotating the cron Bearer must **not** invalidate a consent cookie, and
+  rotating the cookie secret must. **ADR-179** — `erasureRetains` moved to `LEGAL`, keyed by class, and
+  `check:retention-classes` joins it to `erase_account()`'s own list inside `config-gates`.
+- New: 07 §8 **row 20** (`accountErasure`, 5/day per user, fails closed) · `ALERT_ERASURE_OBJECT_STUCK`.
+- Suites: `int.account-erasure` (25) · `int.rollback-0028` (15) · `platform.privacy` (13) · `auth.delete-my-account`
+  (6) · `admin.erasure` (7) · `erasure-cron.route` (2) · `visitor-cookie` (5). Ratchet unchanged at **109** — four
+  functions split rather than listed.
+
+## Files created / modified in the prior unit (`3e` — ADR-170's safeguarding half, the gate split, the cookie route; L-009 Phase 3)
 
 **What this unit is.** The unit `3c` asked for. Its 131-key cascade audit found four person-cascades that erased
 a nanny's entire vetting history — who approved her DBS check, what the outcome was, who lifted a bar — in one

@@ -17,6 +17,7 @@ smoke_env_base() {
   export NODE_ENV=production
   export NEXT_PUBLIC_APP_URL=http://localhost:3000
   export CRON_SECRET=placeholder-cron-secret-0000000000000
+  export VISITOR_COOKIE_SECRET=placeholder-visitor-cookie-secret-00000000
   export ADMIN_API_TOKEN=placeholder-admin-token
   export SYSTEM_PARENT_ID=00000000-0000-4000-8000-000000000000
   export ADMIN_EMAIL=admin@example.test

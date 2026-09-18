@@ -216,6 +216,7 @@ describe("platform/log — createLogger (01 §4b)", () => {
       "ALERT_DISPLACEMENT_CAP",
       "ALERT_UPLOAD_MALWARE",
       "ALERT_CONSENT_DOCUMENT_MISSING",
+      "ALERT_ERASURE_OBJECT_STUCK",
     ]);
     expect(Object.isFrozen(ALERT_NAMES)).toBe(true);
   });

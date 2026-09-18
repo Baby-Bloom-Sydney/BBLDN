@@ -17,8 +17,9 @@ import {
 // HANDOFF §5.4 / 06 §13 O-8 say 51 but enumerate 52 (both the BUNDLE and the SELF_SERVE_APP price-id pairs) —
 // 03 §5.2 owns the price ids, so the BUNDLE pair is not defined and the S2 schema (the count's source) had 50.
 // P1-FIX (ADR-121) added `VERCEL_GIT_COMMIT_SHA` — Vercel's own system variable, optional everywhere, read for
-// `/api/health`'s `sha` because the environment is read only by this module (01 §1.3 rule 1) — so the schema has 51.
-const NAME_COUNT = 51;
+// `/api/health`'s `sha` because the environment is read only by this module (01 §1.3 rule 1) — so the schema had 51.
+// L-009 `3f` (ADR-178) added `VISITOR_COOKIE_SECRET`, required in every environment — so the schema has 52.
+const NAME_COUNT = 52;
 const dotEnvTest = loadDotEnvTest();
 const production = productionEnvFrom(dotEnvTest);
 
@@ -204,9 +205,11 @@ describe("config.env — guards (07 §7 item 1; 07 §5.5; 06 §2.2; 06 §4.1 C)"
     expect(error.names).toContain("PURCHASE_PROVIDER");
   });
 
-  // Security pass MEDIUM (L-009 `3e`): `CRON_SECRET` now backs TWO security properties — the `/api/cron/*`
-  // Bearer and, through HKDF, the key material behind the signed visitor cookie — and the registry's
-  // `kind: "string"` is `min(1)`, so nothing stopped a deployed environment carrying a typed passphrase.
+  // Security pass MEDIUM (L-009 `3e`): the registry's `kind: "string"` is `min(1)`, so nothing stopped a deployed
+  // environment carrying a typed passphrase as a Bearer or as key material. ADR-178 has since split the visitor
+  // cookie onto its own secret, so `CRON_SECRET` is back to one property — the floor stays, because a Bearer
+  // somebody typed is the same defect whether or not a second use hangs off it, and `VISITOR_COOKIE_SECRET`
+  // takes the same floor for the reason the derivation gave it: it is HMAC key material.
   it("★ refuses a CRON_SECRET too short to be key material, in production", () => {
     expect(
       failure(() => parseEnv({ ...production, CRON_SECRET: "short" })).names,
@@ -229,6 +232,34 @@ describe("config.env — guards (07 §7 item 1; 07 §5.5; 06 §2.2; 06 §4.1 C)"
     expect(
       parseEnv(production).server.CRON_SECRET.length,
     ).toBeGreaterThanOrEqual(32);
+  });
+
+  // ADR-178 — the visitor cookie's signing key is its own secret. Three claims, each executable: it is required
+  // in every environment (so a consent surface cannot silently stop verifying), it carries the same key-material
+  // floor, and it is a *different* value from `CRON_SECRET` (the whole point of the split — rotating one must not
+  // touch the other, and a leak of one must not forge the other).
+  it("★ requires VISITOR_COOKIE_SECRET — in every environment (ADR-178)", () => {
+    expect(
+      failure(() => parseEnv(withoutName(production, "VISITOR_COOKIE_SECRET")))
+        .names,
+    ).toContain("VISITOR_COOKIE_SECRET");
+    expect(
+      failure(() => parseEnv(withoutName(dotEnvTest, "VISITOR_COOKIE_SECRET")))
+        .names,
+    ).toContain("VISITOR_COOKIE_SECRET");
+  });
+
+  it("★ refuses a VISITOR_COOKIE_SECRET too short to be key material", () => {
+    expect(
+      failure(() => parseEnv({ ...production, VISITOR_COOKIE_SECRET: "short" }))
+        .names,
+    ).toContain("VISITOR_COOKIE_SECRET");
+  });
+
+  it("★ is not CRON_SECRET, and is not derived from it", () => {
+    const parsed = parseEnv(production).server;
+    expect(parsed.VISITOR_COOKIE_SECRET.length).toBeGreaterThanOrEqual(32);
+    expect(parsed.VISITOR_COOKIE_SECRET).not.toBe(parsed.CRON_SECRET);
   });
 
   // ADR-141 (REVIEW-2 H-11 / M-9): the other two stubs were legal in the production column. `stub-email`
@@ -398,6 +429,7 @@ describe("config.env — the client reader's import graph carries no server name
     "ADMIN_API_TOKEN",
     "STRIPE_WEBHOOK_SECRET",
     "STUB_EVENT_SECRET",
+    "VISITOR_COOKIE_SECRET",
   ];
   const CONFIG_DIR = resolve(__dirname, "..");
 

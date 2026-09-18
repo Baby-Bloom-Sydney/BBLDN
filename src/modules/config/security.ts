@@ -135,6 +135,15 @@ const RATE_LIMITS = declarePolicies({
   // keyed on the nanny, at twice the rate an honest screen spends, with a day ceiling that stops a runaway
   // loop long before it stops a real session. Fails closed (not on `failOpenOnLimiterOutage`).
   // Owner: 07 §8 — a row for the poll to ratify the numbers (REVIEW-3 R-3; P2-HARDEN).
+  // 07 §8 row 20 (new with L-009 `3f`) — the erasure roads. No existing row fits: this is an authenticated,
+  // irreversible, per-person write, and borrowing `profileSteps`' budget would let a hundred attempts a day at
+  // the one action nobody should need twice. A person asks to be erased once; five is generous and still bounds
+  // a script. The admin road's two steps are covered by `adminRoutes` (row 14) and are not this.
+  accountErasure: {
+    key: "user",
+    perDay: 5,
+    note: "row 20 — 07 §6.1's self-service road; fails closed",
+  },
   verificationPolls: {
     key: "user",
     perMinute: 60,
@@ -252,33 +261,11 @@ export const SECURITY = Object.freeze({
     parentLeadsDays: 90,
     backupMaxDays: 35,
     pendingScanObjectHours: UPLOADS.scanPendingMaxHours,
-    // 07 §6.1 — **what an erasure keeps, and the reason, in the words the person is owed.** Art 17(3) is what
-    // makes keeping these rows lawful and Art 12 is what makes telling her about them mandatory, so the two
-    // belong in one list rather than in a screen's copy and a job's comment. `delete-account`'s confirmation and
-    // the settings screen both read it; neither exists yet (01 §4e — that cron is still handler-less), and that
-    // is exactly why the list is here rather than waiting for them: the sentence 07 §6.1 promises must not be
-    // something the first builder of that screen has to remember to write.
-    //
-    // The third row is the one `0027` made true and the one most likely to be left out, because it applies to
-    // nannies only and it is the least comfortable to say. It is said anyway: she is told that a vetting
-    // decision about her is kept, that her identity is removed from it, and why.
-    erasureRetains: Object.freeze([
-      Object.freeze({
-        what: "Payment and subscription records",
-        why: "UK tax and company law require us to keep them, and they may be needed to settle a dispute.",
-        lawfulBasis: "Art 17(3)(b) and (e)",
-      }),
-      Object.freeze({
-        what: "A record of the permissions you gave, and when",
-        why: "We have to be able to show what you agreed to and when you agreed to it.",
-        lawfulBasis: "Art 17(3)(b)",
-      }),
-      Object.freeze({
-        what: "Safeguarding decisions made about you, with your name and contact details removed",
-        why: "Where a background-check decision has been made about someone who cares for children, we are accountable for that decision and have to be able to show who made it and why. Your identity is removed from the record; the decision itself is kept.",
-        lawfulBasis: "Art 17(3)(b) and (e)",
-      }),
-    ] as const),
+    // 07 §6.1's "what is retained and why" moved to `LEGAL.erasureRetains` (ADR-179): the *windows* are security
+    // configuration and live here; the *list of classes that survive an erasure, and the lawful basis for each*,
+    // is a legal fact with one owner (07 §6.2) and one reader set — the job, the confirmation and any future
+    // subject-access answer. Keeping it beside the windows put a sentence a person reads next to a number a sweep
+    // reads, and made two homes plausible for the next class.
   }),
   csp: Object.freeze({
     supabaseOrigin: new URL(publicEnv.NEXT_PUBLIC_SUPABASE_URL).origin,
