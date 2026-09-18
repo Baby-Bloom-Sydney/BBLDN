@@ -8,6 +8,7 @@ import type {
   DecisionOutcome,
   EvidenceOpen,
   LevelSync,
+  SuspensionLift,
   QueueEntry,
   QueueFilter,
   QueueRecord,
@@ -65,10 +66,17 @@ export type RecordUpdateServiceAction = (
   formData: FormData,
 ) => Promise<ClientResult<LevelSync, ActionDetails>>;
 
+/** ★ ADR-168 (b): lifting a bar is its own act, so it is its own action with its own reason. */
+export type LiftSuspensionAction = (
+  previous: unknown,
+  formData: FormData,
+) => Promise<ClientResult<SuspensionLift, ActionDetails>>;
+
 export type VerificationQueueActions = {
   readonly decide: DecideSubmissionAction;
   readonly openEvidence: OpenEvidenceAction;
   readonly recordUpdateService: RecordUpdateServiceAction;
+  readonly liftSuspension: LiftSuspensionAction;
 };
 
 // ── Component props ──

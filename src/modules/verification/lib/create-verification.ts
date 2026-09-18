@@ -10,6 +10,7 @@ import type {
 } from "../types";
 import { adminOverview } from "./admin-overview";
 import { decide } from "./decide";
+import { liftSuspension } from "./lift-suspension";
 import { emptyVerificationState } from "./empty-verification-state";
 import { listQueue } from "./list-queue";
 import { openEvidence } from "./open-evidence";
@@ -103,6 +104,7 @@ export function createVerification(deps: VerificationDeps): Verification {
     openEvidence: (submissionId) => openEvidence(deps, submissionId),
     decide: (input) => decide(deps, input),
     recordUpdateServiceCheck: (input) => recordUpdateServiceCheck(deps, input),
+    liftSuspension: (input) => liftSuspension(deps, input),
     adminOverview: () => adminOverview(deps),
     sweepStaleProcessing: (now) => sweepStaleProcessing(deps, now),
     sweepReminders: (now) => sweepReminders(deps, now),

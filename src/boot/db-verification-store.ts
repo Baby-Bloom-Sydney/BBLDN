@@ -15,6 +15,7 @@ import type {
 } from "@/modules/shared-types";
 import type {
   AdminRecord,
+  SuspensionLift,
   ApplyCheckResultInput,
   LevelSync,
   SectionExpiry,
@@ -475,6 +476,37 @@ export function dbVerificationStore(
             p_checked_by: input.checkedBy as string,
             p_required: REQUIRED as never,
           }),
+        ),
+      ),
+    // ★ ADR-168 (b) — `lift_nanny_suspension()`, service_role. The definer does every refusal (decider not an
+    // admin, blank reason, not suspended) so the adapter adds none of its own: a second copy of a safeguarding
+    // rule is a second copy to drift.
+    liftSuspension: async (input) =>
+      asVerification(
+        await port.run<SuspensionLift>(
+          {
+            name: "verification.liftSuspension",
+            exec: async (q) => {
+              const out = (await q.rpc("lift_nanny_suspension", {
+                p_nanny_id: input.nannyId as string,
+                p_reason: input.reason,
+                p_decided_by: input.decidedBy as string,
+              })) as {
+                readonly nanny_id: string;
+                readonly suspended_since: string;
+                readonly previous_dbs_outcome: string;
+                readonly level: string;
+              };
+              return {
+                nannyId: out.nanny_id as NannyId,
+                suspendedSince: out.suspended_since as Instant,
+                previousDbsOutcome:
+                  out.previous_dbs_outcome as SuspensionLift["previousDbsOutcome"],
+                level: out.level as SuspensionLift["level"],
+              };
+            },
+          },
+          service,
         ),
       ),
     expireSection: async (submissionId) =>

@@ -26,6 +26,7 @@ export const unconfiguredVerification: Verification = Object.freeze({
   openEvidence: async () => refuse(),
   decide: async () => refuse(),
   recordUpdateServiceCheck: async () => refuse(),
+  liftSuspension: async () => refuse(),
   adminOverview: async () => refuse(),
   sweepStaleProcessing: async () => refuse(),
   sweepReminders: async () => refuse(),

@@ -256,6 +256,15 @@ export type Verification = {
   recordUpdateServiceCheck(
     input: UpdateServiceInput,
   ): Promise<Result<LevelSync, VerificationErrorDetails>>;
+  /**
+   * ★ ADR-168 (b) — lifting a bar is its own act, not a side effect of another decision. Its own authority
+   * check, its own reason, its own audit row and its own comms, because "a bar was lifted" is exactly the fact
+   * a regulator asks who authorised. The subject is the submission's nanny, read from the ledger as every other
+   * admin road reads it (ADR-159); the reason is the admin's and is never blank.
+   */
+  liftSuspension(
+    input: LiftSuspensionInput,
+  ): Promise<Result<SuspensionLift, VerificationErrorDetails>>;
   adminOverview(): Promise<Result<AdminOverview, VerificationErrorDetails>>;
 
   // ── The named jobs (ADR-161; 03 §4.3) — run at service scope by the cron shells ──
@@ -539,6 +548,20 @@ export type UpdateServiceInput = {
   readonly subscribed: boolean;
 };
 
+/** ADR-168 (b): the admin names the submission whose bar is coming off, and says why. */
+export type LiftSuspensionInput = {
+  readonly submissionId: SubmissionId;
+  readonly reason: string;
+};
+
+/** What `lift_nanny_suspension()` answers — the durable facts the audit row also holds. */
+export type SuspensionLift = {
+  readonly nannyId: NannyId;
+  readonly suspendedSince: Instant;
+  readonly previousDbsOutcome: DbsOutcome;
+  readonly level: VerificationLevel;
+};
+
 /** 04 §6.4 S-A-16's counters (05 AC-A-17). */
 export type AdminOverview = {
   readonly pending: number;
@@ -605,6 +628,15 @@ export type VerificationDecisionStore = {
     readonly subscribed: boolean;
     readonly checkedBy: UserId;
   }): Promise<Result<LevelSync, VerificationErrorDetails>>;
+  /**
+   * ★ ADR-168 (b) — `lift_nanny_suspension()`, the ONE road that clears `suspended_at`. `service_role`; the
+   * definer validates the decider against `user_roles` and refuses a blank reason or an unsuspended nanny.
+   */
+  liftSuspension(input: {
+    readonly nannyId: NannyId;
+    readonly reason: string;
+    readonly decidedBy: UserId;
+  }): Promise<Result<SuspensionLift, VerificationErrorDetails>>;
   /** `expire_verification_section()` */
   expireSection(
     submissionId: SubmissionId,

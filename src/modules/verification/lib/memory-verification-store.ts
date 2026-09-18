@@ -269,6 +269,39 @@ export function memoryVerificationStore(
       }));
       return ok(sync(input.nannyId));
     },
+    // ★ ADR-168 (b) — the double refuses exactly what the definer refuses, in the same order, so a test can
+    // drive the refusals without a database.
+    liftSuspension: async (input) => {
+      const row = ledger.sectionsOf(input.nannyId);
+      if (row === undefined) return unavailable();
+      if (input.reason.trim() === "")
+        return err<VerificationErrorDetails>(
+          "VALIDATION",
+          "A lift needs a reason",
+          { reason: "reason-required" },
+        );
+      if (!row.suspended)
+        return err<VerificationErrorDetails>(
+          "VALIDATION",
+          "That account is not suspended",
+          { reason: "unsupported-evidence" },
+        );
+      const previous = row.dbsOutcome ?? "unset";
+      ledger.patchSections(input.nannyId, (current) => ({
+        ...current,
+        suspended: false,
+        // ADR-168 (c): the outcome is unset, never restored — a correction to the evidence is a new submission.
+        dbsOutcome: previous === "barred" ? "unset" : previous,
+        crossCheckPassed:
+          previous === "barred" ? false : current.crossCheckPassed,
+      }));
+      return ok({
+        nannyId: input.nannyId,
+        suspendedSince: nowInstant(),
+        previousDbsOutcome: previous,
+        level: row.level,
+      });
+    },
     expireSection: async (submissionId) => {
       const entry = ledger
         .rows()

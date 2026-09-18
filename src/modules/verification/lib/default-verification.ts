@@ -29,6 +29,7 @@ export const verification: Verification = Object.freeze({
   decide: (input) => VERIFICATION_REGISTRY.get().decide(input),
   recordUpdateServiceCheck: (input) =>
     VERIFICATION_REGISTRY.get().recordUpdateServiceCheck(input),
+  liftSuspension: (input) => VERIFICATION_REGISTRY.get().liftSuspension(input),
   adminOverview: () => VERIFICATION_REGISTRY.get().adminOverview(),
   sweepStaleProcessing: (now) =>
     VERIFICATION_REGISTRY.get().sweepStaleProcessing(now),

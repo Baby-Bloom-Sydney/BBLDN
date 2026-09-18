@@ -7,8 +7,13 @@
 //   2. **A row that fails does not stop the sweep.** A cron that aborts on the first bad row leaves the rest of
 //      the cohort unswept and tells no one which; each row is counted `handled` or `skipped` and the run
 //      summary is the truth (01 §4f). A store failure on the *read* does fail the run — there is nothing to do.
-//   3. **`payment-due-sweep` writes nothing** (02 §4.5 writers table). It emits `payment.due` and that is all;
-//      the admin notification AC-A-41 also asks for has no road out of `payments` and is pinned, not faked.
+//   3. **`payment-due-sweep` writes nothing ON THE SPINE** (02 §4.5 writers table). It emits `payment.due` and
+//      raises the operator's row, and that is all — no link is minted and no column on the row is touched.
+//      ★ The row is new (ADR-160, and REVIEW-4 §6.5's pin 2, whose stated owner had landed): AC-A-41 asks for
+//      one open `admin_notifications.payment_due` per family, and until ADR-160 no module owned that table, so
+//      the claim was pinned rather than faked. `comms.notifyAdmin()` is now its one writer, `payments` already
+//      holds `comms`, and ADR-160 names this caller in writing. The insert is idempotent on
+//      `admin_notifications_one_open_per_subject_idx`, which is what keeps the sweep free to re-run.
 import { PRICES } from "@/modules/config";
 import type { Actor, FamilyId, Instant, Uuid } from "@/modules/shared-types";
 import type { PaymentJobName, PaymentJobRun, PaymentsJobs } from "../types";
@@ -79,9 +84,22 @@ async function flagOne(
   target: SweepTarget,
   actor: Actor,
 ): Promise<boolean> {
+  const family = familyOf(target.row);
+  // ADR-160: the email is the delivery, the row the state — and the state is the half that must survive. It is
+  // raised BEFORE the event so a run that dies between them has told the operator rather than only the log; a
+  // repeat run answers the open row rather than duplicating it (the one-open-per-subject index).
+  const notified = await deps.comms.notifyAdmin({
+    kind: "payment_due",
+    subject: { type: "family", id: family as string as Uuid },
+    summary: "A placement balance is due and no payment link has been sent.",
+    ...(target.row.payment_due_at === null
+      ? {}
+      : { dueAt: target.row.payment_due_at as never }),
+  });
+  if (!notified.ok) return false;
   const emitted = await emitMoneyEvents(deps.events, {
     names: ["payment.due"],
-    familyId: familyOf(target.row),
+    familyId: family,
     actor,
     props: {
       path: "payment-link",

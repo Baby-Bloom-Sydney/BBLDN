@@ -5,15 +5,27 @@
     "katieChat": "07 §8 row 8 — Katie chat. The London Katie routes are not built; /api/chat/* is the legacy Sydney tree (F-d). The chat_cost_daily USD cap is the hard stop until then.",
     "katieUploads": "07 §8 row 8 — Katie uploads. Same surface as katieChat: not built in the London tree.",
     "agentRoute": "07 §8 row 9 — the ADMIN_API_TOKEN recruitment-agent route. /api/agent is the legacy Sydney route (F-d); the London one does not exist.",
-    "nannyApplications": "07 §8 row 12 — nanny applications on the self-serve path. No Phase 1 surface lets a nanny apply; connections' K rows are the admin path and carry their own preconditions."
+    "nannyApplications": "07 §8 row 12 — nanny applications on the self-serve path. The `/apply` funnel exists (`src/app/(funnel)/apply/page.tsx`, shipped in `2a`) but does not consume this policy: its write goes through `onboarding-nanny`'s lead road, which carries its own duplicate-email idempotency, and row 12's per-IP ceiling was written for a self-serve apply-as-nanny surface that does not exist yet. Wire the policy when that surface does. (REVIEW-4 M-1: the previous reason said no surface let a nanny apply, which stopped being true one cycle earlier.)"
   },
   "actions": {
     "src/app/admin/katie-proposals/actions.ts": "Legacy Sydney admin actions from the bootstrap import (they build on @/lib/supabase/*) and are rewritten by F-d; 07 §8 row 14's adminRoutes is itself recorded as unwired.",
     "src/app/admin/leads/actions.ts": "Legacy Sydney admin actions from the bootstrap import (they build on @/lib/supabase/*) and are rewritten by F-d; 07 §8 row 14's adminRoutes is itself recorded as unwired.",
     "src/app/admin/positions/actions.ts": "Legacy Sydney admin actions from the bootstrap import (they build on @/lib/supabase/*) and are rewritten by F-d; 07 §8 row 14's adminRoutes is itself recorded as unwired.",
-    "src/modules/admin-verification/actions/decide-submission-action.ts": "07 §8 row 14 is consumed one boundary in, in verification/lib/decide.ts (`consumeAdminRouteLimit`) — the action delegates through VERIFICATION_REGISTRY, which no static read crosses (`2c`, ADR-159).",
-    "src/modules/admin-verification/actions/open-evidence-action.ts": "07 §8 row 14 is consumed one boundary in, in verification/lib/open-evidence.ts (`consumeAdminRouteLimit`) — the action delegates through VERIFICATION_REGISTRY, which no static read crosses (`2c`, ADR-159).",
-    "src/modules/admin-verification/actions/record-update-service-action.ts": "07 §8 row 14 is consumed one boundary in, in verification/lib/record-update-service-check.ts (`consumeAdminRouteLimit`) — the action delegates through VERIFICATION_REGISTRY, which no static read crosses (`2c`, ADR-159).",
+    "src/modules/admin-verification/actions/decide-submission-action.ts": {
+      "reason": "07 §8 row 14 is consumed one boundary in, in verification/lib/decide.ts — the action delegates through VERIFICATION_REGISTRY, which no static read crosses (`2c`, ADR-159). The delegate and its helper are named so this gate checks the claim rather than reading it (REVIEW-4 M-5).",
+      "delegatesTo": "src/modules/verification/lib/decide.ts",
+      "helper": "consumeAdminRouteLimit"
+    },
+    "src/modules/admin-verification/actions/open-evidence-action.ts": {
+      "reason": "07 §8 row 14 is consumed one boundary in, in verification/lib/open-evidence.ts — the action delegates through VERIFICATION_REGISTRY, which no static read crosses (`2c`, ADR-159).",
+      "delegatesTo": "src/modules/verification/lib/open-evidence.ts",
+      "helper": "consumeAdminRouteLimit"
+    },
+    "src/modules/admin-verification/actions/record-update-service-action.ts": {
+      "reason": "07 §8 row 14 is consumed one boundary in, in verification/lib/record-update-service-check.ts — the action delegates through VERIFICATION_REGISTRY, which no static read crosses (`2c`, ADR-159).",
+      "delegatesTo": "src/modules/verification/lib/record-update-service-check.ts",
+      "helper": "consumeAdminRouteLimit"
+    },
     "src/modules/admin/calendar/actions/block-range-action.ts": "07 §8 row 14 — admin-gated by auth.requireRole('admin') + aal2 (07 §5.4 rows 1–2) but not yet consuming `adminRoutes`, which `2c` wired on the verification admin roads; owner `admin` / `1f`, to take the same limit at this boundary.",
     "src/modules/admin/call-queue/actions/book-call-slot-action.ts": "07 §8 row 14 — admin-gated by auth.requireRole('admin') + aal2 (07 §5.4 rows 1–2) but not yet consuming `adminRoutes`, which `2c` wired on the verification admin roads; owner `admin` / `1f`, to take the same limit at this boundary.",
     "src/modules/admin/call-queue/actions/clear-call-slot-action.ts": "07 §8 row 14 — admin-gated by auth.requireRole('admin') + aal2 (07 §5.4 rows 1–2) but not yet consuming `adminRoutes`, which `2c` wired on the verification admin roads; owner `admin` / `1f`, to take the same limit at this boundary.",
@@ -30,8 +42,25 @@
     "src/modules/matching/actions/connect-action.ts": "07 §8 row 12 — the same row and the same precondition as connect-to-nanny (ADR-126 makes this the one entry point `public-site` calls).",
     "src/modules/onboarding-parent/actions/create-position-action.ts": "No 07 §8 row for the in-app position: row 9's ≤ 200/day is the agent route's — recorded for a row of its own, owner 07 §8 / `onboarding-parent`.",
     "src/modules/positions/actions/close-position-action.ts": "A parent's one lever on her own position (03 §2.4 P-7), gated by `advance`'s party check; no 07 §8 row — recorded with create-position, owner 07 §8 / `positions`.",
-    "src/modules/verification/actions/submit-dbs-action.ts": "07 §8 row 11 is consumed one boundary in, in verification/lib/submit-dbs.ts — the action delegates through VERIFICATION_REGISTRY, which no static read crosses.",
-    "src/modules/verification/actions/submit-identity-action.ts": "07 §8 row 11 is consumed one boundary in, in verification/lib/submit-identity.ts — the action delegates through VERIFICATION_REGISTRY, which no static read crosses.",
-    "src/modules/verification/actions/submit-right-to-work-action.ts": "07 §8 row 11 is consumed one boundary in, in verification/lib/submit-right-to-work.ts — the action delegates through VERIFICATION_REGISTRY, which no static read crosses."
+    "src/modules/verification/actions/submit-dbs-action.ts": {
+      "reason": "07 §8 row 11 is consumed one boundary in, in verification/lib/submit-dbs.ts — the action delegates through VERIFICATION_REGISTRY, which no static read crosses.",
+      "delegatesTo": "src/modules/verification/lib/submit-dbs.ts",
+      "helper": "consumeVerificationSubmitLimit"
+    },
+    "src/modules/verification/actions/submit-identity-action.ts": {
+      "reason": "07 §8 row 11 is consumed one boundary in, in verification/lib/submit-identity.ts — the action delegates through VERIFICATION_REGISTRY, which no static read crosses.",
+      "delegatesTo": "src/modules/verification/lib/submit-identity.ts",
+      "helper": "consumeVerificationSubmitLimit"
+    },
+    "src/modules/verification/actions/submit-right-to-work-action.ts": {
+      "reason": "07 §8 row 11 is consumed one boundary in, in verification/lib/submit-right-to-work.ts — the action delegates through VERIFICATION_REGISTRY, which no static read crosses.",
+      "delegatesTo": "src/modules/verification/lib/submit-right-to-work.ts",
+      "helper": "consumeVerificationSubmitLimit"
+    },
+    "src/modules/admin-verification/actions/lift-suspension-action.ts": {
+      "reason": "07 §8 row 14 is consumed one boundary in, in verification/lib/lift-suspension.ts — ADR-168 (b)'s road takes the same role gate, the same budget and the same order (role, budget, work) as its three siblings.",
+      "delegatesTo": "src/modules/verification/lib/lift-suspension.ts",
+      "helper": "consumeAdminRouteLimit"
+    }
   }
 }

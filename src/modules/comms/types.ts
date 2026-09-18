@@ -109,6 +109,9 @@ export interface TemplateRegistry {
   "verification-action-needed": TemplateData;
   "verification-barred": TemplateData;
   "admin-nanny-barred": TemplateData;
+  /** ADR-168 (b) — a bar was lifted: one neutral sentence to her, the mailbox row to the operator. */
+  "verification-suspension-lifted": TemplateData;
+  "admin-nanny-suspension-lifted": TemplateData;
   "verification-reminder": TemplateData;
   "bundle-payment-link": TemplateData;
   "app-ready": TemplateData;
