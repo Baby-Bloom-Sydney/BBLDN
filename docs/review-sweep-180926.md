@@ -37,7 +37,7 @@ ADR-147 is the ruling that makes `nannies.is_isolated` "the record of not having
 
 > "Pool visibility is the conjunction `NOT is_isolated AND verification_level >= config` in every read (`nannies_matching_idx`, `is_active_nanny()`, `nanny_public`), so a Path-A nanny at level 0 and an invited nanny who has applied at level 0 are equally invisible; the flag records _having applied_."
 
-It is true of two of the three reads it names. `nanny_public` (`0016:63-66`) carries `not n.is_isolated` **and** `verification_level in ('L3_PROVISIONALLY_VERIFIED','L4_FULLY_VERIFIED')`. `nannies_matching_idx` (`0005:78`) is a partial index on `profile_visible and not is_isolated` **keyed by** `verification_level`, so every query that uses it supplies the level. **`is_active_nanny()` carries no level term at all:**
+It is true of two of the three reads it names. `nanny_public` (`0016:59-66`) carries `not n.is_isolated` **and** `verification_level in ('L3_PROVISIONALLY_VERIFIED','L4_FULLY_VERIFIED')`. `nannies_matching_idx` (`0005:78`) is a partial index on `profile_visible and not is_isolated` **keyed by** `verification_level`, so every query that uses it supplies the level. **`is_active_nanny()` carries no level term at all:**
 
 ```sql
 select exists (
