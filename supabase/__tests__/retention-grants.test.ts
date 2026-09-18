@@ -233,7 +233,11 @@ const ENUMERATED: Readonly<Record<string, Grant>> = {
 const NAMED = Object.keys(ENUMERATED).sort();
 
 type AclRow = { readonly rel: string; readonly privs: string };
-type ColRow = { readonly rel: string; readonly col: string; readonly privs: string };
+type ColRow = {
+  readonly rel: string;
+  readonly col: string;
+  readonly privs: string;
+};
 
 let db: Client;
 let tableAcl: readonly AclRow[];
@@ -308,7 +312,9 @@ describe("int.retention-grants — the enumerated set is the authority (ADR-185)
   });
 
   it("★ reaches no schema but `public` and `storage`", () => {
-    const schemas = [...new Set(tableAcl.map((r) => r.rel.split(".")[0]))].sort();
+    const schemas = [
+      ...new Set(tableAcl.map((r) => r.rel.split(".")[0])),
+    ].sort();
     expect(schemas).toEqual(["public", "storage"]);
   });
 
@@ -320,7 +326,10 @@ describe("int.retention-grants — the enumerated set is the authority (ADR-185)
   });
 
   it("★ a table no job touches holds nothing — the two created after `0016` prove the default", () => {
-    const untouched = ["public.rate_limit_buckets", "public.position_call_mirror"];
+    const untouched = [
+      "public.rate_limit_buckets",
+      "public.position_call_mirror",
+    ];
     for (const rel of untouched) {
       expect(NAMED).not.toContain(rel);
       expect(tableAcl.map((r) => r.rel)).not.toContain(rel);
@@ -415,9 +424,7 @@ describe("int.retention-grants — what the identity is refused, and by which co
       asRetention(`delete from public.consent_records where false`),
     ).resolves.toBeDefined();
     await expect(
-      asRetention(
-        `update public.email_logs set body_html = null where false`,
-      ),
+      asRetention(`update public.email_logs set body_html = null where false`),
     ).resolves.toBeDefined();
   });
 });

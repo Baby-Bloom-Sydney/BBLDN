@@ -73,7 +73,9 @@ describe("int.rollback-0032 — the twin restores nothing, and proves it", () =>
       .split("\n")
       .filter((line) => !line.trimStart().startsWith("--"))
       .join("\n");
-    expect(executable.toLowerCase()).not.toMatch(/\bgrant\b\s+(select|insert|update|delete|all)/);
+    expect(executable.toLowerCase()).not.toMatch(
+      /\bgrant\b\s+(select|insert|update|delete|all)/,
+    );
   });
 
   it("★ applies cleanly, and the retention identity holds exactly what it held before", async () => {
@@ -108,12 +110,18 @@ describe("int.rollback-0032 — the twin restores nothing, and proves it", () =>
       await holds("public.verifications", "update", "subject_pseudonym"),
     ).toBe(true);
     expect(
-      await holds("public.nanny_suspension_lifts", "update", "subject_pseudonym"),
+      await holds(
+        "public.nanny_suspension_lifts",
+        "update",
+        "subject_pseudonym",
+      ),
     ).toBe(true);
     expect(await holds("public.nannies", "delete")).toBe(true);
     expect(await holds("public.payment_events", "delete")).toBe(true);
     expect(await holds("public.file_retention_log", "insert")).toBe(true);
     // the row locks the arms take, which is the thing `0032` §2h found by running rather than by reading
-    expect(await holds("public.admin_notifications", "update", "id")).toBe(true);
+    expect(await holds("public.admin_notifications", "update", "id")).toBe(
+      true,
+    );
   });
 });

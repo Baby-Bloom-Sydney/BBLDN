@@ -1037,7 +1037,14 @@ isolated nanny · 2 parents with an OPEN position and the held connection. **No 
 `sync_nanny_verification_state()` derives every one, called with the same `p_required` `src/boot` computes.
 
 <!-- audit
-Last edited: 2026-09-19T19:05+10:00 — BB-LDN-Planner-070926/2f
+Last edited: 2026-09-20T15:40+10:00 — BB-LDN-Planner-070926/3i
+Notes: 3i — one section appended (the blanket retention grant, ADR-185; `0032`). The Current state table was NOT
+rewritten — it has been stale since 1i and this unit changes no table, no route and no action, only privileges.
+The measurement is in the section because it is the evidence the ruling rests on: 69 relations held a grant, 64 of
+them the full DML, 9 of those views. Two safeguarding holes closed (INSERT on the two vetting tables, table-wide
+UPDATE on nanny_suspension_lifts) and one mechanism found by running rather than reading — a row lock is an UPDATE
+privilege, which is why three tables carry `update (id)`.
+Prior: 2026-09-19T19:05+10:00 — BB-LDN-Planner-070926/2f
 Notes: 2f — one section appended (the 12.09 fixture audit and the development seed). The Current state table was NOT
 rewritten: it has been stale since 1i and correcting it from a build branch would collide with 2c / 2d / P2-HARDEN,
 all still open. No migration, no route, no action; nothing under src/ touched.
@@ -1178,6 +1185,52 @@ Prior: 2026-09-15T17:40+10:00 — BB-LDN-Planner-070926/S2 (S2 shipped locally).
 Prior: 2026-09-15T15:20+10:00 — BB-LDN-Planner-070926/S1 (S1 shipped locally).
 Prior: 2026-09-15T13:55+10:00 — BB-LDN-Planner-070926/S0 (seeded at bootstrap).
 -->
+
+## Files created / modified in the current unit (`3i` — the blanket retention grant; L-009 Phase 3)
+
+**ADR-185, its own unit because a privilege change across the whole schema is not a passenger on another unit's
+PR.** `0016:288` granted `bbldn_retention` `select, insert, update, delete` **on all tables in schema public**,
+which made every enumerated grant list written afterwards — `0027`'s, `0028`'s, `0030`'s, `0031`'s —
+documentation rather than authority.
+
+- ★ **Measured from the catalogue before anything changed**, on `0000`–`0031` applied from empty: **69**
+  relations carried a table-level grant to the retention identity — 59 tables, **9 views**, `storage.objects` —
+  and **64** of them held the full DML from that one line. Only **5** had ever been narrowed, and they are
+  exactly the tables created _after_ `0016` plus the two `0031` revoked. Two public tables held nothing
+  (`rate_limit_buckets`, `position_call_mirror`), which is the proof that the default is already nothing and the
+  blanket grant was a snapshot of migration order rather than a policy.
+- **`0032_retention-grants-enumerated.sql`** — `revoke all privileges on all tables` in `public` and `storage`,
+  then **33 relations re-granted, one line each with the reason it is there**, derived from what `0028`'s
+  erasure, `0030`'s purge and `0031`'s sweep actually touch. A table no job touches gets nothing; the header
+  says in as many words that **a new table gets no retention privilege by default**.
+- ★ **Two safeguarding holes closed that `3h`'s brief did not name, and it was right not to widen into them.**
+  The identity held table-level **INSERT** on `verifications` and `vetting_submissions` — it could _create_ a
+  DBS outcome no admin ever made — and table-level **UPDATE** on `nanny_suspension_lifts`, so `decided_by`, the
+  reason and the date on the row recording who lifted a bar were writable. All three tables are now
+  `select` plus a named column list and nothing else.
+- ★ **Found by running the jobs after the revoke, not by reading: a row lock is an UPDATE privilege.**
+  `select ... for update nowait` — the house idiom in `0027`, `0028` and three of `0031`'s arms — answers
+  `42501` with `select, delete` held; **DELETE does not satisfy it** and a single _column_ grant does. So
+  `0031`'s own `grant select, delete` lines were another thing that only worked because of `0016:288`.
+  `nannies`, `admin_notifications` and `cookie_consent_records` take `update (id)`: the narrowest privilege that
+  buys the lock, writing no personal data and no decision, with the verify block asserting the data columns
+  (`suspended_at`, `verification_level`, `is_isolated`, `acknowledged_at`, `superseded_by`) stayed unwritable.
+- **`int.retention-grants`** — ADR-185's gate, and it lives in **`integration`** because it needs a database and
+  `config-gates` has none. It reads `pg_class.relacl` / `pg_attribute.attacl` after the whole migration set, so
+  a blanket grant in a _future_ migration fails CI even though `0032` applied cleanly — which `0032`'s own
+  verify block, running at its own apply time, could never catch. The enumerated set is stated twice on purpose
+  (the migration's grant block and the suite's `ENUMERATED` list) and one case asserts the two agree, so neither
+  drifts alone.
+- **The twin restores nothing, and proves it.** `0032` is a security clause from its first line to its last, so
+  ADR-165 (1) leaves its twin with no statement it is allowed to make; `int.rollback-0032` is what makes "did
+  nothing" a fact rather than a comment. The recovery is roll-forward: a job found to need a privilege gets a
+  new migration naming the table and the reason, never a wider grant at 3 a.m.
+- **Not touched, and recorded instead:** `0016:291`'s `grant execute on all functions in schema public to
+bbldn_retention` is the same shape of grant. ADR-185 rules on tables, the trigger functions every retention
+  write fires are reached through it, and a second blanket revoke riding in this PR is the thing ADR-185 itself
+  forbids.
+
+---
 
 ## Files created / modified in the current unit (`3h` — `retention-sweep`, the third retention job; L-009 Phase 3)
 
