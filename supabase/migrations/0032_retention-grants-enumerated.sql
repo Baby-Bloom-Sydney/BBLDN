@@ -231,8 +231,10 @@ grant select, update (raw_response, nanny_id, subject_pseudonym)
   on table public.vetting_submissions to bbldn_retention;
 
 -- ★ `0027`'s pseudonymiser writes exactly these two on this table, and `0030` counts the rows. Nothing else:
--- an audit row whose author can be rewritten is not an audit row, which is `0026`'s own reasoning about
--- `decided_by` applied to the privilege rather than to the foreign key.
+-- an audit row whose author can be rewritten is not an audit row, which is this table's own written
+-- justification for `decided_by` being `restrict` (quoted in ADR-176), applied to the privilege rather than to
+-- the foreign key. ADR-176 noted that the reasoning had been applied to the author and not to the subject; this
+-- is the same gap one layer down — applied to the key and not to the grant.
 grant select, update (nanny_id, subject_pseudonym)
   on table public.nanny_suspension_lifts to bbldn_retention;
 
