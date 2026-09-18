@@ -1,33 +1,27 @@
+// S-N-17 `/nanny/profile` — her own profile (04 §6.3; `03.22` Rejig). Thin by rule (05 §7 rule 5): one read, one
+// component, every href a prop. The Sydney screen this replaces read the Sydney check columns on `verifications` through a
+// service-role client in the page and offered a second editor for fields S-N-18 already owns; both are gone.
+//
+// A session with no nanny row goes to S-N-18, the one screen that makes sense for an account the funnel never
+// finished — the same answer the hub gives.
 import { redirect } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
-import { getNannyProfile, isProfileComplete } from "@/lib/actions/nanny";
-import { NannyMyProfile } from "./NannyMyProfile";
+import {
+  NannyMyProfile,
+  loadNannyProfilePage,
+} from "@/modules/onboarding-nanny";
+
+export const dynamic = "force-dynamic";
 
 export default async function NannyProfilePage() {
-  const complete = await isProfileComplete();
-  if (!complete) {
-    redirect("/nanny/register");
-  }
-
-  const { data: profile, error } = await getNannyProfile();
-
-  if (error || !profile) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">My Profile</h1>
-          <p className="mt-1 text-slate-500">Manage your nanny profile</p>
-        </div>
-        <Card>
-          <CardContent className="flex items-center gap-3 py-6">
-            <AlertCircle className="h-5 w-5 text-red-500" />
-            <p className="text-red-600">{error || "Failed to load profile"}</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return <NannyMyProfile profile={profile} />;
+  const view = await loadNannyProfilePage();
+  if (view === null) redirect("/nanny/register");
+  return (
+    <NannyMyProfile
+      view={view}
+      editHref="/nanny/register"
+      verificationHref="/nanny/verification"
+      hubHref="/nanny"
+      settingsHref="/nanny/settings"
+    />
+  );
 }

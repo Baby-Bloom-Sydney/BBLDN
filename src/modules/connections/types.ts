@@ -69,7 +69,30 @@ export type ConnectionsReads = {
   readonly forParent: (
     parentId: ParentId,
   ) => Promise<ConnectionsResult<ReadonlyArray<ConnectionSummary>>>;
+  /**
+   * `2d` (kickoff debt 2) — one nanny's **first name**, for the three surfaces 04 §7.1 writes `{nanny}` on and
+   * which have no other road to a person: the rail's rows 4-6 (`positions`), S-P-08's cards (here) and the admin
+   * call drawer (`admin`). All three may import this module and none may import `matching`, which owns the one
+   * `nanny_public` read behind it — so the read arrives as the `nannyNameOf` port and leaves by this method.
+   *
+   * `null` when the view has no row for her (isolated, below the pool, or gone): the caller then renders its
+   * line without a name, as it did before, rather than a raw id in front of a family.
+   *
+   * Connector extension, raised for ratification with the three above (03 §7.5 states no signature either).
+   */
+  readonly nannyNameOf: (
+    nannyId: NannyId,
+  ) => Promise<ConnectionsResult<string | null>>;
 };
+
+/**
+ * The port behind `nannyNameOf` — boot binds it to `matching.publicNannyName`, for the reason `advance`,
+ * `positionFacts` and `recipientOf` are injected: 01 §2.3 gives this module no arrow to `matching`. Optional, so
+ * the module stays usable with none — every name then reads `null` and no surface claims one.
+ */
+export type NannyNameReader = (
+  nannyId: NannyId,
+) => Promise<Result<string | null>>;
 
 /** One connection as a parent's screens and rail see it (04 §6.2 S-P-08 states; 04 §7.1 rows 4-5). */
 export type ConnectionSummary = {
@@ -83,14 +106,32 @@ export type ConnectionSummary = {
   readonly meetingSetBy?: "parent" | "nanny" | "admin" | "system";
   readonly meetingOutcome?: MeetingOutcome;
   readonly trialDate?: ISODate;
+  /**
+   * 04 §7.1 `{nanny}` — her first name, absent when the `nannyNameOf` port answered nothing, and **always**
+   * absent on a held row (see below). Absent rather than empty on purpose: every consumer's fallback is the
+   * nameless line it already had.
+   */
+  readonly nannyFirstName?: string;
+  /**
+   * ★ ADR-158 (2) — the silent hold. Carried on the summary because the **parent-facing** consumers must drop
+   * the row (`visibleToParent`) while the machinery must keep it (P-7's close cascade; K-1's duplicate and
+   * pending-cap checks). `connections.forParent` therefore answers held rows and the screens filter, never the
+   * other way round. A held row also carries **no name**: `forParent` does not look one up for a nanny a family
+   * may not be told about.
+   */
+  readonly heldForVerification?: boolean;
 };
 
 // ── The inside (`1g`) ──
 
 /**
  * One connection row (02 §4.2 `connection_requests`), as the module holds it. Only the fields the 25 K rows and
- * the two reads actually move are here: a column the stage model never touches (the `held_for_verification`
- * pair, `phone_exchanged_at`) belongs to whoever writes it, not to this record.
+ * the reads actually move are here: a column the stage model never touches (`phone_exchanged_at`) belongs to
+ * whoever writes it, not to this record.
+ *
+ * `2d` added the **held pair** (ADR-158 (2); R-14). It is on the record because the K rows that create a
+ * connection are what decide it — a connection made for a nanny below L4 is created held, and `2c`'s
+ * `sync_nanny_verification_state()` is what releases it at L4. No later K row touches either field.
  */
 export type ConnectionRecord = {
   readonly connectionId: ConnectionId;
@@ -108,6 +149,13 @@ export type ConnectionRecord = {
   readonly trialDate?: ISODate;
   readonly fillInitiatedBy?: "parent" | "nanny" | "admin";
   readonly availabilitySlots?: number;
+  /**
+   * 02 §4.2 row 7 / R-14 — the silent hold. Written by K-1 / K-2 / K-3 from the nanny's level and never again by
+   * this module; the release at L4 is `verification`'s sync. Absent on a record this module did not create.
+   */
+  readonly heldForVerification?: boolean;
+  /** `0007`'s CHECK: present exactly when `heldForVerification` is true. */
+  readonly heldAt?: Instant;
   /** the terms K-20 carries and L-1 needs (03 §2.4) */
   readonly terms?: PlacementTerms;
 };

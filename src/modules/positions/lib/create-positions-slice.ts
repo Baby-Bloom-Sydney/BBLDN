@@ -390,6 +390,10 @@ async function closeLiveConnections(
   record: PositionRecord,
   uow: UnitOfWork,
 ): Promise<Result<StateAfter["cascaded"]>> {
+  // ★ ADR-158 (2), deliberately NOT filtered by `visibleToParent`: this is machinery, not a screen. A held
+  // connection must close with every other one when its position closes, or a family's closed position would
+  // leave a live connection behind that no one can see or cancel. The two **parent-facing** consumers of this
+  // same read (S-P-08's cards, the rail's rows 4-6) filter; this one must not.
   const all = await connections.forParent(record.parentId);
   if (!all.ok) return all;
   const live = all.value.filter(

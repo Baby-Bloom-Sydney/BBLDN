@@ -210,6 +210,13 @@ export type NannyProfile = NannyContactPatch &
     readonly isIsolated: boolean;
     readonly verificationLevel: NannyVerificationLevel;
     readonly profileVisible: boolean;
+    /**
+     * Kickoff debt 14 — the under-3 signal N1 captured and never shows her (04 §4.1 row 5), off her own lead row.
+     * S-N-01's active / passive variant is the one thing that reads it (04 §6.3). **Absent means "we do not
+     * know"**, not "no": an account created before the funnel captured it, or one with no lead at all, has no
+     * value here and S-N-01 falls back to the active wording.
+     */
+    readonly worksWithUnderThrees?: boolean;
   };
 
 export type NannyAccountStore = {
@@ -243,6 +250,122 @@ export type NannyHubView = {
   readonly line: string;
   /** The one action the state offers, or none (open). */
   readonly action: { readonly label: string; readonly href: string } | null;
+};
+
+// ── S-N-17 / S-N-21 (`2d`) — her own profile and her settings (04 §6.3; `03.22` / `03.24`) ──
+
+/**
+ * One thing S-N-18 still wants from her, and where in the stepper it is asked. The label is the step's own
+ * heading, so there is one place the words live.
+ */
+export type NannyProfileGap = {
+  readonly stepIndex: number;
+  readonly label: string;
+};
+
+/** One line of the profile summary — what a family reads about her, in her own words. */
+export type NannyProfileFact = {
+  readonly id: ProfileStepId;
+  readonly label: string;
+  readonly value: string | null;
+  readonly stepIndex: number;
+};
+
+/** One verification section as S-N-17 and S-N-21 show it. `needsHer` is the only call to action. */
+export type NannyVerificationRow = {
+  readonly section: "identity" | "dbs" | "right-to-work";
+  readonly label: string;
+  readonly status: string;
+  readonly statusLabel: string;
+  readonly needsHer: boolean;
+};
+
+/**
+ * The verification half of both screens.
+ *
+ * **It never names the hold** (ADR-157; the planner's ruling). Its whole input is the level `getStatus` answers
+ * — read, never derived (`2c` rule 1) — and the four section statuses. Nothing here is told whether a connection
+ * is held, so nothing here can say so: an L3 nanny whose connections are waiting on the level-4 check reads
+ * exactly what a nanny mid-check reads.
+ */
+export type NannyVerificationSummary = {
+  readonly level: NannyVerificationLevel;
+  /** the one neutral line, from the level and the sections only */
+  readonly line: string;
+  /** the DBS section's status, for the badge 04 §6.3 S-N-17 asks for */
+  readonly dbs: string;
+  readonly rows: ReadonlyArray<NannyVerificationRow>;
+  /** true when a section is hers to fix — the only thing either screen asks her to do about verification */
+  readonly needsHer: boolean;
+  /** I-V5: barred ⇒ suspended, and she is told (04 §4.1 row 14, VER-010). Not a hold. */
+  readonly suspended: boolean;
+};
+
+export type NannyProfileView = {
+  readonly firstName: string;
+  /** "Clapham · SW4", or `null` until she has given one */
+  readonly areaLine: string | null;
+  readonly complete: boolean;
+  /** the first thing still wanted, or `null` when nothing is */
+  readonly nextStep: NannyProfileGap | null;
+  readonly missing: ReadonlyArray<NannyProfileGap>;
+  readonly facts: ReadonlyArray<NannyProfileFact>;
+  /** her rate in `LOCALE.currency`, or `null` */
+  readonly rateLine: string | null;
+  readonly availability: NannyAvailability | null;
+  readonly verification: NannyVerificationSummary;
+};
+
+/** 04 §6.3 S-N-21's tree, in its order: Profile · Account · Linked children · Contact us · Close account. */
+export type NannySettingsSectionId =
+  | "profile"
+  | "account"
+  | "children"
+  | "help"
+  | "close";
+
+export type NannySettingsSection = {
+  readonly id: NannySettingsSectionId;
+  readonly heading: string;
+  readonly line: string;
+  readonly href: string;
+  readonly linkLabel: string;
+};
+
+export type NannySettingsView = {
+  readonly firstName: string;
+  readonly email: Email;
+  readonly sections: ReadonlyArray<NannySettingsSection>;
+  /** prefills the contact form, which is S-N-18's own location step — no second writer (ADR-152 (2)) */
+  readonly contact: {
+    readonly mobile: string | null;
+    readonly district: string | null;
+    readonly area: string | null;
+  };
+  readonly contactStepIndex: number;
+  readonly verificationRows: ReadonlyArray<NannyVerificationRow>;
+  readonly verification: NannyVerificationSummary;
+};
+
+export type NannyMyProfileProps = {
+  readonly view: NannyProfileView;
+  /** `/nanny/register` — every edit link is this plus `?step=` */
+  readonly editHref: string;
+  readonly verificationHref: string;
+  readonly hubHref: string;
+  readonly settingsHref: string;
+};
+
+export type NannySettingsProps = {
+  readonly view: NannySettingsView;
+  /** for the contact panel's prefill — it renders S-N-18's own location step (04 §6.3 "already held are prefilled") */
+  readonly profile: NannyProfile;
+  readonly options: NannyFunnelOptions;
+  readonly action: NannyProfileStepAction;
+  readonly verificationHref: string;
+  readonly hubHref: string;
+  /** S-X-09 — "set your password" by email; no password field on this screen */
+  readonly passwordHref: string;
 };
 
 // ── Actions (01 §4e; the client component never imports the connector barrel — 01 §2.5) ──

@@ -13,6 +13,7 @@ const unconfigured: ConnectionsReads = Object.freeze({
   liveNannyIdsForParent: async () => NOT_CONFIGURED,
   liveCountForPosition: async () => NOT_CONFIGURED,
   forParent: async () => NOT_CONFIGURED,
+  nannyNameOf: async () => NOT_CONFIGURED,
 });
 
 export const CONNECTIONS_REGISTRY: Registry<ConnectionsReads> =

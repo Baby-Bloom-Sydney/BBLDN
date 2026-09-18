@@ -1,7 +1,6 @@
 {
   "src/boot/db-call-mirror-store.ts": "legacy — 1 function over 50 lines when the rule landed (P2-HARDEN); split when touched.",
   "src/boot/db-comms-store.ts": "legacy — 1 function over 50 lines when the rule landed (P2-HARDEN); split when touched.",
-  "src/boot/db-connection-store.ts": "legacy — 1 function over 50 lines when the rule landed (P2-HARDEN); split when touched.",
   "src/boot/db-consent-store.ts": "legacy — 1 function over 50 lines when the rule landed (P2-HARDEN); split when touched.",
   "src/boot/db-nanny-account-store.ts": "legacy — 1 function over 50 lines when the rule landed (P2-HARDEN); split when touched.",
   "src/boot/db-nanny-lead-store.ts": "legacy — 1 function over 50 lines when the rule landed (P2-HARDEN); split when touched.",
@@ -34,9 +33,6 @@
   "src/modules/call-layer/call-layer.stub.ts": "legacy — 1 function over 50 lines when the rule landed (P2-HARDEN); split when touched.",
   "src/modules/call-layer/components/SlotPicker.tsx": "legacy — 2 functions over 50 lines when the rule landed (P2-HARDEN); split when touched.",
   "src/modules/call-layer/lib/create-call-layer-slice.ts": "legacy — 1 function over 50 lines when the rule landed (P2-HARDEN); split when touched.",
-  "src/modules/connections/lib/connection-preconditions.ts": "legacy — 1 function over 50 lines when the rule landed (P2-HARDEN); split when touched.",
-  "src/modules/connections/lib/create-connections-slice.ts": "legacy — 2 functions over 50 lines when the rule landed (P2-HARDEN); split when touched.",
-  "src/modules/connections/lib/create-connections.ts": "legacy — 1 function over 50 lines when the rule landed (P2-HARDEN); split when touched.",
   "src/modules/matching/components/AreaCombobox.tsx": "legacy — 1 function over 50 lines when the rule landed (P2-HARDEN); split when touched.",
   "src/modules/matching/components/NannyPreviewCard.tsx": "legacy — 1 function over 50 lines when the rule landed (P2-HARDEN); split when touched.",
   "src/modules/matching/components/PreAuthResults.tsx": "legacy — 1 function over 50 lines when the rule landed (P2-HARDEN); split when touched.",

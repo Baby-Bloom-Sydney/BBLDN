@@ -186,12 +186,16 @@ type World = {
  * The fake call slice. K-1 cascades into C-c and `connections` may never import `call-layer` (01 §2.3), so the
  * seam is proved with a registered fake — the device `1e` used for the P-2 -> C-a cascade, for the same reason.
  */
+/** Every C-c payload this module built, for the `aboutNanny` pin below. Reset by the test that reads it. */
+const ccPayloads: Array<Record<string, unknown>> = [];
+
 const callSlice = (fired: Array<string>) => ({
   entity: "call" as const,
   handlers: [
     {
       id: "C-c" as TransitionId,
       run: async (input: AdvanceInput<TransitionId>) => {
+        ccPayloads.push(input.payload as Record<string, unknown>);
         fired.push(
           (
             input.payload as {
@@ -341,6 +345,37 @@ describe("connections — K-1, the Connect a parent makes (04.12)", () => {
       "C-c",
     ]);
   });
+
+  /**
+   * PINNED — the **fourth** `{nanny}` surface (04 §8 "S-P-01 after Connect (trigger c)": "Your matchmaker will
+   * call you about {nanny}"). `2d` gave three surfaces a name through `connections.nannyNameOf`; this one is a
+   * pin rather than a fourth copy, by the planner's ruling.
+   *
+   * The mechanism already exists on both sides — `position_call_mirror.about_nanny` is a column, `CallPageView`
+   * carries `aboutNanny`, and `CallPage` renders the named line — but **nothing in production ever sets it**:
+   * the only writer is a C-c payload key, and the payload this module builds carries `parentId`, `type` and
+   * `recipient` and nothing else. So every trigger-(c) parent reads the generic line.
+   *
+   * Filling it here is one line (`deps.nannyNameOf` is now injected), and it is deliberately not taken: the
+   * name on a **call page** is 04 §3.3's copy and S-P-01's owner, not this module's cascade.
+   * **Owner: the unit that takes S-P-01's trigger-(c) copy (Phase 4, with `call-layer`).**
+   */
+  it.fails(
+    "K-1's C-c cascade names the nanny the call is about (04 §8 S-P-01 trigger (c))",
+    async () => {
+      ccPayloads.length = 0;
+      const w = world();
+      await w.advance({
+        entity: { kind: "connection", id: C1 },
+        transition: "K-1",
+        actor: parentActor,
+        payload: { positionId: POSITION, nannyId: NANNY_A },
+        expectedFrom: null,
+        idempotencyKey: "k1-about-nanny",
+      });
+      expect(ccPayloads[0]).toHaveProperty("aboutNanny");
+    },
+  );
 
   /**
    * The create-time half of the actor rule, and a real hole without it: `checkActor` compares a user against
@@ -616,5 +651,98 @@ describe("connections — the nanny is reachable", () => {
     expect(toNanny?.to).toEqual({ userId: NANNY_USER });
     // The claim that must never regress: there is no address anywhere in what this module posted about her.
     expect(Object.keys(toNanny?.to ?? {})).not.toContain("email");
+  });
+});
+
+/**
+ * ADR-158 (2) — the silent hold's **connections arm**, and the flip of the pin `2c` left behind.
+ *
+ * `2c` built and proved the *release* (`sync_nanny_verification_state()` clears every held row at L4) and
+ * measured that nothing ever set the flag: `ConnectionRecord` carried no held pair and `upsert_connection()`
+ * inserted none. Its pin (`connections.hold.pin.test.ts`) is **retired rather than left to decay** — the claim it
+ * encoded is now false, and it could never have turned green on its own because its assertion was made against a
+ * hand-built record literal rather than against the module. These are the claims that replace it.
+ *
+ * The rule (02 §4.2 row 7, R-14: "held rows withhold parent notification until L4"): a connection created for a
+ * nanny who is not yet L4 is created `held_for_verification` with `held_at`; `0007`'s CHECK ties the two. The
+ * hold is **silent** — nothing on a nanny-facing or family-facing surface names it (ADR-157; 04 §4.1 row 14).
+ */
+describe("connections — the silent hold is written at K-row creation (ADR-158 (2); 02 §4.2 row 7)", () => {
+  const created = async (
+    level: string,
+    transition: "K-1" | "K-2" | "K-3",
+    id: ConnectionId,
+  ) => {
+    const w = world([], { level });
+    const actor = transition === "K-1" ? parentActor : nannyA;
+    await w.advance({
+      entity: { kind: "connection", id },
+      transition,
+      actor,
+      payload: { positionId: POSITION, nannyId: NANNY_A, availabilitySlots: 5 },
+      expectedFrom: null,
+      idempotencyKey: `hold-${transition}-${level}`,
+    });
+    const stored = await w.deps.store.get(id);
+    return stored.ok ? stored.value : null;
+  };
+
+  it("K-1 for a nanny below L4 creates the row held, with the instant", async () => {
+    const row = await created("L3_PROVISIONALLY_VERIFIED", "K-1", C1);
+
+    expect(row?.stage).toBe("REQUEST_SENT");
+    expect(row?.heldForVerification).toBe(true);
+    expect(row?.heldAt).toBe(NOW);
+  });
+
+  it("K-1 for an L4 nanny is not held and carries no instant", async () => {
+    const row = await created("L4_FULLY_VERIFIED", "K-1", C1);
+
+    expect(row?.heldForVerification).toBe(false);
+    expect(row?.heldAt).toBeUndefined();
+  });
+
+  it("K-2 and K-3 hold on the same rule — every road that puts her in front of a family", async () => {
+    const accepted = await created("L3_PROVISIONALLY_VERIFIED", "K-2", C1);
+    const applied = await created("L3_PROVISIONALLY_VERIFIED", "K-3", C2);
+
+    expect(accepted?.heldForVerification).toBe(true);
+    expect(applied?.heldForVerification).toBe(true);
+  });
+
+  it("`held_at` is present exactly when the flag is — `0007`'s CHECK, in the module's own terms", async () => {
+    for (const level of [
+      "L3_PROVISIONALLY_VERIFIED",
+      "L4_FULLY_VERIFIED",
+    ] as const) {
+      const row = await created(level, "K-1", C1);
+      expect(row?.heldForVerification === true).toBe(row?.heldAt !== undefined);
+    }
+  });
+
+  it("a later K row does not disturb the pair — only the L4 sync releases it (ADR-158)", async () => {
+    const w = world([], { level: "L3_PROVISIONALLY_VERIFIED" });
+    await w.advance({
+      entity: { kind: "connection", id: C1 },
+      transition: "K-1",
+      actor: parentActor,
+      payload: { positionId: POSITION, nannyId: NANNY_A },
+      expectedFrom: null,
+      idempotencyKey: "hold-carry-1",
+    });
+    await w.advance({
+      entity: { kind: "connection", id: C1 },
+      transition: "K-5",
+      actor: nannyA,
+      payload: { availabilitySlots: 5 },
+      expectedFrom: "REQUEST_SENT",
+      idempotencyKey: "hold-carry-2",
+    });
+
+    const stored = await w.deps.store.get(C1);
+
+    expect(stored.ok && stored.value?.stage).toBe("ACCEPTED");
+    expect(stored.ok && stored.value?.heldForVerification).toBe(true);
+    expect(stored.ok && stored.value?.heldAt).toBe(NOW);
   });
 });

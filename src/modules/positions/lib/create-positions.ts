@@ -21,7 +21,7 @@ import type {
   Result,
   TransitionId,
 } from "@/modules/shared-types";
-import { connections } from "@/modules/connections";
+import { connections, visibleToParent } from "@/modules/connections";
 import type { ConnectionSummary } from "@/modules/connections";
 import { placements } from "@/modules/placements";
 import type { PlacementRead } from "@/modules/placements";
@@ -54,7 +54,9 @@ async function railRest(parentId: ParentId): Promise<{
     placements.liveForParent(parentId),
   ]);
   return {
-    connections: rows.ok ? rows.value : [],
+    // ★ ADR-158 (2): rows 4-6 are a parent surface, so a held connection is filtered out here — the store reads
+    // at service scope and `0016`'s parent policy never fires on it (`connections/lib/visible-to-parent.ts`).
+    connections: rows.ok ? visibleToParent(rows.value) : [],
     placement: placement.ok ? placement.value : null,
   };
 }

@@ -12,6 +12,8 @@ export type StubConnectionsSeed = {
   readonly byParent?: Readonly<
     Record<string, ReadonlyArray<ConnectionSummary>>
   >;
+  /** `2d` — the first names the three `{nanny}` surfaces read (04 §7.1); an id with no entry answers `null`. */
+  readonly namesByNanny?: Readonly<Record<string, string>>;
 };
 
 export function stubConnections(
@@ -24,5 +26,7 @@ export function stubConnections(
       ok(seed.liveCountByPosition?.[positionId] ?? 0),
     forParent: async (parentId: ParentId) =>
       ok(seed.byParent?.[parentId] ?? Object.freeze([])),
+    nannyNameOf: async (nannyId: NannyId) =>
+      ok(seed.namesByNanny?.[nannyId] ?? null),
   });
 }

@@ -720,9 +720,165 @@ stay, still imported by the Sydney hub) · `src/app/parent/position/page.tsx` (*
 8. **One signed-URL TTL for every kind of evidence** (`security-reviewer` L-5) — the DBS certificate image reveals at the same 1 h as a selfie. Splitting the key is 07 §6's, not a build unit's.
 9. **`adminOverview` reads the whole ledger** (`security-reviewer` L-6) — the header's counters call `listSubmissions({})` unbounded. The fix is a counts-by-status read on the store, which is a 03 §4.2 contract change.
 
+## Files created / modified in the current unit (2d — the nanny's own screens, the nanny's name on the parent surfaces, the K-row hold write and S-N-01's variant; L-008 Phase 2)
+
+**Migration `0024_connection-hold-write.sql`** (+ its rollback twin) — one function body replaced, nothing else.
+`connection_requests.held_for_verification` / `held_at` have existed since `0007` (R-14) and `0023` proved the
+**release** at L4; what nothing did was **set** the flag, because `0019`'s `upsert_connection()` names its INSERT
+columns one by one and the pair was not among them (`jsonb_populate_record` read them off `p_columns` into
+`v_in` and then dropped them). `0024` adds the two columns to the **create branch only**: after creation the one
+writer is the L4 release in `sync_nanny_verification_state()`, so a later K row must not restate a fact it does
+not own, and the verify block asserts that the update branch never assigns either column. No schema change, no
+grant change, no policy touched — and therefore, per **ADR-165**, no security clause to keep forward-only: the
+twin is a clean inverse and its header says exactly why, with `service_role`-only, `SECURITY DEFINER`,
+`search_path` pinning and `0007`'s CHECK all asserted from the catalogue on both sides.
+
+**Verified on the LOCAL stack, forward from empty, and said so.** `supabase db reset` applied `0000`–`0024` from
+an empty database (25 migrations, clean); `int.rpc-0024` then ran green (8); the twin was applied to that same
+database and **4 of the 8 turned red** — the feature genuinely gone, measured rather than argued — and `0024` was
+re-applied, green again. `npm run types:generate` produced **no diff**: there is no schema change to drift.
+`0021` / `0022` / `0023` / `0024` are all still unapplied on `bb-ldn-preview` (B-45 is BAI's) and **no claim in
+this section rests on preview**.
+
+**Kickoff debt 2 — the nanny's name on three surfaces; one read for the two parent ones.** `matching.publicNannyName(auth, nannyId)`
+reads `nanny_public` by id at **session** scope and answers a first name or `null` — 07 §5.1 rule 4 keeps contact
+detail out of that view, so it is a name and nothing more, and no service-role use joins 07 §5.1 rule 5's list.
+None of the three surfaces may import `matching` (01 §2.3) and all three may import `connections`, so boot injects
+it as the `nannyNameOf` port and it leaves by `connections.nannyNameOf`:
+
+- `positions` rail rows 4-6 — `ConnectionSummary.nannyFirstName` rides in on the summary `connections` already
+  hands `positions`, so **no new import and no new port**: "Meeting with {nanny} — {day} {time}", "Met {nanny}",
+  "You're going ahead with {nanny}", "Hired — {nanny} starts {date}". Row 6's name comes from the connection the
+  **placement** names (I-3: exactly one), not from whichever summary sorted first.
+- S-P-08's cards — the name heads each card and the stage phrase sits under it; the phrase is 04 §6.2's own
+  vocabulary and the name is deliberately not folded into it.
+- the admin call drawer — a nanny-commission row read `Nanny commission call · nanny <uuid>`; it now reads her
+  name. **Not through this read**, and the reason is structural: see the `security-reviewer` section below. It
+  uses `admin-verification.nannyNameOf` (`user_profiles`, keyed on her `auth.users` id, session scope with RLS
+  as the second gate), which already existed for this question and falls back to the id's short form.
+
+Every line keeps the nameless form it had when the view has no row for her (isolated, below the pool, gone). The
+**fourth** caller — `call-layer`'s `aboutNanny` on S-P-01's "about {nanny}" line — is a **pin**, not a copy: the
+value is only ever set from a C-c cascade payload nothing in production fills.
+
+**S-N-17 `/nanny/profile` (`03.22` Rejig) and S-N-21 `/nanny/settings` (`03.24` Rejig).** Both read her own rows
+and `verification.getStatus`, and nothing else. The Sydney pages they replace read `user_profiles`, `nannies`,
+the Sydney check columns on `verifications` and `child_client` through a **service-role admin client in the page**;
+the Sydney nanny-profile component moved to its one remaining caller, the admin impersonation viewer, which is
+still Sydney's (`2c`'s gap 1, `09.10` open).
+
+1. **S-N-17 is a view, not a second editor.** 04 §6.3 gives it two states and one exit (incomplete → S-N-18), so
+   every "Edit" is a link into the stepper at the step that owns the field and `update_nanny_profile()` keeps its
+   one caller. A second write road would be a second place for `03.18`'s completeness rule to drift from the
+   database's.
+2. **S-N-21's contact fields are S-N-18's own location step**, rendered in place through
+   `saveNannyProfileStepAction` — one schema, one action, one 07 §8 row 16 ceiling, no new limiter row, no new
+   entry in `check:action-limits`.
+3. **The payouts section is dropped** (N-2; T-2.5, ADR-027): no ledger, no badge, no figure, and the suite
+   asserts it rather than trusting it.
+4. ★ **Neither screen names the hold** (ADR-157). `nannyVerificationSummary` is the one thing either screen says
+   about verification and its whole input is the level `getStatus` answered — **read, never derived** (`2c` rule
+   1. — plus the four section statuses. A nanny at L3 whose connections are held reads **exactly** what a nanny
+      mid-check reads, because nothing is given to either view that could tell them apart. The suite sweeps every
+      level × every section status and asserts that nothing in the rendered output says hold, held, withheld or
+      hidden — including the word "hold" in the suspension line, which was reworded to "we've paused your account".
+
+**Kickoff debt 14 — S-N-01's active / passive variant.** The under-3 signal N1 captures and never shows her
+(04 §4.1 row 5) lives on `nanny_leads.lead_signals.under_three`. The read is widened rather than the signal moved:
+`nannyAccountStore.get()` answers `worksWithUnderThrees` off her own lead row, keyed on the `lead_id` the account
+already carries, asked **only** when there is one, at **service** scope because `nanny_leads` is service-role only
+— a fourth named use in the module README (07 §5.1 rule 5), answering one boolean and nothing else off that row.
+`addChildPitchCopy` is the copy side, pure: **active is the default** (absent means "we do not know", which is
+every pre-signal account and every invited nanny), and **neither variant is a gate** — form, heading and offer are
+identical, only the framing moves.
+
+**The hold's decision, and where it is made.** `checkPreconditions` already read the nanny's facts for K-1 / K-2 /
+K-3's verification floor; it now **returns** them, so the hold is decided from the same read — one read, two
+decisions, no way for the two to disagree. A row created without facts is **not** held: the module never invents a
+hold it has no evidence for.
+
+**Test / doc bookkeeping.** `connections.hold.pin.test.ts` is **retired, not flipped**: its claim ("the module does
+not write the pair") is now false, and it could never have turned green on its own because its assertion was made
+against a hand-built record literal rather than against the module. Five live claims in `connections.inside.test.ts`
+replace it. `matching/README.md` had two stale prose claims — it said the pre-check blast was unbuilt and pinned
+`it.fails` in `matching.autofire.test.ts`; the blast is built (ADR-136, the `PrecheckBlast` port) and that file
+carries no pin at all. Both corrected against the code (ADR-123 rule 2).
+
+**Review battery: `security-reviewer` (ADR-142 — this unit adds routes). 1 CRITICAL · 0 HIGH · 0 MEDIUM · 1 LOW;
+both fixed in-unit, 0 recorded, 0 pinned.**
+
+- **★ C-1 (CRITICAL) — FIXED, RED first. `0024` is what made ADR-158's hold reachable, and nothing on the read
+  side enforced it.** `0016`'s parent SELECT policy does hide a held row — `int.rpc-0024` proves it — but only
+  for a query run **as the parent**, and `dbConnectionStore` reads at `{ scope: "service" }` by design (`0007`
+  gives `connection_requests` no client write policy and the cascades run as `system`, with no session to read
+  under). So RLS never fires on the application's own reads: `connections.forParent` returned the held row,
+  S-P-08 rendered a card for it and the rail rendered rows 4-6 from it — and `2d`'s own new name lookup put the
+  nanny's **first name** on those lines. The state it fails on is the everyday one the feature exists for (L3:
+  above `MATCHING.minVerificationLevel`, below L4). It was inert before this unit, because until `0024` the flag
+  could never be `true`; this unit is what activates it, which is why it is this unit's to close.
+  **Fix:** `visibleToParent` — one rule, one home, applied at the **two parent-facing** consumption points
+  (`loadParentConnections`, and `railRest` before rows 4-6) and deliberately **not** inside
+  `connections.forParent`, because the machinery must keep seeing held rows: P-7's close cascade closes them with
+  everything else (a filter there would leave a live connection behind a closed position that nobody can cancel)
+  and K-1's duplicate and pending-cap checks count them. Defence in depth on top: `forParent` does **not look up
+  a name at all** for a held row, so a future consumer that forgets to filter still cannot name her. The rule is
+  stage-blind — a held row is hidden at every stage, terminal ones included — and **absent is not held**, so
+  every row written before `0024` still shows. Seven claims in `connections.held-invisible.test.ts`, all red
+  first, plus the note at `closeLiveConnections` saying why that one call site does not filter.
+- **★ The admin drawer's read was silently wrong, and the reviewer's "no issues" on the name lookup is what
+  surfaced it.** The parent surfaces' read is `nanny_public`, keyed on `nannies.id`. 03 §3.2's subject for a
+  `nanny-commission` booking is `{ kind: 'nanny', nannyId: UserId }` — her **`auth.users` id** — and
+  `nanny_public` deliberately carries **no `user_id`** (07 §5.2; the ADR-103 review's M1, pinned in `int.rls`).
+  A lookup by user id against that view matches nothing, silently, on **every** row: a fallback that always fires
+  and looks like a working feature. So the admin drawer uses `admin-verification.nannyNameOf` — `user_profiles`,
+  keyed on the user id, session scope with RLS as the second gate (07 §5.2) — which already existed for exactly
+  this question, and `admin` may import `admin-verification` (01 §2.3). **The planner's ruling said one read for
+  all three; it holds for the two parent surfaces and cannot hold for the admin one, and the reason is
+  structural rather than a matter of taste.** Recorded here rather than worked around.
+- **L-1 (LOW) — FIXED.** `NannyAddChildPitch` carried `data-pitch-variant`, which maps 1:1 to the under-3 signal
+  04 §4.1 row 5 says is captured and **never shown to her** — it would have put the signal in her own page
+  source. The attribute is gone; the variant is asserted on the pure `addChildPitchCopy`, where it belongs.
+- **What the battery confirmed:** the `nannyId` handed to every name lookup is server-derived at all three call
+  sites and never client-supplied; `0024` changes no grant, no `search_path`, no policy, and its UPDATE branch
+  cannot write or clear the held pair even with a stale value riding along in `p_columns`; `0007`'s CHECK cannot
+  be half-satisfied from either the SQL or the TypeScript, because every write path sets both fields or neither;
+  the widened `nanny_leads` read is keyed on the caller's own row and cannot be steered to another person's lead,
+  returns one boolean, and degrades to "unknown" (⇒ the active wording) on every failure; both new routes derive
+  everything from the session's own user id and render nothing to an unauthenticated or wrong-role caller; and no
+  attribute, response field or copy branch on either nanny screen distinguishes a held nanny from an unheld one.
+
+**Long functions.** Every file this unit touched that carried an `eslint.long-functions.json` entry had it
+**removed and the function actually split**: `db-connection-store.ts`, `connection-preconditions.ts`,
+`create-connections.ts`, `create-connections-slice.ts`. Nothing new was added to that file.
+
 ## Next unit
 
-**`2c` is built (PR open, not merged); `2d` is next** — the nanny screens that read the new status, S-N-17 (the profile edit, the photo), the positions board, and the nanny's name on parent surfaces (Phase 1 debt 2). **What `2d` must know:** (1) **the level now has its writer** — `sync_nanny_verification_state()` (`0023`, ADR-157) is the only thing that writes `nannies.verification_level` / `suspended_at`, it runs inside each decision definer's own transaction, and a screen must never derive or write a level itself; read it through `verification.getStatus`. (2) **The hold is silent and the level is the mechanism** (ADR-158) — `nanny_visible()` is the one pool predicate, read by `is_active_nanny()`, `nanny_public` and `nannies_matching_idx` alike, so nothing on a nanny screen may name a hold, and the level line stays neutral (04 §4.1 row 14). (3) **The hold's _write_ at K-row creation is yours** — the release at L4 is built and proven; `ConnectionRecord` carries no held pair and `upsert_connection()` inserts none. Pinned in `connections.hold.pin.test.ts`. (4) **`create_nanny_account()` is `service_role` and takes `p_user_id`** (ADR-163): any new signup road calls it at service scope and decides `p_isolated` by road. (5) **The Sydney users tab is still Sydney** — this unit deleted only its verification half; `09.10` is open. (6) **Preview:** `0021`, `0022` and `0023` are all unapplied on `bb-ldn-preview` (B-45, BAI); every claim here was measured against the local stack forward from empty.
+**`2d` is built (PR open, not merged); Phase 2 still owes `2e` and `2f`, and S-N-12…S-N-16 have no owner.**
+
+**What Phase 2 still owes, precisely.** (1) **`2f` — seeds / fixtures** (Opus), now unblocked: the DBS number
+shape is fixed by `0022` / `0023` and nothing in `2d` changes it. (2) **`2e` — recruitment** (Indeed UK,
+Recruitment Agent V1 re-based), still blocked on **B-33** (BAI's Indeed account). (3) **S-N-12…S-N-16 — My
+Positions, the pre-check response, the Connect acceptance, the connection detail, the placement card — are NOT
+built and were never `2d`'s**: `2d`'s scope was S-N-17 and S-N-21, and neither reads a position, a connection or
+a placement. `07.29`, the job-search module behind S-N-12's positions read, is therefore **not needed by this
+unit** and is **re-owned to Phase 4** with those five screens; `onboarding-nanny`'s README gap 3 has been
+corrected to say so (it said the board was `2d`'s). The hub's `open` state still says the board is coming, which
+remains true. (4) **The nanny photo** (ADR-148 (1)) wants a new S-N-18 step with 07 §5.3's signed-URL rules and
+an upload cap — not a field on S-N-17, which is a view. Re-owned to Phase 4 in the same README.
+
+**What the next unit on these surfaces must know.** (1) **The hold is now written as well as released** — a K-1 /
+K-2 / K-3 row for a nanny below L4 is created `held_for_verification` with `held_at`, and `0016`'s parent SELECT
+policy hides it until `sync_nanny_verification_state()` releases it at L4. A K row must **never** write either
+column again; `0024`'s verify block refuses a body that does. (2) **A nanny's name reaches a parent surface by
+exactly one road** — `connections.nannyNameOf`, over `matching.publicNannyName`, over `nanny_public`. A fifth
+caller adds a call site, never a second read, and nothing may widen that read beyond a first name. (3) **Nothing
+nanny-facing may name the hold** (ADR-157) — `nannyVerificationSummary` is the one place either nanny screen
+speaks about verification and it is deliberately given nothing to say it with; a new screen should read that
+summary rather than `getStatus` directly. (4) **`0024` is unapplied on preview**, along with `0021`–`0023`
+(B-45). (5) **The Sydney users tab and the Sydney admin impersonation viewer are still Sydney** — `2d` moved the
+Sydney nanny-profile component under the viewer rather than deleting it; `09.10` is open.
+
+**Superseded — `2c`'s "next unit" text:** **`2c` is built (PR open, not merged); `2d` is next** — the nanny screens that read the new status, S-N-17 (the profile edit, the photo), the positions board, and the nanny's name on parent surfaces (Phase 1 debt 2). **What `2d` must know:** (1) **the level now has its writer** — `sync_nanny_verification_state()` (`0023`, ADR-157) is the only thing that writes `nannies.verification_level` / `suspended_at`, it runs inside each decision definer's own transaction, and a screen must never derive or write a level itself; read it through `verification.getStatus`. (2) **The hold is silent and the level is the mechanism** (ADR-158) — `nanny_visible()` is the one pool predicate, read by `is_active_nanny()`, `nanny_public` and `nannies_matching_idx` alike, so nothing on a nanny screen may name a hold, and the level line stays neutral (04 §4.1 row 14). (3) **The hold's _write_ at K-row creation is yours** — the release at L4 is built and proven; `ConnectionRecord` carries no held pair and `upsert_connection()` inserts none. Pinned in `connections.hold.pin.test.ts`. (4) **`create_nanny_account()` is `service_role` and takes `p_user_id`** (ADR-163): any new signup road calls it at service scope and decides `p_isolated` by road. (5) **The Sydney users tab is still Sydney** — this unit deleted only its verification half; `09.10` is open. (6) **Preview:** `0021`, `0022` and `0023` are all unapplied on `bb-ldn-preview` (B-45, BAI); every claim here was measured against the local stack forward from empty.
 
 **`2g` is also built (S-N-01 + S-N-02, no migration), on its own branch off `fc573cb`, with `2b`'s `main` merged down.** The two overlapped only additively — `onboarding-nanny/index.ts` (one export each way) and one key each out of `limiter-call-sites.allow.json`; both edits are kept on this branch. `2c` waits on `2b`; `2d` (Opus) can run beside it and owns the three reads this unit and `2a` both named: the nanny's name on parent surfaces (debt 2), the positions board, and the widened account read S-N-01's variant needs.
 
@@ -845,7 +1001,14 @@ Twelve units merged with **no review battery** (1a, 1b, 1c, 1d, 1e, 1g, P1-FIX, 
 **Gates** — all local (B-42): `typecheck` · `lint` · `prettier --check .` · `vitest run` · `lint:boundaries` · `check:allowed-imports` · `check:config-literals` · `check:claude-md` · `check:boot-guard` (6/6) · `npm run build` — **all 0**. ★ **`build` and `check:boot-guard` need `scripts/ci/lib/smoke-env.sh` sourced**: a bare `npm run build` fails at page-data collection because the legacy Sydney `/api/verification-status` route constructs a Resend client at module scope, and boot-guard's two positive controls then fail for want of a complete `.next`. That is REVIEW-1's H-4 still open, and it is why `main` can look build-red when it is not.
 
 <!-- audit
-Last edited: 2026-09-18T16:45+10:00 — BB-LDN-Planner-070926/2g
+Last edited: 2026-09-19T15:10+10:00 — BB-LDN-Planner-070926/2d
+Notes: 2d section added — 0024 (the K-row hold write, one function body, verified forward-from-empty then twin
+then re-applied on the local stack), kickoff debt 2 (one nanny_public name read, three call sites, the fourth
+pinned), S-N-17 + S-N-21 with the never-name-the-hold rule and its sweep, kickoff debt 14, the retired pin and
+the two corrected matching/README claims. Next unit rewritten: what Phase 2 still owes (2e blocked on B-33, 2f
+unblocked, S-N-12…S-N-16 + 07.29 + the nanny photo re-owned to Phase 4) and the five things the next unit on
+these surfaces must know.
+Prior: Last edited: 2026-09-18T16:45+10:00 — BB-LDN-Planner-070926/2g
 Notes: 2g — one new files section (S-N-01 + S-N-02, no migration), five design decisions, four notes for the next
 unit, and the Next-unit paragraph rewritten to say what 2g leaves and what 2d owns. **Current state's Trunk /
 Open-branches / Phase rows deliberately NOT edited:** they are another unit's hot rows and 2b is open in parallel;

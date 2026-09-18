@@ -1,13 +1,15 @@
 // 04 §7.1 rows 4-8 of the parent rail — the half `1e` left `pending` because the stages behind it did not
 // exist. They do now (`1g`).
 //
-// The wording is 04 §7.1's, taken as written, with one deliberate deviation stated rather than hidden:
-// §7.1 row 4 in motion reads `"Meeting with {nanny} — {day} {time}"` and row 6 after reads
-// `"Hired — {nanny} starts {date}"`. **There is no road to a nanny's name from here.** `positions` may import
-// `connections` and `placements` (01 §2.3) and neither exposes a person; `nanny_public` is a parent's road to a
-// nanny and no connector puts it behind these reads. So the lines carry the time and the date and leave the
-// name out, rather than rendering a raw id at a family — the same gap `1f` recorded on the admin drawer and
-// `1e` on autofire's recipient, and it wants the same fix.
+// The wording is 04 §7.1's, taken as written. `1e` shipped rows 4-6 **without the `{nanny}` the document writes
+// on them**, because nothing put a person behind the read; `2d` closed that (kickoff debt 2) and nothing new is
+// imported to do it. `ConnectionSummary` now carries `nannyFirstName`, filled by `connections` from the one
+// `nanny_public` read (07 §5.1 rule 4 keeps contact detail out of that view, so it is a name and nothing more).
+// Row 6 is keyed by the placement, and the placement carries `connectionId`, so its name comes from **that**
+// connection (I-3: exactly one) rather than from whichever summary sorted first.
+//
+// A summary with no name is still the normal case for a nanny who has left the pool or been isolated since, and
+// every line below keeps the nameless form it had before — a raw id in front of a family is worse than no name.
 //
 // `1i` fills rows 7 and 8. Both arrive as **plain data on the input**, never as an import: 01 §2.3 gives
 // `positions` arrows to `connections` and `placements` and to neither `payments` nor `app`, and row 3 already
@@ -112,19 +114,37 @@ const londonDate = (isoDate: string): string =>
     timeZone: LOCALE.timezone,
   }).format(new Date(`${isoDate}T12:00:00Z`));
 
+/** 04 §7.1 `{nanny}` — her first name, or the nameless phrasing when the read had no row for her. */
+const named = (
+  row: ConnectionSummary | undefined,
+  withName: (name: string) => string,
+  without: string,
+): string =>
+  row?.nannyFirstName === undefined ? without : withName(row.nannyFirstName);
+
 /** Row 4 — "Meetings" (04 §7.1: before `next`; in motion one line per meeting; after "Met"). */
 function rowFour(
   rows: ReadonlyArray<ConnectionSummary>,
   label: string,
 ): JourneyStep {
-  const met = rows.some((row) => MET_OR_BEYOND.has(row.stage));
-  if (met) return step(4, label, "done", "Met your nanny");
-  const arranged = rows
-    .filter((row) => SCHEDULED_OR_BEYOND.has(row.stage))
-    .map((row) => row.meetingAt)
-    .filter((at): at is NonNullable<typeof at> => at !== undefined);
+  const met = rows.find((row) => MET_OR_BEYOND.has(row.stage));
+  if (met !== undefined)
+    return step(
+      4,
+      label,
+      "done",
+      named(met, (name) => `Met ${name}`, "Met your nanny"),
+    );
+  const arranged = rows.filter(
+    (row) => SCHEDULED_OR_BEYOND.has(row.stage) && row.meetingAt !== undefined,
+  );
   if (arranged.length === 0) return step(4, label, "pending");
-  const lines = arranged.map((at) => `Meeting — ${londonWhen(at)}`).join(" · ");
+  const lines = arranged
+    .map(
+      (row) =>
+        `${named(row, (name) => `Meeting with ${name}`, "Meeting")} — ${londonWhen(row.meetingAt as string)}`,
+    )
+    .join(" · ");
   return step(4, label, "in-motion", lines);
 }
 
@@ -150,26 +170,50 @@ function rowFive(
     return step(5, label, "in-motion", "How did it go?");
   const detail =
     settled.stage === "TRIAL_ARRANGED" || settled.stage === "TRIAL_COMPLETE"
-      ? "A trial is arranged"
-      : "You're going ahead with your nanny";
+      ? named(
+          settled,
+          (name) => `A trial with ${name} is arranged`,
+          "A trial is arranged",
+        )
+      : named(
+          settled,
+          (name) => `You're going ahead with ${name}`,
+          "You're going ahead with your nanny",
+        );
   return step(5, label, "done", detail);
 }
 
-/** Row 6 — "Hire" (03 §2.3: placement `CONFIRMED` / `ACTIVE`). */
-function rowSix(placement: PlacementRead | null, label: string): JourneyStep {
+/**
+ * Row 6 — "Hire" (03 §2.3: placement `CONFIRMED` / `ACTIVE`). The name is taken from the connection the
+ * placement names, not from the list: I-3 makes that connection the single one this hire is about.
+ */
+function rowSix(
+  placement: PlacementRead | null,
+  rows: ReadonlyArray<ConnectionSummary>,
+  label: string,
+): JourneyStep {
   if (placement === null) return step(6, label, "pending");
+  const hired = rows.find(
+    (row) =>
+      (row.connectionId as string) === (placement.connectionId as string),
+  );
+  const starts = londonDate(placement.startDate);
   if (placement.state === "CONFIRMED")
     return step(
       6,
       label,
       "in-motion",
-      `Confirming your nanny: ${String(placement.weeklyHours)} hours a week, starting ${londonDate(placement.startDate)}`,
+      `${named(hired, (name) => `Confirming ${name}`, "Confirming your nanny")}: ${String(placement.weeklyHours)} hours a week, starting ${starts}`,
     );
   return step(
     6,
     label,
     "done",
-    `Hired — starts ${londonDate(placement.startDate)}`,
+    named(
+      hired,
+      (name) => `Hired — ${name} starts ${starts}`,
+      `Hired — starts ${starts}`,
+    ),
   );
 }
 
@@ -242,7 +286,7 @@ export function journeyRows4to8(input: {
   return Object.freeze([
     rowFour(input.connections, input.labels.meetings),
     rowFive(input.connections, input.labels.meetings),
-    rowSix(input.placement, input.labels.hire),
+    rowSix(input.placement, input.connections, input.labels.hire),
     rowSeven(input.app, input.labels.app),
     rowEight(input.app, input.labels.app),
   ]);

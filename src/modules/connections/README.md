@@ -33,8 +33,29 @@ provisional — also recorded.
 the stub slice registered by the test playing the boot file's part, `advance(K-1)` reaching it, and the reads over
 `stubConnections`.
 
+**★ The silent hold's read side (`2d`; ADR-158 (2)).** `0024` is the first migration that can write
+`held_for_verification = true`, and it exposed that nothing on the read side enforced the hold. `0016`'s parent
+SELECT policy hides a held row only for a query run **as the parent**; this module's store reads at
+`{ scope: "service" }` by design (`0007` gives the table no client write policy and the cascades run as `system`,
+with no session to read under), so RLS never fires on the application's own reads. **`visibleToParent` is the
+gate**, at the two parent-facing consumption points — `loadParentConnections` and `positions`' `railRest` — and
+**not** inside `forParent`, because the machinery must keep seeing held rows (P-7's close cascade closes them;
+K-1's duplicate and pending-cap checks count them). `forParent` also does not look up a **name** for a held row,
+so a consumer that forgets to filter still cannot name her. The rule is stage-blind, and absent is not held.
+
+**The name (`2d`; kickoff debt 2).** `nannyNameOf` is a port, bound at boot to `matching.publicNannyName`
+(`nanny_public`, session scope, first name only — 07 §5.1 rule 4 keeps contact detail out of that view). It
+leaves by `connections.nannyNameOf` for the surfaces 04 §7.1 writes `{nanny}` on. **`admin`'s call drawer does
+not use it**: 03 §3.2's subject for a nanny call is her `auth.users` id and `nanny_public` is keyed on
+`nannies.id` and carries no `user_id`, so that lookup would match nothing silently — the admin surface uses
+`admin-verification.nannyNameOf` over `user_profiles` instead.
+
 <!-- audit
-Last edited: 2026-09-16T14:35+10:00 — BB-LDN-Planner-070926/F-a
+Last edited: 2026-09-19T16:20+10:00 — BB-LDN-Planner-070926/2d
+Notes: the hold's write at K-row creation (0024) and its read side (visibleToParent — the security-reviewer
+CRITICAL: the store reads at service scope, so 0016's parent policy is a second gate and the application is the
+gate); the nannyNameOf port and why the admin drawer cannot use it.
+Prior: Last edited: 2026-09-16T14:35+10:00 — BB-LDN-Planner-070926/F-a
 Notes: initial authoring — the F-a connector, the K-row slice stub, `stubConnections` and the swap test. Two
 recorded gaps: the handler type's home (03 §2.5 says `shared-types`) and the provisional read signatures.
 -->

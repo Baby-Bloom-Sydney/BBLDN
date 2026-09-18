@@ -204,10 +204,28 @@ export type AddFamilyChildState = {
 };
 
 /** S-N-01's props. Every href is a prop and the pitch links on to S-N-02 (04 §4.4 c1 → c2). */
+/**
+ * S-N-01's words in one of its two variants (04 §6.3 "active · passive"; kickoff debt 14). `variant` is on the
+ * shape so the screen can carry it as a `data-` attribute and a test can read which one rendered without
+ * matching on prose.
+ */
+export type AddChildPitchCopy = {
+  readonly variant: "active" | "passive";
+  readonly heading: string;
+  readonly lead: string;
+  readonly second: string;
+  readonly formHeading: string;
+};
+
 export type NannyAddChildPitchProps = {
   readonly commissionHref: string;
   readonly skipHref: string;
   readonly skipLabel: string;
   /** `BRAND.name` — the route reads it from `config`, this file never carries it (L4). */
   readonly brandName: string;
+  /**
+   * Kickoff debt 14 — the under-3 signal off her own row (`NannyProfile.worksWithUnderThrees`). Absent means the
+   * route could not answer it, and the screen then reads the **active** wording, which is the default.
+   */
+  readonly worksWithUnderThrees?: boolean;
 };

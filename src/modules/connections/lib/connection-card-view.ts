@@ -6,14 +6,19 @@
 // both prescribe in those exact words. Nothing on the 05 §5.2 list appears in what a family reads here, and
 // `connections.copy.test.ts` claims no allowlist row for this screen.
 //
-// The nanny's **name** is not here, for the reason `journey-rows-4-to-8.ts` gives: no connector puts a person
-// behind these reads, and a raw id in front of a family is worse than no name. Pinned, not papered over.
+// The nanny's **name** IS here now (`2d`, kickoff debt 2): `ConnectionSummary.nannyFirstName` arrives from the
+// one `nanny_public` read, injected into this module as a port. It is its own field rather than folded into the
+// state phrase, because the phrase is 04 §6.2's vocabulary and a name is not part of it — the screen puts the
+// person at the top of her own card and the stage underneath. A summary with no name renders exactly what this
+// screen rendered before it had one; a raw id in front of a family is still worse than no name.
 import { LOCALE } from "@/modules/config";
 import type { ConnectionStage } from "@/modules/shared-types";
 import type { ConnectionSummary } from "../types";
 
 export type ConnectionCard = {
   readonly connectionId: ConnectionSummary["connectionId"];
+  /** 04 §7.1 `{nanny}` — her first name, absent when the `nanny_public` read had no row for her. */
+  readonly nannyFirstName?: string;
   /** the one-line state a parent reads */
   readonly state: string;
   /** what happens next, or what happened — never the enum */
@@ -97,6 +102,9 @@ function detailOf(row: ConnectionSummary): string | undefined {
 export function connectionCardView(row: ConnectionSummary): ConnectionCard {
   return Object.freeze({
     connectionId: row.connectionId,
+    ...(row.nannyFirstName === undefined
+      ? {}
+      : { nannyFirstName: row.nannyFirstName }),
     state: STATE_OF[row.stage],
     live: !TERMINAL.has(row.stage),
     ...(detailOf(row) === undefined ? {} : { detail: detailOf(row) }),

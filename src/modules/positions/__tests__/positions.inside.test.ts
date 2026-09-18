@@ -180,6 +180,9 @@ const wire = () => {
             reason: "connections-not-configured" as const,
           })
         : ok(connectionRows),
+    // `2d` — the rail's `{nanny}` read. This suite is about the stage model, not the name, so it answers none:
+    // every row below renders the nameless line, which is the fallback the rail is required to keep.
+    nannyNameOf: async () => ok(null),
   });
   configurePositions(createPositions({ store }));
 };

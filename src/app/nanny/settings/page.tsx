@@ -1,67 +1,37 @@
+// S-N-21 `/nanny/settings` (04 §6.3; `03.24` Rejig — **the commission pay section is dropped**, N-2). Thin by
+// rule (05 §7 rule 5): one read, one component, every href and every option a prop.
+//
+// The Sydney screen this replaces read `user_profiles`, `nannies`, the Sydney check columns on `verifications` and `child_client`
+// through a service-role client **in the page**, and wrote contact details through a road of its own. All of
+// that is gone: the reads are the module's, the verification state comes from `verification.getStatus` and
+// nothing else, and the contact fields are S-N-18's own location step through `update_nanny_profile(p_contact)`.
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { NannySettingsClient } from "./NannySettingsClient";
-import type { ChildClient } from "@/types/bapp";
+import { LOCALE, MATCHING, SECURITY } from "@/modules/config";
+import {
+  NannySettings,
+  loadNannySettings,
+  saveNannyProfileStepAction,
+} from "@/modules/onboarding-nanny";
+
+export const dynamic = "force-dynamic";
 
 export default async function NannySettingsPage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) redirect("/login");
-
-  const admin = createAdminClient();
-
-  const [profileRes, nannyRes, verificationRes, childrenRes] =
-    await Promise.all([
-      admin
-        .from("user_profiles")
-        .select(
-          "first_name, last_name, email, mobile_number, date_of_birth, suburb, postcode",
-        )
-        .eq("user_id", user.id)
-        .single(),
-      admin
-        .from("nannies")
-        .select("verification_level")
-        .eq("user_id", user.id)
-        .single(),
-      admin
-        .from("verifications")
-        .select("wwcc_number, wwcc_status, wwcc_expiry_date")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      admin
-        .from("child_client")
-        .select("*")
-        .eq("nanny_user_id", user.id)
-        .order("created_at", { ascending: true }),
-    ]);
-
+  const loaded = await loadNannySettings();
+  if (loaded === null) redirect("/nanny/register");
   return (
-    <NannySettingsClient
-      profile={{
-        first_name: profileRes.data?.first_name || "",
-        last_name: profileRes.data?.last_name || "",
-        email: profileRes.data?.email || "",
-        mobile_number: profileRes.data?.mobile_number || "",
-        date_of_birth: profileRes.data?.date_of_birth || "",
-        suburb: profileRes.data?.suburb || "",
-        postcode: profileRes.data?.postcode || "",
+    <NannySettings
+      view={loaded.view}
+      profile={loaded.profile}
+      action={saveNannyProfileStepAction}
+      options={{
+        qualifications: MATCHING.qualificationLadder,
+        minPasswordLength: SECURITY.password.minLength,
+        currency: LOCALE.currency,
+        areasApi: "/api/areas",
       }}
-      verificationLevel={nannyRes.data?.verification_level ?? 0}
-      wwcc={
-        verificationRes.data
-          ? {
-              number: verificationRes.data.wwcc_number || null,
-              status: verificationRes.data.wwcc_status || null,
-              expiryDate: verificationRes.data.wwcc_expiry_date || null,
-            }
-          : null
-      }
-      managedChildren={(childrenRes.data ?? []) as ChildClient[]}
+      verificationHref="/nanny/verification"
+      hubHref="/nanny"
+      passwordHref="/forgot-password"
     />
   );
 }

@@ -140,6 +140,19 @@ describe("int.rls — cross-party reads (07 §5.2)", () => {
     expect(cols).not.toContain("user_id");
     expect(cols).not.toContain("last_name");
     expect(cols).not.toContain("profile_picture_path");
+    // `2d` (kickoff debt 2): this view is now the ONE road a nanny's name takes to a parent surface
+    // (`matching.publicNannyName` → `connections.nannyNameOf` → the rail, S-P-08, the admin call drawer), so
+    // 07 §5.1 rule 4's "no contact detail" is what keeps that read to a name. Held here, on the view itself,
+    // rather than on the caller — a column added to the view would otherwise widen three screens at once.
+    for (const contact of [
+      "email",
+      "mobile",
+      "phone",
+      "date_of_birth",
+      "postcode",
+    ])
+      expect(cols).not.toContain(contact);
+    expect(cols).toContain("first_name");
   });
 
   it("a nanny reads her own verification only through verification_status", async () => {
