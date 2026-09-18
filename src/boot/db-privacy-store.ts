@@ -6,11 +6,13 @@ import type { PrivacyStore } from "@/modules/platform";
 import { privacyErasureOps } from "./privacy-erasure-ops";
 import { privacyPurgeOps } from "./privacy-purge-ops";
 import { privacyRequestOps } from "./privacy-request-ops";
+import { privacyRetentionOps } from "./privacy-retention-ops";
 
 export function dbPrivacyStore(port: DataAccessPort): PrivacyStore {
   return Object.freeze({
     ...privacyRequestOps(port),
     ...privacyErasureOps(port),
     ...privacyPurgeOps(port),
+    ...privacyRetentionOps(port),
   });
 }

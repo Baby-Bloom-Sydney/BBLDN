@@ -158,4 +158,26 @@ describe("check:retention-classes — the job and the list say the same thing (A
     expect([...config].sort()).toEqual([...(sql ?? [])].sort());
     expect(config).toContain("safeguarding");
   });
+
+  // ── L-009 `3h` widened the gate to 07 §6.2's whole table, because ADR-179's own words are about a *retention
+  //    class*, not only about the three an erasure keeps: "a retention class added to 07 §6.2 without a config
+  //    entry is a gate failure, not a documentation choice". Two more sides, each a way the tree can go wrong
+  //    without either file looking wrong on its own.
+  it("★ every one of 07 §6.2's seventeen rows has a schedule entry", async () => {
+    const { compareRetentionSchedule } =
+      await import("../../../../scripts/ci/check-retention-classes.mjs");
+    const { rows } = compareRetentionSchedule();
+    const missing = Array.from({ length: 17 }, (_, i) => i + 1).filter(
+      (row) => !rows.includes(row),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("★ the sweep's arms and the schedule's acting classes are the same set", async () => {
+    const { compareRetentionSchedule } =
+      await import("../../../../scripts/ci/check-retention-classes.mjs");
+    const { acting, arms } = compareRetentionSchedule();
+    expect(arms).not.toBeNull();
+    expect([...acting].sort()).toEqual([...(arms ?? [])].sort());
+  });
 });

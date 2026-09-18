@@ -195,5 +195,19 @@ export function memoryPrivacyStore(options?: Options): MemoryPrivacyStore {
     },
     runErasure: async (input) => erase(world, options, input),
     ...purgeOps(world, options),
+    // 07 §6.2 (L-009 `3h`). The stub models the one behaviour a caller depends on: a class with no window is a
+    // failure rather than a quiet zero — the same ADR-179 rule `0031` raises on, honoured by the double so a
+    // test that exercises the stub cannot pass against a spec the real job would refuse.
+    sweepRetentionClass: async ({ class: name, spec }) =>
+      spec.window === null
+        ? fail("store-failed", `no retention window for ${name}`)
+        : ok(
+            Object.freeze({
+              class: name,
+              removed: 0,
+              nulled: 0,
+              capped: false,
+            }),
+          ),
   });
 }

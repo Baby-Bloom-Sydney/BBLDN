@@ -10,3 +10,4 @@ export { memoryPrivacyStore } from "./privacy.stub";
 export { privacy } from "./lib/default-privacy";
 export { configurePrivacy } from "./lib/configure-privacy";
 export { purgeWindows } from "./lib/purge-windows";
+export { retentionSpecs } from "./lib/retention-schedule";

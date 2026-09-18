@@ -4469,6 +4469,7 @@ export type Database = {
         Args: { p_decided_by: string; p_nanny_id: string; p_reason: string }
         Returns: Json
       }
+      money_last_activity_at: { Args: { p_user_id: string }; Returns: string }
       nanny_is_visible: { Args: { p_nanny_id: string }; Returns: boolean }
       nanny_leave_child: {
         Args: { p_child_id: string; p_reason: string }
@@ -4591,6 +4592,10 @@ export type Database = {
       remove_nanny_from_child: {
         Args: { p_child_id: string; p_reason: string }
         Returns: string
+      }
+      retention_sweep_class: {
+        Args: { p_class: string; p_limit: number; p_spec: Json }
+        Returns: Json
       }
       revoke_child_invite: {
         Args: {

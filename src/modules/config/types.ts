@@ -199,3 +199,38 @@ export type ParsedEnv = {
   readonly public: PublicEnv;
   readonly server: ServerEnv;
 };
+
+// ── 07 §6.2's retention schedule (ADR-179; L-009 `3h`). The values are `retention.ts`; these are their shapes,
+//    here because a config file exports exactly one thing (build-standard L1).
+/** The column a window runs from. Every one is checked against the catalogue by the job, which raises if it is gone. */
+export type RetentionAnchor = {
+  readonly table: string;
+  readonly column: string;
+};
+
+export type RetentionTreatment =
+  | { readonly kind: "delete" }
+  | { readonly kind: "null-columns"; readonly columns: ReadonlyArray<string> }
+  | { readonly kind: "none"; readonly because: string }
+  | {
+      readonly kind: "deferred";
+      readonly because: string;
+      readonly owner: string;
+    };
+
+export type RetentionClass = {
+  /** The name the job dispatches on and the gate joins. */
+  readonly class: string;
+  /** Its row in 07 §6.2. */
+  readonly specRow: number;
+  /** 07 §6.2's own words for what this is. */
+  readonly what: string;
+  /** `null` only for `none` and `deferred`. */
+  readonly window:
+    | { readonly months: number }
+    | { readonly days: number }
+    | null;
+  readonly anchors: ReadonlyArray<RetentionAnchor>;
+  readonly targets: ReadonlyArray<string>;
+  readonly treatment: RetentionTreatment;
+};
