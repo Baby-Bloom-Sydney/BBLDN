@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-18T14:38:08.245Z",
+  "generated_at": "2026-09-18T15:03:01.345Z",
   "summary": {
     "route_count": 59,
     "page_count": 89,
@@ -895,8 +895,8 @@
     },
     {
       "filename": "0003_legal-documents.sql",
-      "bytes": 6933,
-      "modified_at": "2026-09-18T13:33:25.380Z"
+      "bytes": 7394,
+      "modified_at": "2026-09-18T14:49:22.383Z"
     },
     {
       "filename": "0004_consent.sql",
@@ -1010,8 +1010,8 @@
     },
     {
       "filename": "0026_consent-draft-seed-and-binding.sql",
-      "bytes": 25966,
-      "modified_at": "2026-09-18T13:55:06.770Z"
+      "bytes": 30467,
+      "modified_at": "2026-09-18T15:00:48.913Z"
     }
   ],
   "server_actions": [

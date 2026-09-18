@@ -60,6 +60,10 @@ const FACTS: readonly (readonly [string, readonly string[]])[] = [
   ["the E&W children's helpline brand", ["Child", "line"]],
   ["the E&W statutory route", ["children's social", " care"]],
   ["the E&W emergency number, in an instruction", ["call ", "999 immediately"]],
+  // The security pass (2026-09-19) measured that a real instruction one comma or full stop away from the
+  // number slipped past the digit guards. Both shapes are now cases, so the fix cannot be undone quietly.
+  ["an emergency number behind a comma", ["call, ", "999 now"]],
+  ["an emergency number behind a full stop", ["phone ext.", "999"]],
 ];
 
 /** Lines that must NOT redden, or the rule gets deleted within a week (ADR-171's lesson, applied again). */
@@ -71,6 +75,8 @@ const BENIGN: readonly string[] = [
   "// refuses 14.7 % of random uuids (2 944 / 20 000 measured 2026-09-17)",
   "a second copy of a safeguarding decision would be the bug",
   "endOfToday.setHours(23, 59, 59, 999);",
+  "if (newRate < 0 || newRate > 999) return refuse();",
+  "// the call costs A$1,000 and the bundle 20 000 credits",
   '"We need your Service NSW screenshot to continue. Please upload it and try again."',
 ];
 

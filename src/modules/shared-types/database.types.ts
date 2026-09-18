@@ -279,7 +279,7 @@ export type Database = {
           checkboxes_enabled_at: string
           created_at: string
           id: string
-          notice_content_hash: string | null
+          notice_content_hash: string
           notice_document_id: string
           notice_opened_at: string
           notice_scroll_completed_at: string
@@ -294,7 +294,7 @@ export type Database = {
           checkboxes_enabled_at: string
           created_at?: string
           id?: string
-          notice_content_hash?: string | null
+          notice_content_hash: string
           notice_document_id?: string
           notice_opened_at: string
           notice_scroll_completed_at: string
@@ -309,7 +309,7 @@ export type Database = {
           checkboxes_enabled_at?: string
           created_at?: string
           id?: string
-          notice_content_hash?: string | null
+          notice_content_hash?: string
           notice_document_id?: string
           notice_opened_at?: string
           notice_scroll_completed_at?: string

@@ -184,10 +184,16 @@ alter table public.consent_records
 
 alter table public.consent_records
   drop constraint if exists consent_records_document_fkey;
+-- ★ MATCH FULL, not the default MATCH SIMPLE (database pass, 2026-09-19 — MEDIUM). Under MATCH SIMPLE a row
+-- with ANY of the three columns null is exempt from the foreign key entirely — so in exactly the partial-null
+-- case the binding would need to police, the key is a no-op, and ruling 5.1's guarantee would rest on the CHECK
+-- and the trigger staying byte-for-byte correct for ever. MATCH FULL costs nothing observable here: the CHECK
+-- already forbids every partial-null combination, and an informed action's all-null triple still passes.
 alter table public.consent_records
   add constraint consent_records_document_fkey
   foreign key (document_id, document_version, document_content_hash)
-  references public.legal_documents (document_id, version, content_hash);
+  references public.legal_documents (document_id, version, content_hash)
+  match full;
 
 -- The composite foreign key's covering index, widened to the triple (the two-column index `0004` created for the
 -- pair no longer covers it; `audit-consent-expiry` reads on the same leading columns either way).
@@ -199,15 +205,30 @@ create index if not exists consent_records_document_idx
 alter table public.biometric_consent_records
   add column if not exists notice_content_hash text;
 
+-- ★ NOT NULL, not merely guarded (security pass, 2026-09-19 — MEDIUM). `consent_records.document_content_hash` is
+-- nullable because an informed action legitimately names no document, and `consent_records_document_pair_check`
+-- is the structural backstop that keeps the triple whole. Nothing here is ever legitimately absent:
+-- `notice_document_id` is a generated column and `notice_version` is NOT NULL, so the hash is the only member of
+-- the triple that could be missing — and a composite foreign key with a NULL member is **not enforced**
+-- (MATCH SIMPLE). Leaving it to `guard_biometric_consent_insert()` alone would make the Art 9(2)(a) binding
+-- depend entirely on a trigger body a later edit could quietly change. This fails loudly on a database that
+-- already holds a biometric consent with no hash, which is the correct outcome: a human must decide what those
+-- rows are bound to. Every environment's table is empty today.
+alter table public.biometric_consent_records
+  alter column notice_content_hash set not null;
+
 comment on column public.biometric_consent_records.notice_content_hash is
   'Ruling 5.1: the content_hash of the biometric-notice version consented to, part of the composite foreign key to legal_documents. Art 9(2)(a) consent that cannot be shown to attach to the exact notice she scrolled is not explicit consent.';
 
 alter table public.biometric_consent_records
   drop constraint if exists biometric_consent_records_notice_fkey;
+-- MATCH FULL for the same reason; here all three columns are NOT NULL anyway (generated, NOT NULL, NOT NULL),
+-- so it is belt to the braces rather than a behaviour change.
 alter table public.biometric_consent_records
   add constraint biometric_consent_records_notice_fkey
   foreign key (notice_document_id, notice_version, notice_content_hash)
-  references public.legal_documents (document_id, version, content_hash);
+  references public.legal_documents (document_id, version, content_hash)
+  match full;
 
 drop index if exists public.biometric_consent_records_notice_idx;
 create index if not exists biometric_consent_records_notice_idx
@@ -230,11 +251,16 @@ alter table public.biometric_consent_records
   add constraint biometric_consent_records_user_id_fkey
   foreign key (user_id) references auth.users (id) on delete restrict;
 
--- `restrict` needs the subject column indexed or every `auth.users` delete seq-scans both tables.
-create index if not exists consent_records_user_idx
-  on public.consent_records (user_id);
-create index if not exists biometric_consent_records_user_idx
-  on public.biometric_consent_records (user_id);
+-- **No new index for the `restrict` check** (database pass, 2026-09-19 — MEDIUM). `restrict` does need the
+-- subject column indexed or every `auth.users` delete seq-scans both tables, and it already is: every one of
+-- `consent_records_user_agreement_idx (user_id, agreement_id, created_at desc)` (`0004`),
+-- `consent_records_user_purpose_idx (user_id, purpose, created_at desc)` (`0017`) and
+-- `biometric_consent_records_user_version_key unique (user_id, notice_version)` (`0004`) leads with `user_id`,
+-- which is what a leftmost-column equality lookup uses. Measured on the applied stack with the candidate
+-- single-column indexes dropped and `enable_seqscan = off`: the planner picks
+-- `Index Only Scan using consent_records_user_purpose_idx` and
+-- `Bitmap Index Scan on biometric_consent_records_user_version_key`. Two more single-column indexes would have
+-- cost write and storage for no read.
 
 comment on table public.consent_records is
   '02 §4.1 row 5 / UK GDPR Art 7(1): append-only. A decline is a new row with consent_given = false; nothing is ever edited. The document triple (id, version, content_hash) is the latest at write, checked in the guard. ADR-170: the subject key is ON DELETE RESTRICT — an erasure is 07 §6.1 scrub-and-retain, never a cascade that destroys the evidence silently.';
@@ -391,6 +417,16 @@ begin
       raise exception '0026: %.% must reference the (document_id, version, content_hash) triple (ruling 5.1)',
         split_part(v_slug, ':', 1), split_part(v_slug, ':', 2);
     end if;
+    -- MATCH FULL, or the key is a no-op in exactly the partial-null case it exists to police.
+    if not exists (
+      select 1 from pg_constraint c join pg_class t on t.oid = c.conrelid
+        join pg_namespace n on n.oid = t.relnamespace
+       where n.nspname = 'public' and t.relname = split_part(v_slug, ':', 1)
+         and c.conname = split_part(v_slug, ':', 2) and c.confmatchtype = 'f'
+    ) then
+      raise exception '0026: %.% must be MATCH FULL, not the default MATCH SIMPLE (ruling 5.1)',
+        split_part(v_slug, ':', 1), split_part(v_slug, ':', 2);
+    end if;
   end loop;
 
   -- 4. ★ ADR-170 — neither consent table's subject key cascades. This is the security clause the twin keeps.
@@ -408,8 +444,34 @@ begin
     end if;
   end loop;
 
-  -- 5. The guards refuse a half-given triple. Asserted by calling, not by reading the source: a `create or
-  --    replace` that silently kept an older body would otherwise pass every structural check above.
+  -- 5. The hash is structurally required on the biometric side, not only guarded (security pass MEDIUM).
+  if exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public' and table_name = 'biometric_consent_records'
+       and column_name = 'notice_content_hash' and is_nullable = 'YES'
+  ) then
+    raise exception '0026: biometric_consent_records.notice_content_hash must be NOT NULL — a composite foreign key with a NULL member is not enforced';
+  end if;
+
+  -- 6. **Both** guards refuse a half-given triple. Asserted by calling, not by reading the source: a `create or
+  --    replace` that silently kept an older body would otherwise pass every structural check above. The
+  --    `consent_records` half was missing from this block (database pass, 2026-09-19 — MEDIUM), so an edit that
+  --    weakened the document guard would have applied cleanly and been caught only later by the suite.
+  begin
+    insert into public.consent_records
+      (user_id, party, agreement_id, checkpoint_id, checkpoint_text, document_id, document_version,
+       consent_given, purpose)
+    values
+      ('00000000-0000-4000-8000-00000000dead', 'parent', 'AGR-01', 'x', 'y', 'client-tos', 1, true, 'client-tos');
+    raise exception '0026: guard_consent_record_insert accepted a row with no document_content_hash';
+  exception
+    when not_null_violation then null;  -- the guard fired, which is the whole point
+    when check_violation then
+      raise exception '0026: guard_consent_record_insert did not fire — the row reached the pair CHECK';
+    when foreign_key_violation then
+      raise exception '0026: guard_consent_record_insert did not fire — the row reached the foreign key';
+  end;
+
   begin
     insert into public.biometric_consent_records
       (user_id, notice_version, notice_opened_at, notice_scroll_completed_at, checkboxes_enabled_at,

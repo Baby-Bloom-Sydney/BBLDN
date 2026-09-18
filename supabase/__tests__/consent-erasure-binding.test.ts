@@ -174,6 +174,17 @@ describe("int.consent — ruling 5.1: a signature binds to the version AND the w
     expect(message).toMatch(/document_content_hash/);
   });
 
+  it("★ both document keys are MATCH FULL — under MATCH SIMPLE a partial-null row skips the key entirely", async () => {
+    // The database pass measured that the ruling-5.1 guarantee was carried by the CHECK and the triggers while
+    // the foreign key itself was a no-op in exactly the partial-null case it exists to police.
+    const { rows } = await db.query<{ conname: string; confmatchtype: string }>(
+      `select conname, confmatchtype::text as confmatchtype from pg_constraint
+        where conname in ('consent_records_document_fkey', 'biometric_consent_records_notice_fkey')
+        order by conname`,
+    );
+    expect(rows.map((row) => row.confmatchtype)).toEqual(["f", "f"]);
+  });
+
   it("the biometric notice binds the same way, because Art 9(2)(a) consent is explicit or it is nothing", async () => {
     expect(await onDelete("biometric_consent_records", "user_id")).toBe("r");
     const { rows } = await db.query<{ n: string }>(
@@ -266,4 +277,45 @@ describe("int.consent — PINNED: ADR-170's safeguarding half (owner: the verifi
       );
     },
   );
+});
+
+/**
+ * Regression for the security pass's MEDIUM (2026-09-19): the biometric side's binding was closed only by
+ * `guard_biometric_consent_insert()`, with no structural backstop, while `consent_records` had a CHECK. A
+ * composite foreign key with a NULL member is **not enforced** (MATCH SIMPLE), so the whole Art 9(2)(a) binding
+ * rested on a trigger body a later edit could quietly change. `0026` now declares the column NOT NULL. This
+ * drives both halves from raw SQL, so a future `create or replace` that drops the guard check still fails here.
+ */
+describe("int.consent — the biometric binding is structural, not only guarded (security pass MEDIUM)", () => {
+  it("★ `notice_content_hash` is NOT NULL, so the composite foreign key is always enforced", async () => {
+    const { rows } = await db.query<{ is_nullable: string }>(
+      `select is_nullable from information_schema.columns
+        where table_schema = 'public' and table_name = 'biometric_consent_records'
+          and column_name = 'notice_content_hash'`,
+    );
+    expect(rows[0].is_nullable).toBe("NO");
+  });
+
+  it("★ a biometric consent with no hash is refused", async () => {
+    const message = await refused(
+      `insert into public.biometric_consent_records
+         (user_id, notice_version, notice_opened_at, notice_scroll_completed_at, checkboxes_enabled_at,
+          notice_time_spent_seconds, checkbox_timestamps, ai_provider_disclosed, processing_location_disclosed)
+       values ($1, 1, now(), now(), now(), 1, '{}'::jsonb, 'x', 'y')`,
+      [SUBJECT],
+    );
+    expect(message).toMatch(/notice_content_hash/);
+  });
+
+  it("★ a biometric consent naming a hash that notice version never had is refused by the database", async () => {
+    const message = await refused(
+      `insert into public.biometric_consent_records
+         (user_id, notice_version, notice_content_hash, notice_opened_at, notice_scroll_completed_at,
+          checkboxes_enabled_at, notice_time_spent_seconds, checkbox_timestamps, ai_provider_disclosed,
+          processing_location_disclosed)
+       values ($1, 1, $2, now(), now(), now(), 1, '{}'::jsonb, 'x', 'y')`,
+      [SUBJECT, "0".repeat(64)],
+    );
+    expect(message).toMatch(/biometric_consent_records_notice_fkey/);
+  });
 });

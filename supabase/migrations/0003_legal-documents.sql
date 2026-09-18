@@ -3,8 +3,13 @@
 -- Creates: `legal_documents` — every version of every England & Wales document (02 §4.1 row 4).
 -- **Table only.** 02 §6 originally said "+ v1 E&W seed"; the E&W bodies are Phase 3 legal drafting
 -- (10.36-10.39) and `body_md NOT NULL` cannot take a placeholder, so the v1 rows land in a Phase 3
--- seed migration and dev-only placeholders live in supabase/seed.sql marked `is-placeholder` in
--- `change_summary` (HANDOFF §6.2 note, §13 item 9 — closed 2026-09-15).
+-- seed migration (HANDOFF §6.2 note, §13 item 9 — closed 2026-09-15).
+--
+-- **That seed is `0026` (L-009 `3c`), and it is a migration, not `supabase/seed.sql`.** This header used to
+-- point at a `supabase/seed.sql` carrying dev-only placeholders marked `is-placeholder`; no such file was ever
+-- written (`supabase/seed/` is a TypeScript tool that writes no `legal_documents` row). `0026` seeds all eleven
+-- day-one slugs directly, every body marked `DRAFT — not legal advice, pending review`, with `is-placeholder` in
+-- `change_summary` as the pointer intended. Corrected by the database pass over `0026`, 2026-09-19 (LOW).
 --
 -- Forced by: consent_records and biometric_consent_records (0004) reference (document_id, version);
 --            the child_invites schema gate (0012).

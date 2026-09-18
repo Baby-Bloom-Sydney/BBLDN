@@ -161,7 +161,44 @@ do $$
 declare
   v_table   text;
   v_deltype "char";
+  v_n       integer;
 begin
+  -- (a) The shape this file REVERTED, not only the clause it kept (database pass, 2026-09-19 — LOW). `0023`'s
+  --     twin verifies only its kept clauses; a twin that silently half-ran would otherwise leave a database
+  --     whose columns are gone and whose foreign keys still name three of them.
+  select count(*) into v_n from information_schema.columns
+   where table_schema = 'public'
+     and ((table_name = 'consent_records' and column_name = 'document_content_hash')
+       or (table_name = 'biometric_consent_records' and column_name = 'notice_content_hash'));
+  if v_n <> 0 then
+    raise exception '0026 twin: the hash columns must be gone, found %', v_n;
+  end if;
+
+  if exists (
+    select 1 from pg_constraint c join pg_class t on t.oid = c.conrelid
+      join pg_namespace n on n.oid = t.relnamespace
+     where n.nspname = 'public' and t.relname = 'legal_documents'
+       and c.conname = 'legal_documents_version_hash_key'
+  ) then
+    raise exception '0026 twin: legal_documents_version_hash_key must be dropped';
+  end if;
+
+  foreach v_table in array array[
+    'consent_records:consent_records_document_fkey',
+    'biometric_consent_records:biometric_consent_records_notice_fkey'
+  ] loop
+    if not exists (
+      select 1 from pg_constraint c join pg_class t on t.oid = c.conrelid
+        join pg_namespace n on n.oid = t.relnamespace
+       where n.nspname = 'public' and t.relname = split_part(v_table, ':', 1)
+         and c.conname = split_part(v_table, ':', 2) and c.contype = 'f'
+         and array_length(c.conkey, 1) = 2
+    ) then
+      raise exception '0026 twin: %.% must be back to the two-column pair', split_part(v_table, ':', 1), split_part(v_table, ':', 2);
+    end if;
+  end loop;
+
+  -- (b) ★ The clause this file deliberately does NOT undo.
   foreach v_table in array array['consent_records', 'biometric_consent_records'] loop
     select c.confdeltype into v_deltype
       from pg_constraint c join pg_class t on t.oid = c.conrelid

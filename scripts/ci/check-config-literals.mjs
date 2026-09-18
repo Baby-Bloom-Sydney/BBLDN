@@ -123,8 +123,13 @@ export const RULES = [
         "children[\\u2019']?s social care",
         "\\b132\\s?111\\b",
         "\\b1800\\s?55\\s?1800\\b",
-        // an emergency number given as the thing to ring
-        "\\b(?:call|dial|phone|ring|contact)\\b[^\\n]{0,30}(?<![\\d,.])(?:000|999|112)\\b(?![\\d,.])",
+        // An emergency number given as the thing to ring. The guards around the digits exclude only a number
+        // the digits are PART OF — a digit against them, or a comma/period that is itself against a digit
+        // (`A$1,000`, `20 000`, `?? 999`). They deliberately do NOT exclude ordinary punctuation between the
+        // instruction and the number (`call, 999`, `ext.999`), which an earlier `(?<![\\d,.])` did: the
+        // security pass measured that a real instruction one comma away slipped through the one rule the
+        // parked tree is not exempt from.
+        "\\b(?:call|dial|phone|ring|contact)\\b[^\\n]{0,30}(?<!\\d)(?<!\\d[,.])(?:000|999|112)\\b(?!\\d)(?![,.]\\d)",
       ].join("|"),
       "i",
     ),
