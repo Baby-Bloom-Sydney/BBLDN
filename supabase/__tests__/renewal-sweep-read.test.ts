@@ -62,10 +62,17 @@ async function signature(
   );
 }
 
+/**
+ * The read's answer, **narrowed to this suite's own subjects**. The integration database is shared and
+ * accumulates rows from every other suite in the project, so a bare `toEqual([])` on the whole answer would be
+ * asserting something about the whole database rather than about the read — and would go red the first time
+ * anybody else committed a consent row. `limit` is still passed through, so the cap is exercised for real.
+ */
 async function due(purpose = "client-tos", limit = 500): Promise<string[]> {
   const { rows } = await db.query<{ subject_user_id: string }>(
-    `select subject_user_id from public.consent_subjects_due_for_renewal($1, $2, $3)`,
-    [purpose, CUTOFF, limit],
+    `select subject_user_id from public.consent_subjects_due_for_renewal($1, $2, $3)
+      where subject_user_id = any($4::uuid[])`,
+    [purpose, CUTOFF, limit, [ALICE, BOB]],
   );
   return rows.map((row) => row.subject_user_id);
 }
@@ -154,7 +161,13 @@ describe("int.renewal-sweep-read — whose newest row predates the cutoff", () =
     await signature(ALICE, "client-tos", OLD);
     await signature(BOB, "client-tos", OLD);
 
-    expect(await due("client-tos", 1)).toHaveLength(1);
+    // Asserted on the raw answer rather than the narrowed one: the cap is about how many rows the function
+    // returns at all, so narrowing afterwards would hide it.
+    const { rows } = await db.query(
+      `select subject_user_id from public.consent_subjects_due_for_renewal('client-tos', $1, 1)`,
+      [CUTOFF],
+    );
+    expect(rows).toHaveLength(1);
 
     await db.query("rollback to savepoint s");
   });

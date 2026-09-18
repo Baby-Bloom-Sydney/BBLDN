@@ -228,7 +228,7 @@ describe("int.purge — when it does run", () => {
       state: string;
     }>(
       `select subject_user_id, purged_at, state from public.account_erasure_requests
-        where purged_at is not null`,
+        where purged_at is not null and road = 'self-service'`,
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].subject_user_id).toBeNull();
@@ -260,12 +260,14 @@ describe("int.purge — when it does run", () => {
     const old = await subject({ scrubbedAt: "2026-01-01T00:00:00Z" });
     await subject({ scrubbedAt: new Date().toISOString() });
 
+    // Narrowed to this suite's own subjects: the integration database is shared, so a bare length assertion
+    // would be about the whole database rather than about the read.
     const { rows } = await db.query<{ subject_user_id: string }>(
-      `select subject_user_id from public.subjects_ready_to_purge(now() - interval '30 days', 100)`,
+      `select subject_user_id from public.subjects_ready_to_purge(now() - interval '30 days', 1000)
+        where subject_user_id::text like '000000e%'`,
     );
 
-    expect(rows.map((r) => r.subject_user_id)).toContain(old);
-    expect(rows).toHaveLength(1);
+    expect(rows.map((r) => r.subject_user_id)).toEqual([old]);
 
     await db.query("rollback to savepoint s");
   });
