@@ -17,8 +17,9 @@
 #                                        rule) · env:check (.env.example) · crons:check (vercel.json) ·
 #                                        process.env grep outside config · check:retention-classes (ADR-179 —
 #                                        the erasure job, the purge and LEGAL.erasureRetains, each class with a
-#                                        window and an anchor). GREEN today — joins the required list per
-#                                        ADR-109 once it is green on `main` (L-009 `3e`, Q-4)
+#                                        window and an anchor). **REQUIRED** — the eighth context on `main`'s
+#                                        branch protection since `3e` landed the job (L-009 `3e`, Q-4, closed);
+#                                        verified against the protection API rather than remembered
 #   1 lint            → banned-literals banned-words static pre-check ONLY — red on the legacy parent surfaces
 #                                        until F-d, and it is the only step left here for that reason
 #   2 typecheck       → typecheck       tsc --noEmit --pretty false
