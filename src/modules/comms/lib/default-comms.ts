@@ -11,4 +11,5 @@ export const comms: Comms = Object.freeze({
   status: (messageId) => COMMS_REGISTRY.get().status(messageId),
   createInboxMessage: (msg, opts) =>
     COMMS_REGISTRY.get().createInboxMessage(msg, opts),
+  notifyAdmin: (input) => COMMS_REGISTRY.get().notifyAdmin(input),
 });

@@ -116,7 +116,12 @@ beforeEach(async () => {
   configureNannyAccountStore(accounts);
   configureAuth(stubAuth({ users, signedInUserId: NANNY }));
   // ADR-152 (1)'s invited nanny, exactly: isolated, and with no mobile on the account.
-  await accounts.create({ firstName: "Bea", lastName: "Lin", isolated: true });
+  await accounts.create({
+    userId: NANNY as never,
+    firstName: "Bea",
+    lastName: "Lin",
+    isolated: true,
+  });
 });
 
 describe("S-N-19 for a nanny whose account holds no mobile (REVIEW-3 H-3)", () => {

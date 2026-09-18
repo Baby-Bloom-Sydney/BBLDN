@@ -54,17 +54,33 @@ config disclosures, then a `consent_records` row with purpose `biometric-notice`
 · `rejected` · `failed` · `expired`); anything `pending` → the processing step; everything settled → S-N-09.
 `?step=` may name an open step, never skip one.
 
-**What `2c` must know.** (1) `deriveLevel` / `syncNannyVerificationState` — nothing here writes `level`,
-`level_changed_at`, `dbs_outcome`, the cross-check or the sweep-owned Update Service columns (`0022`'s verify
-block asserts it); `VETTING.requiredChecksByLevel` is the gate and right-to-work is in no level's list
-(ADR-153). (2) `verification.override` and `VettingSubmissionStore.recordDecision` refuse by name
-(`not-built` / `decision-not-built`); `stub-manual.record` and the memory double already carry the shape.
-(3) The queue's reads: `listSubmissions({ status: "needs-admin" })` answers every ledger row awaiting a person,
-with `nannyId`, `section`, `evidenceType`, `submittedAt`; `readSubmission(id)` one; the section's own state is
-`verification.getStatus(nannyId)` (the view answers an admin too). (4) `apply_vetting_check_result()` is the write
-`record` needs (status + reason + guidance + expiry + `checked_by = 'admin'`); the stale-`processing` sweep and
-`vetting-expiry` are named jobs still to write. (5) Guidance keys: `SectionCard` maps the **rejection reason**
-to a line today; 04 §8 owns the final copy (☐).
+**The level, the queue and the jobs (`2c`; ADR-157 · ADR-158 · ADR-159 · ADR-161).** The level has ONE writer —
+`sync_nanny_verification_state()` (`0023`), a definer run inside the decision's transaction and asked again
+(idempotently) by the connector so the from → to reaches the events; `deriveLevel` is the same rule in TypeScript,
+pinned equal to the SQL over the whole matrix by `int.rpc-0023`, and it is what the memory double writes. Which
+sections a level requires is `VETTING.requiredChecksByLevel` → `requiredSectionsByLevel` → the sync's `p_required`
+(validated; an emptied L2–L4 list refuses). **The silent hold** is two arms: below `MATCHING.minVerificationLevel`
+she is out of every pool read (ADR-147's conjunction, now `nanny_visible()` — ADR-162) and nothing on S-N-09 says
+so; at L4 the sync releases her `held_for_verification` rows (the write of the flag at K-row creation is
+`connections`', pinned). **The queue's road** — `listQueue` · `readQueueRecord` · `openEvidence` · `decide` ·
+`recordUpdateServiceCheck` · `adminOverview` — re-checks `auth.requireRole('admin')` (`aal2`) on every call,
+consumes `SECURITY.rateLimits.adminRoutes` before every write and every reveal, takes the audit subject from the
+**submission**, and routes the decision through `getProvider(type).record()` (`stub-manual` → `record_vetting_decision()`:
+the admin _is_ the check — a DBS `verified` is the outcome and the cross-check; `adverse` bars). Every reveal mints
+1 h signed URLs through `auth.data.signUrl` and emits `vetting.evidence-viewed`. **The comms** (03 §8.2 rows 28–32):
+`verification-pending` once per day of submitting (the processing step), `verification-approved` on reaching L3 and
+L4, `verification-action-needed` +`VETTING.actionNeededDelayMinutes` keyed per section and cancelled by a
+resubmission, `verification-barred` + `admin-nanny-barred` + a `nanny_barred` queue row (`comms.notifyAdmin`, ADR-160),
+`verification-reminder` LCY-1…4 from the last change while below the pool (`sweepReminders`), cancelled at L3.
+**The named jobs:** `sweepStaleProcessing` (I-V4, `VETTING.staleProcessingMinutes`) and `sweepReminders` in the
+5-minute run, `sweepExpiry` in `vetting-expiry` (warn inside `VETTING.expiryLeadDays`, expire past the date).
+
+**Named service-scope uses** (01 §6.3 / 07 §5.1 rule 5), beyond the two above: `sync_nanny_verification_state()` ·
+`record_vetting_decision()` (through `vetting-providers`' adapter) · `record_update_service_check()` ·
+`expire_verification_section()` · `sweep_stale_verification_processing()` — all `service_role` only, every one
+behind the connector's own `requireAdmin` or a cron shell; the sweeps' reads of `verifications` + `nannies`
+(`listExpiries`, `listRemindable`). The admin's record read (`readAdminRecord`) and the level count run at
+**session** scope under an admin's RLS, deliberately.
 
 **Gaps (recorded, not hidden).**
 
@@ -82,9 +98,30 @@ to a line today; 04 §8 owns the final copy (☐).
    `verification.getStatus`; its "Fix it now" links point at the queue route `2c` builds.
 6. **`selfie` is its own submission** under the identity section (03 §4.3's two evidence types), so a queue tab
    sees two ledger rows per identity attempt; the section's state is one.
+7. **A non-barring adverse disclosure has no reject reason of its own** (`2c`): 03 §4.2's `adverse` reads
+   "barred-list / adverse disclosure" and 03 §4.3 says "adverse → barred", so every `adverse` rejection bars and
+   suspends; a caution that should not bar needs a second reason — 03 §12, BAI (with B-19).
+8. **`override` stays refused** (03 §4.3's arm for a provider that is not a `ManualDecisionProvider`); none is
+   bound, so no road reaches it.
+9. **The hold at K-row creation** (ADR-158 (2)) is `connections`' — `connections.hold.pin.test.ts` names it.
+10. **One signed-URL TTL for every kind of evidence** (`security-reviewer` L-5). `openEvidence` mints every reveal at
+    `SECURITY.signedUrlTtlSeconds.verification` (1 h) — the identity document, the selfie, the right-to-work document
+    and the **DBS certificate image**, which is the one most likely to carry conviction detail. The TTL is 07 §6's to
+    split; a second key (`…verification.dbs`) and one lookup by section is the whole change. Not taken here because a
+    security config value is not a build unit's to re-rule.
+11. **`adminOverview` reads the whole ledger** (`security-reviewer` L-6). The counters behind the queue's header call
+    `listSubmissions({})` with no filter and no limit, so every render of the tab scans `vetting_submissions`. Correct
+    today (a handful of rows, and the numbers must count every state), wrong at volume: the fix is a counts-by-status
+    read on the store rather than a filter here, which is a `VettingSubmissionStore` contract change — owner: whoever
+    next opens 03 §4.2. Bound it before the ledger is large.
 
 <!-- audit
-Last edited: 2026-09-18T12:10+10:00 — BB-LDN-Planner-070926/2b
+Last edited: 2026-09-18T19:30+10:00 — BB-LDN-Planner-070926/2c
+Notes: 2c — security-reviewer pass: H-3 closed (vetting_submissions.decided_by, written and validated inside the
+decision's transaction — the best-effort event is no longer the only record of who decided) and M-4 closed (the
+limiter now precedes the first read on decide(), as on the other two roads); L-5 and L-6 recorded as gaps 10–11.
+Prior: 2c — the level's one writer, the silent hold's two arms, the queue's road, the outcome comms, the three named jobs; service-scope uses named; gaps 7–9.
+Prior: 2026-09-18T12:10+10:00 — BB-LDN-Planner-070926/2b
 Notes: the inside built (L-008 2b): the wizard, the status page, the notice consent, the upload road, the four submit paths, processing; ADR-153/154/155; data handled, service-scope uses, limits, the consent gate, resume, what 2c must know, six gaps.
 Prior: 2026-09-16T13:55+10:00 — BB-LDN-Planner-070926/F-b
 Notes: created at F-b — ADR-117 Tier A, so connector + types only; the binding fails closed and every inside is a recorded gap for the inline-reviewed unit.

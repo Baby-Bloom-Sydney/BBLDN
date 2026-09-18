@@ -117,6 +117,7 @@ async function createAccount(
     return refuseFunnel(ACTION, "consent-not-recorded", consented.error);
 
   const created = await nannyAccountStore.create({
+    userId,
     firstName: person.firstName,
     lastName: person.lastName,
     // ADR-147: the funnel is the one road that says "not isolated"; every other account starts isolated.

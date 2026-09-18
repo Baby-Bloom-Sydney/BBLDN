@@ -2822,6 +2822,7 @@ export type Database = {
         Row: {
           event_type: string
           id: string
+          outcome: string | null
           parent_user_id: string | null
           payload: Json
           processed_at: string | null
@@ -2834,6 +2835,7 @@ export type Database = {
         Insert: {
           event_type: string
           id?: string
+          outcome?: string | null
           parent_user_id?: string | null
           payload: Json
           processed_at?: string | null
@@ -2846,6 +2848,7 @@ export type Database = {
         Update: {
           event_type?: string
           id?: string
+          outcome?: string | null
           parent_user_id?: string | null
           payload?: Json
           processed_at?: string | null
@@ -3701,6 +3704,7 @@ export type Database = {
         Row: {
           checked_at: string | null
           created_at: string
+          decided_by: string | null
           evidence_id: string
           evidence_type: string
           id: string
@@ -3716,6 +3720,7 @@ export type Database = {
         Insert: {
           checked_at?: string | null
           created_at?: string
+          decided_by?: string | null
           evidence_id: string
           evidence_type: string
           id?: string
@@ -3731,6 +3736,7 @@ export type Database = {
         Update: {
           checked_at?: string | null
           created_at?: string
+          decided_by?: string | null
           evidence_id?: string
           evidence_type?: string
           id?: string
@@ -4185,6 +4191,7 @@ export type Database = {
           p_lead_id?: string
           p_mobile?: string
           p_profile?: Json
+          p_user_id?: string
         }
         Returns: Json
       }
@@ -4213,6 +4220,10 @@ export type Database = {
           p_parent_user_id: string
         }
         Returns: string
+      }
+      expire_verification_section: {
+        Args: { p_required?: Json; p_submission_id: string }
+        Returns: Json
       }
       family_access_reason: {
         Args: { p_parent_user_id: string }
@@ -4276,11 +4287,19 @@ export type Database = {
       is_privileged_writer: { Args: never; Returns: boolean }
       is_retention_job: { Args: never; Returns: boolean }
       lift_nanny_isolation: { Args: never; Returns: boolean }
+      nanny_is_visible: { Args: { p_nanny_id: string }; Returns: boolean }
       nanny_leave_child: {
         Args: { p_child_id: string; p_reason: string }
         Returns: string
       }
       nanny_profile_columns: { Args: { p_profile: Json }; Returns: Json }
+      nanny_visible: {
+        Args: {
+          p_is_isolated: boolean
+          p_level: Database["public"]["Enums"]["verification_level"]
+        }
+        Returns: boolean
+      }
       open_dfy_access: {
         Args: {
           p_parent_user_id: string
@@ -4359,6 +4378,28 @@ export type Database = {
           p_visitor_id: string
         }
         Returns: string
+      }
+      record_update_service_check: {
+        Args: {
+          p_checked_by: string
+          p_nanny_id: string
+          p_required?: Json
+          p_result: Database["public"]["Enums"]["update_service_result"]
+          p_subscribed: boolean
+        }
+        Returns: Json
+      }
+      record_vetting_decision: {
+        Args: {
+          p_decided_by?: string
+          p_decision: string
+          p_expires_at?: string
+          p_note?: string
+          p_reject_reason?: string
+          p_required?: Json
+          p_submission_id: string
+        }
+        Returns: Json
       }
       remove_nanny_from_child: {
         Args: { p_child_id: string; p_reason: string }
@@ -4450,6 +4491,14 @@ export type Database = {
         }
         Returns: Json
       }
+      sweep_stale_verification_processing: {
+        Args: { p_stale_minutes: number }
+        Returns: number
+      }
+      sync_nanny_verification_state: {
+        Args: { p_nanny_id: string; p_required: Json }
+        Returns: Json
+      }
       update_nanny_profile: {
         Args: { p_contact?: Json; p_profile?: Json }
         Returns: boolean
@@ -4514,6 +4563,13 @@ export type Database = {
         Returns: number
       }
       user_has_child_access: { Args: { p_child_id: string }; Returns: boolean }
+      verification_sections_verified: {
+        Args: {
+          p_row: Database["public"]["Tables"]["verifications"]["Row"]
+          p_sections: Json
+        }
+        Returns: boolean
+      }
       verification_submission_columns: {
         Args: {
           p_columns: Json

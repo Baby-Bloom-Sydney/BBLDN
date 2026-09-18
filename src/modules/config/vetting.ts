@@ -81,6 +81,12 @@ export const VETTING = Object.freeze({
     minReadSeconds: 8,
   }),
   expiryLeadDays: 30, // `vetting-expiry` warns this far ahead — [unverified]
+  /** I-V4's safety net (`05.14`: "the 5-min stale → `review`"): a section left `processing` longer than this is handed to a person. [unverified] */
+  staleProcessingMinutes: 5,
+  /** `08.11` LCY-1…4 — 30 min · 24 h · 48 h · 7 d from the last section change while a nanny is below the pool (03 §8.2 row 32). */
+  reminderOffsetsMinutes: Object.freeze([30, 1440, 2880, 10080] as const),
+  /** 03 §8.2 row 30: `verification-action-needed` goes +10 min after a rejection, cancelled if she resubmits first. */
+  actionNeededDelayMinutes: 10,
   retryBudget: 3, // provider-unavailable → PROVIDER_ERROR after this many (03 §4.2; 03 §12 item 29)
   attemptsCap: 3, // identity attempts per section → `review` (07 §8 row 11) — [unverified]
 });

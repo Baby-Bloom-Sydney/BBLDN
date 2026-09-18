@@ -187,6 +187,8 @@ export type NannyContactPatch = Partial<{
 
 /** `create_nanny_account()`'s arguments. `isolated` is explicit — the column defaults `true` (ADR-147). */
 export type NannyAccountInput = {
+  /** ADR-163: the user `auth.signUp` just minted — the definer runs at service scope and acts for this id */
+  readonly userId: UserId;
   readonly firstName: string;
   readonly lastName: string;
   readonly isolated: boolean;

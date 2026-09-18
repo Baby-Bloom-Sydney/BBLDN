@@ -380,6 +380,7 @@ describe("admin/call-queue — the call-due sweep (08.43)", () => {
       cancel: async () => ok({ cancelled: 0 }),
       status: async () => ok({ status: "sent" }),
       createInboxMessage: async () => ok({ id: "i1" }),
+      notifyAdmin: async () => ok({ id: "n-1" as never }),
     } as never);
   };
 

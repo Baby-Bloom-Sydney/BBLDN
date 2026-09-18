@@ -23,7 +23,10 @@
 // `L0_SIGNED_UP` (`0005:50`). So anyone who completes the public funnel — no document, no identity check, no
 // admin — reads every OPEN / CONNECTING position and every child's care-needs text on it.
 //
-// **Why this is pinned and not fixed.** The fix is one predicate in a new migration:
+// **Flipped by `2c` (0023, ADR-162):** the predicate is `nanny_visible()`, read by `is_active_nanny()`, the view and
+// the index alike. The header below is kept as the record of what was measured.
+//
+// **Why this was pinned and not fixed (REVIEW-3).** The fix is one predicate in a new migration:
 //
 //   and n.verification_level in ('L3_PROVISIONALLY_VERIFIED', 'L4_FULLY_VERIFIED')
 //
@@ -115,35 +118,29 @@ describe("int.rls — ADR-147's conjunction on the inbound half of the marketpla
     expect(pool.map((r) => r.nanny_id)).toContain(f.nannyVisibleId);
   });
 
-  it.fails(
-    "PINNED — an applied, level-0 nanny reads no open position and no child's care needs (ADR-147; 0021 header; owner: 02 §4.2 / 03 §2.6 I-5 with `2c`)",
-    async () => {
-      const positions = await asRole<{ id: string }>(
-        db,
-        APPLIED,
-        "select id from public.nanny_positions",
-      );
-      const children = await asRole<{ needs_details: string | null }>(
-        db,
-        APPLIED,
-        "select needs_details from public.position_children",
-      );
-      // Measured today: one position (`Parent A position`, SW4) and one child row carrying
-      // `needs_details = 'private care needs'`.
-      expect(positions).toEqual([]);
-      expect(children).toEqual([]);
-    },
-  );
+  it("an applied, level-0 nanny reads no open position and no child's care needs (ADR-147; 0021 header; owner: 02 §4.2 / 03 §2.6 I-5 with `2c`)", async () => {
+    const positions = await asRole<{ id: string }>(
+      db,
+      APPLIED,
+      "select id from public.nanny_positions",
+    );
+    const children = await asRole<{ needs_details: string | null }>(
+      db,
+      APPLIED,
+      "select needs_details from public.position_children",
+    );
+    // Measured today: one position (`Parent A position`, SW4) and one child row carrying
+    // `needs_details = 'private care needs'`.
+    expect(positions).toEqual([]);
+    expect(children).toEqual([]);
+  });
 
-  it.fails(
-    "PINNED — `is_active_nanny()` carries the level term its own migration header claims for it",
-    async () => {
-      const rows = await asRole<{ active: boolean }>(
-        db,
-        APPLIED,
-        "select public.is_active_nanny() as active",
-      );
-      expect(rows[0]).toEqual({ active: false });
-    },
-  );
+  it("`is_active_nanny()` carries the level term its own migration header claims for it", async () => {
+    const rows = await asRole<{ active: boolean }>(
+      db,
+      APPLIED,
+      "select public.is_active_nanny() as active",
+    );
+    expect(rows[0]).toEqual({ active: false });
+  });
 });

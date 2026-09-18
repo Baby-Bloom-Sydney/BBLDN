@@ -92,6 +92,7 @@ describe("loadCommissionPage — who the page is for", () => {
 
   it("answers `isolated` for an invited nanny — S-N-22 sees this page after she applies (ADR-147)", async () => {
     await accounts.create({
+      userId: NANNY as never,
       firstName: "Bea",
       lastName: "Lin",
       isolated: true,
@@ -104,6 +105,7 @@ describe("loadCommissionPage — who the page is for", () => {
 
   it("carries her first name, her mobile for the call, and the London days", async () => {
     await accounts.create({
+      userId: NANNY as never,
       firstName: "Bea",
       lastName: "Lin",
       isolated: false,
@@ -125,6 +127,7 @@ describe("loadCommissionPage — who the page is for", () => {
 
   it("shows the time she already picked, so she is never offered a second call (I-10)", async () => {
     await accounts.create({
+      userId: NANNY as never,
       firstName: "Bea",
       lastName: "Lin",
       isolated: false,
@@ -143,6 +146,7 @@ describe("loadCommissionPage — who the page is for", () => {
 
   it("renders the page with no calendar rather than nothing when the read fails (L·E·E)", async () => {
     await accounts.create({
+      userId: NANNY as never,
       firstName: "Bea",
       lastName: "Lin",
       isolated: false,

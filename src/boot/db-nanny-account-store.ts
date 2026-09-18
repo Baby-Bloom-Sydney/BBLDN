@@ -1,5 +1,5 @@
 // The `NannyAccountStore` of `onboarding-nanny` over `auth`'s data port — `0021`'s three definers (ADR-152) at
-// **session scope**, deliberately: each takes no user id and acts for `auth.uid()`, so running them under the
+// **session scope** for the profile and isolation writes, deliberately: each takes no user id and acts for `auth.uid()`, so running them under the
 // service role would silently mean "no session", which they refuse. The reads are the nanny's own rows under
 // RLS (`nannies_self_select`, `user_profiles_self_select`), so no service-role call joins 07 §5.1 rule 5's list.
 import type { DataAccessPort } from "@/modules/auth";
@@ -21,6 +21,7 @@ import type {
 } from "@/modules/shared-types";
 
 const session = { scope: "session" as const };
+const service = { scope: "service" as const };
 
 const asStore = <T>(result: Result<T>): Result<T, NannyStoreErrorDetails> =>
   result as Result<T, NannyStoreErrorDetails>;
@@ -140,6 +141,7 @@ export function dbNannyAccountStore(
             name: "onboarding-nanny.createAccount",
             exec: async (q) => {
               const out = (await q.rpc("create_nanny_account", {
+                p_user_id: input.userId as string,
                 p_first_name: input.firstName,
                 p_last_name: input.lastName,
                 p_isolated: input.isolated,
@@ -158,7 +160,9 @@ export function dbNannyAccountStore(
               };
             },
           },
-          session,
+          // ADR-163: service scope — the definer is service_role only and acts for `input.userId`; the signup action
+          // is the one caller and decides `isolated` by road, so a nanny's own session can never say false
+          service,
         ),
       ),
     liftIsolation: async () =>
