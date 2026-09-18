@@ -1749,7 +1749,6 @@ export function ConnectionDetailPopup({
                       recordInformedAction({
                         agreementId: "AGR-11",
                         buttonText: "Confirm Position",
-                        modalContentVersion: "v3.0-2026-03-23",
                         relatedEntityId: intro.connectionId,
                       }).catch(() => {});
                       handleAction(
@@ -1837,7 +1836,6 @@ export function ConnectionDetailPopup({
                           recordInformedAction({
                             agreementId: "AGR-10",
                             buttonText: "Confirm Placement",
-                            modalContentVersion: "v3.0-2026-03-23",
                             relatedEntityId: intro.connectionId,
                           }).catch(() => {});
                           handleAction(

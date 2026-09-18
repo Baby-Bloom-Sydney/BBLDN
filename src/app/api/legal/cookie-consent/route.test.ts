@@ -19,7 +19,7 @@ import {
   memoryConsentStore,
   memoryRateLimitStore,
 } from "@/modules/platform";
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 const CALLER = { "x-forwarded-for": "203.0.113.11" };
 const OTHER_CALLER = { "x-forwarded-for": "198.51.100.9" };
@@ -210,5 +210,145 @@ describe("POST /api/legal/cookie-consent — 07 §8 row 5 (ruling (c))", () => {
 
   it("★ fails CLOSED: `cookieConsent` is not on the fail-open allow-list (ADR-134)", () => {
     expect(SECURITY.failOpenOnLimiterOutage).not.toContain("cookieConsent");
+  });
+});
+
+// --------------------------------------------------------------------------------------------------------
+// L-009 `3g` — the readable preference cookie, and the `GET` the preference screen reads the record through.
+// --------------------------------------------------------------------------------------------------------
+
+/** Every `Set-Cookie` on a response, as separate values — `headers.get` joins them with a comma. */
+function setCookies(response: Response): ReadonlyArray<string> {
+  const all = response.headers.getSetCookie?.();
+  return (
+    all ?? (response.headers.get("set-cookie") ?? "").split(/,\s*(?=\w+=)/)
+  );
+}
+
+function preferenceCookieOf(response: Response): string | undefined {
+  return setCookies(response).find((value) =>
+    value.startsWith(`${SECURITY.consentPreferenceCookie.name}=`),
+  );
+}
+
+function get(headers: Readonly<Record<string, string>> = CALLER): Request {
+  return new Request("https://example.test/api/legal/cookie-consent", {
+    headers,
+  });
+}
+
+describe("POST — the readable preference cookie (ADR-175 (c); FATE 10.22)", () => {
+  it("★ is written on the response that recorded the choice, so the browser's copy cannot outrun the row", async () => {
+    const response = await POST(post(ACCEPT));
+
+    expect(response.status).toBe(200);
+    expect(preferenceCookieOf(response)).toContain("bb_consent=accept_all.11");
+  });
+
+  it("★ a reject writes it too — the banner must not re-ask a visitor who declined", async () => {
+    const cookie = preferenceCookieOf(await POST(post(REJECT)));
+
+    expect(cookie).toContain("bb_consent=reject_non_essential.00");
+  });
+
+  it("is readable by script, unlike the visitor cookie, because the gate has to read it", async () => {
+    const cookie = preferenceCookieOf(await POST(post(ACCEPT))) ?? "";
+
+    expect(cookie).not.toContain("HttpOnly");
+    expect(cookie).toContain("SameSite=Lax");
+    expect(cookie).toContain("Path=/");
+  });
+
+  it("carries no identifier — the visitor id stays in the HttpOnly cookie and out of the body", async () => {
+    const response = await POST(post(ACCEPT));
+    const visitor = setCookies(response).find((value) =>
+      value.startsWith(`${SECURITY.visitorCookie.name}=`),
+    );
+    const id = decodeURIComponent(
+      (visitor ?? "").split(";")[0].split("=")[1],
+    ).split(".")[0];
+
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(preferenceCookieOf(response)).not.toContain(id);
+    expect(await response.clone().text()).not.toContain(id);
+  });
+
+  it("is not written when the write was refused — a refused choice leaves no mirror of itself", async () => {
+    const refused = await POST(
+      post({
+        consent_choice: "accept_all",
+        analytics_enabled: false,
+        marketing_enabled: true,
+      }),
+    );
+
+    expect(refused.status).toBe(422);
+    expect(preferenceCookieOf(refused)).toBeUndefined();
+  });
+});
+
+describe("GET — the preference screen reads the record, not the mirror", () => {
+  it("★ answers 'no choice' for a visitor with no cookie, so the toggles start off", async () => {
+    const response = await GET(get());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: { choice: null, analyticsEnabled: false, marketingEnabled: false },
+    });
+  });
+
+  it("★ answers with the recorded choice for a visitor who has one", async () => {
+    const recorded = await POST(post(REJECT));
+    const cookie = cookieFrom(recorded);
+
+    const response = await GET(get({ ...CALLER, cookie }));
+
+    expect(await response.json()).toMatchObject({
+      data: {
+        choice: "reject_non_essential",
+        analyticsEnabled: false,
+        marketingEnabled: false,
+      },
+    });
+  });
+
+  it("★ answers with the LATEST choice — the road is append-only and the read takes the newest row", async () => {
+    const first = await POST(post(ACCEPT));
+    const cookie = cookieFrom(first);
+    await POST(post(REJECT, { ...CALLER, cookie }));
+
+    const response = await GET(get({ ...CALLER, cookie }));
+
+    expect(await response.json()).toMatchObject({
+      data: { choice: "reject_non_essential", marketingEnabled: false },
+    });
+  });
+
+  it("never echoes the visitor id, which is HttpOnly for a reason", async () => {
+    const recorded = await POST(post(ACCEPT));
+    const cookie = cookieFrom(recorded);
+    const id = decodeURIComponent(cookie.split("=")[1]).split(".")[0];
+
+    const body = await (await GET(get({ ...CALLER, cookie }))).text();
+
+    expect(body).not.toContain(id);
+  });
+
+  it("treats a forged cookie as no cookie, rather than telling the caller it was forged", async () => {
+    const response = await GET(
+      get({
+        ...CALLER,
+        cookie: `${SECURITY.visitorCookie.name}=not-a-signed-value`,
+      }),
+    );
+
+    expect(await response.json()).toMatchObject({ data: { choice: null } });
+  });
+
+  it("consumes the same limiter as the write — a read of someone else's absence is still a call", async () => {
+    for (let i = 0; i < PER_MINUTE; i += 1)
+      expect((await GET(get())).status).toBe(200);
+
+    expect((await GET(get())).status).toBe(429);
   });
 });

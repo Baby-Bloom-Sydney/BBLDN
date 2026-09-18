@@ -33,4 +33,6 @@ export const SYSTEM_JOB_NAMES = Object.freeze([
   // security-definer jobs (07 §6.2; R7)
   "retention-sweep",
   "delete-account",
+  // 07 §6.1 step 6's second half, and the third retention identity `0000` has named since Phase 0 (L-009 `3g`).
+  "purge-scrubbed-users",
 ] as const);

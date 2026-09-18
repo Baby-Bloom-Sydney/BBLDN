@@ -8,7 +8,7 @@ import { requireChildFamilyAccess } from "@/lib/payments/access-gate";
 import { createSubscribeInvite } from "@/lib/actions/payments/createSubscribeInvite";
 import {
   hasChildConsent,
-  NANNY_ATTESTATION_AGREEMENT_ID,
+  NANNY_ATTESTATION_PURPOSE,
 } from "@/lib/legal/media-consent-gate";
 import { ConsentRenewalModal } from "@/components/legal/ConsentRenewalModal";
 import type { ChildClient } from "@/types/bapp";
@@ -107,7 +107,7 @@ export default async function DevelopmentLayout({
           const nannyGate = await hasChildConsent(
             {
               childId: c.id,
-              agreementId: NANNY_ATTESTATION_AGREEMENT_ID,
+              purpose: NANNY_ATTESTATION_PURPOSE,
             },
             { admin },
           );

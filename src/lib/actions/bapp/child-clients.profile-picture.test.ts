@@ -38,6 +38,12 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 vi.mock("@/lib/invite/mint", () => ({ mintChildInvite: vi.fn() }));
 vi.mock("@/lib/invite/flags", () => ({ invitesDisabled: () => false }));
+vi.mock("@/lib/legal/require-media-consent", () => ({
+  // This suite is not about the media consent gate (FATE `07.71`) — it states that rather than relying on the
+  // gate having a `NODE_ENV === "test"` bypass, which L-009 `3g` removed: a gate that is off under test has a
+  // coverage number and no coverage. `media-consent-gate.test.ts` is where the decision itself is driven.
+  requireMediaConsentForImageWrite: vi.fn(async () => ({ ok: true })),
+}));
 vi.mock("@/lib/legal/record-consent", () => ({ recordConsent: vi.fn() }));
 
 const PARENT_ID = "11111111-1111-4000-8000-111111111111";

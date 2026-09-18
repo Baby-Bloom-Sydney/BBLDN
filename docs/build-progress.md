@@ -1179,7 +1179,65 @@ Prior: 2026-09-15T15:20+10:00 — BB-LDN-Planner-070926/S1 (S1 shipped locally).
 Prior: 2026-09-15T13:55+10:00 — BB-LDN-Planner-070926/S0 (seeded at bootstrap).
 -->
 
-## Files created / modified in the current unit (`3f` — the erasure job end to end; L-009 Phase 3, B-46)
+## Files created / modified in the current unit (`3g` — the consent surfaces, the renewal sweep, the gate re-bases and the purge; L-009 Phase 3)
+
+**Four things Phase 3 could still finish without BAI, and one measured defect that turned out to be underneath
+three of them.**
+
+- **The cookie banner and its surfaces** (`10.22` / `10.23` / `01.07`; ADR-175). `ConsentGate` is the PECR
+  control — in JavaScript, because 07 §10.3 says the Meta origins are allow-listed statically, so the CSP is a
+  ceiling and not evidence. It starts not-granted, so the **server's HTML carries no gated script at all**, and
+  it moves both ways on a later choice (Art 7(3)). `<Analytics />` had been mounted unconditionally in the root
+  layout for every visitor, asked or not; it is now behind the analytics choice, and
+  `consent-gate.repo.test.ts` is the gate that keeps the next tracker from arriving the same way. The banner's
+  reject is the same element at the same level as accept and writes a row exactly as an accept does; it closes
+  only when the server says the row exists (the Sydney one wrote a client cookie, fired the POST into a
+  `catch {}` and closed regardless). The preference screen started both toggles **on** — a pre-ticked box that
+  _wrote a record_; both now start off and are filled in from the record through a new `GET`.
+- ★ **The legacy consent writer was unwritable, and every legacy clickwrap surface called it.**
+  `record-consent.ts` built its own row: `user_type` (a column the London table does not have) and no content
+  hash. Measured against the applied stack — `23502 … document_content_hash must name the content_hash of the
+version accepted`. Re-based onto the connector with no caller's signature changed;
+  `int.legacy-consent-shape` keeps the measurement executable.
+- **`10.16` bundled per-child consent** now has a recorder (one consent per party per child, against its own
+  document's triple, scoped by `related_entity_id`, decline as a row), and the two Sydney labels take London
+  `AGR-15` / `AGR-16` — 02 §4.1 says an agreement id is `AGR-nn`, and the database has never held a consent row,
+  so the rename costs nothing today.
+- **`10.18` the per-user renewal sweep**, which `3c` left because it needed a read that did not exist. `0029` is
+  that read (`distinct on (user_id)`, which PostgREST cannot express); the sweep carries an unchanged document
+  forward and **records the carry**, counts a moved hash as a re-ask and writes nothing, and re-asks a decline.
+  Idempotent because the carry is itself the newest row. Hosted in `audit-consent-expiry`, whose run summary now
+  counts a carry as done and a re-ask as outstanding.
+- **`3d` the consent re-bases.** `07.71`'s media gate keyed on an agreement label the recorder no longer writes;
+  it now keys on the registry's `purpose` and takes its TTL from `CONSENT.renewalCheckMonths`. ★ **The OAIC
+  "15 and over needs no consent" cliff is gone and nothing replaces it** — an Australian code with no force in
+  England and Wales, removed rather than translated, so consent is required for every child (the conservative
+  direction) and the gate no longer reads a child's DOB at all. The `NODE_ENV === "test"` bypasses are gone from
+  the gate and its helper. `05.03`: stocktake Q6 closed — the second biometric recorder is deleted and
+  `consent-writers.repo.test.ts` asserts one road per consent table.
+- **`purge-scrubbed-users`** (07 §6.1 step 6's second half; `0030`) — `3f`'s named residual, and the last part of
+  §6.1 with nothing behind it.
+  **The database pass on `0030` was the expensive one, and worth it.** One CRITICAL, reproduced live: the ledger
+  write had no `state` filter, so a subject holding a completed erasure _and_ a later still-open request had that
+  open request nulled and stamped as purged — a pending Art 12 request pointing at nobody. The narrower
+  `state = 'completed'` would have been wrong the other way (an old **refused** row left pointing at the subject
+  makes the delete raise for ever), so the fix is `state <> 'requested'` plus a **recorded `request-open`
+  refusal**, with `for update nowait` and `purged_at` on the completed row only. Two MEDIUMs closed with it: the
+  anchor is now validated rather than merely present (a misspelled `from` fell silently into the wrong branch and
+  computed a wrong date with complete confidence), and **`payment_events.parent_user_id` moves `set null` →
+  `restrict`**, because the file's own claim that "anything still referencing the row raises" was true for three
+  of the four money tables and false for that one. A third refusal, **`rows-outstanding`**, came from a
+  measurement of my own: with every window passed but the rows still here — `retention-sweep` is unbuilt — the
+  delete raised `23503`, which the store classifies as retryable, so the sweep would have tried the same subject
+  every night for ever.
+
+One transaction per subject, idempotent on the **absence** of the `auth.users`
+row, refusing in ADR-182's two ways with the date each window runs out. **The windows come from
+`LEGAL.erasureRetains` and a missing class raises** (ADR-179's ruling), and money's anchor is the last
+transaction while consent's is the scrub. `3f`'s **Q-3 ruled with it**: both safeguarding-author keys move to
+`restrict`, because this is the first job that hard-deletes an `auth.users` row at all.
+
+## Files created / modified in the prior unit (`3f` — the erasure job end to end; L-009 Phase 3, B-46)
 
 **The right to erasure now runs.** 07 §6.1 has specified it since Phase 0; `3e` made the schema safe for it; nothing
 executed it. This unit is the job, both roads, the cron's inside, the two settings surfaces and ADR-178 / ADR-179's

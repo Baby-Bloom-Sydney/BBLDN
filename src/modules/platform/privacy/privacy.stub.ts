@@ -22,12 +22,15 @@ type Options = {
   readonly subjectsByEmail?: Readonly<Record<string, string>>;
   readonly refuse?: Readonly<Record<string, ErasureRefusal>>;
   readonly unremovable?: ReadonlyArray<string>;
+  /** Subjects a retention window still holds, and which class holds them (07 §6.1 step 6). */
+  readonly retain?: Readonly<Record<string, (typeof RETAINED)[number]>>;
 };
 
 type World = {
   readonly requests: ErasureRequest[];
   readonly removed: ErasureObject[];
   readonly erased: string[];
+  readonly purged: string[];
 };
 
 const fail = (
@@ -108,8 +111,57 @@ function erase(
   );
 }
 
+/**
+ * The purge half of the stub (07 §6.1 step 6; L-009 `3g`). Its own function because `memoryPrivacyStore` is at
+ * the 50-line ceiling and this is a separable behaviour: three rules, and nothing about the erasure half.
+ */
+function purgeOps(
+  world: World,
+  options: Options | undefined,
+): Pick<MemoryPrivacyStore, "listPurgeCandidates" | "purgeSubject"> {
+  return {
+    // 07 §6.1 step 6 (L-009 `3g`). The stub models the three behaviours a caller depends on and nothing else:
+    // a subject is a candidate once she has been erased, a subject named in `retain` is refused with that
+    // class's reason, and a second purge of an already-purged subject answers `already-purged`.
+    listPurgeCandidates: async ({ limit }) =>
+      ok(
+        world.erased
+          .filter((subjectUserId) => !world.purged.includes(subjectUserId))
+          .slice(0, limit)
+          .map((subjectUserId) =>
+            Object.freeze({
+              subjectUserId,
+              scrubbedAt: "2026-01-01T00:00:00.000Z" as never,
+            }),
+          ),
+      ),
+    purgeSubject: async ({ subjectUserId, windows }) => {
+      // The ADR-179 rule the real function enforces: a class with no window is not one to skip quietly.
+      for (const name of RETAINED)
+        if (windows[name] === undefined)
+          return fail("store-failed", `no retention window for ${name}`);
+      if (world.purged.includes(subjectUserId))
+        return ok(Object.freeze({ outcome: "already-purged" as const }));
+      if (!world.erased.includes(subjectUserId))
+        return ok(
+          Object.freeze({ outcome: "refused" as const, reason: "not-erased" }),
+        );
+      const held = options?.retain?.[subjectUserId];
+      if (held !== undefined)
+        return ok(
+          Object.freeze({
+            outcome: "refused" as const,
+            reason: `retained-${held}`,
+          }),
+        );
+      world.purged.push(subjectUserId);
+      return ok(Object.freeze({ outcome: "purged" as const }));
+    },
+  };
+}
+
 export function memoryPrivacyStore(options?: Options): MemoryPrivacyStore {
-  const world: World = { requests: [], removed: [], erased: [] };
+  const world: World = { requests: [], removed: [], erased: [], purged: [] };
   let nextId = 1;
 
   return Object.freeze({
@@ -142,5 +194,6 @@ export function memoryPrivacyStore(options?: Options): MemoryPrivacyStore {
       return ok(undefined);
     },
     runErasure: async (input) => erase(world, options, input),
+    ...purgeOps(world, options),
   });
 }

@@ -31,6 +31,7 @@
 import { SECURITY } from "@/modules/config";
 import { consent, log, ok, rateLimiter, toResponse } from "@/modules/platform";
 import type { VisitorId } from "@/modules/shared-types";
+import { consentPreferenceHeader } from "../../_lib/consent-preference-cookie";
 import { ipKeyOf } from "../../_lib/ip-key";
 import { requestIdOf } from "../../_lib/request-id";
 import {
@@ -79,12 +80,74 @@ export async function POST(request: Request): Promise<Response> {
   });
   if (!recorded.ok) return toResponse(recorded, { requestId });
 
-  // Re-issued on every recorded choice so the cookie's life tracks the record's (07 §6.2 row 12). The response
-  // body says nothing about the visitor id: it is HttpOnly for a reason, and echoing it back undoes that.
+  // Two cookies, and they are not the same kind of thing. The visitor cookie is re-issued on every recorded
+  // choice so its life tracks the record's (07 §6.2 row 12). The preference cookie is the browser's copy of
+  // **this** answer, and it is written here — on the response that recorded it — for the reason `3g` had to
+  // build this surface at all: a browser that decides whether a tracker may load must be able to read the
+  // answer without a round trip (ADR-175 (c)), and the copy must never be able to claim a choice the database
+  // did not take. The response body still says nothing about the visitor id: it is HttpOnly for a reason, and
+  // echoing it back undoes that.
   const response = toResponse(ok({ recorded: true }), { requestId });
   response.headers.append("Set-Cookie", visitorCookieHeader(visitorId));
+  response.headers.append(
+    "Set-Cookie",
+    consentPreferenceHeader({
+      choice: parsed.value.choice,
+      analyticsEnabled: parsed.value.analyticsEnabled,
+      marketingEnabled: parsed.value.marketingEnabled,
+    }),
+  );
   return response;
 }
+
+/**
+ * The preference screen's read (FATE `10.22`). It exists so the toggles show **the record**, not the browser's
+ * mirror of it: the Sydney screen initialised both toggles to `true` and then overwrote them from a client
+ * cookie, so a visitor who had never chosen was shown two ticked boxes — the exact thing ADR-175 (a) forbids,
+ * and a screen that would have recorded an "accept" she never made if she pressed Save.
+ *
+ * It answers only about the caller's own signed cookie, so there is no id to supply and none to leak. A visitor
+ * with no cookie, a forged one, or a lapsed record all get the same `{ choice: null }` — "you have not chosen" —
+ * which is the state the banner and the gate both treat as no consent.
+ */
+export async function GET(request: Request): Promise<Response> {
+  const requestId = requestIdOf(request);
+
+  const limited = await rateLimiter.consume(
+    await ipKeyOf(request),
+    SECURITY.rateLimits.cookieConsent,
+  );
+  if (!limited.ok) return toResponse(limited, { requestId });
+
+  const visitorId = visitorIdOf(request);
+  if (visitorId === null) return toResponse(ok(NO_CHOICE), { requestId });
+
+  const state = await consent.currentCookieChoice({
+    kind: "visitor",
+    id: visitorId as VisitorId,
+  });
+  if (!state.ok) return toResponse(state, { requestId });
+  return toResponse(
+    ok(
+      state.value === null
+        ? NO_CHOICE
+        : {
+            choice: state.value.choice,
+            analyticsEnabled: state.value.analyticsEnabled,
+            marketingEnabled: state.value.marketingEnabled,
+            expiresAt: state.value.expiresAt,
+          },
+    ),
+    { requestId },
+  );
+}
+
+/** One frozen value, so "she has not chosen" is the same shape however it was arrived at. */
+const NO_CHOICE = Object.freeze({
+  choice: null,
+  analyticsEnabled: false,
+  marketingEnabled: false,
+});
 
 /** A body that is not JSON is a client error, not a 500 — `parseCookieChoice` turns `null` into the envelope. */
 async function safeJson(request: Request): Promise<unknown> {

@@ -89,6 +89,18 @@ describe("every port fails closed until src/instrumentation.ts wires it", () => 
     expect(reasonOf(marketing)).toBe("consent-not-configured");
   });
 
+  it("consent — `currentCookieChoice` refuses too, so the banner cannot read a choice out of an unwired seam", async () => {
+    // It matters that this refuses rather than answering `null`: `null` is "she has not chosen", which the
+    // banner would show as a question and the gate would read as no consent — both correct. An unconfigured
+    // store answering `null` would be *indistinguishable* from a working one with no record, and the surface
+    // would look healthy while recording nothing (L-009 `3g`).
+    const state = await consent.currentCookieChoice({
+      kind: "visitor",
+      id: "v" as never,
+    });
+    expect(reasonOf(state)).toBe("consent-not-configured");
+  });
+
   it("areas · comms · scheduling — each answers its own not-configured reason", async () => {
     expect(reasonOf(await areas.lookupArea("SW4"))).toBe(
       "areas-not-configured",

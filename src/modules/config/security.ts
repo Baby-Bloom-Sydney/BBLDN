@@ -208,6 +208,27 @@ export const SECURITY = Object.freeze({
     name: "bb_visitor",
     maxAgeSeconds: COOKIE_EXPIRY_DAYS * 24 * 60 * 60,
   }),
+  // The **readable** half of the pair (L-009 `3g`; FATE `10.22` / `01.07`). `visitorCookie` above is HttpOnly
+  // and signed, which is what makes it safe to decide *which row a write lands on* — and also what makes it
+  // useless for the one decision the browser has to make on every page: whether a non-essential script may be
+  // mounted at all. ADR-175 (c) puts that decision in JavaScript rather than in the CSP, so the browser needs
+  // the answer without a round trip.
+  //
+  // Three properties keep it honest:
+  //   1. **The server writes it, never the client.** It is set on the same response that records the choice, so
+  //      it cannot say "accepted" for a choice the database refused. `cookie-utils.ts`'s `setCookiePrefs`,
+  //      which wrote it from the browser *before* the record existed, goes with it.
+  //   2. **It carries no identifier** — the choice and two flags. The visitor id stays HttpOnly.
+  //   3. It is the cookie-preference cookie 07 §2.9 and ADR-175 (a) call strictly necessary: it stores a
+  //      person's consent decision and nothing else, so it needs no consent of its own.
+  //
+  // `SameSite=Lax`, deliberately the opposite of `visitorCookie` and for the opposite reason: this one **is**
+  // read on the arriving navigation — that is its whole purpose — so `Strict` would hide a recorded choice
+  // from the first page of a visit arriving from a link and ask her again.
+  consentPreferenceCookie: Object.freeze({
+    name: "bb_consent",
+    maxAgeSeconds: COOKIE_EXPIRY_DAYS * 24 * 60 * 60,
+  }),
   inviteLookupBlock: Object.freeze({ failedPerHour: 5, blockMinutes: 60 }), // 07 §8 row 7
   burstAlertMultiple: 10, // ALERT_RATE_LIMIT_BURST when a key trips ≥ 10× in an hour (07 §8)
   signedUrlTtlSeconds: Object.freeze({
@@ -249,6 +270,11 @@ export const SECURITY = Object.freeze({
     contactMessagesMonths: 24,
     spamMessagesDays: 30,
     consentYearsAfterScrub: 6,
+    // 07 §6.1 step 6 — how long after a completed scrub `purge-scrubbed-users` may hard-delete the
+    // `auth.users` row, and only then if no money or consent row is still inside its own window (in practice
+    // years later). The 30 days are not a retention window: they are the grace period in which a mistaken
+    // erasure can still be investigated while the row that identifies the request still resolves.
+    purgeScrubbedUserDays: 30,
     cookieConsentRecordMonths: 13,
     cookieConsentSupersededDays: 30,
     cookieExpiryDays: COOKIE_EXPIRY_DAYS, // the consent cookie itself — re-prompt after 12 months (07 §6.2 row 12 `config.consent.cookieExpiryDays`)

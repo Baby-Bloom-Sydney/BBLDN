@@ -23,7 +23,7 @@ import { ENUMS } from "@/modules/shared-types";
 
 const CONFIG_DIR = resolve(__dirname, "..");
 const BARRELS = new Set(["index.ts", "types.ts"]);
-const CRON_COUNT = 23; // 01 §4f: 13 carried + 8 named sweeps (01 §9) + usage-weekly-check + payment-due-sweep
+const CRON_COUNT = 24; // 01 §4f: 13 carried + 8 named sweeps (01 §9) + usage-weekly-check + payment-due-sweep + purge-scrubbed-users (L-009 3g)
 const ADR_076 = {
   slotMinutes: 30,
   horizonDays: 14,
@@ -83,6 +83,7 @@ describe("config — one export per file (build-standard L1; 05 §7 rule 4)", ()
         "areas-source.ts",
         "brand.ts",
         "connections.ts",
+        "consent.ts",
         "crons.ts",
         "domain.ts",
         "env.ts",

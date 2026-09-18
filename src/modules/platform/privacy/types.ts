@@ -81,6 +81,32 @@ export type PrivacyStore = {
   removeObject(
     object: ErasureObject,
   ): Promise<Result<void, PrivacyErrorDetails>>;
+  /**
+   * 07 §6.1 step 6 — subjects whose scrub completed before `before` and whose `auth.users` row is still there.
+   * Only "old enough to consider": whether each may actually go is `purgeSubject`'s question, per subject.
+   */
+  listPurgeCandidates(input: {
+    readonly before: Instant;
+    readonly limit: number;
+  }): Promise<
+    Result<
+      ReadonlyArray<{
+        readonly subjectUserId: string;
+        readonly scrubbedAt: Instant;
+      }>,
+      PrivacyErrorDetails
+    >
+  >;
+  /**
+   * `0030`'s one write per subject. `windows` is `LEGAL.erasureRetains` as the job reads it — the dates live in
+   * config (ADR-179) and are handed across, never re-derived here or in SQL.
+   */
+  purgeSubject(input: {
+    readonly subjectUserId: string;
+    readonly windows: Readonly<
+      Record<string, { readonly months: number; readonly from: string }>
+    >;
+  }): Promise<Result<PurgeOutcome, PrivacyErrorDetails>>;
   /** `0028`'s one write: every database step of 07 §6.1 or none of them. */
   runErasure(input: {
     readonly subjectUserId: string;
@@ -88,6 +114,27 @@ export type PrivacyStore = {
     readonly deletedObjects: ReadonlyArray<ErasureObject>;
     readonly uow?: UnitOfWork;
   }): Promise<Result<ErasureOutcome, PrivacyErrorDetails>>;
+};
+
+/**
+ * What `0030` answered for one subject (07 §6.1 step 6; L-009 `3g`). ADR-182's two refusals are both here and
+ * they are told apart by *shape*: a **recorded** refusal is this value with `outcome: "refused"` and a reason
+ * the operator can act on (or wait out); a **raised** one never becomes a `PurgeOutcome` at all — it is a
+ * `CONFLICT` with `reason: "retry"` from the store, because the transaction rolled back.
+ */
+export type PurgeOutcome = {
+  readonly outcome: "purged" | "already-purged" | "refused";
+  /** `not-erased` · `not-scrubbed` · `retained-money` · `retained-consent` · `retained-safeguarding` */
+  readonly reason?: string;
+  /** For a `retained-*` refusal: the date the window runs out. Nothing to do until then. */
+  readonly until?: string;
+};
+
+/** What one purge run did, for the cron's run-summary line. */
+export type PurgeSweepSummary = {
+  readonly purged: number;
+  /** still held by a retention window, or not yet safe to purge — the number an operator reads */
+  readonly retained: number;
 };
 
 /** The connector. */
@@ -113,6 +160,13 @@ export type Privacy = {
   runRequest(
     requestId: string,
   ): Promise<Result<ErasureOutcome, PrivacyErrorDetails>>;
+  /**
+   * `/api/cron/purge-scrubbed-users` (07 §6.1 step 6): the housekeeping half. It never pushes — a subject still
+   * inside any retention window is counted and left, which in practice is years.
+   */
+  purgeScrubbedUsers(
+    now: Instant,
+  ): Promise<Result<PurgeSweepSummary, PrivacyErrorDetails>>;
   /** `/api/cron/delete-account` (01 §4f): re-attempt every request still open. */
   sweepRequests(
     now: Instant,

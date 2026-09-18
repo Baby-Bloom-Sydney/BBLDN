@@ -14,10 +14,13 @@ export const consent: Consent = Object.freeze({
     CONSENT_REGISTRY.get().recordCookieConsent(input),
   getPolicy: (purpose) => CONSENT_REGISTRY.get().getPolicy(purpose),
   hasMarketing: (subject) => CONSENT_REGISTRY.get().hasMarketing(subject),
+  currentCookieChoice: (subject) =>
+    CONSENT_REGISTRY.get().currentCookieChoice(subject),
   dueForRenewal: (userId, purposes) =>
     CONSENT_REGISTRY.get().dueForRenewal(userId, purposes),
   auditExpiry: (now, purposes) =>
     CONSENT_REGISTRY.get().auditExpiry(now, purposes),
+  sweepRenewals: (now) => CONSENT_REGISTRY.get().sweepRenewals(now),
   hasConsent: (userId, purpose) =>
     CONSENT_REGISTRY.get().hasConsent(userId, purpose),
 });

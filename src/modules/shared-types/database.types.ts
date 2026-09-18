@@ -40,39 +40,42 @@ export type Database = {
           created_at: string
           id: string
           object_count: number | null
+          purged_at: string | null
           refusal_reason: string | null
           requested_at: string
           requested_by: string | null
           road: string
           scrubbed_tables: string[] | null
           state: string
-          subject_user_id: string
+          subject_user_id: string | null
         }
         Insert: {
           completed_at?: string | null
           created_at?: string
           id?: string
           object_count?: number | null
+          purged_at?: string | null
           refusal_reason?: string | null
           requested_at?: string
           requested_by?: string | null
           road: string
           scrubbed_tables?: string[] | null
           state?: string
-          subject_user_id: string
+          subject_user_id?: string | null
         }
         Update: {
           completed_at?: string | null
           created_at?: string
           id?: string
           object_count?: number | null
+          purged_at?: string | null
           refusal_reason?: string | null
           requested_at?: string
           requested_by?: string | null
           road?: string
           scrubbed_tables?: string[] | null
           state?: string
-          subject_user_id?: string
+          subject_user_id?: string | null
         }
         Relationships: []
       }
@@ -4287,6 +4290,7 @@ export type Database = {
         }
         Returns: Json
       }
+      auth_user_purge_state: { Args: { p_user_id: string }; Returns: string }
       book_slot: {
         Args: {
           p_actor_role: Database["public"]["Enums"]["actor_role"]
@@ -4320,6 +4324,16 @@ export type Database = {
       connect_child_invite: {
         Args: { p_token: string; p_user_id: string }
         Returns: string
+      }
+      consent_subjects_due_for_renewal: {
+        Args: {
+          p_before: string
+          p_limit?: number
+          p_purpose: Database["public"]["Enums"]["consent_purpose"]
+        }
+        Returns: {
+          subject_user_id: string
+        }[]
       }
       consume_rate_limit: {
         Args: { p_bucket: string; p_now: string; p_window_seconds: number }
@@ -4532,6 +4546,11 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      purge_auth_user: { Args: { p_user_id: string }; Returns: undefined }
+      purge_scrubbed_user: {
+        Args: { p_user_id: string; p_windows: Json }
+        Returns: Json
+      }
       record_cookie_consent: {
         Args: {
           p_analytics: boolean
@@ -4648,6 +4667,13 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      subjects_ready_to_purge: {
+        Args: { p_before: string; p_limit?: number }
+        Returns: {
+          scrubbed_at: string
+          subject_user_id: string
+        }[]
       }
       submit_verification_evidence: {
         Args: {
