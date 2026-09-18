@@ -106,16 +106,6 @@ export function ProfessionalHireSummaryPDF({
           disclosed.
         </Text>
 
-        <Text style={styles.sectionTitle}>5. Mandatory Reporting</Text>
-        <Text style={styles.paragraph}>
-          As a childcare provider in NSW, you have legal obligations as a
-          mandatory reporter. You must report situations involving Risk of
-          Significant Harm (ROSH) to the NSW DCJ Child Protection Helpline on
-          132 111. ROSH includes physical abuse, sexual abuse, emotional abuse,
-          neglect, witnessing domestic violence, and substance abuse affecting
-          parenting.
-        </Text>
-
         <Text style={styles.sectionTitle}>6. Confidentiality</Text>
         <Text style={styles.paragraph}>
           You must keep all information about the family, their children,

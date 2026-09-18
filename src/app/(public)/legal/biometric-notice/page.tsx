@@ -392,7 +392,7 @@ export default function BiometricNoticePage({
         </p>
         <ul>
           <li>
-            Government agencies (NSW DCJ, law enforcement) if required by law or
+            Government agencies (law enforcement) if required by law or
             court order.
           </li>
           <li>
