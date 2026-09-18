@@ -122,6 +122,16 @@ export type ManualDecision = {
   readonly decision: "verified" | "rejected";
   readonly reason?: RejectReason;
   readonly actor: { readonly kind: "admin"; readonly id: AdminId };
+  /**
+   * ★ ADR-169, additive to 03 §4.2 — the audit SUBJECT's `auth.users.id`. 03 §9.3 makes
+   * `vetting.decision-recorded` carry `actor admin, onBehalfOf nanny`, and `Actor.onBehalfOf.id` is a session
+   * id; the ledger row the provider reads carries the PARTY row's id (`nannies.id`), which is a different
+   * value. The caller has already crossed that seam once — it read the admin record to get here — so it hands
+   * the subject down rather than leaving the provider to reuse whichever id was to hand, which is precisely
+   * the mistake REVIEW-4 C-3 measured. Optional: a provider with no subject emits the event without one rather
+   * than naming the wrong person.
+   */
+  readonly onBehalfOf?: UserId;
   readonly note?: string;
   readonly expiresAt?: Instant;
 };

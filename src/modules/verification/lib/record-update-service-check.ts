@@ -31,7 +31,16 @@ export async function recordUpdateServiceCheck(
     return err("VALIDATION", "That check is not available", {
       reason: "unsupported-evidence",
     });
+  // ★ ADR-169 — the write is keyed by the ledger's party row; the events and her approval email are keyed by
+  // her `auth.users.id`. The record read is where the two meet, once, on this road.
   const nannyId = entry.value.nannyId;
+  const record = await deps.store.readAdminRecord(nannyId);
+  if (!record.ok) return record;
+  if (record.value === null)
+    return err("VALIDATION", "That check is not available", {
+      reason: "unsupported-evidence",
+    });
+  const userId = record.value.userId;
   const synced = await deps.store.recordUpdateServiceCheck({
     nannyId,
     result: input.result,
@@ -39,9 +48,9 @@ export async function recordUpdateServiceCheck(
     checkedBy: admin.value.userId,
   });
   if (!synced.ok) return synced;
-  await emitLevelEvents(nannyId, synced.value);
+  await emitLevelEvents(userId, synced.value);
   await sendVerificationOutcome({
-    nannyId,
+    nannyId: userId,
     sync: synced.value,
     now: nowInstant(),
   });

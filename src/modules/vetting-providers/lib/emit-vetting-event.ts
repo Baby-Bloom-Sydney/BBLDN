@@ -6,7 +6,6 @@ import type {
   EvidenceType,
   ProviderId,
   SubmissionId,
-  UserId,
 } from "@/modules/shared-types";
 
 type VettingEventName =
@@ -17,7 +16,13 @@ type VettingEventName =
 
 export async function emitVettingEvent(
   name: VettingEventName,
-  nannyId: UserId,
+  /**
+   * ★ ADR-169 — who the event is ABOUT, as an `Actor` rather than as a loose id. It used to be a `UserId` from
+   * which a default actor was built, and the one caller that could not supply a session id (`record`, which
+   * reads the ledger and therefore holds a `nannies.id`) filled it with the party row — naming, in the audit
+   * log, an id the audit log cannot be joined on. Making the actor explicit removes the slot the wrong id fits.
+   */
+  actor: Actor,
   props: {
     readonly submissionId: SubmissionId;
     readonly evidenceType: EvidenceType;
@@ -25,8 +30,6 @@ export async function emitVettingEvent(
     readonly statusKind?: string;
     readonly decision?: string;
   },
-  /** 03 §9.3: `vetting.decision-recorded` carries `actor admin, onBehalfOf nanny`; every other event is hers */
-  actor: Actor = { kind: "user", id: nannyId, role: "nanny" },
 ): Promise<void> {
   const emitted = await Events.emit({
     name,

@@ -78,7 +78,17 @@ export function createVerification(deps: VerificationDeps): Verification {
           : { extracted: result.extracted }),
       });
       if (!applied.ok) return applied;
-      return getStatus(entry.value.nannyId);
+      // ADR-169: `getStatus` is her own read and keys on the SESSION id (R-7); the ledger entry carries the
+      // party row. One named crossing, here, rather than a cast.
+      const party = await deps.store.readAdminRecord(entry.value.nannyId);
+      if (!party.ok) return party;
+      if (party.value === null)
+        return err<VerificationErrorDetails>(
+          "VALIDATION",
+          "That check is not available",
+          { reason: "unsupported-evidence" },
+        );
+      return getStatus(party.value.userId);
     },
     // 03 §4.3's arm for a provider that is not a `ManualDecisionProvider` — none is bound (03 §4.4), so it stays
     // refused by name; `decide` is the road the queue takes (ADR-159).

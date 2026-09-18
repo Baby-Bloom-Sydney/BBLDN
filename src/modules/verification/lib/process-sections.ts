@@ -4,8 +4,8 @@
 // (2c) takes it from there. A provider that cannot answer leaves the section `processing` for the stale
 // sweep (2c's named job), logged, never guessed.
 import { comms } from "@/modules/comms";
-import { log, nowInstant } from "@/modules/platform";
-import type { Result, UserId, Uuid } from "@/modules/shared-types";
+import { err, log, nowInstant } from "@/modules/platform";
+import type { NannyId, Result, UserId, Uuid } from "@/modules/shared-types";
 import { getProvider, listSubmissions } from "@/modules/vetting-providers";
 import type { VettingLedgerEntry } from "@/modules/vetting-providers";
 import type {
@@ -48,7 +48,7 @@ const latestPerType = (
 
 async function checkSection(
   deps: VerificationDeps,
-  nannyId: UserId,
+  nannyId: NannyId,
   section: VerificationSection,
 ): Promise<void> {
   const listed = await listSubmissions({
@@ -101,14 +101,29 @@ export async function processSections(
 ): Promise<Result<VerificationState, VerificationErrorDetails>> {
   const own = await requireOwnNanny(nannyId);
   if (!own.ok) return own;
+  // ★ ADR-169 — this road arrives with the SESSION's id (it is her own processing step) and the ledger and the
+  // sync both speak the party row's. The crossing is one named call at the top, the read-side mirror of the
+  // resolution every session-scope definer does inside itself. Before ADR-169 the ledger filter below was
+  // handed a session id and matched nothing, so `processSections` never saw the submissions it had just claimed.
+  const party = await deps.store.partyIdOf(nannyId);
+  if (!party.ok) return party;
+  if (party.value === null)
+    // `requireOwnNanny` has already passed, so a missing party row is an inconsistency, not a state she can be
+    // in: refuse rather than process against an id that resolves to nothing.
+    return err<VerificationErrorDetails>(
+      "INTERNAL",
+      "We couldn't check that just now.",
+      { reason: "store-failed" },
+    );
+  const partyId = party.value;
   const claimed = await deps.store.claimProcessing();
   if (!claimed.ok) return claimed;
   for (const section of claimed.value)
-    await checkSection(deps, nannyId, section);
+    await checkSection(deps, partyId, section);
   if (claimed.value.length > 0) await sendPending(nannyId);
   // ADR-157: L1 ("identity submitted") has no writer but the sync, and nothing decides before a person does —
   // so the processing step asks for it here (the boot adapter runs it at service scope; module README).
-  const synced = await deps.store.syncLevel(nannyId);
+  const synced = await deps.store.syncLevel(partyId);
   if (synced.ok) await emitLevelEvents(nannyId, synced.value);
   const state = await deps.store.getStatus(nannyId);
   if (!state.ok) return state;

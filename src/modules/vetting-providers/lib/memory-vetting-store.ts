@@ -10,6 +10,7 @@ import type {
   CheckStatus,
   EvidenceType,
   SubmissionId,
+  NannyId,
   UserId,
 } from "@/modules/shared-types";
 import type {
@@ -72,16 +73,34 @@ const unknown = () =>
     reason: "unsupported-evidence",
   });
 
+/**
+ * ★ ADR-169 — **the double models TWO id spaces, because production has two.**
+ *
+ * `submit_verification_evidence` resolves the session's `auth.uid()` to `nannies.id` INSIDE the definer
+ * (`0023:864-868`) and writes the party row's id into `vetting_submissions.nanny_id`. This double used one
+ * opaque string for both, which is exactly why REVIEW-4 C-3 survived a whole phase of unit tests: the mock and
+ * the column were never in the same room. So the resolution lives here too, once and named, and a session id
+ * and a party id are now different VALUES as well as different types — a test that confuses them fails on the
+ * value even where a cast has silenced the compiler.
+ */
+const PARTY_PREFIX = "party-";
+const partyIdOf = (userId: UserId): NannyId =>
+  `${PARTY_PREFIX}${userId as string}` as NannyId;
+const userIdOf = (nannyId: NannyId): UserId =>
+  (nannyId as string).startsWith(PARTY_PREFIX)
+    ? ((nannyId as string).slice(PARTY_PREFIX.length) as UserId)
+    : (nannyId as string as UserId);
+
 export function memoryVettingStore(): MemoryVettingStore {
   const state: {
     rows: ReadonlyArray<VettingLedgerEntry>;
-    world: ReadonlyMap<UserId, MemoryVerificationRow>;
+    world: ReadonlyMap<NannyId, MemoryVerificationRow>;
   } = { rows: [], world: new Map() };
 
-  const rowOf = (nannyId: UserId): MemoryVerificationRow =>
+  const rowOf = (nannyId: NannyId): MemoryVerificationRow =>
     state.world.get(nannyId) ?? EMPTY_ROW;
   const patchSections = (
-    nannyId: UserId,
+    nannyId: NannyId,
     patch: (row: MemoryVerificationRow) => MemoryVerificationRow,
   ): MemoryVerificationRow => {
     const next = patch(rowOf(nannyId));
@@ -144,7 +163,10 @@ export function memoryVettingStore(): MemoryVettingStore {
       if (existing !== undefined) return ok(existing);
       const section = sectionOfEvidenceType(evidence.type);
       const key = KEY[section as keyof typeof KEY];
-      const current = rowOf(evidence.nannyId);
+      // The definer's resolution, in the double: the evidence carries the SESSION's id (it is what the wizard
+      // submitted under) and the ledger row carries the party row's (ADR-169).
+      const partyId = partyIdOf(evidence.nannyId);
+      const current = rowOf(partyId);
       if (current.suspended)
         return err("FORBIDDEN", "That account is suspended", {
           reason: "unsupported-evidence",
@@ -160,7 +182,7 @@ export function memoryVettingStore(): MemoryVettingStore {
         provider,
         status,
         ...(providerRef === undefined ? {} : { providerRef }),
-        nannyId: evidence.nannyId,
+        nannyId: partyId,
         section,
         evidenceType: evidence.type,
         submittedAt: nowInstant(),
@@ -170,7 +192,7 @@ export function memoryVettingStore(): MemoryVettingStore {
         section: OBJECT_SECTION[evidence.type],
         path: doc.path,
       }));
-      patchSections(evidence.nannyId, (row) => ({
+      patchSections(partyId, (row) => ({
         ...row,
         [key]: {
           ...row[key],
@@ -262,6 +284,8 @@ export function memoryVettingStore(): MemoryVettingStore {
     sectionsOf: (nannyId) => state.world.get(nannyId),
     nannyIds: () => [...state.world.keys()],
     patchSections,
+    partyIdOf,
+    userIdOf,
     applyResult,
   });
 }

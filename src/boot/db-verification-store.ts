@@ -8,6 +8,7 @@ import { err, ok } from "@/modules/platform";
 import { ENUMS } from "@/modules/shared-types";
 import type {
   Instant,
+  NannyId,
   Result,
   SubmissionId,
   UserId,
@@ -89,8 +90,13 @@ const docOf = (
 ): AdminRecord["documents"] =>
   path === null ? [] : [{ section, ref: { bucket: BUCKET, path } }];
 
-const recordOf = (userId: UserId, row: AdminRow): AdminRecord => ({
-  nannyId: userId,
+const recordOf = (
+  nannyId: NannyId,
+  userId: UserId,
+  row: AdminRow,
+): AdminRecord => ({
+  nannyId,
+  userId,
   level: row.level,
   suspended: row.suspended_at !== null,
   declared: {
@@ -280,15 +286,23 @@ export function dbVerificationStore(
         service,
       ),
     );
+  /**
+   * ★ ADR-169's boundary, on the read side, in ONE place. Every session-scope definer resolves
+   * `auth.uid() -> nannies.id` inside itself before it touches a column; the reads have no definer to do it in,
+   * so this is their copy of that resolution — named, and called only by `partyIdOf` and `getStatus`, the two
+   * roads that genuinely arrive holding a session id. The decision-side methods below take a `NannyId` and go
+   * straight at `nannies.id`: before ADR-169 they each re-resolved, and since the ledger was already handing
+   * them a party id, each of those lookups matched nothing (REVIEW-4 C-3).
+   */
   const nannyIdOf = async (
     q: Parameters<Parameters<DataAccessPort["run"]>[0]["exec"]>[0],
     userId: UserId,
-  ): Promise<string | null> => {
+  ): Promise<NannyId | null> => {
     const nanny = (await q
       .from("nannies")
       .eq("user_id", userId as string)
       .single()) as { readonly id: string } | null;
-    return nanny === null ? null : nanny.id;
+    return nanny === null ? null : (nanny.id as NannyId);
   };
   const rpcSync = (
     name: `verification.${string}`,
@@ -402,56 +416,66 @@ export function dbVerificationStore(
 
     // The base table, at SESSION scope: 02 §4.3 gives an admin every column, and the caller is an admin
     // (`requireAdmin` in the connector), so RLS is the second gate here rather than a service-role use.
-    readAdminRecord: async (userId) =>
+    readAdminRecord: async (nannyId) =>
       asVerification(
         await port.run<AdminRecord | null>(
           {
             name: "verification.readAdminRecord",
             exec: async (q) => {
-              const nannyId = await nannyIdOf(q, userId);
-              if (nannyId === null) return null;
               const row = (await q
                 .from("verifications")
-                .eq("nanny_id", nannyId)
+                .eq("nanny_id", nannyId as string)
                 .single()) as AdminRow | null;
-              return row === null ? null : recordOf(userId, row);
+              if (row === null) return null;
+              // ADR-169: the mailbox id is resolved HERE, once, beside the row it belongs to, so no consumer
+              // downstream has to guess which of the two ids it is holding.
+              const nanny = (await q
+                .from("nannies")
+                .eq("id", nannyId as string)
+                .single()) as { readonly user_id: string } | null;
+              return nanny === null
+                ? null
+                : recordOf(nannyId, nanny.user_id as UserId, row);
             },
           },
           session,
         ),
       ),
+    // ADR-169's seam, exposed: the nanny-side roads hold a session id and the ledger speaks party ids.
+    partyIdOf: async (userId) =>
+      asVerification(
+        await port.run<NannyId | null>(
+          {
+            name: "verification.partyIdOf",
+            exec: async (q) => nannyIdOf(q, userId),
+          },
+          service,
+        ),
+      ),
     // `sync_nanny_verification_state()` — service_role only; idempotent, so asking after a definer already
     // synced answers the same level (module README, 07 §5.1 rule 5).
-    syncLevel: async (userId) =>
+    // ADR-169: no re-resolution. The fabricated `{L0 -> L0}` answer went with it — it existed only to cover
+    // the lookup that could not match, and it is what turned a broken road into a silent one (REVIEW-4 C-3).
+    syncLevel: async (nannyId) =>
       asVerification(
-        await rpcSync("verification.syncLevel", async (q) => {
-          const nannyId = await nannyIdOf(q, userId);
-          if (nannyId === null)
-            return {
-              from_level: "L0_SIGNED_UP",
-              to_level: "L0_SIGNED_UP",
-              suspended: false,
-              released: 0,
-            };
-          return q.rpc("sync_nanny_verification_state", {
-            p_nanny_id: nannyId,
+        await rpcSync("verification.syncLevel", (q) =>
+          q.rpc("sync_nanny_verification_state", {
+            p_nanny_id: nannyId as string,
             p_required: REQUIRED as never,
-          });
-        }),
+          }),
+        ),
       ),
     recordUpdateServiceCheck: async (input) =>
       asVerification(
-        await rpcSync("verification.recordUpdateServiceCheck", async (q) => {
-          const nannyId = await nannyIdOf(q, input.nannyId);
-          if (nannyId === null) throw new Error("no nannies row for that user");
-          return q.rpc("record_update_service_check", {
-            p_nanny_id: nannyId,
+        await rpcSync("verification.recordUpdateServiceCheck", (q) =>
+          q.rpc("record_update_service_check", {
+            p_nanny_id: input.nannyId as string,
             p_result: input.result,
             p_subscribed: input.subscribed,
             p_checked_by: input.checkedBy as string,
             p_required: REQUIRED as never,
-          });
-        }),
+          }),
+        ),
       ),
     expireSection: async (submissionId) =>
       asVerification(

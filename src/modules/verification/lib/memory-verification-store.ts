@@ -8,7 +8,7 @@ import { auth } from "@/modules/auth";
 import { VETTING } from "@/modules/config";
 import { err, nowInstant, ok } from "@/modules/platform";
 import { ENUMS } from "@/modules/shared-types";
-import type { Result, UserId } from "@/modules/shared-types";
+import type { NannyId, Result, UserId } from "@/modules/shared-types";
 import type {
   MemorySectionRow,
   MemoryVerificationRow,
@@ -128,7 +128,8 @@ const opt = <K extends string, V>(key: K, value: V | undefined) =>
   value === undefined ? {} : ({ [key]: value } as Record<K, V>);
 
 function recordOf(
-  nannyId: UserId,
+  nannyId: NannyId,
+  userId: UserId,
   row: MemoryVerificationRow | undefined,
 ): AdminRecord | null {
   if (row === undefined) return null;
@@ -136,6 +137,7 @@ function recordOf(
   const us = row.updateService ?? {};
   return {
     nannyId,
+    userId,
     level: row.level,
     suspended: row.suspended,
     declared: {
@@ -173,7 +175,8 @@ export function memoryVerificationStore(
     if (!current.ok || current.value === null) return NO_SESSION;
     return ok(current.value);
   };
-  const sync = (nannyId: UserId): LevelSync => {
+  // ★ ADR-169 — the double crosses the seam through the ledger's own named resolution, never by reusing an id.
+  const sync = (nannyId: NannyId): LevelSync => {
     let out: LevelSync | undefined;
     ledger.patchSections(nannyId, (row) => {
       const synced = syncRow(row);
@@ -184,14 +187,21 @@ export function memoryVerificationStore(
   };
 
   return Object.freeze({
+    // The nanny's own read arrives with her SESSION id (R-7), as it does in production.
     getStatus: async (nannyId) => {
-      const row = ledger.sectionsOf(nannyId);
+      const row = ledger.sectionsOf(ledger.partyIdOf(nannyId));
       return ok(row === undefined ? null : stateOf(nannyId, row));
     },
+    partyIdOf: async (userId) =>
+      ok(
+        ledger.sectionsOf(ledger.partyIdOf(userId)) === undefined
+          ? null
+          : ledger.partyIdOf(userId),
+      ),
     saveContact: async () => {
       const user = await session();
       if (!user.ok) return user;
-      ledger.patchSections(user.value, (row) => ({
+      ledger.patchSections(ledger.partyIdOf(user.value), (row) => ({
         ...row,
         contact: "verified",
       }));
@@ -201,7 +211,7 @@ export function memoryVerificationStore(
       const user = await session();
       if (!user.ok) return user;
       const claimed: VerificationSection[] = [];
-      ledger.patchSections(user.value, (row) => {
+      ledger.patchSections(ledger.partyIdOf(user.value), (row) => {
         const claim = (
           key: "identity" | "dbs" | "rightToWork",
           name: VerificationSection,
@@ -229,7 +239,13 @@ export function memoryVerificationStore(
 
     // ── the decision side (ADR-157) ──
     readAdminRecord: async (nannyId) =>
-      ok(recordOf(nannyId, ledger.sectionsOf(nannyId))),
+      ok(
+        recordOf(
+          nannyId,
+          ledger.userIdOf(nannyId),
+          ledger.sectionsOf(nannyId),
+        ),
+      ),
     syncLevel: async (nannyId) =>
       ledger.sectionsOf(nannyId) === undefined
         ? ok({
@@ -300,6 +316,9 @@ export function memoryVerificationStore(
         ledger.nannyIds().flatMap((nannyId) => {
           const row = ledger.sectionsOf(nannyId);
           if (row === undefined) return [];
+          // The expiry sweep addresses her (`vetting.expiry-approaching` carries a mailbox), so it speaks the
+          // session id — ADR-169's seam, crossed through the ledger's own named resolution.
+          const userId = ledger.userIdOf(nannyId);
           return (
             [
               ["identity", row.identity],
@@ -312,7 +331,7 @@ export function memoryVerificationStore(
             s.submissionId !== undefined
               ? [
                   {
-                    nannyId,
+                    nannyId: userId,
                     section,
                     submissionId: s.submissionId,
                     expiresAt: s.expiresAt,
@@ -337,7 +356,13 @@ export function memoryVerificationStore(
             .at(-1);
           return last === undefined
             ? []
-            : [{ nannyId, level: row.level, lastChangeAt: last }];
+            : [
+                {
+                  nannyId: ledger.userIdOf(nannyId),
+                  level: row.level,
+                  lastChangeAt: last,
+                },
+              ];
         }),
       ),
     countByLevel: async () => {
