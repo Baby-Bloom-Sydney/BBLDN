@@ -92,25 +92,25 @@ describe("uploadEvidence", () => {
   });
 
   it("removeEvidenceObjects never hands the service-scope delete a path outside the nanny's own prefix (security pass M2)", async () => {
-    const { createAuth } = await import("@/modules/auth");
-    const { fakeDriver } =
-      await import("@/modules/auth/__tests__/fixtures/fake-driver");
-    const fake = fakeDriver();
-    configureAuth(createAuth({ driver: fake.driver }));
+    // Through the connector only (01 §2.3: no deep import of `auth`'s internals): the stub driver keeps an object
+    // map, so both objects are put first, the helper is asked to remove both, and what is still there afterwards
+    // is read back through the port — the foreign object survives, the nanny's own one is gone.
     const OTHER = "22222222-2222-4222-8222-222222222222";
-    await removeEvidenceObjects(NANNY, [
-      {
-        bucket: "verification-documents",
-        path: `${OTHER}/identity-document/a.jpg`,
-      },
-      {
-        bucket: "verification-documents",
-        path: `${NANNY}/identity-document/b.jpg`,
-      },
-    ]);
-    expect(fake.state.removes.map((entry) => entry.ref.path)).toEqual([
-      `${NANNY}/identity-document/b.jpg`,
-    ]);
-    expect(fake.state.removes[0]?.scope).toBe("service");
+    const foreign = {
+      bucket: "verification-documents" as const,
+      path: `${OTHER}/identity-document/a.jpg`,
+    };
+    const own = {
+      bucket: "verification-documents" as const,
+      path: `${NANNY}/identity-document/b.jpg`,
+    };
+    const opts = { contentType: "image/jpeg" };
+    expect((await auth.data.putObject(foreign, JPEG, opts)).ok).toBe(true);
+    expect((await auth.data.putObject(own, JPEG, opts)).ok).toBe(true);
+    await removeEvidenceObjects(NANNY, [foreign, own]);
+    // still there: the helper refused it before the port
+    expect((await auth.data.removeObject(foreign)).ok).toBe(true);
+    // already gone: the helper removed it
+    expect((await auth.data.removeObject(own)).ok).toBe(false);
   });
 });
