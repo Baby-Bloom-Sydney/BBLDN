@@ -2550,27 +2550,30 @@ export type Database = {
           decided_at: string
           decided_by: string
           id: string
-          nanny_id: string
+          nanny_id: string | null
           previous_dbs_outcome: Database["public"]["Enums"]["dbs_outcome"]
           reason: string
+          subject_pseudonym: string | null
           suspended_since: string
         }
         Insert: {
           decided_at?: string
           decided_by: string
           id?: string
-          nanny_id: string
+          nanny_id?: string | null
           previous_dbs_outcome: Database["public"]["Enums"]["dbs_outcome"]
           reason: string
+          subject_pseudonym?: string | null
           suspended_since: string
         }
         Update: {
           decided_at?: string
           decided_by?: string
           id?: string
-          nanny_id?: string
+          nanny_id?: string | null
           previous_dbs_outcome?: Database["public"]["Enums"]["dbs_outcome"]
           reason?: string
+          subject_pseudonym?: string | null
           suspended_since?: string
         }
         Relationships: [
@@ -3563,7 +3566,7 @@ export type Database = {
           identity_user_guidance: Json | null
           level: Database["public"]["Enums"]["verification_level"]
           level_changed_at: string | null
-          nanny_id: string
+          nanny_id: string | null
           nationality: string | null
           rtw_check_date: string | null
           rtw_checked_at: string | null
@@ -3581,6 +3584,7 @@ export type Database = {
           rtw_status: Database["public"]["Enums"]["section_status"]
           rtw_status_at: string | null
           rtw_user_guidance: Json | null
+          subject_pseudonym: string | null
           surname: string | null
           suspended_at: string | null
           updated_at: string
@@ -3638,7 +3642,7 @@ export type Database = {
           identity_user_guidance?: Json | null
           level?: Database["public"]["Enums"]["verification_level"]
           level_changed_at?: string | null
-          nanny_id: string
+          nanny_id?: string | null
           nationality?: string | null
           rtw_check_date?: string | null
           rtw_checked_at?: string | null
@@ -3656,6 +3660,7 @@ export type Database = {
           rtw_status?: Database["public"]["Enums"]["section_status"]
           rtw_status_at?: string | null
           rtw_user_guidance?: Json | null
+          subject_pseudonym?: string | null
           surname?: string | null
           suspended_at?: string | null
           updated_at?: string
@@ -3713,7 +3718,7 @@ export type Database = {
           identity_user_guidance?: Json | null
           level?: Database["public"]["Enums"]["verification_level"]
           level_changed_at?: string | null
-          nanny_id?: string
+          nanny_id?: string | null
           nationality?: string | null
           rtw_check_date?: string | null
           rtw_checked_at?: string | null
@@ -3731,6 +3736,7 @@ export type Database = {
           rtw_status?: Database["public"]["Enums"]["section_status"]
           rtw_status_at?: string | null
           rtw_user_guidance?: Json | null
+          subject_pseudonym?: string | null
           surname?: string | null
           suspended_at?: string | null
           updated_at?: string
@@ -3767,12 +3773,13 @@ export type Database = {
           evidence_id: string
           evidence_type: string
           id: string
-          nanny_id: string
+          nanny_id: string | null
           provider_key: string
           provider_ref: string | null
           raw_response: Json | null
           section: Database["public"]["Enums"]["verification_section"]
           status: Database["public"]["Enums"]["vetting_submission_status"]
+          subject_pseudonym: string | null
           submitted_at: string
           verification_id: string
         }
@@ -3783,12 +3790,13 @@ export type Database = {
           evidence_id: string
           evidence_type: string
           id?: string
-          nanny_id: string
+          nanny_id?: string | null
           provider_key: string
           provider_ref?: string | null
           raw_response?: Json | null
           section: Database["public"]["Enums"]["verification_section"]
           status?: Database["public"]["Enums"]["vetting_submission_status"]
+          subject_pseudonym?: string | null
           submitted_at?: string
           verification_id: string
         }
@@ -3799,12 +3807,13 @@ export type Database = {
           evidence_id?: string
           evidence_type?: string
           id?: string
-          nanny_id?: string
+          nanny_id?: string | null
           provider_key?: string
           provider_ref?: string | null
           raw_response?: Json | null
           section?: Database["public"]["Enums"]["verification_section"]
           status?: Database["public"]["Enums"]["vetting_submission_status"]
+          subject_pseudonym?: string | null
           submitted_at?: string
           verification_id?: string
         }
@@ -4345,6 +4354,7 @@ export type Database = {
       is_parent: { Args: never; Returns: boolean }
       is_privileged_writer: { Args: never; Returns: boolean }
       is_retention_job: { Args: never; Returns: boolean }
+      is_safeguarding_retention_job: { Args: never; Returns: boolean }
       lift_nanny_isolation: { Args: never; Returns: boolean }
       lift_nanny_suspension: {
         Args: { p_decided_by: string; p_nanny_id: string; p_reason: string }

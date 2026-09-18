@@ -261,3 +261,42 @@ describe("config — values from the foundations (01 §3.1)", () => {
     expect(paths).not.toContain("/api/cron/release-payouts");
   });
 });
+
+/**
+ * 07 §6.1's promise, as a value rather than as a sentence somebody has to remember to write.
+ *
+ * The spec says an account deletion's confirmation "states what is retained and why". Neither the job
+ * (`/api/cron/delete-account`, still handler-less) nor the settings screen exists, which is precisely why the
+ * list lives in `config` now: the first builder of either reads it instead of inventing it, and the row most
+ * likely to be dropped — the safeguarding one, which applies to nannies only and is the least comfortable to
+ * say — cannot be dropped without failing here.
+ */
+describe("config — what an erasure keeps, and why (07 §6.1; ADR-170)", () => {
+  const retained = universal.SECURITY.retention.erasureRetains;
+
+  it("names the three classes 07 §6.1 keeps, money and consent among them", () => {
+    expect(retained).toHaveLength(3);
+    expect(retained.map((row) => row.what).join(" | ")).toMatch(/Payment/);
+    expect(retained.map((row) => row.what).join(" | ")).toMatch(/permissions/);
+  });
+
+  it("★ names the safeguarding class — the one `0027` made true and the one most easily left out", () => {
+    const safeguarding = retained.find((row) =>
+      row.what.includes("Safeguarding"),
+    );
+    expect(safeguarding).toBeDefined();
+    // It has to say the identity goes, because that is the whole difference between "we keep a decision about
+    // you" and "we keep your file". ADR-170's pseudonymisation is what makes the sentence true.
+    expect(safeguarding?.what).toMatch(/removed/);
+    expect(safeguarding?.why).toMatch(/accountable/);
+  });
+
+  it("every class carries a lawful basis and a reason a person can read", () => {
+    for (const row of retained) {
+      expect(row.lawfulBasis).toMatch(/^Art 17\(3\)/);
+      // A reason, not a label: one short sentence at least, ending like a sentence.
+      expect(row.why.length).toBeGreaterThan(40);
+      expect(row.why.endsWith(".")).toBe(true);
+    }
+  });
+});
