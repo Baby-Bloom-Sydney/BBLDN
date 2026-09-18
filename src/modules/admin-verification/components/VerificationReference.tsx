@@ -1,6 +1,7 @@
 // S-A-17 `/admin/verification-reference` (04 §6.4): the admin's crib — levels, section statuses, who moves which
 // status, and how the level follows (ADR-157) — built from the enums and the config, so it can never describe a
-// code the schema does not carry (the Sydney page listed NSW outcomes that London never had).
+// code the schema does not carry (the Sydney page listed outcome codes London never had; row `12.08` — the AU
+// jurisdiction word is gone from the sentence too, because naming it here bought nothing).
 import { ENUMS } from "@/modules/shared-types";
 import type { VerificationReferenceProps } from "../types";
 

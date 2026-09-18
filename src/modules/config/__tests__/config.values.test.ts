@@ -90,6 +90,7 @@ describe("config — one export per file (build-standard L1; 05 §7 rule 4)", ()
         "index.ts",
         "katie.ts",
         "launch.ts",
+        "legal.ts",
         "locale.ts",
         "matching.ts",
         "meta-events.ts",

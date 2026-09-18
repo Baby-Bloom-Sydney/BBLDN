@@ -37,8 +37,9 @@ const ESCAPE = /\/\/\s*config-literal-ok:\s*\S/;
 const near = (a, b) =>
   new RegExp(`(?:${a})[^\\n]{0,40}(?:${b})|(?:${b})[^\\n]{0,40}(?:${a})`, "i");
 
-// 05 §6 pattern table, verbatim in intent.
-const RULES = [
+// 05 §6 pattern table, verbatim in intent. Exported so `config.legal.test.ts` can prove the `jurisdiction` rule
+// catches each fact it names — a gate nobody has driven is a claim, not a control (ADR-171).
+export const RULES = [
   { rule: "brand", pattern: /BabyBloom|Baby Bloom|babybloom/i },
   {
     rule: "domain",
@@ -77,6 +78,15 @@ const RULES = [
     pattern: near("access|birthday|until", "\\b3\\s*(?:y|yr|years)\\b"),
   },
   { rule: "supply gate", pattern: near("nann", "\\b25\\b") },
+  // Row `12.08` — a legal jurisdiction fact is `config` (ADR-171: `LEGAL`), never a literal. Case-sensitive on the
+  // acronyms and the proper nouns on purpose: `wwcc` is added because that is how the AU check name travels in data,
+  // but a bare city name is NOT here — ~40 London files say "Sydney's X is not carried" and reddening those would
+  // have the rule deleted within a week. The `locale` rule above already owns `en-AU` / `AUD` / `A$` / `Australia/…`.
+  {
+    rule: "jurisdiction",
+    pattern:
+      /New South Wales|\bNSW\b|\.com\.au|Privacy Act 1988|\bOAIC\b|\bWWCC\b|\bwwcc\b|Fair Work|Australian Consumer Law|\bABN\b|\bACN\b|\+61/,
+  },
 ];
 
 function relPath(file) {
