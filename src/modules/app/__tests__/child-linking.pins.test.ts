@@ -46,40 +46,29 @@ const build = () =>
     inviteBaseUrl: "https://example.test/invite",
   });
 
-describe("★ PIN — 04 §4.4 c1: a nanny adds an existing client and mints a token for that family", () => {
-  it.fails(
-    "a nanny may mint a `nanny_to_parent` invite for the child she just created (owner: 02 §4.6)",
-    async () => {
-      // **The schema half landed in `0019`; this stays red because the module half did not, and flipping it
-      // now would be the tautology ADR-120 rule 2 exists to stop.** `children.created_by_user_id` exists,
-      // is stamped from the session by a trigger so it cannot be spoofed, and `user_has_child_access()` has
-      // its fourth arm for the creator of an **unclaimed** child — all three measured in `int.rpc-0019`
-      // against the applied migration. What has not moved is this module: `ChildFacts` carries only
-      // `{ parentUserId, linkedNannyUserIds }`, `createChild` never sends a creator (its insert runs at
-      // service scope, where the stamp trigger deliberately keeps what it is given), and the store never
-      // reads the column back. Making `mayMint` answer `true` before those three land would turn a green
-      // test into a claim about nothing, which is exactly the failure ADR-120 was written after.
-      // **What flips this, precisely:** `ChildFacts` gains `createdByUserId`; `mayMint`'s `nanny_to_parent`
-      // arm accepts it beside `linkedNannyUserIds`; `insertChild` writes the creator; the store selects it.
-      // Until then `invite-authorisation.ts` authorises a **linked** nanny or an admin, and path E runs from
-      // the admin's side (S-A-11, `09.28`).
-      const allowed = inviteAuthorisation.mayMint(
-        nannyActor,
-        "nanny_to_parent",
-        {
-          parentUserId: null,
-          linkedNannyUserIds: [],
-        },
-      );
-
-      expect(allowed).toBe(true);
-    },
-  );
-
-  it("meanwhile a LINKED nanny and an admin can, so the claim path is reachable end to end", async () => {
+describe("PIN FLIPPED (`2g`) — 04 §4.4 c1: a nanny adds an existing client and mints a token for them", () => {
+  // **Flipped by behaviour, not by assertion.** `1i` pinned this because the schema could not say the row was
+  // hers; `0019` landed `children.created_by_user_id` (trigger-stamped), the fourth arm of
+  // `user_has_child_access()` and `create_child_invite()`'s creator branch, and `2g` landed the three module
+  // edits the pin itself named — `ChildFacts.createdByUserId`, `mayMint`'s `nanny_to_parent` arm, and
+  // `invite-methods` reading the column back. The behaviour that makes it green is measured end to end in
+  // `child-linking.nanny-mint.test.ts` (she creates the child, she mints, a stranger cannot, the family's
+  // claim closes the arm). This read stays as the pin's own epitaph: the same call, now answering `true`.
+  it("a nanny may mint a `nanny_to_parent` invite for the child she just created", () => {
     expect(
       inviteAuthorisation.mayMint(nannyActor, "nanny_to_parent", {
         parentUserId: null,
+        createdByUserId: NANNY as UserId,
+        linkedNannyUserIds: [],
+      }),
+    ).toBe(true);
+  });
+
+  it("a LINKED nanny and an admin still can, so every road in 04 §4.4 c1 is reachable", async () => {
+    expect(
+      inviteAuthorisation.mayMint(nannyActor, "nanny_to_parent", {
+        parentUserId: null,
+        createdByUserId: null,
         linkedNannyUserIds: [NANNY as UserId],
       }),
     ).toBe(true);
@@ -92,7 +81,11 @@ describe("★ PIN — 04 §4.4 c1: a nanny adds an existing client and mints a t
           onBehalfOf: { role: "nanny", id: NANNY as UserId },
         },
         "nanny_to_parent",
-        { parentUserId: null, linkedNannyUserIds: [] },
+        {
+          parentUserId: null,
+          createdByUserId: null,
+          linkedNannyUserIds: [],
+        },
       ),
     ).toBe(true);
   });

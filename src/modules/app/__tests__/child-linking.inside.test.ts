@@ -177,12 +177,33 @@ describe("createChild (`07.50`) — the trial and the access window", () => {
     expect(!tooOld.ok && tooOld.error.details?.reason).toBe("E_CHILD_TOO_OLD");
   });
 
-  it("refuses a nanny: only a parent adds a child to their own app", async () => {
+  // **Re-argued to the document, not relaxed to the code (`2g`; ADR-120 rule 2).** `1i` wrote this claim as
+  // "only a parent adds a child", which was true of the code and was never what 04 §4.4 c1 says — the nanny's
+  // add has been in the document since it was written, and `1i` could not build it because `children` had no
+  // creator column to make the row hers. `0019` gave it one. The claim therefore becomes the document's: her
+  // add creates an **unclaimed** child, so neither the trial (ADR-093, a family's first child) nor the access
+  // window (ADR-083 / 084, a family's youngest) moves — there is no family until the token is claimed.
+  it("a nanny adds an existing family's child: unclaimed, hers as creator, no trial and no window", async () => {
+    const { inside, store, startTrial, setAccessWindow } = build();
+
+    const made = await inside.createChild(
+      { firstName: "Amara", dateOfBirth: "2025-01-15" as ISODate },
+      nannyActor,
+    );
+
+    expect(made.ok).toBe(true);
+    expect(store.state.children[0]?.parent_user_id).toBeNull();
+    expect(store.state.children[0]?.created_by_user_id).toBe(NANNY);
+    expect(startTrial).not.toHaveBeenCalled();
+    expect(setAccessWindow).not.toHaveBeenCalled();
+  });
+
+  it("refuses an admin with nobody named — a child row must have a traceable author (03 §2.5)", async () => {
     const { inside } = build();
 
     const refused = await inside.createChild(
       { firstName: "Amara", dateOfBirth: "2025-01-15" as ISODate },
-      nannyActor,
+      { kind: "admin", id: "admin-1" as never },
     );
 
     expect(!refused.ok && refused.error.details?.reason).toBe(

@@ -91,6 +91,11 @@ export function inviteMethods(
       if (!links.ok) return carryLinkStoreError(links.error);
       const allowed = inviteAuthorisation.mayMint(actor, direction, {
         parentUserId: (child.value.parent_user_id as UserId | null) ?? null,
+        // `0019`'s creator arm (04 §4.4 c1): the nanny who added an existing family's child may mint their
+        // token before any link row exists — which is the whole of S-N-01. `create_child_invite()` reads the
+        // same column for the same branch, so the two gates cannot disagree.
+        createdByUserId:
+          (child.value.created_by_user_id as UserId | null) ?? null,
         linkedNannyUserIds: links.value.map(
           (row) => row.nanny_user_id as UserId,
         ),

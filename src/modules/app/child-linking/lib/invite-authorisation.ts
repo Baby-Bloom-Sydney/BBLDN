@@ -1,12 +1,11 @@
 // Who may mint and who may revoke a child invite — pure, and the **only** place either question is answered.
 //
-// ★ It carries more weight than it looks like it should. 07 §5.2 says links and invites are written only by
-// definer RPCs, and `0012` ships RPCs for the claim and the unlinks but **none for the mint or the revoke**;
-// `child_invites` therefore has a SELECT policy and no client INSERT or UPDATE at all, and this module writes
-// those two through the service scope. That makes this file the authorisation — there is no second check in
-// SQL behind it. A `0019` should add `create_child_invite` / `revoke_child_invite` as SECURITY DEFINER
-// functions asserting the same two rules, at which point this becomes the belt and Postgres the braces. Until
-// then it is pinned by test and the store's header names the functions owed.
+// ★ It carries more weight than it looks like it should — though less than it did. 07 §5.2 says links and
+// invites are written only by definer RPCs; `0012` shipped RPCs for the claim and the unlinks and none for the
+// mint or the revoke, so for a while this file *was* the authorisation. `0019` added `create_child_invite` /
+// `revoke_child_invite` as SECURITY DEFINER functions asserting the same two rules under the caller's own
+// session, so this is now the belt and Postgres the braces. Both must say the same thing: a rule that moves
+// here and not there is a rule with two answers.
 //
 // The rules, from 04 §4.4 c1 (a nanny adds an existing client and passes a token to that family), 04 §3 row 22
 // (the parent invites her nanny), and 04 §6.4 S-A-11 (`09.28`, the matchmaker does either on behalf):
@@ -18,19 +17,27 @@
 //   revoke           — whoever created the row, or an admin. Revoking is the only invalidation path there is
 //                      (memory: token stability), so it must not be reachable by the other party.
 //
-// ★ CONTRADICTION, stopped on rather than guessed (model-marking rule). 04 §4.4 c1 has a nanny create a child
-// for an existing client and mint a `nanny_to_parent` token to pass to that family — but `children` has no
-// creator column, and `user_has_child_access` admits only the parent, an **actively linked** nanny, or an
-// admin. A nanny therefore cannot read back the child she just created, let alone mint an invite for it: there
-// is nothing in the schema that says the row is hers. So `nanny_to_parent` is authorised here for a linked
-// nanny or an admin, the unlinked-creator path is pinned `it.fails`, and the owner is 02 §4.6 (`children` wants
-// a `created_by_user_id`, or `user_has_child_access` wants a fourth arm). Path E still runs end to end from the
-// admin's side (S-A-11, `09.28`) and from a linked nanny's, which is what `1i` needed of it.
+// ★ THE CONTRADICTION `1i` STOPPED ON IS CLOSED (`2g`; kickoff debt 8). 04 §4.4 c1 has a nanny create a child
+// for an existing client and mint a `nanny_to_parent` token to pass to that family. `1i` could not authorise
+// it: `children` had no creator column and `user_has_child_access` admitted only the parent, an **actively
+// linked** nanny, or an admin, so a nanny could not read back the row she had just inserted, let alone prove
+// it was hers. `0019` landed all three halves — `children.created_by_user_id` (stamped by
+// `children_stamp_creator` from the session, never trusted from the caller), the fourth arm of
+// `user_has_child_access()` for the creator of an **unclaimed** child, and `create_child_invite()`'s own
+// `created_by_user_id = v_actor` branch. So `ChildFacts` carries the creator and `mayMint` reads it, which is
+// this file saying in TypeScript exactly what the definer says in SQL.
+//
+// The narrowness is copied from `0019` deliberately: the creator arm **closes the moment `parent_user_id` is
+// set**. From then on the child belongs to a family, and its creator needs an active `child_client` link like
+// any other nanny — otherwise whoever first typed a child's name would hold a permanent road into that
+// family's record.
 import type { Actor, UserId } from "@/modules/shared-types";
 import type { InviteDirection } from "../types";
 
 type ChildFacts = {
   readonly parentUserId: UserId | null;
+  /** `children.created_by_user_id` (`0019`). `null` for any row written before it, which authorises nobody. */
+  readonly createdByUserId: UserId | null;
   readonly linkedNannyUserIds: ReadonlyArray<UserId>;
 };
 
@@ -60,7 +67,8 @@ export const inviteAuthorisation = Object.freeze({
     return (
       actor.role === "nanny" &&
       child.parentUserId === null &&
-      child.linkedNannyUserIds.includes(id as UserId)
+      (child.createdByUserId === (id as UserId) ||
+        child.linkedNannyUserIds.includes(id as UserId))
     );
   },
   mayRevoke: (actor: Actor, createdByUserId: UserId | null): boolean => {
