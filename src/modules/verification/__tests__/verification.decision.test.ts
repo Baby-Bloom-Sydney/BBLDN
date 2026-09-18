@@ -527,3 +527,98 @@ describe("adminOverview (05 AC-A-17's counters)", () => {
     });
   });
 });
+
+describe("★ liftSuspension — a bar is terminal and lifting one is its own act (ADR-168)", () => {
+  async function bar(): Promise<QueueEntry["submissionId"]> {
+    await submitEverything();
+    await verification.decide({
+      submissionId: entryOf(await queue("identity"), "identity-document")
+        .submissionId,
+      decision: "verified",
+    });
+    const dbs = entryOf(await queue("dbs"), "dbs-certificate").submissionId;
+    await verification.decide({
+      submissionId: dbs,
+      decision: "rejected",
+      reason: "adverse",
+    });
+    return dbs;
+  }
+
+  it("★ re-deciding the same submission does not lift the bar — the derivation has no clearing branch", async () => {
+    const dbs = await bar();
+
+    await verification.decide({
+      submissionId: dbs,
+      decision: "rejected",
+      reason: "mismatch",
+    });
+
+    // REVIEW-4 C-2 measured `suspended` going t -> f here. `0025` removed that road, and the double models the
+    // same rule: only `liftSuspension` writes `suspended` false.
+    expect((await levelOf()).suspended).toBe(true);
+  });
+
+  it("★ the explicit lift clears it, unsets the outcome and tells both audiences", async () => {
+    const dbs = await bar();
+    const before = comms.sent.length;
+
+    const lifted = await verification.liftSuspension({
+      submissionId: dbs,
+      reason: "Identified as a different person; DBS reissued.",
+    });
+
+    expect(lifted.ok).toBe(true);
+    expect(lifted.ok && lifted.value.previousDbsOutcome).toBe("barred");
+    expect((await levelOf()).suspended).toBe(false);
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.dbsOutcome).toBe(
+      "unset",
+    );
+    expect(comms.sent.slice(before).map((m) => m.templateId)).toEqual([
+      "verification-suspension-lifted",
+      "admin-nanny-suspension-lifted",
+    ]);
+  });
+
+  it("a blank reason is refused, and nothing is lifted — a lift with no reason is half an answer", async () => {
+    const dbs = await bar();
+
+    const refused = await verification.liftSuspension({
+      submissionId: dbs,
+      reason: "   ",
+    });
+
+    expect(refused.ok).toBe(false);
+    expect(!refused.ok && refused.error.details?.reason).toBe(
+      "reason-required",
+    );
+    expect((await levelOf()).suspended).toBe(true);
+  });
+
+  it("a nanny cannot lift her own bar, and the budget is taken before any read", async () => {
+    const dbs = await bar();
+    signIn(NANNY);
+
+    const refused = await verification.liftSuspension({
+      submissionId: dbs,
+      reason: "please",
+    });
+
+    expect(!refused.ok && refused.error.details?.reason).toBe("not-permitted");
+    signIn(ADMIN);
+    expect((await levelOf()).suspended).toBe(true);
+    expect(limited).toContainEqual(expect.stringContaining("admin-routes"));
+  });
+
+  it("lifting a suspension that is not there refuses rather than recording a second lift", async () => {
+    await submitEverything();
+    const dbs = entryOf(await queue("dbs"), "dbs-certificate").submissionId;
+
+    const refused = await verification.liftSuspension({
+      submissionId: dbs,
+      reason: "nothing to lift",
+    });
+
+    expect(refused.ok).toBe(false);
+  });
+});

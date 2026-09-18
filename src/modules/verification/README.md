@@ -54,6 +54,22 @@ config disclosures, then a `consent_records` row with purpose `biometric-notice`
 · `rejected` · `failed` · `expired`); anything `pending` → the processing step; everything settled → S-N-09.
 `?step=` may name an open step, never skip one.
 
+**A bar is terminal (ADR-168).** `sync_nanny_verification_state()` may SET `suspended_at` and may never clear it:
+re-deciding the same submission with any non-`adverse` reason used to walk the pair back (REVIEW-4 C-2, measured
+`suspended t → f`), so the derivation lost the clearing branch entirely in `0025`. Lifting is its own act —
+`verification.liftSuspension` on the admin road, its own reason, its own `nanny_suspension_lifts` row naming who
+authorised it, its own comms — and it writes **no level**: she stays where I-V5 left her until her next decision
+re-derives it through the one writer. An adverse DBS outcome is never re-derivable to safe; the lift unsets it,
+and a correction to the evidence is a new submission.
+
+**Two id spaces, named apart (ADR-169).** `vetting_submissions.nanny_id` and `verifications.nanny_id` are
+`nannies.id` — the **party** row — and carry the `NannyId` brand through the ledger, the queue, the admin record
+and the decision store. The wizard's own reads key on her `auth.users.id` (`UserId`, R-7). The boundary is where
+`auth.uid()` resolves to `nannies.id`: inside each session-scope definer, and — for the reads, which have no
+definer — once and named, in `partyIdOf` / `AdminRecord.userId`. Never in a caller, and never by passing
+whichever id was to hand: that was REVIEW-4 C-3, and it emptied the queue, made L4 unreachable and silenced the
+barred alert while the database stayed correct throughout.
+
 **The level, the queue and the jobs (`2c`; ADR-157 · ADR-158 · ADR-159 · ADR-161).** The level has ONE writer —
 `sync_nanny_verification_state()` (`0023`), a definer run inside the decision's transaction and asked again
 (idempotently) by the connector so the from → to reaches the events; `deriveLevel` is the same rule in TypeScript,
@@ -63,7 +79,7 @@ sections a level requires is `VETTING.requiredChecksByLevel` → `requiredSectio
 she is out of every pool read (ADR-147's conjunction, now `nanny_visible()` — ADR-162) and nothing on S-N-09 says
 so; at L4 the sync releases her `held_for_verification` rows (the write of the flag at K-row creation is
 `connections`', pinned). **The queue's road** — `listQueue` · `readQueueRecord` · `openEvidence` · `decide` ·
-`recordUpdateServiceCheck` · `adminOverview` — re-checks `auth.requireRole('admin')` (`aal2`) on every call,
+`recordUpdateServiceCheck` · `liftSuspension` · `adminOverview` — re-checks `auth.requireRole('admin')` (`aal2`) on every call,
 consumes `SECURITY.rateLimits.adminRoutes` before every write and every reveal, takes the audit subject from the
 **submission**, and routes the decision through `getProvider(type).record()` (`stub-manual` → `record_vetting_decision()`:
 the admin _is_ the check — a DBS `verified` is the outcome and the cross-check; `adverse` bars). Every reveal mints
@@ -71,13 +87,18 @@ the admin _is_ the check — a DBS `verified` is the outcome and the cross-check
 `verification-pending` once per day of submitting (the processing step), `verification-approved` on reaching L3 and
 L4, `verification-action-needed` +`VETTING.actionNeededDelayMinutes` keyed per section and cancelled by a
 resubmission, `verification-barred` + `admin-nanny-barred` + a `nanny_barred` queue row (`comms.notifyAdmin`, ADR-160),
+`verification-suspension-lifted` + `admin-nanny-suspension-lifted` when a bar is lifted (ADR-168 (b); no second
+`admin_notifications` row — the open `nanny_barred` one is what an operator acknowledges),
 `verification-reminder` LCY-1…4 from the last change while below the pool (`sweepReminders`), cancelled at L3.
 **The named jobs:** `sweepStaleProcessing` (I-V4, `VETTING.staleProcessingMinutes`) and `sweepReminders` in the
 5-minute run, `sweepExpiry` in `vetting-expiry` (warn inside `VETTING.expiryLeadDays`, expire past the date).
 
 **Named service-scope uses** (01 §6.3 / 07 §5.1 rule 5), beyond the two above: `sync_nanny_verification_state()` ·
 `record_vetting_decision()` (through `vetting-providers`' adapter) · `record_update_service_check()` ·
-`expire_verification_section()` · `sweep_stale_verification_processing()` — all `service_role` only, every one
+`expire_verification_section()` · `sweep_stale_verification_processing()` · `lift_nanny_suspension()` (`0025`,
+ADR-168 (b) — the ONE road that clears `suspended_at`; the definer validates the decider against `user_roles`,
+refuses a blank reason and a nanny who is not suspended, and writes the `nanny_suspension_lifts` audit row in the
+same transaction) — all `service_role` only, every one
 behind the connector's own `requireAdmin` or a cron shell; the sweeps' reads of `verifications` + `nannies`
 (`listExpiries`, `listRemindable`). The admin's record read (`readAdminRecord`) and the level count run at
 **session** scope under an admin's RLS, deliberately.

@@ -95,7 +95,11 @@ function syncRow(row: MemoryVerificationRow): {
     },
     VETTING.requiredChecksByLevel,
   );
-  const suspended = row.dbsOutcome === "barred";
+  // ★ ADR-168 (a) — the derivation may SET a bar and may never CLEAR one, exactly as `0025` re-created
+  // `sync_nanny_verification_state()`. Before `0025` this line read `row.dbsOutcome === "barred"` on both sides
+  // and so walked the bar back with the outcome (REVIEW-4 C-2, measured `suspended t → f`); now the old value
+  // is the floor. `liftSuspension` is the only writer of `false`.
+  const suspended = row.dbsOutcome === "barred" || row.suspended;
   const released =
     toLevel === "L4_FULLY_VERIFIED" ? (row.heldConnections ?? 0) : 0;
   return {
@@ -105,7 +109,14 @@ function syncRow(row: MemoryVerificationRow): {
       suspended,
       heldConnections: (row.heldConnections ?? 0) - released,
     },
-    sync: { fromLevel: row.level, toLevel, suspended, released },
+    // `sync.suspended` stays the DERIVATION's answer — "this decision bars her" — because it is what
+    // `sendVerificationOutcome` reads to fire `onBarred`, and a lift must not re-send a barred email.
+    sync: {
+      fromLevel: row.level,
+      toLevel,
+      suspended: row.dbsOutcome === "barred",
+      released,
+    },
   };
 }
 
