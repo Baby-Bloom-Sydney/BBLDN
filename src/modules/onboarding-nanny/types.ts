@@ -210,6 +210,13 @@ export type NannyProfile = NannyContactPatch &
     readonly isIsolated: boolean;
     readonly verificationLevel: NannyVerificationLevel;
     readonly profileVisible: boolean;
+    /**
+     * Kickoff debt 14 — the under-3 signal N1 captured and never shows her (04 §4.1 row 5), off her own lead row.
+     * S-N-01's active / passive variant is the one thing that reads it (04 §6.3). **Absent means "we do not
+     * know"**, not "no": an account created before the funnel captured it, or one with no lead at all, has no
+     * value here and S-N-01 falls back to the active wording.
+     */
+    readonly worksWithUnderThrees?: boolean;
   };
 
 export type NannyAccountStore = {

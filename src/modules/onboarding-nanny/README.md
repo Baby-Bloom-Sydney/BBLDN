@@ -21,7 +21,10 @@ certificate and _which_ right-to-work status she has; the evidence is `verificat
 **Service-role use, named (07 §5.1 rule 5).** `nanny_leads` is service-role only, so the lead capture runs at
 service scope: `onboarding-nanny.captureLead` (S-X-15 page 8 and S-N-19: reads `user_profiles.email` for the
 "sign in instead" answer, reads / inserts / updates one `nanny_leads` row), `onboarding-nanny.readLead` (N3 / N4 /
-N5: the row the lead cookie names), `onboarding-nanny.patchLead` (N3 / N4 / S-N-19). Every account-side write is
+N5: the row the lead cookie names), `onboarding-nanny.patchLead` (N3 / N4 / S-N-19), and — since `2d` — `onboarding-nanny.readLeadSignal`: one
+boolean off her own lead row (`lead_signals.under_three`), for S-N-01's active / passive variant (kickoff debt 14;
+04 §4.1 row 8). It is asked only when the account carries a `lead_id`, it answers nothing else off that row, and
+a refusal leaves the signal absent so the screen reads the active wording. Every account-side write is
 one of `0021`'s definers at **session** scope (`create_nanny_account` · `update_nanny_profile` ·
 `lift_nanny_isolation` — ADR-152), and the profile read is the nanny's own rows under RLS. The adapters live in
 `src/boot/db-nanny-lead-store.ts` and `src/boot/db-nanny-account-store.ts`; boot binds both in
@@ -73,7 +76,10 @@ renders the active wording for everyone. Owner: whoever next widens the account 
 the variant is dropped.
 
 <!-- audit
-Last edited: 2026-09-18T19:30+10:00 — BB-LDN-Planner-070926/2c
+Last edited: 2026-09-19T12:30+10:00 — BB-LDN-Planner-070926/2d
+Notes: the fourth named service-scope read (`readLeadSignal`) — the under-3 signal off her own lead row for
+S-N-01's variant (kickoff debt 14); `NannyProfile.worksWithUnderThrees`, absent meaning "we do not know".
+Prior: Last edited: 2026-09-18T19:30+10:00 — BB-LDN-Planner-070926/2c
 Notes: 2c — create_nanny_account at service scope with p_user_id (ADR-163); nothing else.
 Prior: 2026-09-18T16:20+10:00 — BB-LDN-Planner-070926/2g
 Notes: S-N-02 built (L-008 2g) — the explainer + book-a-call section over call-layer, the hub's two pitch links, gap 5 closed by 2g, gap 9 (the under-3 variant) recorded.

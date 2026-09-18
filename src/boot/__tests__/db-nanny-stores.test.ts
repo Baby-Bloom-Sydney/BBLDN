@@ -347,3 +347,126 @@ describe("dbNannyLeadStore — nanny_leads at service scope (02 §4.7; 07 §5.1 
     });
   });
 });
+
+/**
+ * Kickoff debt 14 — **S-N-01's active / passive variant** (04 §4.1 row 8, §6.3 S-N-01). The under-3 signal is
+ * captured by N1 and never shown to her (04 §4.1 row 5); it lives on `nanny_leads.lead_signals.under_three`, and
+ * `2g` shipped the pitch with the active wording for everyone because `nannyAccountStore.get()` could not answer
+ * it. `2d` widens the read rather than moving the signal: it is her own row, reached by the `lead_id` the
+ * account already carries, and no table is added.
+ *
+ * `nanny_leads` is **service-role only** (02 §4.7; 07 §5.1 rule 5 lists the table), so the second read is at
+ * service scope and is named in the module README beside the lead store's own uses. It is asked **only** when
+ * the account has a `lead_id`, so an invited nanny (no lead) costs nothing.
+ *
+ * Absent beats wrong: a lead that cannot be read, or one with no signal on it, leaves the field off, and S-N-01
+ * falls back to the active wording — which is what every account created before the funnel captured the signal
+ * gets, by the planner's ruling.
+ */
+describe("dbNannyAccountStore — the under-3 signal (kickoff debt 14)", () => {
+  const LEAD = "33333333-3333-4333-8333-333333333333";
+
+  const withLead = (signals: unknown) =>
+    fakeDataPort({
+      nannies: [
+        {
+          id: "n-1",
+          user_id: USER,
+          bio: null,
+          years_experience: null,
+          qualification: null,
+          certificates: null,
+          languages: null,
+          has_car: null,
+          has_driving_licence: null,
+          is_non_smoker: null,
+          comfortable_with_pets: null,
+          hourly_rate_min_pence: null,
+          availability: null,
+          available_from: null,
+          is_isolated: false,
+          verification_level: "L0_SIGNED_UP",
+          profile_visible: false,
+          lead_id: LEAD,
+        },
+      ],
+      user_profiles: [
+        {
+          user_id: USER,
+          first_name: "Amara",
+          last_name: "Okafor",
+          email: "amara@example.test",
+          mobile: MOBILE,
+          district: "SW4",
+          area: "Clapham",
+          date_of_birth: null,
+        },
+      ],
+      nanny_leads: [{ id: LEAD, lead_signals: signals }],
+    });
+
+  it("carries the signal when the lead holds it, read at service scope", async () => {
+    const fake = withLead({ under_three: true });
+
+    const result = await dbNannyAccountStore(fake.port, currentUser).get();
+
+    expect(result.ok && result.value?.worksWithUnderThrees).toBe(true);
+    expect(fake.keyedReads.map((r) => r.table)).toEqual([
+      "nannies",
+      "user_profiles",
+      "nanny_leads",
+    ]);
+    // 07 §5.1 rule 5: the lead table is service-role only, and only this read is
+    expect(fake.calls.map((c) => c.scope)).toEqual(["session", "service"]);
+  });
+
+  it("carries a false signal as false — the passive variant is a fact, not an absence", async () => {
+    const fake = withLead({ under_three: false });
+
+    const result = await dbNannyAccountStore(fake.port, currentUser).get();
+
+    expect(result.ok && result.value?.worksWithUnderThrees).toBe(false);
+  });
+
+  it("leaves the field off when the lead carries no signal — S-N-01 then reads active", async () => {
+    const fake = withLead({});
+
+    const result = await dbNannyAccountStore(fake.port, currentUser).get();
+
+    expect(result.ok && "worksWithUnderThrees" in (result.value ?? {})).toBe(
+      false,
+    );
+  });
+
+  it("never asks for a lead the account does not have", async () => {
+    const fake = fakeDataPort({
+      nannies: [
+        {
+          id: "n-1",
+          user_id: USER,
+          bio: null,
+          years_experience: null,
+          qualification: null,
+          certificates: null,
+          languages: null,
+          has_car: null,
+          has_driving_licence: null,
+          is_non_smoker: null,
+          comfortable_with_pets: null,
+          hourly_rate_min_pence: null,
+          availability: null,
+          available_from: null,
+          is_isolated: true,
+          verification_level: "L0_SIGNED_UP",
+          profile_visible: false,
+          lead_id: null,
+        },
+      ],
+    });
+
+    const result = await dbNannyAccountStore(fake.port, currentUser).get();
+
+    expect(result.ok).toBe(true);
+    expect(fake.keyedReads.map((r) => r.table)).not.toContain("nanny_leads");
+  });
+});

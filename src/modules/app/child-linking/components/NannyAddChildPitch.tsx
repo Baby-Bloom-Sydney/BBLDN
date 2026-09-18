@@ -14,6 +14,7 @@
 import { useFormState, useFormStatus } from "react-dom";
 import type { NannyAddChildPitchProps } from "../types";
 import { addFamilyChildAction } from "../actions/add-family-child-action";
+import { addChildPitchCopy } from "../lib/add-child-pitch-copy";
 
 const FIELD =
   "mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500";
@@ -39,29 +40,32 @@ export function NannyAddChildPitch({
   skipHref,
   skipLabel,
   brandName,
+  worksWithUnderThrees,
 }: NannyAddChildPitchProps) {
   const [state, action] = useFormState(addFamilyChildAction, {
     url: null,
     error: null,
   });
+  // kickoff debt 14 — the words follow the signal; the offer does not (see `add-child-pitch-copy.ts`)
+  const copy = addChildPitchCopy(worksWithUnderThrees);
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10 md:py-14">
+    <main
+      className="mx-auto max-w-2xl px-4 py-10 md:py-14"
+      data-pitch-variant={copy.variant}
+    >
       <section aria-labelledby="add-child-heading">
         <h1
           id="add-child-heading"
           className="text-3xl font-bold leading-tight [letter-spacing:-0.02em] text-slate-900 md:text-4xl"
         >
-          Get paid for adding existing clients.
+          {copy.heading}
         </h1>
         <p className="mt-4 text-base leading-relaxed text-slate-600">
-          Already with a family? Add their child here and we&rsquo;ll make you a
-          link to pass on. If they come on board, we arrange a commission with
-          you personally — agreed on a short call, not worked out on a screen.
+          {copy.lead}
         </p>
         <p className="mt-3 text-base leading-relaxed text-slate-600">
-          The family gets the app for their child: their days, what their child
-          is doing and what comes next, shared with you.
+          {copy.second}
         </p>
         <p className="mt-4">
           <a href={commissionHref} className={LINK}>
@@ -78,7 +82,7 @@ export function NannyAddChildPitch({
           id="add-family-heading"
           className="text-lg font-semibold text-slate-900"
         >
-          Add a family you work for
+          {copy.formHeading}
         </h2>
         {state.url === null ? (
           <form action={action} className="mt-4 space-y-5">

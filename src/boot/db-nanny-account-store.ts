@@ -1,7 +1,16 @@
 // The `NannyAccountStore` of `onboarding-nanny` over `auth`'s data port — `0021`'s three definers (ADR-152) at
 // **session scope** for the profile and isolation writes, deliberately: each takes no user id and acts for `auth.uid()`, so running them under the
 // service role would silently mean "no session", which they refuse. The reads are the nanny's own rows under
-// RLS (`nannies_self_select`, `user_profiles_self_select`), so no service-role call joins 07 §5.1 rule 5's list.
+// RLS (`nannies_self_select`, `user_profiles_self_select`).
+//
+// **One service-scope read, named here and in the module README (07 §5.1 rule 5).** `get()` also answers the
+// under-3 signal N1 captured and never shows her (04 §4.1 row 5), which S-N-01's active / passive variant reads
+// (kickoff debt 14). It lives on `nanny_leads.lead_signals`, and `nanny_leads` is service-role only (02 §4.7) —
+// so the lead is read at service scope, keyed on the `lead_id` the account already carries, and only when there
+// is one. It answers nothing else off that row: this is a boolean about her own application, not a second road
+// into the lead table. A refusal or a lead with no signal leaves the field **off**, and S-N-01 then reads the
+// active wording — absent beats wrong, and every account created before the funnel captured the signal is in
+// exactly that case.
 import type { DataAccessPort } from "@/modules/auth";
 import type {
   NannyAccountStore,
@@ -79,6 +88,7 @@ type NannyRow = {
   readonly is_isolated: boolean;
   readonly verification_level: string;
   readonly profile_visible: boolean;
+  readonly lead_id: string | null;
 };
 
 type ProfileRow = {
@@ -125,6 +135,38 @@ const profileOf = (nanny: NannyRow, profile: ProfileRow | null): NannyProfile =>
       nanny.verification_level as NannyProfile["verificationLevel"],
     profileVisible: nanny.profile_visible,
   });
+
+/** Her own rows plus the `lead_id` the signal read is keyed on — internal, never part of `NannyProfile`. */
+type OwnRows = {
+  readonly profile: NannyProfile;
+  readonly leadId: string | null;
+};
+
+/**
+ * The under-3 signal off her own lead row (kickoff debt 14). `null` means "we do not know" — a lead that could
+ * not be read, a row that is gone, or a `lead_signals` with nothing in it — and the caller leaves the field off.
+ */
+async function underThreeSignal(
+  port: DataAccessPort,
+  leadId: string,
+): Promise<boolean | null> {
+  const read = await port.run<boolean | null>(
+    {
+      name: "onboarding-nanny.readLeadSignal",
+      exec: async (q) => {
+        const row = (await q.from("nanny_leads").eq("id", leadId).single()) as {
+          readonly lead_signals: unknown;
+        } | null;
+        const signals = row?.lead_signals;
+        if (typeof signals !== "object" || signals === null) return null;
+        const value = (signals as Record<string, unknown>).under_three;
+        return typeof value === "boolean" ? value : null;
+      },
+    },
+    service,
+  );
+  return read.ok ? read.value : null;
+}
 
 export function dbNannyAccountStore(
   port: DataAccessPort,
@@ -198,8 +240,8 @@ export function dbNannyAccountStore(
       if (!user.ok) return user as Result<never, NannyStoreErrorDetails>;
       if (user.value === null) return ok(null);
       const userId = user.value;
-      return asStore(
-        await port.run<NannyProfile | null>(
+      const read = asStore(
+        await port.run<OwnRows | null>(
           {
             name: "onboarding-nanny.readProfile",
             exec: async (q) => {
@@ -212,11 +254,24 @@ export function dbNannyAccountStore(
                 .from("user_profiles")
                 .eq("user_id", userId as string)
                 .single()) as ProfileRow | null;
-              return profileOf(nanny, profile);
+              return {
+                profile: profileOf(nanny, profile),
+                leadId: nanny.lead_id ?? null,
+              };
             },
           },
           session,
         ),
+      );
+      if (!read.ok) return read;
+      if (read.value === null) return ok(null);
+      const { profile, leadId } = read.value;
+      if (leadId === null) return ok(profile);
+      const signal = await underThreeSignal(port, leadId);
+      return ok(
+        signal === null
+          ? profile
+          : Object.freeze({ ...profile, worksWithUnderThrees: signal }),
       );
     },
   });

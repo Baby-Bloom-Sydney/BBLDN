@@ -58,8 +58,17 @@ does not exist yet). The observable fact is the `invite.sent` that follows one l
 `child-linking.nanny-mint.test.ts` (S-N-01's rules end to end) · `child-linking.add-family-child.test.ts` (the
 action: the tick, the order, every refusal).
 
+**S-N-01's active / passive variant (`2d`, kickoff debt 14).** `addChildPitchCopy(worksWithUnderThrees)` is the
+whole of it: two frozen sets of words, chosen by the under-3 signal N1 captured and never shows her (04 §4.1
+row 5), which `nannyAccountStore.get()` now answers off her own lead row. Two rules are pinned in
+`child-linking.add-child-variant.test.ts` — **active is the default** (`undefined` means "we do not know", which
+is every account made before the funnel captured the signal and every invited nanny, who has no lead at all), and
+**neither variant is a gate** (the form, the heading and the offer are identical; only the framing moves).
+
 <!-- audit
-Last edited: 2026-09-18T16:20+10:00 — BB-LDN-Planner-070926/2g
+Last edited: 2026-09-19T12:35+10:00 — BB-LDN-Planner-070926/2d
+Notes: S-N-01's active / passive variant built (kickoff debt 14) — `addChildPitchCopy`, the two rules pinned.
+Prior: Last edited: 2026-09-18T16:20+10:00 — BB-LDN-Planner-070926/2g
 Notes: S-N-01 built (L-008 2g) — the pitch, `addFamilyChildAction`, AGR-14, the ADR-142 pass's HIGH + LOW closed (07 §8 row 17 + the boundary date parse); the nanny-mint pin flipped by behaviour (ChildFacts.createdByUserId, mayMint, invite-methods, createChild's unclaimed branch). The missing event name recorded for 03 §9.3.
 Prior: 2026-09-16T16:15+10:00 — BB-LDN-Planner-070926/F-c
 Notes: initial authoring — the parent connector, the three sub-module folders, `stubApp` and the swap test.
