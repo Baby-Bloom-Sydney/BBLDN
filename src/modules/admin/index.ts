@@ -36,4 +36,5 @@ export {
   openErasureRequestAction,
   runErasureRequestAction,
   loadErasureRequests,
+  ErasurePanel,
 } from "./erasure";

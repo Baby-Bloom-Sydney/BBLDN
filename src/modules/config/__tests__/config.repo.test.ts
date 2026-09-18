@@ -129,4 +129,28 @@ describe("ci — the green gates are not in a job that is allowed to be red (Q-4
       expect(body).toContain(step);
     }
   });
+
+  // ADR-179's gate joined the job in L-009 `3f`. A gate nobody has driven is a claim, not a control — and a gate
+  // in no job at all is not even a claim, which is the failure mode `3e` split this job out to end.
+  it("★ and ADR-179's retention-class gate runs here too", () => {
+    expect(jobBody("config-gates")).toContain(
+      "npm run check:retention-classes",
+    );
+  });
+});
+
+/**
+ * ADR-179 — the gate itself, driven rather than trusted. It joins two files that can disagree in a way nobody
+ * reading either one would notice: the classes `erase_account()` keeps, and the sentences `LEGAL.erasureRetains`
+ * shows a person before she confirms. Both directions are failures, and both are asserted.
+ */
+describe("check:retention-classes — the job and the list say the same thing (ADR-179)", () => {
+  it("agrees today, on the real files", async () => {
+    const { compareRetentionClasses } =
+      await import("../../../../scripts/ci/check-retention-classes.mjs");
+    const { config, sql } = compareRetentionClasses();
+    expect(sql).not.toBeNull();
+    expect([...config].sort()).toEqual([...(sql ?? [])].sort());
+    expect(config).toContain("safeguarding");
+  });
 });

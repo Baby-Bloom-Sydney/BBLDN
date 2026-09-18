@@ -60,12 +60,14 @@ that one `declare module` target). The module is **client-safe**: it reads no se
 `SENTRY_DSN` and hands the tracker in.
 
 **Named service-role uses.** None inside this module — the ports that reach Postgres (`EventLogStore`,
-`ConsentStore`, `RateLimitStore`) are implemented by the boot code (`src/boot/db-*.ts`) over `auth`'s data port,
-which names its own service-role uses (07 §5.1 rule 5: the `event-log` insert is named there; `recordCookieConsent`
-will be when its store exists). The `TransactionOpener` reaches no database at all (ADR-127).
+`ConsentStore`, `RateLimitStore`, `PrivacyStore`) are implemented by the boot code (`src/boot/db-*.ts`) over
+`auth`'s data port, which names its own service-role uses (07 §5.1 rule 5: the `event-log` insert is named there;
+`recordCookieConsent` will be when its store exists; **`PrivacyStore` is the `delete-account` row already on that
+table**). The `TransactionOpener` reaches no database at all (ADR-127).
 
 **Stubs (05 §3 rule 1 — production code, one export, inside the module).** `memoryTransactionOpener` ·
-`memorySink` · `memoryEventLogStore` · `consent.stub.ts` (`memoryConsentStore`) · `memoryRateLimitStore` ·
+`memorySink` · `memoryEventLogStore` · `consent.stub.ts` (`memoryConsentStore`) · `privacy.stub.ts`
+(`memoryPrivacyStore`) · `memoryRateLimitStore` ·
 `upload-scan.stub.ts` (`stubUploadScanner`). The suites in `__tests__/` run the connectors against them; the real
 insides run the same suites through the `configure*` hooks — nothing else changes (L3). `platform.uow.test.ts`
 runs swap test 9's unit-of-work half over **both** openers.
@@ -105,7 +107,9 @@ which refuses a value the scrubber would change). Adding a fourth prose boundary
 `looksLikePii` directly.
 
 **Not here.** `platform/events/client.ts` (`track` → `POST /api/events`) lands with the route (F-c); the
-`vercel-analytics` and `meta` sinks land with Phase 4c; `platform/privacy.exportUser` (07 §6.1) is Phase 3.
+`vercel-analytics` and `meta` sinks land with Phase 4c; `platform/privacy` **is built** (L-009 `3f`, B-46): the Art 17 erasure, both roads and
+the sweep. `exportUser` (Art 15, 07 §6.1's last sentence) is deliberately **not** in it — no surface asks for it
+yet, and a connector method with no caller is a claim rather than a capability.
 
 <!-- audit
 Last edited: 2026-09-17T12:10+10:00 — BB-LDN-Planner-070926/P1-WIRE

@@ -4,3 +4,4 @@ export type * from "./types";
 export { openErasureRequestAction } from "./actions/open-erasure-request-action";
 export { runErasureRequestAction } from "./actions/run-erasure-request-action";
 export { loadErasureRequests } from "./lib/load-erasure-requests";
+export { ErasurePanel } from "./components/ErasurePanel";
