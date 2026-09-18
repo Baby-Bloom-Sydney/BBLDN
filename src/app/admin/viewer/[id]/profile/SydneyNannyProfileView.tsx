@@ -1,3 +1,14 @@
+// SYDNEY LEGACY, moved not rewritten (L-008 `2d`).
+//
+// This was `src/app/nanny/profile/NannyMyProfile.tsx`, the Sydney nanny profile screen. `2d` rebuilt S-N-17 as a
+// London screen in `onboarding-nanny` (`03.22` Rejig: DBS, area + district, £, the DfE ladder, and no second
+// write road), so the nanny-facing route no longer uses this file. The **admin impersonation viewer** still
+// does, and that surface is Sydney's — `2c` recorded the Sydney users tab as gap 1 and `09.10` is open — so the
+// component is moved to its one remaining caller rather than deleted under it. It keeps its Sydney vocabulary
+// (including the Sydney check name, which is why `banned-literals` still counts it) until that surface is taken.
+//
+// Nothing London imports this. Do not add a caller: S-N-17 is `onboarding-nanny`'s `NannyMyProfile`.
+
 "use client";
 
 import { useState, useEffect, useTransition, useRef } from "react";

@@ -43,7 +43,7 @@ const placement = (over: Partial<PlacementRead> = {}): PlacementRead =>
     connectionId: "c-1" as ConnectionId,
     state: "ACTIVE",
     weeklyHours: 30,
-    hourlyRatePence: 1800,
+    hourlyRatePence: 1800, // config-literal-ok: a row fixture, not a price
     startDate: "2026-10-12",
     ...over,
   }) as PlacementRead;

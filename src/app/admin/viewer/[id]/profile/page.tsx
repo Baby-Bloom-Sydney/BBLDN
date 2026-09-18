@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { NannyMyProfile } from "@/app/nanny/profile/NannyMyProfile";
+import { NannyMyProfile } from "./SydneyNannyProfileView";
 import type { NannyProfile } from "@/lib/actions/nanny";
 
 export default async function AdminViewerProfilePage({

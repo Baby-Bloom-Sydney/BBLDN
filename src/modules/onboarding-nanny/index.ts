@@ -30,6 +30,13 @@ export { nannyHubView } from "./lib/nanny-hub-view";
 export { loadCommissionPage } from "./lib/load-commission-page";
 export { NannyCommissionPage } from "./components/NannyCommissionPage";
 export { loadNannyProfile } from "./lib/load-nanny-profile";
+// S-N-17 (`03.22`) and S-N-21 (`03.24`, payouts dropped — N-2): their one server read each, their pure views,
+// and the one place either screen speaks about verification (which never names the hold — ADR-157).
+export { loadNannyProfilePage } from "./lib/load-nanny-profile-page";
+export { nannyProfileView } from "./lib/nanny-profile-view";
+export { loadNannySettings } from "./lib/load-nanny-settings";
+export { nannySettingsView } from "./lib/nanny-settings-view";
+export { nannyVerificationSummary } from "./lib/nanny-verification-summary";
 export { carriedTokenCookie } from "./lib/carried-token-cookie";
 export { isNannyProfileComplete } from "./lib/is-nanny-profile-complete";
 export { FUNNEL_STEPS } from "./lib/funnel-steps";
@@ -44,3 +51,5 @@ export { NannyApplyFunnel } from "./components/NannyApplyFunnel";
 export { NannySignupForm } from "./components/NannySignupForm";
 export { NannyHub } from "./components/NannyHub";
 export { NannyProfileStepper } from "./components/NannyProfileStepper";
+export { NannyMyProfile } from "./components/NannyMyProfile";
+export { NannySettings } from "./components/NannySettings";
