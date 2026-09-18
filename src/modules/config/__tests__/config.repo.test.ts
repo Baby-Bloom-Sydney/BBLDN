@@ -86,6 +86,11 @@ describe("config — the environment is read only by the two readers (01 §1.3 r
  *
  * The fix is a split by colour, and these cases are what keep it split: a later edit that folds the config
  * gates back in beside `banned-words` fails here rather than silently un-requiring them again.
+ *
+ * **The split worked and `config-gates` is now a required check** — the eighth context on `main`'s branch
+ * protection, verified against the protection API (L-009 `3g`). So these cases guard a live requirement rather
+ * than an aspiration: folding the steps back would not merely hide them, it would move a control out from
+ * behind a merge gate that exists today.
  */
 describe("ci — the green gates are not in a job that is allowed to be red (Q-4)", () => {
   const workflow = readFileSync(
