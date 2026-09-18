@@ -33,6 +33,16 @@ const PURGE = resolve(
   REPO_ROOT,
   "supabase/migrations/0030_purge-scrubbed-users.sql",
 );
+// L-009 `3h`: ADR-179's words are about a *retention class*, not only about the three an erasure keeps — "a
+// retention class added to 07 §6.2 without a config entry is a gate failure". So the gate has two more sides.
+// `config/retention.ts` is 07 §6.2's whole seventeen-row table as a value, and `0031` is the sweep that acts on
+// it; a row with no entry is a class nothing sweeps and nobody learns, and an arm the schedule does not name
+// (or a schedule entry with no arm) is a sweep that raises nightly or silently does nothing.
+const SCHEDULE = resolve(REPO_ROOT, "src/modules/config/retention.ts");
+const SWEEP = resolve(
+  REPO_ROOT,
+  "supabase/migrations/0031_retention-sweep.sql",
+);
 
 /** `class: "money",` … in the `erasureRetains` array. */
 function configClasses(source) {
@@ -65,6 +75,38 @@ function sqlClasses(source) {
     /v_retained\s+constant\s+text\[\]\s*:=\s*array\[([^\]]*)\]/.exec(source);
   if (match === null) return null;
   return [...match[1].matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
+}
+
+/** 07 §6.2's rows the schedule names, and the classes it gives a real treatment. */
+function scheduleRows(source) {
+  const block = source.slice(source.indexOf("schedule: Object.freeze(["));
+  return [...block.matchAll(/specRow:\s*(\d+)/g)].map((m) => Number(m[1]));
+}
+
+/** A class is *acting* when its treatment removes or nulls something; `none` and `deferred` do neither. */
+function actingClasses(source) {
+  const block = source.slice(source.indexOf("schedule: Object.freeze(["));
+  return [...block.matchAll(/class:\s*"([a-z-]+)"([\s\S]*?)\n    \}\),/g)]
+    .filter(([, , body]) => /kind:\s*"(delete|null-columns)"/.test(body))
+    .map(([, name]) => name);
+}
+
+/** The `when '<class>' then` arms `0031` actually implements. */
+function sweepArms(source) {
+  const body = source.slice(source.indexOf("case p_class"));
+  const arms = [...body.matchAll(/^\s{4}when '([a-z-]+)' then$/gm)].map(
+    (m) => m[1],
+  );
+  return arms.length === 0 ? null : arms;
+}
+
+export function compareRetentionSchedule() {
+  const schedule = readFileSync(SCHEDULE, "utf8");
+  return {
+    rows: scheduleRows(schedule),
+    acting: actingClasses(schedule),
+    arms: sweepArms(readFileSync(SWEEP, "utf8")),
+  };
 }
 
 export function compareRetentionClasses() {
@@ -136,8 +178,33 @@ function main() {
     process.exit(1);
   }
 
+  // ── the fourth and fifth sides (L-009 `3h`): 07 §6.2's whole table, and the sweep that acts on it.
+  const { rows, acting, arms } = compareRetentionSchedule();
+  const SPEC_ROWS = Array.from({ length: 17 }, (_, i) => i + 1);
+  const uncovered = SPEC_ROWS.filter((row) => !rows.includes(row));
+  if (uncovered.length > 0) {
+    console.error(
+      `check-retention-classes: FAIL — 07 §6.2 row(s) ${uncovered.join(", ")} have no entry in config/retention.ts. A retention class with no config entry is a gate failure, not a documentation choice (ADR-179): retention-sweep would silently do nothing about it.`,
+    );
+    process.exit(1);
+  }
+  if (arms === null) {
+    console.error(
+      "check-retention-classes: FAIL — 0031 names no class arms. The sweep must state which classes it implements so this gate can join them to the schedule.",
+    );
+    process.exit(1);
+  }
+  const armOnly = arms.filter((name) => !acting.includes(name));
+  const scheduleOnly = acting.filter((name) => !arms.includes(name));
+  if (armOnly.length > 0 || scheduleOnly.length > 0) {
+    console.error(
+      `check-retention-classes: FAIL — retention_sweep_class() and config/retention.ts disagree (job-only: ${armOnly.join(", ") || "none"}; schedule-only: ${scheduleOnly.join(", ") || "none"}). An arm the schedule does not give a treatment is dead code the cron never calls; a class the schedule acts on with no arm makes the sweep raise every night.`,
+    );
+    process.exit(1);
+  }
+
   console.log(
-    `check-retention-classes: OK — the erasure job, the purge and LEGAL.erasureRetains name the same ${config.length} classes (${config.join(", ")}), each with a window and an anchor`,
+    `check-retention-classes: OK — the erasure job, the purge and LEGAL.erasureRetains name the same ${config.length} classes (${config.join(", ")}), each with a window and an anchor; config/retention.ts covers all 17 rows of 07 §6.2 and its ${acting.length} acting classes are exactly retention_sweep_class()'s arms`,
   );
 }
 
