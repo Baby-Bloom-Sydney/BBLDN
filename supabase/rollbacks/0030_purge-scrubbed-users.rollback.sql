@@ -11,7 +11,7 @@
 -- first run afterwards catches up by construction, because "ready to purge" is computed from the ledger's dates
 -- rather than from a cursor this file could have lost.
 --
--- ⚠️ **THREE THINGS THIS FILE DELIBERATELY DOES NOT UNDO — ADR-165 (1), each named.**
+-- ⚠️ **FOUR THINGS THIS FILE DELIBERATELY DOES NOT UNDO — ADR-165 (1), each named.**
 --
 -- 1. ★ **`vetting_submissions.decided_by` and `verifications.dbs_update_service_checked_by` stay
 --    `on delete restrict`.** `0030` narrowed them from `set null` on `3f`'s Q-3: *"an audit row whose author can
@@ -20,11 +20,18 @@
 --    removes the author of a safeguarding decision — exactly ADR-165 (2)'s "hole", and it costs the reverted code
 --    nothing, because nothing before `0030` hard-deletes an `auth.users` row.
 --
--- 2. **`account_erasure_requests.subject_user_id` stays nullable.** Restoring `not null` would fail outright on
+-- 2. ★ **`payment_events.parent_user_id` stays `on delete restrict`.** `0030` narrowed it from `set null` so
+--    that the safety net the job claims — "anything still referencing the row raises" — is true for the money
+--    class rather than true for three of its four tables. Re-arming `set null` would hand back a road that
+--    silently orphans a payment event still inside its Limitation Act window, which is a hole in ADR-165 (2)'s
+--    sense; and it costs the reverted code nothing, because nothing before `0030` hard-deletes an `auth.users`
+--    row at all.
+--
+-- 3. **`account_erasure_requests.subject_user_id` stays nullable.** Restoring `not null` would fail outright on
 --    any database where a purge has already run, and would be pointless anywhere else: nothing writes a null but
 --    the function this file removes. A column that permits a value nothing writes is not a hole.
 --
--- 3. **`purged_at` is kept, with its values.** It records that a hard delete happened on a given date, which is
+-- 4. **`purged_at` is kept, with its values.** It records that a hard delete happened on a given date, which is
 --    an Art 5(2) fact about what we did; dropping the column would destroy that record to tidy up a schema.
 --
 -- One transaction: a rollback that fails midway must not leave half the objects standing.
@@ -39,7 +46,7 @@ drop function if exists public.subjects_ready_to_purge(timestamptz, integer);
 commit;
 
 -- ---------------------------------------------------------------------------
--- Verify — the job is gone, and the three clauses above are still standing
+-- Verify — the job is gone, and the four clauses above are still standing
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -55,6 +62,12 @@ begin
     end if;
   end loop;
 
+  -- ★ Clause 2 — the money safety net is still true.
+  if (select c.confdeltype from pg_constraint c join pg_class t on t.oid = c.conrelid
+       where t.relname = 'payment_events' and c.conname = 'payment_events_parent_user_id_fkey') <> 'r' then
+    raise exception '0030 rollback: it re-armed set null on payment_events.parent_user_id';
+  end if;
+
   -- ★ Clause 1 — the safeguarding authors are still undeletable.
   if (select c.confdeltype from pg_constraint c join pg_class t on t.oid = c.conrelid
        where t.relname = 'vetting_submissions'
@@ -67,7 +80,7 @@ begin
     raise exception '0030 rollback: it re-armed set null on verifications.dbs_update_service_checked_by';
   end if;
 
-  -- Clause 3 — the record of what we did is still there.
+  -- Clause 4 — the record of what we did is still there.
   if not exists (
     select 1 from information_schema.columns
      where table_schema = 'public' and table_name = 'account_erasure_requests'

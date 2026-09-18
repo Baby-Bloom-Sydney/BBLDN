@@ -64,6 +64,13 @@
 --     second case is the safety net that matters: if the window list ever misses a table, the delete is refused
 --     by the database rather than succeeding against a row somebody still needs.
 --
+-- ★ **`rows-outstanding` is a third answer and it exists because of a measured trap.** Every window can have
+-- passed and the rows still be here, because removing an *expired* money or consent row is `retention-sweep`'s
+-- job (07 §6.2 rows 9 and 11) and that job has no handler yet. Measured on the applied stack with a
+-- `parent_subscriptions` row whose window passed ten years ago: the delete raised `23503`, which the store
+-- classifies as retryable, so the sweep would have tried the same subject every night for ever. It is a
+-- **recorded** refusal naming the table instead — nothing to retry, and an operator can read what is owed.
+--
 -- **Two definers, for ADR-183's reason.** `auth` is owned by `supabase_auth_admin` and its privileges are not
 -- re-grantable, so the delete cannot run under the retention identity: `purge_auth_user()` is owned by the
 -- deploying role, its whole body is the deletion of one named row, and EXECUTE is `bbldn_retention`'s alone.
@@ -71,7 +78,7 @@
 -- ledger's own append-only guard admits the one update it makes. Either owner alone would have failed: the first
 -- cannot touch `auth`, the second cannot write the ledger.
 --
--- Additive over `0000`–`0029`: one column, one NOT NULL dropped, two foreign keys replaced, two functions.
+-- Additive over `0000`–`0029`: one column, one NOT NULL dropped, **three** foreign keys replaced, four functions.
 
 begin;
 
@@ -109,6 +116,29 @@ alter table public.verifications
 
 comment on column public.verifications.dbs_update_service_checked_by is
   'ON DELETE RESTRICT since 0030: as vetting_submissions.decided_by — who ran the Update Service check is part of the decision, not metadata about it.';
+
+-- ---------------------------------------------------------------------------
+-- 2b. The money safety net, made true rather than claimed (database pass, MEDIUM)
+-- ---------------------------------------------------------------------------
+-- This file says of its own delete that "anything still referencing the row raises `foreign_key_violation` …
+-- the safety net for a class this function does not yet know about". That was **false for one table**:
+-- `payment_events.parent_user_id` is `on delete set null` while every money sibling
+-- (`parent_subscriptions`, `refund_requests`, `guarantee_events`) is `restrict`. So a bug in the money window
+-- would have let the purge proceed and silently null a payment event still inside its Limitation Act window —
+-- no error, no evidence, exactly the outcome the sentence promises cannot happen.
+--
+-- Pre-existing from `0010` and harmless until now, because nothing hard-deleted an `auth.users` row. This is
+-- the file that does, so it is this file's to close. The column stays nullable — a webhook event that never
+-- resolved to a parent is a real row — and 07 §6.1's rule for money is unchanged: those rows outlive the
+-- account with their `user_id` intact.
+alter table public.payment_events
+  drop constraint if exists payment_events_parent_user_id_fkey;
+alter table public.payment_events
+  add constraint payment_events_parent_user_id_fkey
+  foreign key (parent_user_id) references auth.users (id) on delete restrict;
+
+comment on column public.payment_events.parent_user_id is
+  'ON DELETE RESTRICT since 0030: the money classes are kept six years (07 §6.2 row 9) and purge-scrubbed-users is the first job that hard-deletes an auth.users row. Under set null a mis-computed money window would have orphaned a payment event silently; under restrict the database refuses and the purge says why.';
 
 -- ---------------------------------------------------------------------------
 -- 3. Who is ready to be considered
@@ -223,12 +253,25 @@ declare
   v_class        text;
   v_months       integer;
   v_from         text;
+  v_blocker      record;
+  v_outstanding  boolean;
 begin
   -- ADR-179 at run time: a class with no window is not a class we may quietly skip.
+  --
+  -- ★ The **anchor is validated, not merely present** (database pass, MEDIUM). Each window below reads
+  -- `case when v_from = 'scrub' then … else <last activity> end`, so a typo — `"srub"`, or a key renamed in
+  -- `LEGAL.erasureRetains` — would fall silently into the activity branch and compute the wrong date with
+  -- complete confidence. A malformed anchor is the same failure mode as a missing one, so it raises the same way.
   foreach v_class in array array['money', 'consent', 'safeguarding'] loop
     if p_windows -> v_class ->> 'months' is null or p_windows -> v_class ->> 'from' is null then
       raise exception
         'purge_scrubbed_user: no retention window supplied for class % — LEGAL.erasureRetains is the one owner of these dates (ADR-179)', v_class
+        using errcode = 'invalid_parameter_value';
+    end if;
+    if p_windows -> v_class ->> 'from' not in ('scrub', 'last-activity') then
+      raise exception
+        'purge_scrubbed_user: class % names the anchor %, which is neither "scrub" nor "last-activity" — a window is a number AND the date it runs from (ADR-179)',
+        v_class, p_windows -> v_class ->> 'from'
         using errcode = 'invalid_parameter_value';
     end if;
   end loop;
@@ -261,6 +304,18 @@ begin
     -- Not a failure: the purge is only ever about an account that went through §6.1, and refusing to touch one
     -- that did not is the whole safety of the job.
     return jsonb_build_object('outcome', 'refused', 'reason', 'not-erased');
+  end if;
+
+  -- ★ **An OPEN request means something is still outstanding, so the purge does not run** (database pass,
+  -- CRITICAL). A subject can hold a completed erasure *and* a later `requested` row — a duplicate, or an admin
+  -- actioning an emailed request the person had also made herself. Purging underneath it would leave a pending
+  -- Art 12 request pointing at a person who no longer exists, and the write below would have stamped it as
+  -- purged. Recorded, not raised: a human has to close the open request, and no amount of retrying will.
+  if exists (
+    select 1 from public.account_erasure_requests r
+     where r.subject_user_id = p_user_id and r.state = 'requested'
+  ) then
+    return jsonb_build_object('outcome', 'refused', 'reason', 'request-open');
   end if;
 
   -- ── money (07 §6.2 row 9) — anchored on the LAST TRANSACTION ────────────────────────────────────────────
@@ -320,13 +375,65 @@ begin
     end if;
   end if;
 
+  -- ★ **Every window has passed — but the rows may still be here, and that is a different refusal.**
+  -- Removing an *expired* money or consent row is `retention-sweep`'s job (07 §6.2 rows 9 and 11), and that
+  -- job has no handler yet. Under a `restrict` key the delete below would then raise `23503`, which the store
+  -- classifies as retryable, and the sweep would try the same subject every night for ever. Measured on the
+  -- applied stack (2026-09-20) with a `parent_subscriptions` row whose window passed ten years ago.
+  --
+  -- So it is a **recorded** refusal naming the table: there is nothing to retry, and an operator can read what
+  -- is owed. The list is read from the catalogue rather than typed, so a `restrict` key added later is covered
+  -- the day it appears — which is the same safety-net argument as the `23503` arm, one step earlier and legible.
+  for v_blocker in
+    select t.relname as tbl, a.attname as col
+      from pg_constraint c
+      join pg_class t on t.oid = c.conrelid
+      join pg_namespace n on n.oid = t.relnamespace
+      join pg_class ft on ft.oid = c.confrelid
+      join pg_namespace fn on fn.oid = ft.relnamespace
+      join pg_attribute a on a.attrelid = t.oid and a.attnum = c.conkey[1]
+     where c.contype = 'f' and c.confdeltype = 'r'
+       and fn.nspname = 'auth' and ft.relname = 'users'
+       and n.nspname = 'public'
+       and array_length(c.conkey, 1) = 1
+       -- this function nulls the ledger itself, below, so it is not a blocker
+       and t.relname <> 'account_erasure_requests'
+     order by t.relname, a.attname
+  loop
+    execute format('select exists (select 1 from public.%I where %I = $1)', v_blocker.tbl, v_blocker.col)
+      into v_outstanding using p_user_id;
+    if v_outstanding then
+      return jsonb_build_object('outcome', 'refused', 'reason', 'rows-outstanding', 'table', v_blocker.tbl);
+    end if;
+  end loop;
+
   -- The ledger lets the subject go, explicitly and before the delete, so the FK never has to act. This is the
   -- update `is_retention_job()` admits, which is why this function is owned by `bbldn_retention` and the delete
   -- below is not.
+  -- ★ **Narrowed, probed, and split into two statements** (database pass, CRITICAL + MEDIUM).
+  --
+  --   · `state <> 'requested'` — the structural half of the refusal above. A single `where subject_user_id = …`
+  --     matched *every* row for the subject, so a still-open request was nulled and stamped as purged. The
+  --     narrower `state = 'completed'` would have been wrong in the other direction: the key is
+  --     `on delete restrict`, so an old **refused** row left pointing at the subject makes the delete below
+  --     raise for ever. Every row that is not open must let go; the open one is why we are not here.
+  --   · `for update nowait` — the house idiom (`0027`, `0028`, and this file's own `auth_user_purge_state`).
+  --     The transaction already holds the `auth.users` row lock, so a blocking wait here is a purge holding a
+  --     lock while it waits; failing fast and letting the sweep retry is ADR-182's shape.
+  --   · **`purged_at` goes on the completed row only.** It says "we hard-deleted on this date", and a refusal
+  --     from two years earlier did not do that. Stamping it there would make the ledger say something untrue
+  --     about a row that is otherwise correct.
+  perform 1 from public.account_erasure_requests r
+   where r.subject_user_id = p_user_id and r.state <> 'requested'
+   for update nowait;
+
   update public.account_erasure_requests r
-     set subject_user_id = null,
-         purged_at = now()
-   where r.subject_user_id = p_user_id;
+     set subject_user_id = null
+   where r.subject_user_id = p_user_id and r.state <> 'requested';
+
+  update public.account_erasure_requests r
+     set purged_at = now()
+   where r.id = v_request.id;
 
   -- Anything still referencing the row raises `foreign_key_violation` here and the whole transaction rolls back
   -- — the safety net for a class this function does not yet know about.
@@ -436,7 +543,24 @@ begin
     raise exception '0030: bbldn_retention was left holding create on schema public';
   end if;
 
-  -- 6. Both safeguarding author keys refuse a delete (3f Q-3).
+  -- 6. The anchor is validated, not merely present (database pass, MEDIUM).
+  begin
+    perform public.purge_scrubbed_user(v_probe, jsonb_build_object(
+      'money',        jsonb_build_object('months', 72, 'from', 'srub'),
+      'consent',      jsonb_build_object('months', 72, 'from', 'scrub'),
+      'safeguarding', jsonb_build_object('months', 12, 'from', 'scrub')));
+    raise exception '0030: a misspelled anchor was accepted — the job would have computed the wrong date';
+  exception
+    when invalid_parameter_value then null;  -- the guard fired, which is the point
+  end;
+
+  -- 7. The money safety net is true rather than claimed (database pass, MEDIUM).
+  if (select c.confdeltype from pg_constraint c join pg_class t on t.oid = c.conrelid
+       where t.relname = 'payment_events' and c.conname = 'payment_events_parent_user_id_fkey') <> 'r' then
+    raise exception '0030: payment_events.parent_user_id is not ON DELETE RESTRICT — the FK safety net this file claims is false for it';
+  end if;
+
+  -- 8. Both safeguarding author keys refuse a delete (3f Q-3).
   if (select c.confdeltype from pg_constraint c join pg_class t on t.oid = c.conrelid
        where t.relname = 'vetting_submissions' and c.conname = 'vetting_submissions_decided_by_fkey') <> 'r' then
     raise exception '0030: vetting_submissions.decided_by is not ON DELETE RESTRICT';

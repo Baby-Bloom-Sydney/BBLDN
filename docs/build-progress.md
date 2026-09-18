@@ -1216,11 +1216,26 @@ version accepted`. Re-based onto the connector with no caller's signature change
   the gate and its helper. `05.03`: stocktake Q6 closed — the second biometric recorder is deleted and
   `consent-writers.repo.test.ts` asserts one road per consent table.
 - **`purge-scrubbed-users`** (07 §6.1 step 6's second half; `0030`) — `3f`'s named residual, and the last part of
-  §6.1 with nothing behind it. One transaction per subject, idempotent on the **absence** of the `auth.users`
-  row, refusing in ADR-182's two ways with the date each window runs out. **The windows come from
-  `LEGAL.erasureRetains` and a missing class raises** (ADR-179's ruling), and money's anchor is the last
-  transaction while consent's is the scrub. `3f`'s **Q-3 ruled with it**: both safeguarding-author keys move to
-  `restrict`, because this is the first job that hard-deletes an `auth.users` row at all.
+  §6.1 with nothing behind it.
+  **The database pass on `0030` was the expensive one, and worth it.** One CRITICAL, reproduced live: the ledger
+  write had no `state` filter, so a subject holding a completed erasure _and_ a later still-open request had that
+  open request nulled and stamped as purged — a pending Art 12 request pointing at nobody. The narrower
+  `state = 'completed'` would have been wrong the other way (an old **refused** row left pointing at the subject
+  makes the delete raise for ever), so the fix is `state <> 'requested'` plus a **recorded `request-open`
+  refusal**, with `for update nowait` and `purged_at` on the completed row only. Two MEDIUMs closed with it: the
+  anchor is now validated rather than merely present (a misspelled `from` fell silently into the wrong branch and
+  computed a wrong date with complete confidence), and **`payment_events.parent_user_id` moves `set null` →
+  `restrict`**, because the file's own claim that "anything still referencing the row raises" was true for three
+  of the four money tables and false for that one. A third refusal, **`rows-outstanding`**, came from a
+  measurement of my own: with every window passed but the rows still here — `retention-sweep` is unbuilt — the
+  delete raised `23503`, which the store classifies as retryable, so the sweep would have tried the same subject
+  every night for ever.
+
+One transaction per subject, idempotent on the **absence** of the `auth.users`
+row, refusing in ADR-182's two ways with the date each window runs out. **The windows come from
+`LEGAL.erasureRetains` and a missing class raises** (ADR-179's ruling), and money's anchor is the last
+transaction while consent's is the scrub. `3f`'s **Q-3 ruled with it**: both safeguarding-author keys move to
+`restrict`, because this is the first job that hard-deletes an `auth.users` row at all.
 
 ## Files created / modified in the prior unit (`3f` — the erasure job end to end; L-009 Phase 3, B-46)
 

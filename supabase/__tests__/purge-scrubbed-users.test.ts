@@ -26,7 +26,12 @@ const WINDOWS = {
 let db: Client;
 let seq = 0;
 
-type Answer = { outcome: string; reason?: string; until?: string };
+type Answer = {
+  outcome: string;
+  reason?: string;
+  until?: string;
+  table?: string;
+};
 
 async function subject(options: {
   erased?: boolean;
@@ -201,6 +206,92 @@ describe("int.purge — the refusals, which are almost every run", () => {
   });
 });
 
+describe("int.purge — the ledger is not collateral (database pass, CRITICAL)", () => {
+  it("★ refuses while a SECOND, still-open request exists — and does not touch that row", async () => {
+    await db.query("savepoint s");
+    const id = await subject({});
+    // A duplicate: an admin actioning an emailed request the person had also made herself.
+    await db.query(
+      `insert into public.account_erasure_requests (subject_user_id, road, state)
+       values ($1, 'admin', 'requested')`,
+      [id],
+    );
+
+    expect(await purge(id)).toMatchObject({
+      outcome: "refused",
+      reason: "request-open",
+    });
+
+    const { rows } = await db.query<{
+      state: string;
+      subject_user_id: string | null;
+      purged_at: string | null;
+    }>(
+      `select state, subject_user_id, purged_at from public.account_erasure_requests
+        where state = 'requested'`,
+    );
+    expect(rows).toHaveLength(1);
+    // The open request still names its subject and is not stamped as purged — it is still actionable.
+    expect(rows[0].subject_user_id).toBe(id);
+    expect(rows[0].purged_at).toBeNull();
+    expect(await stillThere(id)).toBe(true);
+
+    await db.query("rollback to savepoint s");
+  });
+
+  it("★ a prior REFUSED request lets go, or the delete would raise for ever", async () => {
+    await db.query("savepoint s");
+    const id = await subject({});
+    // She asked once while a placement was live, was refused, ended it, and asked again.
+    await db.query(
+      `insert into public.account_erasure_requests (subject_user_id, road, state, refusal_reason)
+       values ($1, 'self-service', 'refused', 'live-placement')`,
+      [id],
+    );
+
+    expect(await purge(id)).toMatchObject({ outcome: "purged" });
+    expect(await stillThere(id)).toBe(false);
+
+    const { rows } = await db.query<{
+      state: string;
+      subject_user_id: string | null;
+      purged_at: string | null;
+    }>(
+      `select state, subject_user_id, purged_at from public.account_erasure_requests
+        where road in ('self-service','admin') order by state`,
+    );
+    // Both rows let go of the subject; only the completed one says a purge happened.
+    expect(rows.map((r) => r.subject_user_id)).toEqual([null, null]);
+    expect(
+      rows.filter((r) => r.purged_at !== null).map((r) => r.state),
+    ).toEqual(["completed"]);
+
+    await db.query("rollback to savepoint s");
+  });
+
+  it("★ refuses with `rows-outstanding` when every window has passed but the rows are still here", async () => {
+    await db.query("savepoint s");
+    // The scrub and the last transaction are both a decade old, so no window holds her — but
+    // `retention-sweep` has not removed the expired money row, and the key is `restrict`. Without this
+    // refusal the delete raises 23503, the store calls it retryable, and the sweep loops for ever.
+    const id = await subject({ scrubbedAt: "2014-01-01T00:00:00Z" });
+    await db.query(
+      `insert into public.parent_subscriptions (parent_user_id, status, created_at)
+       values ($1, 'cancelled', '2014-01-01T00:00:00Z')`,
+      [id],
+    );
+
+    expect(await purge(id)).toMatchObject({
+      outcome: "refused",
+      reason: "rows-outstanding",
+      table: "parent_subscriptions",
+    });
+    expect(await stillThere(id)).toBe(true);
+
+    await db.query("rollback to savepoint s");
+  });
+});
+
 describe("int.purge — ADR-179 at run time", () => {
   it("★ raises when a class has no window, rather than assuming one", async () => {
     await db.query("savepoint s");
@@ -209,6 +300,20 @@ describe("int.purge — ADR-179 at run time", () => {
     await expect(
       purge(id, { money: { months: 72, from: "last-activity" } }),
     ).rejects.toThrow(/no retention window supplied for class consent/);
+
+    await db.query("rollback to savepoint s");
+  });
+
+  it("★ raises on a MISSPELLED anchor too — the wrong date computed confidently is the same failure", async () => {
+    await db.query("savepoint s");
+    const id = await subject({});
+
+    await expect(
+      purge(id, {
+        ...WINDOWS,
+        money: { months: 72, from: "srub" },
+      }),
+    ).rejects.toThrow(/neither "scrub" nor "last-activity"/);
 
     await db.query("rollback to savepoint s");
   });
@@ -302,6 +407,28 @@ describe("int.purge — who may run it", () => {
     );
 
     expect(rows[0].owner).toBe("bbldn_retention");
+  });
+
+  it("★ the money safety net is true, not claimed: every money key refuses a delete", async () => {
+    const { rows } = await db.query<{ tbl: string; action: string }>(
+      `select t.relname as tbl, c.confdeltype::text as action
+         from pg_constraint c
+         join pg_class t on t.oid = c.conrelid
+         join pg_class ft on ft.oid = c.confrelid
+         join pg_namespace fn on fn.oid = ft.relnamespace
+         join pg_attribute a on a.attrelid = t.oid and a.attnum = c.conkey[1]
+        where c.contype = 'f' and fn.nspname = 'auth' and ft.relname = 'users'
+          and t.relname in ('parent_subscriptions','payment_events','refund_requests','guarantee_events')
+          and a.attname in ('parent_user_id')
+        order by t.relname`,
+    );
+
+    expect(rows).toEqual([
+      { tbl: "guarantee_events", action: "r" },
+      { tbl: "parent_subscriptions", action: "r" },
+      { tbl: "payment_events", action: "r" },
+      { tbl: "refund_requests", action: "r" },
+    ]);
   });
 
   it("the retention identity was not left holding `create` on the schema", async () => {
