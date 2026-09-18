@@ -145,7 +145,13 @@ describe("dbVettingStore — the ledger over 0022 (ADR-154)", () => {
       p_columns: {
         dbs_certificate_number: "001234567890",
         dbs_issue_date: "2025-06-01",
-        dbs_update_service_consent_at: true, // REVIEW-3 M-5: the key's presence; 0023 stamps now()
+        // REVIEW-4 C-1: the key's PRESENCE is the consent and `0023:980-982` stamps `now()` — but
+        // `jsonb_populate_record` casts every admitted key through the column's own type, and
+        // `verifications.dbs_update_service_consent_at` is `timestamptz`. A boolean here raises 22007
+        // inside `submit_verification_evidence` and no DBS certificate can be submitted at all.
+        // `null` carries the presence (`p_columns ? key` is true for a null value) and casts cleanly.
+        // Held from both sides by `supabase/__tests__/dbs-consent-marker.test.ts`.
+        dbs_update_service_consent_at: null,
       },
     });
     expect(columns[2]).toMatchObject({

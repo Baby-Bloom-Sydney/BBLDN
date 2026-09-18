@@ -42,18 +42,24 @@ export async function sendNannyCallMessages(input: {
   if (!confirmation.ok)
     warn("call-confirmation", booking.id as string, confirmation.error.code);
 
-  if (adminEmail === undefined) {
+  // ★ REVIEW-4 M-2 — the `adminEmail === undefined` return below is about the NOTICE, never about the row. It
+  // predates ADR-160, when this function only sent email; the `notifyAdmin` call was appended underneath it, so
+  // a boot with no admin address silently lost the operator's queue row as well — a nanny books her commission
+  // call and nothing anywhere says so. ADR-160's own words are "the email is the delivery, the
+  // `admin_notifications` row the state", and the state is the half that has to survive a missing address.
+  if (adminEmail !== undefined) {
+    const notice = await comms.send({
+      channel: "email",
+      templateId: "admin-commission-booking",
+      to: { email: adminEmail as Email },
+      data: { slotAt: booking.start, bookingId: booking.id as string },
+    });
+    if (!notice.ok)
+      warn("admin-commission-booking", booking.id as string, notice.error.code);
+  } else {
     warn("admin-commission-booking", booking.id as string, "NO_ADMIN_ADDRESS");
-    return;
   }
-  const notice = await comms.send({
-    channel: "email",
-    templateId: "admin-commission-booking",
-    to: { email: adminEmail as Email },
-    data: { slotAt: booking.start, bookingId: booking.id as string },
-  });
-  if (!notice.ok)
-    warn("admin-commission-booking", booking.id as string, notice.error.code);
+
   // ADR-160: the email is the delivery, the `admin_notifications` row the state (02 §4.6) — one writer, `comms`.
   const row = await comms.notifyAdmin({
     kind: "commission_call_booked",
