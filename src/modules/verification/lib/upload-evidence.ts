@@ -43,6 +43,15 @@ async function prepare(
     );
   if (mime === "application/pdf") return ok({ bytes: file.bytes, mime });
   const image = await reEncodeImage(file.bytes);
+  // Our runtime, not her file (REVIEW-3 H-1): the same arm the scanner's `unavailable` verdict takes below.
+  // An outage is an outage whichever provider is down, and "try another photo" would be false — she would
+  // spend the attempt, and every other nanny would spend hers, on a fault no camera can fix.
+  if (image === "encoder-unavailable")
+    return err<VerificationErrorDetails>(
+      "PROVIDER_ERROR",
+      "We couldn't process that photo just now. Try again in a moment.",
+      { reason: "storage_failure" },
+    );
   if (image === null)
     return refuse(
       "invalid_type",
