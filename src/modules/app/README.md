@@ -43,6 +43,13 @@ child, and the `nanny_to_parent` token, in that order. **The nanny-mint pin is f
 `invite-methods` passes it, and `createChild` gained the unclaimed branch (`child-creator-of.ts`). Neither the
 trial nor the access window moves on that branch — there is no family until the token is claimed.
 
+**The ADR-142 pass (`2g`).** 0 CRITICAL · **1 HIGH** (`addFamilyChildAction` had no limiter: a `"use server"`
+export doing three writes, with idempotency on the mint but **not** on the creation) · 0 MEDIUM · **1 LOW** (the
+`dateOfBirth` cast — a malformed value is `NaN` in `ageInMonths`, and `NaN >= cap` is `false`, so the age cap
+passed silently and the `date` column was the only refusal). Both closed in-unit, RED first: 07 §8 gains **row
+17** (amend-first) and `SECURITY.rateLimits.childAdds` (user, 10 / day, fails closed) consumed before any write;
+`lib/is-iso-date.ts` validates the day at the boundary, round-tripped so `2025-02-30` is refused too.
+
 **Recorded, for the planner.** 03 §9.3's event taxonomy has **no name** for "a nanny added an unclaimed child",
 and it is append-only, so `2g` emits none rather than borrowing `app.family-in` (whose subject is a parent who
 does not exist yet). The observable fact is the `invite.sent` that follows one line later. Owner: 03 §9.3.
@@ -53,7 +60,7 @@ action: the tick, the order, every refusal).
 
 <!-- audit
 Last edited: 2026-09-18T16:20+10:00 — BB-LDN-Planner-070926/2g
-Notes: S-N-01 built (L-008 2g) — the pitch, `addFamilyChildAction`, AGR-14; the nanny-mint pin flipped by behaviour (ChildFacts.createdByUserId, mayMint, invite-methods, createChild's unclaimed branch). The missing event name recorded for 03 §9.3.
+Notes: S-N-01 built (L-008 2g) — the pitch, `addFamilyChildAction`, AGR-14, the ADR-142 pass's HIGH + LOW closed (07 §8 row 17 + the boundary date parse); the nanny-mint pin flipped by behaviour (ChildFacts.createdByUserId, mayMint, invite-methods, createChild's unclaimed branch). The missing event name recorded for 03 §9.3.
 Prior: 2026-09-16T16:15+10:00 — BB-LDN-Planner-070926/F-c
 Notes: initial authoring — the parent connector, the three sub-module folders, `stubApp` and the swap test.
 -->

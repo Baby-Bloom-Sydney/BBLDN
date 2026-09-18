@@ -12,12 +12,15 @@ import { SECURITY } from "@/modules/config";
 import {
   configureConsent,
   configureEvents,
+  configureRateLimiter,
   createConsent,
   createEvents,
   createLogger,
+  createRateLimiter,
   log,
   memoryConsentStore,
   memoryEventLogStore,
+  memoryRateLimitStore,
 } from "@/modules/platform";
 import type { ConsentRecordId, Email, Instant } from "@/modules/shared-types";
 import {
@@ -67,6 +70,12 @@ const signedInAs = (id: string | null) =>
 
 beforeEach(() => {
   store = memoryChildLinkingStore();
+  configureRateLimiter(
+    createRateLimiter({
+      store: memoryRateLimitStore(),
+      burstAlertMultiple: SECURITY.burstAlertMultiple,
+    }),
+  );
   configureEvents(createEvents({ store: memoryEventLogStore(), log }));
   consents = memoryConsentStore();
   let n = 0;
@@ -145,6 +154,33 @@ describe("S-N-01 — addFamilyChildAction", () => {
     signedInAs(PARENT);
 
     const refused = await addFamilyChildAction(null, form());
+
+    expect(refused.url).toBeNull();
+    expect(refused.error).not.toBeNull();
+    expect(store.state.children).toEqual([]);
+  });
+
+  it("is bounded by 07 §8 row 17 — the limit is consumed before anything is written", async () => {
+    // The ADR-142 pass's HIGH-1: this is a `"use server"` export, so the form is not the only caller. Two
+    // writes and a consent record per call, with no per-child idempotency on the creation step, is exactly the
+    // class of surface ADR-134 says must refuse rather than run unbounded.
+    const limit = SECURITY.rateLimits.childAdds.perDay ?? 0;
+    expect(limit).toBeGreaterThan(0);
+
+    const results = [];
+    for (let attempt = 0; attempt <= limit; attempt += 1)
+      results.push(await addFamilyChildAction(null, form()));
+
+    expect(results.at(-1)?.url).toBeNull();
+    expect(results.at(-1)?.error).not.toBeNull();
+    expect(store.state.children).toHaveLength(limit);
+  });
+
+  it("refuses a malformed date of birth before it writes (not by arithmetic that quietly passes)", async () => {
+    const refused = await addFamilyChildAction(
+      null,
+      form({ dateOfBirth: "not-a-date" }),
+    );
 
     expect(refused.url).toBeNull();
     expect(refused.error).not.toBeNull();

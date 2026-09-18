@@ -20,6 +20,8 @@ import type { ISODate, UserId } from "@/modules/shared-types";
 import type { AddFamilyChildState } from "../types";
 import { appActor } from "../lib/app-actor";
 import { childLinking } from "../lib/default-child-linking";
+import { consumeChildAddLimit } from "../lib/consume-child-add-limit";
+import { isIsoDate } from "../lib/is-iso-date";
 import { recordGuardianPermission } from "../lib/record-guardian-permission";
 
 const refuse = (error: string): AddFamilyChildState => ({ url: null, error });
@@ -28,6 +30,10 @@ const NOT_HERS =
   "Sign in as a childcare professional to add a family you work for.";
 const NO_PERMISSION =
   "Confirm you have this family's permission before you add their child.";
+const BAD_DOB = "Give the child's date of birth as a date.";
+// One line for "over the limit" and for "the limiter is down" alike: the difference is operational, and
+// telling them apart is a probe (07 §8; 01 §4a rule 2).
+const TOO_MANY = "That didn't go through — try again in a little while.";
 
 export async function addFamilyChildAction(
   _state: AddFamilyChildState | null,
@@ -41,11 +47,19 @@ export async function addFamilyChildAction(
   if (typeof permission !== "string" || permission.length === 0)
     return refuse(NO_PERMISSION);
 
+  // 01 §4a: validated **once, at the boundary**. Without this the string is cast to `ISODate` and reaches
+  // `ageInMonths`, where a malformed value is `NaN` — and `NaN >= APP.maxChildAgeMonths` is `false`, so the
+  // age cap silently passes and Postgres' `date` column becomes the only thing refusing it (`2g`'s security
+  // pass, LOW-1).
+  const dateOfBirth = String(form.get("dateOfBirth") ?? "");
+  if (!isIsoDate(dateOfBirth)) return refuse(BAD_DOB);
+
+  // 07 §8 row 17 — before any write, and before the consent record that would otherwise outlive a refusal.
+  if (!(await consumeChildAddLimit(actor.id as UserId)))
+    return refuse(TOO_MANY);
+
   const added = await childLinking.createChild(
-    {
-      firstName: String(form.get("firstName") ?? ""),
-      dateOfBirth: String(form.get("dateOfBirth") ?? "") as ISODate,
-    },
+    { firstName: String(form.get("firstName") ?? ""), dateOfBirth },
     actor,
   );
   if (!added.ok) return refuse(added.error.message);

@@ -100,6 +100,15 @@ const RATE_LIMITS = declarePolicies({
     perDay: 300,
     note: "S-N-18 profile steps per user (row 16)",
   },
+  // 07 §8 row 17 (`2g`'s ADR-142 pass): S-N-01's one submit writes an unclaimed `children` row, an AGR-14
+  // consent record and a `nanny_to_parent` invite. The mint is idempotent per child; the **creation is not**,
+  // and a `"use server"` export is callable without the form, so the surface is otherwise unbounded. Keyed on
+  // the nanny, at the volume a real one has: a handful of existing clients, not hundreds a day.
+  childAdds: {
+    key: "user",
+    perDay: 10,
+    note: "S-N-01 add-a-family per nanny (row 17)",
+  },
   // 07 §8 has **no row** for a signed-in parent creating a checkout or a portal session, and `1h` needed one:
   // both server actions call out to the purchase provider, so a parent in a tight loop is unbounded provider
   // cost against a real account. Row 13's "no rate limit" is scoped to provider-retried, signature-verified
