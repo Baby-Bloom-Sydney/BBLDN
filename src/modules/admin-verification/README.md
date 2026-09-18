@@ -5,13 +5,28 @@ redirects there — 04 §6.4) and the reference crib **S-A-17** (`/admin/verific
 `2c` under **ADR-159**. It imports `verification` and **never** `vetting-providers`: every provider call goes
 through `verification` (03 §4.2). It decorates rather than decides — the rows are `verification`'s `QueueEntry`s
 with a name from `auth` beside each (03 §3.6's pattern for the call list), the decision is `verification.decide`,
-the reveal `verification.openEvidence`, the level-4 step `verification.recordUpdateServiceCheck`.
+the reveal `verification.openEvidence`, the level-4 step `verification.recordUpdateServiceCheck`, and — since
+ADR-168 (b) — the lift `verification.liftSuspension`.
+
+**★ A bar comes off through its own door (ADR-168).** REVIEW-4 C-2 measured an adverse-DBS bar being lifted by
+re-submitting the decision form with a different reason: `suspended_at` went `t → f` and nothing recorded that
+it had happened. `0025` removed clearing from the derivation, so the only road left is
+`liftSuspensionAction` → `verification.liftSuspension` — its own form on `SubmissionPanel`, shown only while a
+bar stands, its own required reason, its own `nanny_suspension_lifts` row naming who authorised it, and its own
+pair of messages. The form is deliberately not part of the decision form above it and carries no default: the
+whole finding was a safeguarding write reachable by accident from a screen about something else.
+
+**★ The queue speaks party ids (ADR-169).** `QueueEntry.nannyId` is a `NannyId` — `nannies.id`, straight from
+`vetting_submissions.nanny_id` — and not her session id. The name beside a row therefore comes from
+`nannyNameOfParty`, which resolves the party row to her user once and then delegates to `nannyNameOf`;
+`nannyNameOf` itself stays session-keyed because `admin/call-queue` genuinely holds a session id. Before
+ADR-169 the party id was handed to a `user_id = $1` lookup, so every row rendered `Nanny 5eed0200`.
 
 **Connector.**
 
-| Values                                                                                                                                                                                            | Types                                                                                                                                                        |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| reads `loadVerificationQueue` · `parseQueueQuery` · actions `decideSubmissionAction` · `openEvidenceAction` · `recordUpdateServiceAction` · screens `VerificationQueue` · `VerificationReference` | `QueueTab` · `QueueQuery` · `QueueRow` · `OpenRecord` · `VerificationQueueView` · the three action types · `VerificationQueueActions` · the three prop types |
+| Values                                                                                                                                                                                                                                     | Types                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| reads `loadVerificationQueue` · `parseQueueQuery` · `nannyNameOf` · actions `decideSubmissionAction` · `openEvidenceAction` · `recordUpdateServiceAction` · `liftSuspensionAction` · screens `VerificationQueue` · `VerificationReference` | `QueueTab` · `QueueQuery` · `QueueRow` · `OpenRecord` · `VerificationQueueView` · the four action types · `VerificationQueueActions` · the three prop types |
 
 **What it may import.** `config` (+ `config/server`), `shared-types`, `platform`, `auth`, `areas`, `comms`,
 `verification` (01 §2.3 row).
@@ -20,7 +35,9 @@ the reveal `verification.openEvidence`, the level-4 step `verification.recordUpd
 `verification`'s connector gates again (`aal2`), so the module itself holds no authority check to get wrong. The
 subject of a decision or a reveal is the **submission's** nanny, read from the ledger inside `verification` —
 no action here takes a nanny id for a decision, and the Update Service action's `nannyId` names the open row,
-never the checker (the checker is the session's admin, written as `checked_by`). Every action consumes
+never the checker (the checker is the session's admin, written as `checked_by`). The lift is the same shape: the
+reason is the only thing the form carries beyond the submission id, and the decider is the session's admin,
+validated inside the definer and written to `nanny_suspension_lifts.decided_by`. Every action consumes
 `SECURITY.rateLimits.adminRoutes` inside the road (07 §8 row 14 — its first consumer).
 
 **Data handled (07 §3).** S4 by design: the reveal returns the declared fields of ONE section and 1 h signed URLs,

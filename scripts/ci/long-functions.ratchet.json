@@ -1,0 +1,6 @@
+{
+  "ceiling": 109,
+  "recordedBy": "BB-LDN-Planner-070926/P2-FIX",
+  "recordedAt": "2026-09-19T21:00+10:00",
+  "why": "REVIEW-4 M-6 / §8 R-8. eslint.long-functions.json grew 106 -> 109 in one cycle while both sibling limiter allow-files fail on a stale entry by design. This number is the ONE legal direction of travel: it may be lowered when a file is split, and it may never be raised. check-long-functions.mjs refuses either drift."
+}

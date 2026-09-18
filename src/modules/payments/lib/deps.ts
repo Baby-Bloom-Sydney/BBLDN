@@ -10,7 +10,12 @@ import type { SpineStore } from "./spine-store";
 export type PaymentsDeps = {
   readonly store: SpineStore;
   readonly provider: PurchaseProvider;
-  readonly comms: Pick<Comms, "send">;
+  /**
+   * ★ ADR-160 — `send` for her messages, `notifyAdmin` for the operator's row. `payments` may not reach past
+   * `comms` (01 §2.3) and `comms` is the one send seam, so the row joins the seam rather than getting a second
+   * one: "`payment_due` stays payments' to call".
+   */
+  readonly comms: Pick<Comms, "send" | "notifyAdmin">;
   readonly events: Pick<EventsConnector, "emit">;
   readonly now: () => Instant;
   /** `FLAGS.PAYMENTS` — the kill switch (`06.11`); off ⇒ every link and checkout is `E_PAYMENTS_DISABLED`. */

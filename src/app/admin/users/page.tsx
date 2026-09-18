@@ -13,6 +13,7 @@ import {
   loadVerificationQueue,
   openEvidenceAction,
   parseQueueQuery,
+  liftSuspensionAction,
   recordUpdateServiceAction,
 } from "@/modules/admin-verification";
 import { AdminUsersClient } from "./AdminUsersClient";
@@ -177,6 +178,7 @@ export default async function AdminUsersPage({
             decide: decideSubmissionAction,
             openEvidence: openEvidenceAction,
             recordUpdateService: recordUpdateServiceAction,
+            liftSuspension: liftSuspensionAction,
           }}
         />
       </main>

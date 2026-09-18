@@ -12,6 +12,7 @@ import type {
   Expiry,
   Instant,
   ManualDecision,
+  NannyId,
   ProviderId,
   Result,
   Submission,
@@ -77,9 +78,18 @@ export type VettingSubmissionInput = {
   readonly providerRef?: string;
 };
 
-/** The ledger's own view of a submission — 03 §4.2's `Submission` plus the columns the queue lists on (2c). */
+/**
+ * The ledger's own view of a submission — 03 §4.2's `Submission` plus the columns the queue lists on (2c).
+ *
+ * ★ ADR-169 — `nannyId` is a **`NannyId`**, the `nannies.id` party row, and not the session's `auth.users.id`.
+ * `vetting_submissions.nanny_id` is `references public.nannies (id)` (`0008:156`) and
+ * `submit_verification_evidence` writes it as `select n.id from public.nannies n where n.user_id = auth.uid()`
+ * (`0023:865`): the column was always right and the label was wrong, which is why REVIEW-4 C-3 read as an empty
+ * queue rather than as an error. Verification is a fact about the nanny's PROFILE, which is where `nanny_public`,
+ * the matching index and ADR-166's reasoning already live — so this is the id space, and the brand says so.
+ */
 export type VettingLedgerEntry = Submission & {
-  readonly nannyId: UserId;
+  readonly nannyId: NannyId;
   readonly section: LedgerSection;
   readonly evidenceType: EvidenceType;
   readonly submittedAt: Instant;
@@ -89,7 +99,8 @@ export type VettingLedgerEntry = Submission & {
 };
 
 export type VettingLedgerFilter = {
-  readonly nannyId?: UserId;
+  /** ADR-169: the party row, as the column is — `.eq("nanny_id", …)` goes straight at `nannies.id`. */
+  readonly nannyId?: NannyId;
   readonly section?: LedgerSection;
   readonly status?: CheckStatus["kind"];
 };
@@ -177,14 +188,21 @@ export type MemoryVettingStore = VettingSubmissionStore & {
   /** every ledger row, oldest first */
   rows(): ReadonlyArray<VettingLedgerEntry>;
   /** the double's `verifications` row for a nanny, or `undefined` before her first write (I-V1) */
-  sectionsOf(nannyId: UserId): MemoryVerificationRow | undefined;
+  sectionsOf(nannyId: NannyId): MemoryVerificationRow | undefined;
   /** every nanny with a row — what the sweeps walk (2c) */
-  nannyIds(): ReadonlyArray<UserId>;
+  nannyIds(): ReadonlyArray<NannyId>;
   /** the writes `verification`'s memory store makes through the same world (contact, claim, apply) */
   patchSections(
-    nannyId: UserId,
+    nannyId: NannyId,
     patch: (row: MemoryVerificationRow) => MemoryVerificationRow,
   ): MemoryVerificationRow;
+  /**
+   * ★ ADR-169 — the double's copy of the one resolution `submit_verification_evidence` does inside itself
+   * (`0023:864-868`). Exposed so a test can cross the seam deliberately instead of by accident: the two id
+   * spaces are different values here, not one opaque string, which is the defect REVIEW-4 C-3 measured.
+   */
+  partyIdOf(userId: UserId): NannyId;
+  userIdOf(nannyId: NannyId): UserId;
   /** the provider-side write (`apply_vetting_check_result`), shared with `verification`'s memory store */
   applyResult(
     submissionId: SubmissionId,

@@ -39,9 +39,18 @@ const provider = {
   portal: async () => ({ ok: true, value: { url: "u" as never } }),
 } as unknown as PurchaseProvider;
 
-function build(rows: ReadonlyArray<SpineRow>) {
+function build(
+  rows: ReadonlyArray<SpineRow>,
+  options: { readonly notifyAdminFails?: boolean } = {},
+) {
   const emitted: string[] = [];
   const sent: string[] = [];
+  /** ADR-160: the operator's queue, observed where its ONE writer is — `comms.notifyAdmin`, not the spine. */
+  const notified: Array<{
+    readonly kind: string;
+    readonly subject?: { readonly type: string; readonly id: string };
+    readonly dueAt?: string;
+  }> = [];
   const store: MemorySpineStore = memorySpineStore({
     rows,
     now: () => NOW,
@@ -61,6 +70,32 @@ function build(rows: ReadonlyArray<SpineRow>) {
         sent.push(message.templateId);
         return { ok: true, value: "m" as never };
       },
+      notifyAdmin: async (input) => {
+        if (options.notifyAdminFails === true)
+          return {
+            ok: false,
+            error: {
+              code: "INTERNAL" as const,
+              message: "down",
+              details: { reason: "store-not-configured" as const },
+            },
+          };
+        notified.push({
+          kind: input.kind,
+          ...(input.subject === undefined
+            ? {}
+            : {
+                subject: {
+                  type: input.subject.type,
+                  id: input.subject.id as string,
+                },
+              }),
+          ...(input.dueAt === undefined
+            ? {}
+            : { dueAt: input.dueAt as string }),
+        });
+        return { ok: true, value: { id: "n" as never } };
+      },
     },
     events: {
       emit: async (input) => {
@@ -73,7 +108,7 @@ function build(rows: ReadonlyArray<SpineRow>) {
     newTrialsEnabled: () => true,
     appUrl: "https://app",
   });
-  return { store, jobs, emitted, sent };
+  return { store, jobs, emitted, sent, notified };
 }
 
 describe("expire-trials (ADR-090 / 093)", () => {
@@ -259,21 +294,54 @@ describe("payment-due-sweep (ADR-094; AC-A-41)", () => {
     expect(first).toEqual(second);
   });
 
-  // DOCUMENTED, NOT BUILT — AC-A-41 also asks for one open `admin_notifications.payment_due` per family. No
-  // module owns `admin_notifications` (01 §2.3 names no writer, and `payments` may not reach past `comms`), so
-  // the row is not written. The document wins: the claim is pinned here rather than dropped, and clears when
-  // `admin_notifications` gets a connector.
-  it.fails(
-    "raises one open admin_notifications.payment_due per family (AC-A-41)",
-    async () => {
-      const { store, jobs } = build([due]);
-      await jobs.run("payment-due-sweep", NOW);
-      const notifications = (
-        store as unknown as { notifications?: () => ReadonlyArray<unknown> }
-      ).notifications;
-      expect(notifications?.()).toHaveLength(1);
-    },
-  );
+  /**
+   * ★ REVIEW-4 §6.5's pin 2, FLIPPED — its stated owner had landed and nobody had made the call.
+   *
+   * The pin read: "No module owns `admin_notifications` (01 §2.3 names no writer, and `payments` may not reach
+   * past `comms`), so the row is not written … clears when `admin_notifications` gets a connector." **ADR-160
+   * gave it exactly that connector in this same range** — `comms.notifyAdmin()` is on the port, `payment_due`
+   * is a member of the enum, and the ADR names this caller in writing: "`payment_due` stays payments' to call".
+   * Every clause of the pin's reason was false, and it was still red only because the call had not been made.
+   *
+   * It is observed at `comms.notifyAdmin` rather than on the spine, because that — not a store method — is the
+   * writer ADR-160 named; the pin's old assertion reached for a `store.notifications()` that ADR-160's shape
+   * says should never exist.
+   */
+  it("raises one open admin_notifications.payment_due per family (AC-A-41; ADR-160)", async () => {
+    const { jobs, notified } = build([due]);
+
+    await jobs.run("payment-due-sweep", NOW);
+
+    expect(notified).toEqual([
+      {
+        kind: "payment_due",
+        subject: { type: "family", id: FAMILY as string },
+        dueAt: PAST,
+      },
+    ]);
+  });
+
+  it("raises nothing for a family the sweep does not select — the row follows the event, not the run", async () => {
+    const { jobs, notified } = build([{ ...due, payment_due_at: FUTURE }]);
+
+    await jobs.run("payment-due-sweep", NOW);
+
+    expect(notified).toEqual([]);
+  });
+
+  it("a refused row is skipped, and `payment.due` is not logged for a family nobody was told about", async () => {
+    // ADR-160's ordering, driven rather than argued: the row is raised first, so a refusal costs the family its
+    // place in the run rather than leaving an event that says an operator was notified when none was.
+    const { jobs, emitted, notified } = build([due], {
+      notifyAdminFails: true,
+    });
+
+    const run = await jobs.run("payment-due-sweep", NOW);
+
+    expect(run.ok && run.value).toMatchObject({ handled: 0, skipped: 1 });
+    expect(emitted).toEqual([]);
+    expect(notified).toEqual([]);
+  });
 });
 
 describe("the sweep's own failure behaviour (01 §4f)", () => {
@@ -299,7 +367,10 @@ describe("the sweep's own failure behaviour (01 §4f)", () => {
         }),
       } as never,
       provider,
-      comms: { send: async () => ({ ok: true, value: "m" as never }) },
+      comms: {
+        send: async () => ({ ok: true, value: "m" as never }),
+        notifyAdmin: async () => ({ ok: true, value: { id: "n" as never } }),
+      },
       events: { emit: async () => ({ ok: true, value: { id: "e" as never } }) },
       now: () => NOW,
       paymentsEnabled: () => true,

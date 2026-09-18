@@ -53,10 +53,13 @@
 // use one opaque string for both id spaces, so the two are indistinguishable there; the integration suites
 // drive the SQL and never the adapters. The seam again.
 //
-// The pin below asserts the property the whole road assumes: **the id the ledger hands the application is one
-// a `nannies.user_id` lookup can resolve.** It is schema-level on purpose, so it flips whichever way the owner
-// closes it — a join in `entryOf`, or a distinct `NannyPartyId` brand with the conversion made explicit at the
-// module seam. **Owner: `2c` / `03 §4.2`'s connector shape.** REVIEW-4 §8 R-4.
+// ★ **ADR-169 answered it (R-4): the column is right, the label is wrong.** Verification is a fact about the
+// nanny's PROFILE — which is where `nanny_public`, the matching index and ADR-166's reasoning already live — so
+// the id space is `nannies.id` and the brand became `NannyId` through the connector, the store, the queue and
+// the ledger. The boundary is where `auth.uid()` resolves to `nannies.id`: inside each definer, once and named,
+// never in a caller and never by passing whichever id was to hand. The pin below is therefore RESTATED rather
+// than flipped — its original form asked the schema to make the two id spaces interchangeable, which is exactly
+// what the ruling refuses.
 //
 // One transaction, rolled back, like `int.rls`.
 import type { Client } from "pg";
@@ -66,6 +69,7 @@ import { connect } from "./db-client";
 const NANNY = "000000d1-0000-4000-8000-000000000000";
 const ADMIN = "000000d9-0000-4000-8000-000000000000";
 const EVIDENCE = "000000f1-0000-4000-8000-000000000000";
+const EVIDENCE_2 = "000000f2-0000-4000-8000-000000000000";
 
 /** `VETTING.requiredChecksByLevel` as the adapters compute it — the shape, not a test invention. */
 const REQUIRED = {
@@ -107,8 +111,19 @@ async function asNanny(sql: string): Promise<void> {
     JSON.stringify({ sub: NANNY, role: "authenticated" }),
   ]);
   await db.query("set local role authenticated");
-  await db.query(sql);
-  await db.query("reset role");
+  try {
+    await db.query(sql);
+  } finally {
+    // `reset role` must run even when the statement raised, or every later query in this transaction runs as
+    // `authenticated` and the suite's own fixtures start failing for the wrong reason. Its own failure is
+    // swallowed on purpose: a raise inside the statement aborts the transaction, so this query fails too, and
+    // the error the CALLER needs is the first one, not `25P02`. `refusal()`'s savepoint does the real cleanup.
+    try {
+      await db.query("reset role");
+    } catch {
+      /* the statement's own error is the one that matters */
+    }
+  }
 }
 
 type NannyState = {
@@ -128,6 +143,50 @@ async function stateOfNanny(): Promise<NannyState> {
     [NANNY],
   );
   return rows[0];
+}
+
+/**
+ * Everything here runs inside one transaction, and a `raise` aborts a transaction: without a savepoint the
+ * first refused call would make every later query fail with `25P02` for the wrong reason. Each expected refusal
+ * therefore runs inside its own savepoint, which is rolled back whether it raised or not — so a refusal that
+ * silently SUCCEEDS also leaves no trace, and the assertion after it is measuring the real state.
+ */
+async function refusal(sql: () => Promise<unknown>): Promise<string> {
+  await db.query("savepoint probe");
+  try {
+    await sql();
+    await db.query("rollback to savepoint probe");
+    return "";
+  } catch (error) {
+    await db.query("rollback to savepoint probe");
+    return error instanceof Error ? error.message : String(error);
+  } finally {
+    await db.query("release savepoint probe");
+  }
+}
+
+async function nannyPartyId(): Promise<string> {
+  const { rows } = await db.query<{ id: string }>(
+    `select id from public.nannies where user_id = $1`,
+    [NANNY],
+  );
+  return rows[0].id;
+}
+
+async function lift(decider: string, reason: string): Promise<void> {
+  await db.query(
+    `select public.lift_nanny_suspension($1::uuid, $2, $3::uuid)`,
+    [await nannyPartyId(), reason, decider],
+  );
+}
+
+async function liftRowCount(): Promise<number> {
+  const { rows } = await db.query<{ n: string }>(
+    `select count(*)::text as n from public.nanny_suspension_lifts l
+       join public.nannies n on n.id = l.nanny_id where n.user_id = $1`,
+    [NANNY],
+  );
+  return Number(rows[0].n);
 }
 
 async function decide(reason: string): Promise<void> {
@@ -182,25 +241,131 @@ describe("int.decision — an adverse DBS bars, and the bar holds (03 §4.3 / I-
   });
 
   /**
-   * PINNED — REVIEW-4 C-2. A second decision on the SAME submission id, with any non-`adverse` reason, resets
-   * `dbs_outcome` to `unset` and the sync then clears `suspended_at` because it derives the suspension from
-   * `dbs_outcome = 'barred'` alone. Measured: `suspended` goes `t → f`.
+   * ★ REVIEW-4 C-2's pin, FLIPPED by `0025` (ADR-168 (a)). A second decision on the SAME submission id with
+   * any non-`adverse` reason still resets `dbs_outcome` to `unset` — `record_vetting_decision`'s else-branch is
+   * unchanged — but the sync no longer derives `suspended_at` at all, so the bar it did not set is the bar it
+   * cannot lift. Measured before `0025`: `suspended` went `t → f`. Measured after: it stays `t`.
    *
-   * **Owner: `2c` / the migration's author** — a guard in a new migration, not a twin and not a review agent's.
+   * The outcome moving off `barred` is deliberate and is not the finding: what keeps her out of the pool is
+   * `suspended_at` (`is_active_nanny()`, `nanny_is_visible()`, and `0022:180`'s SUSPENDED gate on resubmission
+   * all read that column, not the outcome). The bar is the suspension.
    */
-  it.fails(
-    "★ PINNED — re-deciding the same submission cannot lift the bar (owner: `2c`, a new migration)",
-    async () => {
-      await decide("mismatch");
+  it("★ re-deciding the same submission cannot lift the bar (ADR-168 (a))", async () => {
+    await decide("mismatch");
 
-      const after = await stateOfNanny();
-      expect(after.suspended).toBe(true);
-      expect(after.outcome).toBe("barred");
-    },
-  );
+    const after = await stateOfNanny();
+    expect(after.suspended).toBe(true);
+    expect(after.level).toBe("L0_SIGNED_UP");
+  });
+
+  it("she still cannot resubmit while the bar stands — `0022`'s SUSPENDED gate reads the column the sync kept", async () => {
+    const message = await refusal(() =>
+      asNanny(
+        `select public.submit_verification_evidence('${EVIDENCE_2}'::uuid, 'dbs', 'dbs-certificate',
+                'stub-manual', 'needs_admin',
+                '{"dbs_certificate_ref":"x/dbs/b.pdf","dbs_certificate_number":"001234567891",
+                  "dbs_issue_date":"2026-01-03","dbs_update_service_consent_at":null}'::jsonb)`,
+      ),
+    );
+
+    expect(message).toMatch(/SUSPENDED|suspended/);
+  });
 });
 
-describe("int.decision — the ledger hands the application an id its own stores can resolve", () => {
+describe("int.decision — lifting a bar is its own act, recorded (ADR-168 (b))", () => {
+  it("an unattributable lift is refused before anything is read or written", async () => {
+    const message = await refusal(() =>
+      lift(NANNY, "the DBS was another person's"),
+    );
+
+    expect(message).toMatch(/must be an admin/);
+    expect((await stateOfNanny()).suspended).toBe(true);
+    expect(await liftRowCount()).toBe(0);
+  });
+
+  it("a blank reason is refused — a lift with no reason answers half the question", async () => {
+    const message = await refusal(() => lift(ADMIN, "   "));
+
+    expect(message).toMatch(/needs a reason/);
+    expect((await stateOfNanny()).suspended).toBe(true);
+    expect(await liftRowCount()).toBe(0);
+  });
+
+  it("★ the explicit lift works, and the audit row records who, why and what it walked back", async () => {
+    const before = await stateOfNanny();
+    expect(before.suspended).toBe(true);
+
+    await lift(ADMIN, "  Identified as a different person; DBS reissued.  ");
+
+    const after = await stateOfNanny();
+    expect(after.suspended).toBe(false);
+    expect(after.outcome).toBe("unset");
+
+    const { rows } = await db.query<{
+      reason: string;
+      decided_by: string;
+      previous_dbs_outcome: string;
+      attributed: boolean;
+    }>(
+      `select l.reason, l.decided_by::text, l.previous_dbs_outcome::text,
+              l.decided_at is not null as attributed
+         from public.nanny_suspension_lifts l
+         join public.nannies n on n.id = l.nanny_id
+        where n.user_id = $1`,
+      [NANNY],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual({
+      reason: "Identified as a different person; DBS reissued.",
+      decided_by: ADMIN,
+      previous_dbs_outcome: "unset",
+      attributed: true,
+    });
+  });
+
+  it("lifting a suspension that is not there refuses rather than recording a second lift", async () => {
+    const message = await refusal(() => lift(ADMIN, "again"));
+
+    expect(message).toMatch(/is not suspended/);
+    expect(await liftRowCount()).toBe(1);
+  });
+
+  it("★ the audit table is append-only — even the role that writes it cannot rewrite it", async () => {
+    // Driven by `database-reviewer` M-4 and it was real: Supabase's default privileges grant ALL on a new
+    // public table to `service_role`, so `grant select, insert` on top of them left UPDATE and DELETE where
+    // they were. `0025`'s verify block refused the first apply, which is the gate working.
+    const { rows } = await db.query<{
+      upd: boolean;
+      del: boolean;
+      ins: boolean;
+    }>(
+      `select has_table_privilege('service_role', 'public.nanny_suspension_lifts', 'UPDATE') as upd,
+              has_table_privilege('service_role', 'public.nanny_suspension_lifts', 'DELETE') as del,
+              has_table_privilege('service_role', 'public.nanny_suspension_lifts', 'INSERT') as ins`,
+    );
+
+    expect(rows[0]).toEqual({ upd: false, del: false, ins: true });
+  });
+
+  it("neither anon nor authenticated may execute the lift, and neither may read its audit rows", async () => {
+    const { rows } = await db.query<{
+      anon_exec: boolean;
+      auth_exec: boolean;
+      anon_read: boolean;
+    }>(
+      `select has_function_privilege('anon', 'public.lift_nanny_suspension(uuid, text, uuid)', 'EXECUTE') as anon_exec,
+              has_function_privilege('authenticated', 'public.lift_nanny_suspension(uuid, text, uuid)', 'EXECUTE') as auth_exec,
+              has_table_privilege('anon', 'public.nanny_suspension_lifts', 'SELECT') as anon_read`,
+    );
+    expect(rows[0]).toEqual({
+      anon_exec: false,
+      auth_exec: false,
+      anon_read: false,
+    });
+  });
+});
+
+describe("int.decision — the ledger's id space, as ADR-169 rules it", () => {
   it("the ledger's nanny_id is the party row's id, as `0008`'s foreign key says", async () => {
     const { rows } = await db.query<{ matches: boolean }>(
       `select exists (select 1 from public.nannies n
@@ -212,22 +377,54 @@ describe("int.decision — the ledger hands the application an id its own stores
   });
 
   /**
-   * PINNED — REVIEW-4 C-1. `db-vetting-store.ts:98` labels that value `UserId` and hands it to stores that
-   * resolve it through `nannies.user_id = $1`, which matches nothing. Asserted at the schema so it flips on
-   * either fix — a join in `entryOf`, or a distinct brand with the conversion made explicit at the seam.
+   * ★ REVIEW-4 C-3's pin, RESTATED rather than flipped — because ADR-169 ruled the other way and a pin that
+   * asserts the opposite of the ruling can only ever go green by breaking the schema.
    *
-   * **Owner: `2c` / 03 §4.2's connector shape.**
+   * The pin asked that the ledger's id ALSO resolve as a session user id, so it would flip on either fix — a
+   * join in `entryOf`, or a distinct brand. ADR-169 picked the brand and said why: **the column is right and
+   * the label is wrong.** Verification is a fact about the nanny's profile, which is where `nanny_public`, the
+   * matching index and ADR-166's reasoning already live. So the property to hold is the INVERSE of the pin:
+   * the two id spaces are distinct, and nothing may quietly treat one as the other.
+   *
+   * The half of ADR-169 that lives in TypeScript — that a session id can no longer be ACCEPTED where a profile
+   * id belongs — is `src/modules/verification/__tests__/verification.id-space.test.ts`, held by the compiler.
+   * This is the half that lives in the database.
    */
-  it.fails(
-    "★ PINNED — that id also resolves as a session user id, which is what every 2c admin road assumes (owner: `2c`)",
-    async () => {
-      const { rows } = await db.query<{ resolves: boolean }>(
-        `select exists (select 1 from public.nannies n
-                         where n.user_id = (select s.nanny_id from public.vetting_submissions s where s.id = $1)
-        ) as resolves`,
-        [submissionId],
-      );
-      expect(rows[0].resolves).toBe(true);
-    },
-  );
+  it("★ the two id spaces are distinct, so a session id resolves nothing in the ledger's place (ADR-169)", async () => {
+    const { rows } = await db.query<{
+      party_is_user: boolean;
+      user_resolves: boolean;
+    }>(
+      `select (n.id = n.user_id) as party_is_user,
+              exists (select 1 from public.vetting_submissions s where s.nanny_id = n.user_id) as user_resolves
+         from public.nannies n where n.user_id = $1`,
+      [NANNY],
+    );
+
+    expect(rows[0].party_is_user).toBe(false);
+    expect(rows[0].user_resolves).toBe(false);
+  });
+
+  it("★ and the ledger's id is the one the decision-side writes are keyed by, on every road `2c` built", async () => {
+    const { rows } = await db.query<{
+      verifications: boolean;
+      sync: boolean;
+      update_service: boolean;
+    }>(
+      `with party as (
+         select s.nanny_id as id from public.vetting_submissions s where s.id = $1
+       )
+       select exists (select 1 from public.verifications v, party p where v.nanny_id = p.id) as verifications,
+              exists (select 1 from public.nannies n, party p where n.id = p.id) as sync,
+              exists (select 1 from public.nannies n, party p
+                       where n.id = p.id and n.user_id is not null) as update_service`,
+      [submissionId],
+    );
+
+    expect(rows[0]).toEqual({
+      verifications: true,
+      sync: true,
+      update_service: true,
+    });
+  });
 });

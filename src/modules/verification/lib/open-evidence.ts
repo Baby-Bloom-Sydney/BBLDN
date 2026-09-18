@@ -118,7 +118,10 @@ export async function openEvidence(
     actor: {
       kind: "admin",
       id: admin.value.adminId,
-      onBehalfOf: { role: "nanny", id: entry.value.nannyId },
+      // ★ ADR-169 — `Actor.onBehalfOf.id` is an `auth.users.id` (03 §9.2), and the ledger hands this road a
+      // `nannies.id`. The record read above already crossed the seam once, so the audit subject is the id the
+      // audit log is keyed by rather than the one that happened to be in scope.
+      onBehalfOf: { role: "nanny", id: record.value.userId },
     },
     props: {
       submissionId,

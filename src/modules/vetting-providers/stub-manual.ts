@@ -4,7 +4,7 @@
 // answers `verified` — so binding it cannot make a nanny look verified (REVIEW-1 M-9, answered by construction).
 import { VETTING } from "@/modules/config";
 import { err, nowInstant, ok } from "@/modules/platform";
-import type { EvidenceType } from "@/modules/shared-types";
+import type { Actor, EvidenceType } from "@/modules/shared-types";
 import type { ManualDecisionProvider, VettingErrorDetails } from "./types";
 import { emitVettingEvent } from "./lib/emit-vetting-event";
 import { VETTING_STORE_REGISTRY } from "./lib/vetting-store-registry";
@@ -39,8 +39,14 @@ export const stubManualProvider: ManualDecisionProvider = Object.freeze({
       provider: PROVIDER_ID,
       statusKind: "needs-admin",
     };
-    await emitVettingEvent("vetting.submitted", evidence.nannyId, props);
-    await emitVettingEvent("vetting.needs-admin", evidence.nannyId, props);
+    // 03 §9.3: every event but the decision is hers, and `submit` genuinely holds her session id.
+    const hers: Actor = {
+      kind: "user",
+      id: evidence.nannyId,
+      role: "nanny",
+    };
+    await emitVettingEvent("vetting.submitted", hers, props);
+    await emitVettingEvent("vetting.needs-admin", hers, props);
     return submitted;
   },
   check: async (submissionId) => {
@@ -65,20 +71,24 @@ export const stubManualProvider: ManualDecisionProvider = Object.freeze({
     const recorded = await store.recordDecision(input);
     if (!recorded.ok) return recorded;
     if (entry.value !== null)
+      // 03 §9.3 / 07 §5.4 row 6: the actor is the admin who decided, the subject the submission's nanny.
+      // ★ ADR-169: the subject is her `auth.users.id`, handed down by the caller that already resolved it —
+      // `entry.value.nannyId` is the party row and would name nobody the audit log can be joined on. Without
+      // one the event is emitted with no subject rather than with a wrong one.
       await emitVettingEvent(
         "vetting.decision-recorded",
-        entry.value.nannyId,
+        input.onBehalfOf === undefined
+          ? { kind: "admin", id: input.actor.id }
+          : {
+              kind: "admin",
+              id: input.actor.id,
+              onBehalfOf: { role: "nanny", id: input.onBehalfOf },
+            },
         {
           submissionId: input.submissionId,
           evidenceType: entry.value.evidenceType,
           provider: PROVIDER_ID,
           decision: input.decision,
-        },
-        // 03 §9.3 / 07 §5.4 row 6: the actor is the admin who decided, the subject the submission's nanny
-        {
-          kind: "admin",
-          id: input.actor.id,
-          onBehalfOf: { role: "nanny", id: entry.value.nannyId },
         },
       );
     return recorded;

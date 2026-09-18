@@ -75,6 +75,7 @@ export function SubmissionPanel({
     actions.recordUpdateService,
     null,
   );
+  const [lifted, liftAction] = useFormState(actions.liftSuspension, null);
   const opened: EvidenceOpen | null =
     reveal !== null && reveal.ok ? reveal.value : null;
   const { entry, state, record: facts, note, nannyName } = record;
@@ -253,6 +254,36 @@ export function SubmissionPanel({
           </label>
           <Submit label="Record Update Service check" />
           <Outcome state={updateService} />
+        </form>
+      )}
+
+      {/*
+        ★ ADR-168 (b) — lifting a bar is its own act, so it is its own form, shown only while there is a bar to
+        lift. Deliberately last and deliberately plain: it carries no default, the reason is required, and the
+        line above it says what the lift actually does — a bar does not become a clearance, it becomes "no DBS
+        conclusion on file", and she resubmits. Nothing about this control is reachable from the decision form
+        above it, which is the whole point: REVIEW-4 C-2 was a bar coming off through the decision form.
+      */}
+      {state.suspended && (
+        <form action={liftAction} className="space-y-3" noValidate>
+          <h3 className="font-medium text-slate-900">Lift the suspension</h3>
+          <p className="text-sm text-slate-600">
+            This clears the suspension and sets the DBS outcome back to
+            &ldquo;unset&rdquo;, so she can submit a certificate again. It does
+            not verify anything. Your name and your reason are recorded.
+          </p>
+          <input type="hidden" name="submissionId" value={entry.submissionId} />
+          <label className="block text-sm">
+            <span className="text-slate-700">Reason (required)</span>
+            <textarea
+              name="reason"
+              required
+              maxLength={500}
+              className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1"
+            />
+          </label>
+          <Submit label="Lift the suspension" />
+          <Outcome state={lifted} />
         </form>
       )}
     </section>

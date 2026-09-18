@@ -1,32 +1,30 @@
-// ★ **ADR-158 (2)'s third road — the one the read-side fix does not cover.** REVIEW-4 H-2.
+// ★ **ADR-158 (2)'s third road — the notification side of the silent hold.** REVIEW-4 H-2, now closed.
 //
 // `2d`'s own `security-reviewer` found that a held connection reached both parent **screens** and closed it in
 // `visibleToParent`, at the two consumption points, with `connections.held-invisible.test.ts` holding both
 // halves. That fix is sound and this file does not touch it.
 //
-// But R-14's sentence is *"held rows withhold parent **notification** until L4"*, and notification is a third
-// road. `sendRowMessages` runs unconditionally after every committed K row (`create-connections-slice.ts:172`),
-// takes the record, and reads only `fillInitiatedBy` — the held flag appears nowhere in `connections`' comms
-// path. `MESSAGES_OF` (`connection-messages.ts:22-52`) carries six parent-addressed templates:
-// `K-5 connection-accepted`, `K-6 connection-declined`, `K-8`/`K-10 connection-expired-parent`,
-// `K-9`/`K-11 meeting-scheduled`, `K-17 confirm-nanny` and `K-20`'s pair.
+// R-14's sentence is *"held rows withhold parent **notification** until L4"*, and notification was a third
+// road. `sendRowMessages` ran unconditionally after every committed K row (`create-connections-slice.ts:172`)
+// and read only `fillInitiatedBy`; the held flag appeared nowhere in `connections`' comms path. `MESSAGES_OF`
+// (`connection-messages.ts:22-52`) carries six parent-addressed templates: `K-5 connection-accepted`,
+// `K-6 connection-declined`, `K-8`/`K-10 connection-expired-parent`, `K-9`/`K-11 meeting-scheduled`,
+// `K-17 confirm-nanny` and `K-20`'s pair.
 //
 // **And the held case is the main line, not an edge.** `MATCHING.minVerificationLevel` is L3, so a nanny enters
 // the pool at L3 and `heldPair` (`create-connections-slice.ts:88-91`) holds every connection made for anyone
 // below L4 — which is every nanny between entering the pool and her Update Service check. So the ordinary
-// sequence *parent Connects → nanny accepts* emails the family "your connection was accepted" about a row her
-// own screens are built to hide, and she then finds nothing when she looks. `recipientOf` is wired in
-// production (`boot/wire-connections.ts:44-56`), so the address resolves and the message goes.
+// sequence *parent Connects → nanny accepts* emailed the family "your connection was accepted" about a row her
+// own screens are built to hide, and she then found nothing when she looked.
 //
-// **Pinned rather than fixed, and the reason is not scope but judgement.** Suppressing `to === "parent"` on a
-// held row is one early return, and for K-5 it is unambiguously what R-14 asks. It is not obviously right for
-// all six: K-20's `placement-confirmed-parent` and `hire-confirmation-family` are the hire itself, and
-// swallowing those to honour a hold would be a worse failure than the one being fixed. Which of the six a hold
-// silences — and whether a held row should be able to reach K-20 at all — is 03 §8.3's and ADR-158's owner's
-// call, not a checkpoint sweep's. **Owner: `connections` / ADR-158 (2)'s owner.** REVIEW-4 §8 R-5.
+// **The fix, ruled by the planner (REVIEW-4 §8 R-5).** The hold is consulted **once**, where the recipient set
+// is built — exactly the shape `2d` used on the read side. A held row has no parent recipient, so every one of
+// the six parent-addressed templates drops, and the nanny-addressed rows are untouched. One consult, one place,
+// stage-blind: the hold is not about where the connection has got to but about whether this family may be told
+// about this nanny at all yet. The uniform rule is the ruling; K-20's pair is covered by it, and the residual
+// question *may a held row reach K-20 at all* is recorded for its owner rather than answered by a filter here.
 //
-// The first case is the pin. The second and third are the control and the boundary, and both pass today, so
-// the pin cannot be read as "comms are broken" — they are right for the unheld row and right for K-1.
+// The last two cases are the control and the boundary: right for the unheld row, right for K-1.
 import { describe, expect, it } from "vitest";
 import {
   configureEvents,
@@ -46,7 +44,8 @@ import {
   createConnectionsSlice,
   memoryConnectionStore,
 } from "@/modules/connections";
-import type { ConnectionsDeps } from "@/modules/connections";
+import type { ConnectionRecord, ConnectionsDeps } from "@/modules/connections";
+import { sendRowMessages } from "../lib/send-row-messages";
 import type {
   Actor,
   AdvanceInput,
@@ -182,23 +181,28 @@ describe("★ a held connection withholds the parent's notification too (ADR-158
   });
 
   /**
-   * PINNED — REVIEW-4 H-2. Measured on the shipped tree: `posted` carries
-   * `{ templateId: "connection-accepted", to: "parent" }`. `visibleToParent` then hides the row from both of
-   * her screens, so the email is about a connection she cannot find.
-   *
-   * **Owner: `connections` / ADR-158 (2)'s owner** — which of `MESSAGES_OF`'s six parent templates a hold
-   * silences is 03 §8.3's call. REVIEW-4 §8 R-5.
+   * ★ REVIEW-4 H-2's pin, FLIPPED by behaviour. On the shipped tree `posted` carried
+   * `{ templateId: "connection-accepted", to: "parent" }` while `visibleToParent` hid the row from both of her
+   * screens — an email about a connection she cannot find. The hold is now consulted where the recipient set
+   * is built, so a held row has no parent recipient at all. R-14 / ADR-158 (2); REVIEW-4 §8 R-5.
    */
-  it.fails(
-    "★ PINNED — K-5 on a held row sends the family nothing (owner: `connections` / ADR-158 (2))",
-    async () => {
-      const w = world("L3_PROVISIONALLY_VERIFIED");
+  it("★ K-5 on a held row sends the family nothing (R-14 / ADR-158 (2))", async () => {
+    const w = world("L3_PROVISIONALLY_VERIFIED");
 
-      await connectThenAccept(w);
+    await connectThenAccept(w);
 
-      expect(w.posted.filter((m) => m.to === "parent")).toEqual([]);
-    },
-  );
+    expect(w.posted.filter((m) => m.to === "parent")).toEqual([]);
+  });
+
+  it("the hold silences one audience, not the send — the nanny's K-1 still goes", async () => {
+    const w = world("L3_PROVISIONALLY_VERIFIED");
+
+    await connectThenAccept(w);
+
+    expect(w.posted).toEqual([
+      { templateId: "connection-requested", to: "nanny" },
+    ]);
+  });
 
   it("the control: at L4 the row is not held and the family IS told, as 03 §8.3 says", async () => {
     const w = world("L4_FULLY_VERIFIED");
@@ -227,6 +231,78 @@ describe("★ a held connection withholds the parent's notification too (ADR-158
 
     expect(w.posted).toEqual([
       { templateId: "connection-requested", to: "nanny" },
+    ]);
+  });
+});
+
+/**
+ * The rule at the seam itself, over **every** parent-addressed row rather than the one K-5 drives. Six templates
+ * across five transitions carry `to: "parent"`; the ruling is that the hold drops all six, uniformly, because it
+ * is consulted once where the recipient set is built. Driving each K row through the slice would prove the same
+ * thing five more times over five long chains; this reads the seam directly, which is where the consult lives.
+ */
+describe("★ the hold is consulted once, where the recipient set is built (REVIEW-4 §8 R-5)", () => {
+  const PARENT_ROWS: ReadonlyArray<{
+    readonly id: TransitionId;
+    readonly templateId: string;
+  }> = [
+    { id: "K-5", templateId: "connection-accepted" },
+    { id: "K-6", templateId: "connection-declined" },
+    { id: "K-8", templateId: "connection-expired-parent" },
+    { id: "K-9", templateId: "meeting-scheduled" },
+    { id: "K-10", templateId: "connection-expired-parent" },
+    { id: "K-11", templateId: "meeting-scheduled" },
+    { id: "K-17", templateId: "confirm-nanny" },
+    { id: "K-20", templateId: "placement-confirmed-parent" },
+    { id: "K-20", templateId: "hire-confirmation-family" },
+  ];
+
+  function recordOf(held: boolean): ConnectionRecord {
+    return {
+      connectionId: C1,
+      positionId: POSITION,
+      parentId: PARENT,
+      nannyId: NANNY,
+      stage: "ACCEPTED",
+      origin: "parent_request",
+      createdAt: NOW,
+      version: 2,
+      ...(held ? { heldForVerification: true, heldAt: NOW } : {}),
+    };
+  }
+
+  async function postedFor(
+    id: TransitionId,
+    held: boolean,
+  ): Promise<ReadonlyArray<Posted>> {
+    const w = world("L3_PROVISIONALLY_VERIFIED");
+    await sendRowMessages(w.deps, id, recordOf(held));
+    return w.posted;
+  }
+
+  for (const row of PARENT_ROWS) {
+    it(`${row.id} → ${row.templateId} is withheld from the family on a held row`, async () => {
+      const posted = await postedFor(row.id, true);
+
+      expect(posted.filter((m) => m.to === "parent")).toEqual([]);
+    });
+
+    it(`${row.id} → ${row.templateId} still reaches the family on an unheld row`, async () => {
+      const posted = await postedFor(row.id, false);
+
+      expect(posted).toContainEqual({
+        templateId: row.templateId,
+        to: "parent",
+      });
+    });
+  }
+
+  it("the nanny-addressed half of every row survives the hold", async () => {
+    const posted = await postedFor("K-20", true);
+
+    expect(posted).toEqual([
+      { templateId: "placement-confirmed-nanny", to: "nanny" },
+      { templateId: "hire-confirmation-nanny", to: "nanny" },
     ]);
   });
 });

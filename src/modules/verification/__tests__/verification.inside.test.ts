@@ -117,7 +117,9 @@ describe("submitContact (S-N-04)", () => {
         area: "Clapham",
       },
     ]);
-    expect(ledger.sectionsOf(NANNY)?.contact).toBe("verified");
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.contact).toBe(
+      "verified",
+    );
   });
 
   it("refuses to act for another nanny (not-permitted)", async () => {
@@ -160,7 +162,9 @@ describe("submitIdentity (S-N-05) — the consent gate before any upload (07 §2
       "selfie",
     ]);
     expect(ledger.rows()[0]?.status).toEqual({ kind: "needs-admin" });
-    expect(ledger.sectionsOf(NANNY)?.identity.attempts).toBe(1);
+    expect(ledger.sectionsOf(ledger.partyIdOf(NANNY))?.identity.attempts).toBe(
+      1,
+    );
   });
 
   it("a second submit while the section is pending or in review is already-submitted", async () => {
@@ -224,7 +228,7 @@ describe("submitDbs (S-N-06) and submitRightToWork (S-N-07)", () => {
       });
       if (attempt === 0) expect(result.ok).toBe(true);
       // later attempts are refused as already-submitted before the limiter, so reset the section to rejected
-      ledger.patchSections(NANNY, (row) => ({
+      ledger.patchSections(ledger.partyIdOf(NANNY), (row) => ({
         ...row,
         dbs: { ...row.dbs, status: "rejected" },
       }));

@@ -34,12 +34,12 @@
 //     The twin states this and asks the operator to revoke it by hand. ADR-165 (2) says that is exactly the
 //     position in which a twin must instead refuse. **Owner: `2c` / the migration's author — a twin is a
 //     migration artefact and a checkpoint sweep does not write one.** See REVIEW-4 §8 R-2.
-import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { connect } from "./db-client";
 import { asRole } from "./rls-fixtures";
+import { bodyOf } from "./rollback-twin";
 
 const TWIN_0023 = resolve(
   __dirname,
@@ -52,19 +52,6 @@ const PARENT = "000000b1-0000-4000-8000-000000000000";
 
 let db: Client;
 let stripped: { readonly sql: string; readonly removed: number };
-
-/**
- * The twin's body without its own transaction control. Only a `begin;` or `commit;` that is the whole line is
- * removed — a `begin` inside a `plpgsql` body is indented and followed by declarations, and must survive.
- */
-function bodyOf(path: string): {
-  readonly sql: string;
-  readonly removed: number;
-} {
-  const lines = readFileSync(path, "utf8").split("\n");
-  const kept = lines.filter((line) => !/^(begin|commit);\s*$/i.test(line));
-  return { sql: kept.join("\n"), removed: lines.length - kept.length };
-}
 
 async function makeUser(
   id: string,

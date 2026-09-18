@@ -8,7 +8,7 @@ import { auth } from "@/modules/auth";
 import { VETTING } from "@/modules/config";
 import { err, nowInstant, ok } from "@/modules/platform";
 import { ENUMS } from "@/modules/shared-types";
-import type { Result, UserId } from "@/modules/shared-types";
+import type { NannyId, Result, UserId } from "@/modules/shared-types";
 import type {
   MemorySectionRow,
   MemoryVerificationRow,
@@ -95,7 +95,11 @@ function syncRow(row: MemoryVerificationRow): {
     },
     VETTING.requiredChecksByLevel,
   );
-  const suspended = row.dbsOutcome === "barred";
+  // ★ ADR-168 (a) — the derivation may SET a bar and may never CLEAR one, exactly as `0025` re-created
+  // `sync_nanny_verification_state()`. Before `0025` this line read `row.dbsOutcome === "barred"` on both sides
+  // and so walked the bar back with the outcome (REVIEW-4 C-2, measured `suspended t → f`); now the old value
+  // is the floor. `liftSuspension` is the only writer of `false`.
+  const suspended = row.dbsOutcome === "barred" || row.suspended;
   const released =
     toLevel === "L4_FULLY_VERIFIED" ? (row.heldConnections ?? 0) : 0;
   return {
@@ -105,7 +109,14 @@ function syncRow(row: MemoryVerificationRow): {
       suspended,
       heldConnections: (row.heldConnections ?? 0) - released,
     },
-    sync: { fromLevel: row.level, toLevel, suspended, released },
+    // `sync.suspended` stays the DERIVATION's answer — "this decision bars her" — because it is what
+    // `sendVerificationOutcome` reads to fire `onBarred`, and a lift must not re-send a barred email.
+    sync: {
+      fromLevel: row.level,
+      toLevel,
+      suspended: row.dbsOutcome === "barred",
+      released,
+    },
   };
 }
 
@@ -128,7 +139,8 @@ const opt = <K extends string, V>(key: K, value: V | undefined) =>
   value === undefined ? {} : ({ [key]: value } as Record<K, V>);
 
 function recordOf(
-  nannyId: UserId,
+  nannyId: NannyId,
+  userId: UserId,
   row: MemoryVerificationRow | undefined,
 ): AdminRecord | null {
   if (row === undefined) return null;
@@ -136,6 +148,7 @@ function recordOf(
   const us = row.updateService ?? {};
   return {
     nannyId,
+    userId,
     level: row.level,
     suspended: row.suspended,
     declared: {
@@ -173,7 +186,8 @@ export function memoryVerificationStore(
     if (!current.ok || current.value === null) return NO_SESSION;
     return ok(current.value);
   };
-  const sync = (nannyId: UserId): LevelSync => {
+  // ★ ADR-169 — the double crosses the seam through the ledger's own named resolution, never by reusing an id.
+  const sync = (nannyId: NannyId): LevelSync => {
     let out: LevelSync | undefined;
     ledger.patchSections(nannyId, (row) => {
       const synced = syncRow(row);
@@ -184,14 +198,21 @@ export function memoryVerificationStore(
   };
 
   return Object.freeze({
+    // The nanny's own read arrives with her SESSION id (R-7), as it does in production.
     getStatus: async (nannyId) => {
-      const row = ledger.sectionsOf(nannyId);
+      const row = ledger.sectionsOf(ledger.partyIdOf(nannyId));
       return ok(row === undefined ? null : stateOf(nannyId, row));
     },
+    partyIdOf: async (userId) =>
+      ok(
+        ledger.sectionsOf(ledger.partyIdOf(userId)) === undefined
+          ? null
+          : ledger.partyIdOf(userId),
+      ),
     saveContact: async () => {
       const user = await session();
       if (!user.ok) return user;
-      ledger.patchSections(user.value, (row) => ({
+      ledger.patchSections(ledger.partyIdOf(user.value), (row) => ({
         ...row,
         contact: "verified",
       }));
@@ -201,7 +222,7 @@ export function memoryVerificationStore(
       const user = await session();
       if (!user.ok) return user;
       const claimed: VerificationSection[] = [];
-      ledger.patchSections(user.value, (row) => {
+      ledger.patchSections(ledger.partyIdOf(user.value), (row) => {
         const claim = (
           key: "identity" | "dbs" | "rightToWork",
           name: VerificationSection,
@@ -229,7 +250,9 @@ export function memoryVerificationStore(
 
     // ── the decision side (ADR-157) ──
     readAdminRecord: async (nannyId) =>
-      ok(recordOf(nannyId, ledger.sectionsOf(nannyId))),
+      ok(
+        recordOf(nannyId, ledger.userIdOf(nannyId), ledger.sectionsOf(nannyId)),
+      ),
     syncLevel: async (nannyId) =>
       ledger.sectionsOf(nannyId) === undefined
         ? ok({
@@ -256,6 +279,39 @@ export function memoryVerificationStore(
             : row.dbs,
       }));
       return ok(sync(input.nannyId));
+    },
+    // ★ ADR-168 (b) — the double refuses exactly what the definer refuses, in the same order, so a test can
+    // drive the refusals without a database.
+    liftSuspension: async (input) => {
+      const row = ledger.sectionsOf(input.nannyId);
+      if (row === undefined) return unavailable();
+      if (input.reason.trim() === "")
+        return err<VerificationErrorDetails>(
+          "VALIDATION",
+          "A lift needs a reason",
+          { reason: "reason-required" },
+        );
+      if (!row.suspended)
+        return err<VerificationErrorDetails>(
+          "VALIDATION",
+          "That account is not suspended",
+          { reason: "unsupported-evidence" },
+        );
+      const previous = row.dbsOutcome ?? "unset";
+      ledger.patchSections(input.nannyId, (current) => ({
+        ...current,
+        suspended: false,
+        // ADR-168 (c): the outcome is unset, never restored — a correction to the evidence is a new submission.
+        dbsOutcome: previous === "barred" ? "unset" : previous,
+        crossCheckPassed:
+          previous === "barred" ? false : current.crossCheckPassed,
+      }));
+      return ok({
+        nannyId: input.nannyId,
+        suspendedSince: nowInstant(),
+        previousDbsOutcome: previous,
+        level: row.level,
+      });
     },
     expireSection: async (submissionId) => {
       const entry = ledger
@@ -300,6 +356,9 @@ export function memoryVerificationStore(
         ledger.nannyIds().flatMap((nannyId) => {
           const row = ledger.sectionsOf(nannyId);
           if (row === undefined) return [];
+          // The expiry sweep addresses her (`vetting.expiry-approaching` carries a mailbox), so it speaks the
+          // session id — ADR-169's seam, crossed through the ledger's own named resolution.
+          const userId = ledger.userIdOf(nannyId);
           return (
             [
               ["identity", row.identity],
@@ -312,7 +371,7 @@ export function memoryVerificationStore(
             s.submissionId !== undefined
               ? [
                   {
-                    nannyId,
+                    nannyId: userId,
                     section,
                     submissionId: s.submissionId,
                     expiresAt: s.expiresAt,
@@ -337,7 +396,13 @@ export function memoryVerificationStore(
             .at(-1);
           return last === undefined
             ? []
-            : [{ nannyId, level: row.level, lastChangeAt: last }];
+            : [
+                {
+                  nannyId: ledger.userIdOf(nannyId),
+                  level: row.level,
+                  lastChangeAt: last,
+                },
+              ];
         }),
       ),
     countByLevel: async () => {

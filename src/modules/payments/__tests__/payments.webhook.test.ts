@@ -79,6 +79,7 @@ function build(
     provider,
     comms: {
       send: async () => ({ ok: true, value: "m" as never }),
+      notifyAdmin: async () => ({ ok: true, value: { id: "n" as never } }),
     },
     events: { emit: async () => ({ ok: true, value: { id: "e" as never } }) },
     now: () => NOW,
@@ -254,7 +255,10 @@ describe("ADR-127 — the ledger row, the spine and the stamp are one transactio
     return createPayments({
       store: store as never,
       provider,
-      comms: { send: async () => ({ ok: true, value: "m" as never }) },
+      comms: {
+        send: async () => ({ ok: true, value: "m" as never }),
+        notifyAdmin: async () => ({ ok: true, value: { id: "n" as never } }),
+      },
       events: { emit: async () => ({ ok: true, value: { id: "e" as never } }) },
       now: () => NOW,
       paymentsEnabled: () => true,

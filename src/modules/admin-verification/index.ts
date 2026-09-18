@@ -15,10 +15,11 @@ export { loadVerificationQueue } from "./lib/load-verification-queue";
 export { nannyNameOf } from "./lib/nanny-name-of";
 export { parseQueueQuery } from "./lib/parse-queue-query";
 
-// The three actions (01 §4e) — route files pass them to the screens as props.
+// The four actions (01 §4e) — route files pass them to the screens as props.
 export { decideSubmissionAction } from "./actions/decide-submission-action";
 export { openEvidenceAction } from "./actions/open-evidence-action";
 export { recordUpdateServiceAction } from "./actions/record-update-service-action";
+export { liftSuspensionAction } from "./actions/lift-suspension-action";
 
 // Screens.
 export { VerificationQueue } from "./components/VerificationQueue";

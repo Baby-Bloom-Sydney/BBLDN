@@ -84,6 +84,7 @@ function build(seed: MemorySpineSeed = {}, paymentsOn = true) {
         sent.push(message.templateId);
         return { ok: true, value: "m" as never };
       },
+      notifyAdmin: async () => ({ ok: true, value: { id: "n" as never } }),
     },
     events: {
       emit: async (input) => {
@@ -460,6 +461,7 @@ describe("comms failing does not fail the money (03 §5.4.3)", () => {
         send: async () => {
           throw new Error("comms must not be reached with no email on file");
         },
+        notifyAdmin: async () => ({ ok: true, value: { id: "n" as never } }),
       },
       events: { emit: async () => ({ ok: true, value: { id: "e" as never } }) },
       now: () => NOW,

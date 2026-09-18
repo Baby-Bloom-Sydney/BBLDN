@@ -16,7 +16,7 @@ import type {
   Result,
   Submission,
   SubmissionId,
-  UserId,
+  NannyId,
 } from "@/modules/shared-types";
 import type {
   LedgerSection,
@@ -95,7 +95,9 @@ const entryOf = (row: LedgerRow): VettingLedgerEntry => ({
   provider: row.provider_key,
   status: checkStatusOf(row),
   ...(row.provider_ref === null ? {} : { providerRef: row.provider_ref }),
-  nannyId: row.nanny_id as UserId,
+  // ★ ADR-169: the column is `references public.nannies (id)` (`0008:156`), so the brand is `NannyId`. The
+  // join REVIEW-4 C-3 measured missing is not added here — there is nothing to join, the column was right.
+  nannyId: row.nanny_id as NannyId,
   section: row.section,
   evidenceType: row.evidence_type as EvidenceType,
   submittedAt: row.submitted_at as Instant,

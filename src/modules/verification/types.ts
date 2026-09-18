@@ -18,6 +18,7 @@ import type {
   Result,
   SubmissionId,
   Url,
+  NannyId,
   UserId,
 } from "@/modules/shared-types";
 import type { StorageRef } from "@/modules/auth";
@@ -255,6 +256,15 @@ export type Verification = {
   recordUpdateServiceCheck(
     input: UpdateServiceInput,
   ): Promise<Result<LevelSync, VerificationErrorDetails>>;
+  /**
+   * ★ ADR-168 (b) — lifting a bar is its own act, not a side effect of another decision. Its own authority
+   * check, its own reason, its own audit row and its own comms, because "a bar was lifted" is exactly the fact
+   * a regulator asks who authorised. The subject is the submission's nanny, read from the ledger as every other
+   * admin road reads it (ADR-159); the reason is the admin's and is never blank.
+   */
+  liftSuspension(
+    input: LiftSuspensionInput,
+  ): Promise<Result<SuspensionLift, VerificationErrorDetails>>;
   adminOverview(): Promise<Result<AdminOverview, VerificationErrorDetails>>;
 
   // ── The named jobs (ADR-161; 03 §4.3) — run at service scope by the cron shells ──
@@ -439,10 +449,17 @@ export type QueueQuery = {
   readonly filter: QueueFilter;
 };
 
-/** One ledger row as the queue lists it — ids and states, no name: the admin panel decorates (03 §3.6). */
+/**
+ * One ledger row as the queue lists it — ids and states, no name: the admin panel decorates (03 §3.6).
+ *
+ * ★ ADR-169 — `nannyId` is the **party row** (`nannies.id`), carried through from the ledger unchanged. The
+ * queue is a list of facts about nannies' profiles, so it speaks the profile's id; anything that needs a
+ * mailbox or a session (the outcome emails, the audit subject, her name) crosses the seam deliberately through
+ * the store's one named resolution and never by reusing whichever id was to hand.
+ */
 export type QueueEntry = {
   readonly submissionId: SubmissionId;
-  readonly nannyId: UserId;
+  readonly nannyId: NannyId;
   readonly section: VerificationSection;
   readonly evidenceType: EvidenceType;
   readonly status: CheckStatus["kind"];
@@ -464,7 +481,15 @@ export type DeclaredFields = {
 
 /** The base-table facts an admin's read carries beyond the view (`readAdminRecord`, session scope under RLS). */
 export type AdminRecord = {
-  readonly nannyId: UserId;
+  /** ADR-169: the party row the `verifications` row is keyed by. */
+  readonly nannyId: NannyId;
+  /**
+   * ★ ADR-169's seam, resolved ONCE where the row is read rather than by every consumer afterwards: the
+   * nanny's `auth.users.id`. It is what addresses a mailbox (`comms.send({ to: { userId } })`), what names an
+   * audit subject (`Actor.onBehalfOf`) and what `user_profiles` is keyed by. Absent only when the party row has
+   * no user, which `0005`'s NOT NULL forbids — so the doubles model it and the adapter reads it.
+   */
+  readonly userId: UserId;
   readonly level: VerificationLevel;
   readonly suspended: boolean;
   readonly declared: DeclaredFields;
@@ -509,7 +534,8 @@ export type DecisionInput = {
 };
 
 export type DecisionOutcome = {
-  readonly nannyId: UserId;
+  /** ADR-169: the party row, as the queue that asked for the decision carries it. */
+  readonly nannyId: NannyId;
   readonly section: VerificationSection;
   readonly status: SectionStatus;
   readonly sync: LevelSync;
@@ -520,6 +546,20 @@ export type UpdateServiceInput = {
   readonly submissionId: SubmissionId;
   readonly result: UpdateServiceResult;
   readonly subscribed: boolean;
+};
+
+/** ADR-168 (b): the admin names the submission whose bar is coming off, and says why. */
+export type LiftSuspensionInput = {
+  readonly submissionId: SubmissionId;
+  readonly reason: string;
+};
+
+/** What `lift_nanny_suspension()` answers — the durable facts the audit row also holds. */
+export type SuspensionLift = {
+  readonly nannyId: NannyId;
+  readonly suspendedSince: Instant;
+  readonly previousDbsOutcome: DbsOutcome;
+  readonly level: VerificationLevel;
 };
 
 /** 04 §6.4 S-A-16's counters (05 AC-A-17). */
@@ -563,21 +603,40 @@ export type RequiredSectionsByLevel = Readonly<
 
 /** The decision-side port (ADR-157) — the `0023` definers at service scope, plus the admin's reads. */
 export type VerificationDecisionStore = {
+  /**
+   * ★ ADR-169's one named resolution on the read side — the mirror of what every session-scope definer does
+   * inside itself (`submit_verification_evidence`, `save_verification_contact`, `claim_verification_processing`
+   * each run `select n.id from public.nannies n where n.user_id = auth.uid()` before they touch a column).
+   * A road that holds a session id and needs the party row asks HERE, once, at the top — never by passing
+   * whichever id was to hand, which is the defect REVIEW-4 C-3 measured. `null` when the user has no nanny row.
+   */
+  partyIdOf(
+    userId: UserId,
+  ): Promise<Result<NannyId | null, VerificationErrorDetails>>;
   /** the base-table facts an admin may read (02 §4.3 "admin all"); `null` before her first write */
   readAdminRecord(
-    nannyId: UserId,
+    nannyId: NannyId,
   ): Promise<Result<AdminRecord | null, VerificationErrorDetails>>;
   /** `sync_nanny_verification_state()` — idempotent; the memory double derives with `deriveLevel` */
   syncLevel(
-    nannyId: UserId,
+    nannyId: NannyId,
   ): Promise<Result<LevelSync, VerificationErrorDetails>>;
   /** `record_update_service_check()` — the level-4 action; `nannyId` from the submission, `checkedBy` the session's admin */
   recordUpdateServiceCheck(input: {
-    readonly nannyId: UserId;
+    readonly nannyId: NannyId;
     readonly result: UpdateServiceResult;
     readonly subscribed: boolean;
     readonly checkedBy: UserId;
   }): Promise<Result<LevelSync, VerificationErrorDetails>>;
+  /**
+   * ★ ADR-168 (b) — `lift_nanny_suspension()`, the ONE road that clears `suspended_at`. `service_role`; the
+   * definer validates the decider against `user_roles` and refuses a blank reason or an unsuspended nanny.
+   */
+  liftSuspension(input: {
+    readonly nannyId: NannyId;
+    readonly reason: string;
+    readonly decidedBy: UserId;
+  }): Promise<Result<SuspensionLift, VerificationErrorDetails>>;
   /** `expire_verification_section()` */
   expireSection(
     submissionId: SubmissionId,

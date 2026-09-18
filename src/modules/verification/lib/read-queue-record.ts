@@ -28,19 +28,21 @@ export async function readQueueRecord(
     return err("VALIDATION", "That check is not available", {
       reason: "unsupported-evidence",
     });
-  const [state, record] = await Promise.all([
-    deps.store.getStatus(entry.value.nannyId),
-    deps.store.readAdminRecord(entry.value.nannyId),
-  ]);
-  if (!state.ok) return state;
+  // ★ ADR-169 — the admin record is keyed by the ledger's party id and carries her `auth.users.id` with it, so
+  // the view read below (which keys on the session's id, R-7) is reached without a second guess about which id
+  // this road is holding. Sequential rather than parallel for exactly that reason: the second read needs the
+  // first one's answer.
+  const record = await deps.store.readAdminRecord(entry.value.nannyId);
   if (!record.ok) return record;
   if (record.value === null)
     return err("VALIDATION", "That check is not available", {
       reason: "unsupported-evidence",
     });
+  const state = await deps.store.getStatus(record.value.userId);
+  if (!state.ok) return state;
   return ok({
     entry: queueEntryOf(entry.value, section),
-    state: state.value ?? emptyVerificationState(entry.value.nannyId),
+    state: state.value ?? emptyVerificationState(record.value.userId),
     record: record.value,
     ...(entry.value.note === undefined ? {} : { note: entry.value.note }),
   });

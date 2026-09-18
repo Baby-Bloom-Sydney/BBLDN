@@ -29,6 +29,25 @@
 // reason under `"actions"` in `limiter-call-sites.allow.json`. A stale entry fails: if the file has since
 // acquired a call site, or has gone, the record has outlived its reason and comes out.
 //
+// ★ **A DELEGATION REASON IS CHECKED, NOT READ** (REVIEW-4 M-5 / §8 R-7). The sweep proved the hole by
+// measurement: it replaced `verification/lib/decide.ts`'s `consumeAdminRouteLimit` call with a literal and this
+// gate **stayed green**, because the action was allow-listed and the prose naming the delegate was never read by
+// anything. A reason that says "the limiter is one boundary in, in `<file>`" is a claim about the tree, and a
+// claim about the tree is checkable. So an entry that delegates is written as an object rather than a sentence:
+//
+//     "src/modules/admin-verification/actions/decide-submission-action.ts": {
+//       "reason": "07 §8 row 14 is consumed one boundary in …",
+//       "delegatesTo": "src/modules/verification/lib/decide.ts",
+//       "helper": "consumeAdminRouteLimit"
+//     }
+//
+// and the gate then asserts three things the prose only asserted rhetorically: `delegatesTo` exists, its **code**
+// (comments and strings stripped) calls `helper`, and `helper` is a name that file brought in or defined. Delete
+// the call and the gate fails naming the file, which is the behaviour the sweep could not get. A plain-string
+// entry is still legal — most reasons genuinely are "there is no surface" or "this is a read" and have nothing
+// to check — but a string that *claims* a delegation ("consumed one boundary in") and does not carry the fields
+// is refused, so the prose form cannot be used to dodge the check.
+//
 // Reports check `limiter-call-sites` (same job). Exit 0 = every action is limited or recorded; 1 = listed.
 import { readFileSync } from "node:fs";
 import { resolve, dirname, relative } from "node:path";
@@ -51,6 +70,9 @@ const ACTION_FILE = /^src\/modules\/[^/]+(?:\/[^/]+)*\/actions\/[^/]+\.tsx?$/;
 /** The `"use server"` directive prologue: the first statement of the module, after comments only. */
 const DIRECTIVE =
   /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*["']use server["']\s*;?/;
+
+/** A reason that claims a delegation must prove it: the phrase is the trigger, the object is the proof. */
+const CLAIMS_DELEGATION = /consumed one boundary in/i;
 
 /** `import { a, b } from "…/consume-<something>-limit"` — the specifier is a string, so read it raw. */
 const CONSUME_IMPORT =
@@ -104,13 +126,80 @@ function consumes(raw) {
 const legacy = legacyMatchers();
 const isLegacy = (path) => legacy.some((matcher) => matcher.test(path));
 
-/** @type {Record<string, string>} */
+/** @type {Record<string, string | { reason: string, delegatesTo?: string, helper?: string }>} */
 let allowed = {};
 try {
   // The file is shared with `check-limiter-call-sites.mjs`; this gate owns the `actions` half only.
   allowed = JSON.parse(readFileSync(ALLOW_FILE, "utf8")).actions ?? {};
 } catch (error) {
   if (error.code !== "ENOENT") throw error;
+}
+
+const reasonOf = (entry) => (typeof entry === "string" ? entry : entry.reason);
+
+/**
+ * ★ The delegation check (REVIEW-4 M-5). Returns a list of failures, empty when the claim holds.
+ *
+ * It is deliberately about the DELEGATE and not about the action: the action reaches its delegate through the
+ * module connector (`VERIFICATION_REGISTRY`), which no static read crosses — that is the true fact the original
+ * prose stated. What IS statically checkable, and what actually broke, is whether the named helper is still
+ * called in the named file. So that is what is asserted.
+ */
+function delegationFailures(path, entry) {
+  const reason = reasonOf(entry);
+  if (typeof reason !== "string" || reason.trim() === "")
+    return [
+      `limiter-call-sites.allow.json's "actions" entry for "${path}" has no reason. A record without a reason is an exemption.`,
+    ];
+  if (typeof entry === "string")
+    return CLAIMS_DELEGATION.test(reason)
+      ? [
+          `limiter-call-sites.allow.json's "actions" entry for "${path}" claims the limiter is "consumed one boundary in" but is a bare sentence. Write it as { "reason": …, "delegatesTo": "<repo-relative file>", "helper": "<function>" } so the gate can check the claim (REVIEW-4 M-5).`,
+        ]
+      : [];
+
+  const { delegatesTo, helper } = entry;
+  if (typeof delegatesTo !== "string" || typeof helper !== "string")
+    return [
+      `limiter-call-sites.allow.json's "actions" entry for "${path}" is an object but names no "delegatesTo" + "helper" pair. Either name both, or make it a plain reason.`,
+    ];
+
+  let source;
+  try {
+    source = readFileSync(resolve(REPO_ROOT, delegatesTo), "utf8");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    return [
+      `limiter-call-sites.allow.json's "actions" entry for "${path}" delegates to "${delegatesTo}", which does not exist. The record has outlived its reason.`,
+    ];
+  }
+
+  const code = codeOnly(source);
+  const failures = [];
+  // The same call shape the in-file check uses: a bare call, or one method of a helper that exposes several.
+  const called = new RegExp(
+    "\\b" + helper + "\\s*(?:\\.\\s*[A-Za-z_$][\\w$]*\\s*)?\\(",
+  );
+  // And the name must be one the file brought in or defined — a call to a name from nowhere is a typo, not a
+  // control, and would otherwise pass on a file that happens to mention it.
+  const known = new RegExp(
+    "(?:import[^;]*\\b" +
+      helper +
+      "\\b|function\\s+" +
+      helper +
+      "\\b|const\\s+" +
+      helper +
+      "\\b)",
+  );
+  if (!called.test(code))
+    failures.push(
+      `limiter-call-sites.allow.json excuses "${path}" because "${delegatesTo}" consumes the limit through ${helper}(), and ${delegatesTo} does not call it. Either restore the call or stop excusing the action (REVIEW-4 M-5).`,
+    );
+  else if (!known.test(code))
+    failures.push(
+      `limiter-call-sites.allow.json names ${helper} in "${delegatesTo}", which neither imports nor defines it.`,
+    );
+  return failures;
 }
 
 const limited = [];
@@ -138,6 +227,14 @@ const unknownAllowances = Object.keys(allowed).filter(
 const staleAllowances = Object.keys(allowed).filter((path) =>
   limited.includes(path),
 );
+// Only entries that still describe a live action are checked: an unknown or stale one is already failing above
+// and its delegate is not the interesting news.
+const brokenDelegations = Object.entries(allowed)
+  .filter(
+    ([path]) =>
+      !unknownAllowances.includes(path) && !staleAllowances.includes(path),
+  )
+  .flatMap(([path, entry]) => delegationFailures(path, entry));
 
 for (const path of unrecorded)
   console.error(
@@ -151,10 +248,21 @@ for (const path of staleAllowances)
   console.error(
     `check-action-limits: FAIL — limiter-call-sites.allow.json's "actions" still excuses "${path}", which now consumes a limit. Remove the entry.`,
   );
+for (const message of brokenDelegations)
+  console.error(`check-action-limits: FAIL — ${message}`);
 
-if (unrecorded.length + unknownAllowances.length + staleAllowances.length > 0)
+if (
+  unrecorded.length +
+    unknownAllowances.length +
+    staleAllowances.length +
+    brokenDelegations.length >
+  0
+)
   process.exit(1);
 
+const checkedDelegations = Object.values(allowed).filter(
+  (entry) => typeof entry !== "string",
+).length;
 console.log(
-  `check-action-limits: OK — ${limited.length} of ${seen.size} server actions consume a rate-limit policy; ${unlimited.length} recorded with a reason`,
+  `check-action-limits: OK — ${limited.length} of ${seen.size} server actions consume a rate-limit policy; ${unlimited.length} recorded with a reason, ${checkedDelegations} of them a delegation checked against its named helper`,
 );

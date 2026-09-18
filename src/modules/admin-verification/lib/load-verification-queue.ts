@@ -6,7 +6,7 @@ import { log } from "@/modules/platform";
 import type { SubmissionId } from "@/modules/shared-types";
 import { verification } from "@/modules/verification";
 import type { OpenRecord, QueueQuery, VerificationQueueView } from "../types";
-import { nannyNameOf } from "./nanny-name-of";
+import { nannyNameOfParty } from "./nanny-name-of-party";
 
 export async function loadVerificationQueue(
   query: QueueQuery & { readonly open: SubmissionId | null },
@@ -31,7 +31,7 @@ export async function loadVerificationQueue(
   const rows = await Promise.all(
     listed.value.map(async (entry) => ({
       ...entry,
-      nannyName: await nannyNameOf(entry.nannyId),
+      nannyName: await nannyNameOfParty(entry.nannyId),
     })),
   );
   let open: OpenRecord | null = null;
@@ -40,7 +40,7 @@ export async function loadVerificationQueue(
     if (record.ok)
       open = {
         ...record.value,
-        nannyName: await nannyNameOf(record.value.entry.nannyId),
+        nannyName: await nannyNameOfParty(record.value.entry.nannyId),
       };
     else
       log.warn("verification submission could not be opened", {

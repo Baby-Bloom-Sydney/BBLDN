@@ -60,8 +60,16 @@ export async function decide(
       reason: "not-built",
     });
 
+  // ★ ADR-169 — two ids, named apart, crossed ONCE. `nannyId` is the ledger's party row (`nannies.id`) and is
+  // what every decision-side write is keyed by; `userId` is her `auth.users.id` and is what a mailbox, an
+  // audit subject and `verification_status` are keyed by. The crossing happens here, in the admin record the
+  // road already had to read, and nowhere else on this road.
   const nannyId = entry.value.nannyId;
-  const before = await deps.store.getStatus(nannyId);
+  const record = await deps.store.readAdminRecord(nannyId);
+  if (!record.ok) return record;
+  if (record.value === null) return unavailable();
+  const userId = record.value.userId;
+  const before = await deps.store.getStatus(userId);
   if (!before.ok) return before;
   const fromLevel = before.value?.level ?? "L0_SIGNED_UP";
 
@@ -72,6 +80,8 @@ export async function decide(
     ...(input.note === undefined ? {} : { note: input.note }),
     ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt }),
     actor: { kind: "admin", id: admin.value.adminId },
+    // ADR-169: the audit subject, crossed once above and handed down (03 §9.3).
+    onBehalfOf: userId,
   });
   if (!recorded.ok) {
     log.warn("verification decision refused by the provider", {
@@ -88,11 +98,11 @@ export async function decide(
   const synced = await deps.store.syncLevel(nannyId);
   if (!synced.ok) return synced;
   const sync = { ...synced.value, fromLevel };
-  const state = await deps.store.getStatus(nannyId);
+  const state = await deps.store.getStatus(userId);
   if (!state.ok) return state;
-  await emitLevelEvents(nannyId, sync);
+  await emitLevelEvents(userId, sync);
   await sendVerificationOutcome({
-    nannyId,
+    nannyId: userId,
     sync,
     now: nowInstant(),
     ...(input.decision === "rejected"

@@ -115,6 +115,12 @@ jobs:
       - run: npm ci
       - name: eslint (05 §9 stage 1; §7 boundary + platform rules once S6 lands)
         run: npm run lint
+      - name: check:long-functions — the 50-line allow-list is a RATCHET, not a drawer (REVIEW-4 M-6 / R-8)
+        # `eslint.long-functions.json` turns the 50-line rule off per file. It grew 106 -> 109 in one cycle while
+        # both limiter allow-files fail on a stale entry by design. This step is the missing sibling: entries
+        # must exist, must carry a reason, and the count may only fall.
+        if: ${{ !cancelled() }}
+        run: npm run check:long-functions
       - name: prettier --check (05 §9 stage 1) — red on the raw copy until S1 formats the legacy tree
         if: ${{ !cancelled() }}
         run: npm run format:check
@@ -191,16 +197,36 @@ jobs:
   # excellent tests with no teeth, and REVIEW-3's CRITICAL is the worked example of what that costs: the gap it
   # found lives in exactly the seam between a mock and a column.
   #
-  # The stack is started **in the runner** and `supabase db reset` applies `0000`–`0023` forward from empty, so
+  # The stack is started **in the runner** and `supabase db reset` applies `0000`–`0025` forward from empty, so
   # this job also proves on every PR that the whole ordered migration set still applies to an empty database —
   # the other thing nothing checked. No secrets and no hosted project: `bb-ldn-preview` is behind (B-45) and a
-  # preview-backed job would be red for reasons that are not the code's. Same-repo PRs and pushes to `main` only,
-  # because a fork's runner is not ours to spend. Joins the required checks when it is green (ADR-109).
+  # preview-backed job would be red for reasons that are not the code's. Joins the required checks when it is
+  # green (ADR-109).
+  #
+  # ★ **A SKIP IS NOT A PASS** (REVIEW-4 M-4 / §8 R-6). This job carried a job-level
+  # `if: …head.repo.full_name == github.repository || …` so a fork's runner was not spent on it. Both halves of
+  # the consequence were confirmed by measurement: branch protection lists `integration` among the required
+  # checks, and **a job skipped by a job-level `if` reports "skipped", which branch protection counts as
+  # success**. So on a fork PR — and this repository is PUBLIC — the one gate guarding the mock-versus-column
+  # seam reported green without running a line. The fork reasoning was sound; what was missing was that its
+  # consequence was silent.
+  #
+  # The `if` is therefore gone from the job and lives in a **step** instead. The job always starts, and on a PR
+  # from a fork its first step fails with a message saying so. A fork PR is now RED rather than green-by-absence,
+  # which is the honest report: this gate cannot run here, so it has not passed here. A maintainer who wants such
+  # a PR merged runs it from a branch in this repository, which is the same thing they had to do before — the
+  # difference is that the check now says so out loud instead of quietly agreeing.
   integration:
     name: integration
     runs-on: ubuntu-latest
-    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'push'
     steps:
+      - name: refuse to report a skip as a pass (REVIEW-4 M-4)
+        # A fork's runner is not ours to spend, and a required check that reports success without running is
+        # worse than one that is missing. So the job runs and fails, rather than skipping and passing.
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          echo "::error title=integration cannot run on a fork PR::This job starts a Supabase stack in the runner and is a required check. It is not run for pull requests from forks (a fork's runner is not ours to spend), and a job that SKIPS reports success to branch protection — so it fails instead. Re-open this pull request from a branch in ${{ github.repository }} to run it."
+          exit 1
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -210,7 +236,7 @@ jobs:
       - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
         with:
           version: 2.117.0
-      - name: supabase start + db reset — the ordered set 0000..0024 applied forward from empty (02 §6)
+      - name: supabase start + db reset — the ordered set 0000..0025 applied forward from empty (02 §6)
         run: |
           supabase start
           supabase db reset
