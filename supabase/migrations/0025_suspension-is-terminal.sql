@@ -80,7 +80,7 @@ comment on table public.nanny_suspension_lifts is
 
 create index if not exists nanny_suspension_lifts_nanny_idx
   on public.nanny_suspension_lifts (nanny_id, decided_at desc);
--- covering index for the RESTRICT foreign key
+-- The FK index the RESTRICT check needs, so deleting an `auth.users` row does not seq-scan this table.
 create index if not exists nanny_suspension_lifts_decided_by_idx
   on public.nanny_suspension_lifts (decided_by);
 
@@ -93,16 +93,24 @@ drop policy if exists nanny_suspension_lifts_admin_select on public.nanny_suspen
 create policy nanny_suspension_lifts_admin_select on public.nanny_suspension_lifts
   for select to authenticated using ((select public.is_admin()));
 
-revoke all on table public.nanny_suspension_lifts from public, anon, authenticated;
+-- ★ `service_role` is revoked too, and that is not belt-and-braces (database-reviewer M-4, driven — the verify
+-- block below refused the first apply). Supabase's default privileges grant ALL on a new public table to
+-- `service_role`, so a `grant select, insert` on top of them grants nothing new and leaves UPDATE and DELETE
+-- exactly where they were: an audit table whose rows the application could rewrite. The revoke is what makes
+-- this table append-only; the grant merely says which two verbs come back.
+revoke all on table public.nanny_suspension_lifts from public, anon, authenticated, service_role;
 grant select on table public.nanny_suspension_lifts to authenticated;
 grant select, insert on table public.nanny_suspension_lifts to service_role;
 
 -- ---------------------------------------------------------------------------
 -- 2. `sync_nanny_verification_state()` — re-created; the bar is terminal here
 -- ---------------------------------------------------------------------------
--- Byte-for-byte `0023`'s function except for the two `suspended_at` assignments and this note. The whole body is
--- restated rather than patched because `create or replace function` has no other form, and a reader comparing
--- the two files should be able to diff them.
+-- The function BODY is byte-for-byte `0023`'s except for the two `suspended_at` assignments and the note above
+-- them; it is restated rather than patched because `create or replace function` has no other form, and a reader
+-- comparing the two files should be able to diff them. Outside the body one line is deliberately not identical:
+-- the `revoke all` below names `anon` and `authenticated` explicitly where `0023` named only `public`. That is
+-- the same privilege set either way (neither role holds a separate explicit grant), stated rather than left for
+-- someone to discover while checking the claim above.
 
 create or replace function public.sync_nanny_verification_state(p_nanny_id uuid, p_required jsonb)
 returns jsonb
@@ -260,17 +268,27 @@ begin
       using errcode = '22023';
   end if;
 
-  -- Lock order matches the sync: the nanny row, then her verification row.
+  -- ★ LOCK ORDER: `verifications` FIRST, then `nannies` — and not the other way round, which is what this
+  -- function did until `database-reviewer` drove it (H-1). The order is not the sync's internal one; it is the
+  -- one every CALLER establishes. `record_vetting_decision` (`0023:412-434`), `record_update_service_check`
+  -- (`0023:473`) and `expire_verification_section` (`0023:513`) all touch `verifications` before the sync ever
+  -- reaches `nannies`, so verifications-then-nannies is the schema's effective global order. A lift that took
+  -- them the other way round was the only writer inverting it, and two admins on the same nanny — one recording
+  -- a decision, one lifting her bar — would deadlock, surfacing as a spurious 40P01 on a legitimate action.
+  select * into v_v from public.verifications v where v.nanny_id = p_nanny_id for update;
   select * into v_n from public.nannies n where n.id = p_nanny_id for update;
   if not found then
     raise exception 'lift_nanny_suspension: unknown nanny %', p_nanny_id using errcode = 'P0002';
   end if;
-  select * into v_v from public.verifications v where v.nanny_id = p_nanny_id for update;
 
-  v_suspended_at := coalesce(v_n.suspended_at, v_v.suspended_at);
+  -- `least` rather than `coalesce`: both ignore a null side, so today (the two columns are only ever written
+  -- together, inside one transaction) they answer the same thing. They differ the day something writes one of
+  -- them alone — the admin-suspend button this file's header anticipates — and then the EARLIER instant is the
+  -- honest answer to "how long had she been suspended", which is the question the audit row exists to answer.
+  v_suspended_at := least(v_n.suspended_at, v_v.suspended_at);
   if v_suspended_at is null then
     raise exception 'lift_nanny_suspension: nanny % is not suspended', p_nanny_id
-      using errcode = '22023';
+      using errcode = '55006';
   end if;
   v_outcome := coalesce(v_v.dbs_outcome, 'unset');
 
@@ -368,20 +386,35 @@ begin
   -- 4b. ★ The security clause itself, asserted on the SOURCE rather than on prose: neither `suspended_at`
   --     assignment in the sync may fall back to `null`. This is the clause the twin must not undo, and the
   --     assertion is what makes "forward-only" checkable by a machine rather than by a reader.
+  -- ★ `~*`, not `~` (database-reviewer M-1): these four regexes are the ONE machine check protecting ADR-168's
+  -- forward-only clause, and a case-sensitive check is defeated by `ELSE NULL END`. A rewrite that re-opens the
+  -- hole in different casing must trip this, or the file applies "successfully" while undoing itself.
   if exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'sync_nanny_verification_state'
-       and p.prosrc ~ 'suspended_at\s*=\s*case when v_suspend then[^;]*else\s+null\s+end'
+       and p.prosrc ~* 'suspended_at\s*=\s*case when v_suspend then[^;]*else\s+null\s+end'
   ) then
     raise exception '0025: sync_nanny_verification_state() still derives suspended_at to null — a bar it did not set (ADR-168 (a))';
   end if;
   if not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'sync_nanny_verification_state'
-       and p.prosrc ~ 'else v\.suspended_at end'
-       and p.prosrc ~ 'else n\.suspended_at end'
+       and p.prosrc ~* 'else v\.suspended_at end'
+       and p.prosrc ~* 'else n\.suspended_at end'
   ) then
     raise exception '0025: sync_nanny_verification_state() must leave an existing suspended_at alone in BOTH statements (ADR-168 (a))';
+  end if;
+
+  -- 4b(ii). ★ The audit row is the promise, so it is asserted too (database-reviewer M-2; `0023:1138-1143` set
+  --        the precedent for `record_vetting_decision`'s `decided_by`). An edit that drops the insert would
+  --        otherwise leave suspensions liftable with no trail and still pass this block.
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'lift_nanny_suspension'
+       and p.prosrc ~* 'insert\s+into\s+public\.nanny_suspension_lifts'
+       and p.prosrc ~* 'user_roles'
+  ) then
+    raise exception '0025: lift_nanny_suspension() must validate the decider and write the nanny_suspension_lifts row (ADR-168 (b))';
   end if;
 
   -- 4c. The audit table: RLS on and FORCED, admin SELECT only, and no client write policy of any kind.
@@ -403,5 +436,39 @@ begin
      or has_table_privilege('authenticated', 'public.nanny_suspension_lifts', 'DELETE') then
     raise exception '0025: nanny_suspension_lifts grants are wrong — admin SELECT through the policy only';
   end if;
+
+  -- ★ APPEND-ONLY, asserted rather than assumed (database-reviewer M-4). The table's comment promises nothing
+  --   updates or deletes a row; today that holds only because the GRANT above omits those verbs. An audit table
+  --   whose append-only-ness is an accident of one line is one careless grant away from being editable.
+  if has_table_privilege('service_role', 'public.nanny_suspension_lifts', 'UPDATE')
+     or has_table_privilege('service_role', 'public.nanny_suspension_lifts', 'DELETE') then
+    raise exception '0025: nanny_suspension_lifts must be append-only — service_role may INSERT and SELECT, never UPDATE or DELETE';
+  end if;
+
+  -- 4d. ★ The table's SHAPE, not only its posture (database-reviewer M-3). `create table if not exists` is a
+  --     silent no-op against a pre-existing, differently-shaped table — one missing the non-blank reason check,
+  --     or with `decided_by` cascading instead of restricting — and the migration would then apply cleanly with
+  --     the actual safeguards absent. `0008:252-260` set this pattern; it is followed here.
+  if not exists (
+    select 1 from pg_constraint c join pg_class t on t.oid = c.conrelid
+      join pg_namespace n on n.oid = t.relnamespace
+     where n.nspname = 'public' and t.relname = 'nanny_suspension_lifts'
+       and c.conname = 'nanny_suspension_lifts_reason_not_blank_check'
+  ) then
+    raise exception '0025: nanny_suspension_lifts is missing nanny_suspension_lifts_reason_not_blank_check — a lift with no reason is half an answer';
+  end if;
+  foreach v_fn in array array['decided_by:r', 'nanny_id:c'] loop
+    if not exists (
+      select 1 from pg_constraint c join pg_class t on t.oid = c.conrelid
+        join pg_namespace n on n.oid = t.relnamespace
+        join pg_attribute a on a.attrelid = t.oid and a.attnum = c.conkey[1]
+       where n.nspname = 'public' and t.relname = 'nanny_suspension_lifts'
+         and c.contype = 'f' and array_length(c.conkey, 1) = 1
+         and a.attname = split_part(v_fn, ':', 1)
+         and c.confdeltype = split_part(v_fn, ':', 2)
+    ) then
+      raise exception '0025: nanny_suspension_lifts.% does not carry the ON DELETE action 0025 declares (% = restrict, c = cascade)', split_part(v_fn, ':', 1), split_part(v_fn, ':', 2);
+    end if;
+  end loop;
 end
 $$;

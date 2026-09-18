@@ -40,7 +40,12 @@ drop function if exists public.lift_nanny_suspension(uuid, text, uuid);
 -- 2. The audit table and its indexes (the policy and indexes go with the table).
 drop table if exists public.nanny_suspension_lifts;
 
--- 3. `sync_nanny_verification_state()` is NOT re-created here. See the ADR-165 (1) block above.
+-- 3. `sync_nanny_verification_state()` is NOT re-created here. See the ADR-165 (1) block above. Its COMMENT is
+--    restored to `0023`'s, because `0025`'s version names `lift_nanny_suspension()` — a function line 1 has
+--    just dropped — and a function whose own metadata points at something that no longer exists is how an
+--    operator at 3 a.m. concludes the rollback half-ran. The body, and its clause, stay exactly as they are.
+comment on function public.sync_nanny_verification_state(uuid, jsonb) is
+  'ADR-157 (1): the ONE writer of verifications.level / nannies.verification_level (02 §4.3, R-8). Derives the level top-down from the section statuses, dbs_outcome, the cross-check and the Update Service columns against the sections-per-level the caller hands it (validated; an emptied L2-L4 list refuses). Releases held_for_verification rows at L4 (ADR-158). ADR-168 (0025), KEPT THROUGH THIS ROLLBACK (ADR-165 (1)): it may SET suspended_at and may NEVER clear it. lift_nanny_suspension() was the road that lifted one and this rollback dropped it, so nothing in this schema clears the column - lift by hand, as a named and logged change, or roll forward. Called inside the decision definers; never from a client. service_role only.';
 
 -- 4. Verify — the twin asserts what it did AND what it refused to do (M-16: a twin with no verify block cannot
 --    tell a half-applied rollback from a whole one).
@@ -63,8 +68,8 @@ begin
   if not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'sync_nanny_verification_state'
-       and p.prosrc ~ 'else v\.suspended_at end'
-       and p.prosrc ~ 'else n\.suspended_at end'
+       and p.prosrc ~* 'else v\.suspended_at end'
+       and p.prosrc ~* 'else n\.suspended_at end'
   ) then
     raise exception '0025 rollback: the ADR-168 (a) narrowing is gone — this twin must KEEP it (ADR-165 (1))';
   end if;

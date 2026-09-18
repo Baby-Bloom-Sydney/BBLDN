@@ -330,6 +330,23 @@ describe("int.decision — lifting a bar is its own act, recorded (ADR-168 (b))"
     expect(await liftRowCount()).toBe(1);
   });
 
+  it("★ the audit table is append-only — even the role that writes it cannot rewrite it", async () => {
+    // Driven by `database-reviewer` M-4 and it was real: Supabase's default privileges grant ALL on a new
+    // public table to `service_role`, so `grant select, insert` on top of them left UPDATE and DELETE where
+    // they were. `0025`'s verify block refused the first apply, which is the gate working.
+    const { rows } = await db.query<{
+      upd: boolean;
+      del: boolean;
+      ins: boolean;
+    }>(
+      `select has_table_privilege('service_role', 'public.nanny_suspension_lifts', 'UPDATE') as upd,
+              has_table_privilege('service_role', 'public.nanny_suspension_lifts', 'DELETE') as del,
+              has_table_privilege('service_role', 'public.nanny_suspension_lifts', 'INSERT') as ins`,
+    );
+
+    expect(rows[0]).toEqual({ upd: false, del: false, ins: true });
+  });
+
   it("neither anon nor authenticated may execute the lift, and neither may read its audit rows", async () => {
     const { rows } = await db.query<{
       anon_exec: boolean;
