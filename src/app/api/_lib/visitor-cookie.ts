@@ -13,24 +13,18 @@
 // can guess it. Here the question is different and the answer has to be stronger: this cookie decides **which
 // row a write lands on**, so "unguessable" is not enough, "minted by us" is the property required.
 //
-// **Where the key comes from, stated plainly because it is a judgement.** There is no dedicated signing secret
-// in the environment, and adding one would make the cookie banner depend on a value BAI has not set yet — a
-// consent surface that silently stops recording is worse than the defect it replaces. So the key is *derived*
-// from `CRON_SECRET` with HKDF (RFC 5869) under its own `info` label: the derived key cannot be reversed to
-// `CRON_SECRET`, and holding it does not let anyone forge a cron bearer.
+// **Where the key comes from** — `VISITOR_COOKIE_SECRET`, its own value in the environment (ADR-178). `3e`
+// derived it by HKDF from `CRON_SECRET`, because there was no dedicated secret and a consent surface that
+// silently stops recording is worse than the defect it replaced. That derivation is cryptographically sound and
+// operationally wrong, and ADR-178 ruled it out for two reasons rather than one: rotating the cron Bearer would
+// have invalidated every visitor's consent cookie for a reason unrelated to consent, and a leaked cron Bearer
+// would have become a key for **forging** consent records — the one artefact whose whole value is that it
+// evidences what a person actually chose. Two unrelated trust domains now rotate and leak apart.
 //
-// **The cost, both halves, because only naming one of them would be dishonest** (security pass, 2026-09-19):
-//   * *Rotation* invalidates every visitor cookie. The whole consequence is that a fresh id is minted on the
-//     next request — no error, no lost record, just a new pseudonymous visitor.
-//   * *A leak of `CRON_SECRET`* is the graver half and it is an **expansion of that secret's blast radius**.
-//     The derivation is public and forward-computable, so whoever holds a leaked `CRON_SECRET` can mint a valid
-//     cookie for any uuid they choose — and if they have separately learned a real visitor's id (from a log, a
-//     referrer, an analytics export), they can supersede that person's consent row. Accepted, not overlooked:
-//     the same leak already opens every cron endpoint, and the bound on this extra harm is one consent record
-//     per id they can already name.
-// Recorded in L-009 PROGRESS with the alternative — a dedicated `VISITOR_COOKIE_SECRET`, which costs a new
-// value BAI owes and a boot dependency — for the planner to rule on. `refine-env.ts` now holds `CRON_SECRET` to
-// a minimum length outside development, because it carries two security properties instead of one.
+// HKDF stays, over the dedicated secret: it normalises an arbitrary-length secret to a 32-byte key and the
+// `info` label carries a version, so a future change of scheme is a label change rather than a silent
+// re-interpretation of the same bytes. Rotation invalidates outstanding cookies and the next visitor is asked
+// again — which is the correct failure, not a defect to design around.
 import { createHmac, hkdfSync, randomUUID, timingSafeEqual } from "node:crypto";
 import { env } from "@/modules/config/server";
 import { SECURITY, publicEnv } from "@/modules/config";
@@ -44,7 +38,13 @@ const SIGNED = /^([0-9a-f-]{36})\.([A-Za-z0-9_-]+)$/;
 
 function key(): Buffer {
   return Buffer.from(
-    hkdfSync("sha256", env.server.CRON_SECRET, "", HKDF_INFO, KEY_BYTES),
+    hkdfSync(
+      "sha256",
+      env.server.VISITOR_COOKIE_SECRET,
+      "",
+      HKDF_INFO,
+      KEY_BYTES,
+    ),
   );
 }
 

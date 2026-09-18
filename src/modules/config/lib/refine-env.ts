@@ -66,26 +66,34 @@ function stripePrefixNames(values: Parsed): string[] {
 }
 
 /**
- * `CRON_SECRET` now carries **two** security properties, not one (security pass MEDIUM, 2026-09-19): it is the
- * Bearer every `/api/cron/*` route compares against, and — via HKDF under its own label — the key material
- * behind the signed visitor cookie (`app/api/_lib/visitor-cookie.ts`). Its entropy floor went up with the
- * second use, and nothing enforced a floor at all: the registry says `kind: "string"`, which is `min(1)`.
+ * Two names are key material or a Bearer, and the registry says `kind: "string"` for both — which is `min(1)`,
+ * so nothing stopped a deployed environment carrying a passphrase somebody typed (security pass MEDIUM,
+ * 2026-09-19).
+ *
+ * `CRON_SECRET` is the Bearer every `/api/cron/*` route compares against. It briefly carried a second property —
+ * the visitor cookie's signing key was derived from it by HKDF — and **ADR-178 has since split that off** onto
+ * `VISITOR_COOKIE_SECRET`, so the two trust domains rotate and leak apart. The floor stays on both: a Bearer
+ * somebody typed is the same defect whether or not a second use hangs off it, and an HMAC key is key material by
+ * definition.
  *
  * 32 characters is a 128-bit value in hex and a 192-bit one in base64url, so it is the smallest length that
  * cannot be met by a passphrase somebody typed. Development is exempt on purpose — a local stack is not a place
  * to make anyone invent secrets, and every deployed environment is preview or production.
  */
-const CRON_SECRET_MIN_LENGTH = 32;
+const SECRET_MIN_LENGTH = 32;
 
-function cronSecretStrengthNames(
+/** The names held to `SECRET_MIN_LENGTH` outside development; both are required in every environment. */
+const KEY_MATERIAL_NAMES = ["CRON_SECRET", "VISITOR_COOKIE_SECRET"] as const;
+
+function keyMaterialStrengthNames(
   values: Parsed,
   environment: Environment,
 ): string[] {
   if (environment === "development") return [];
-  const secret = values.CRON_SECRET;
-  return typeof secret === "string" && secret.length < CRON_SECRET_MIN_LENGTH
-    ? ["CRON_SECRET"]
-    : [];
+  return KEY_MATERIAL_NAMES.filter((name) => {
+    const secret = values[name];
+    return typeof secret === "string" && secret.length < SECRET_MIN_LENGTH;
+  });
 }
 
 export function refineEnv(
@@ -97,6 +105,6 @@ export function refineEnv(
     ...stubGuardNames(values, environment),
     ...productionStubProviderNames(values, environment),
     ...stripePrefixNames(values),
-    ...cronSecretStrengthNames(values, environment),
+    ...keyMaterialStrengthNames(values, environment),
   ];
 }
