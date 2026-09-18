@@ -740,7 +740,7 @@ re-applied, green again. `npm run types:generate` produced **no diff**: there is
 `0021` / `0022` / `0023` / `0024` are all still unapplied on `bb-ldn-preview` (B-45 is BAI's) and **no claim in
 this section rests on preview**.
 
-**Kickoff debt 2 — the nanny's name on three parent surfaces, one read.** `matching.publicNannyName(auth, nannyId)`
+**Kickoff debt 2 — the nanny's name on three surfaces; one read for the two parent ones.** `matching.publicNannyName(auth, nannyId)`
 reads `nanny_public` by id at **session** scope and answers a first name or `null` — 07 §5.1 rule 4 keeps contact
 detail out of that view, so it is a name and nothing more, and no service-role use joins 07 §5.1 rule 5's list.
 None of the three surfaces may import `matching` (01 §2.3) and all three may import `connections`, so boot injects
@@ -753,8 +753,9 @@ it as the `nannyNameOf` port and it leaves by `connections.nannyNameOf`:
 - S-P-08's cards — the name heads each card and the stage phrase sits under it; the phrase is 04 §6.2's own
   vocabulary and the name is deliberately not folded into it.
 - the admin call drawer — a nanny-commission row read `Nanny commission call · nanny <uuid>`; it now reads her
-  name, falling back to the id's **short form** (the shape `admin-verification.nannyNameOf` already uses), never
-  a whole identifier.
+  name. **Not through this read**, and the reason is structural: see the `security-reviewer` section below. It
+  uses `admin-verification.nannyNameOf` (`user_profiles`, keyed on her `auth.users` id, session scope with RLS
+  as the second gate), which already existed for this question and falls back to the id's short form.
 
 Every line keeps the nameless form it had when the view has no row for her (isolated, below the pool, gone). The
 **fourth** caller — `call-layer`'s `aboutNanny` on S-P-01's "about {nanny}" line — is a **pin**, not a copy: the
@@ -802,6 +803,49 @@ against a hand-built record literal rather than against the module. Five live cl
 replace it. `matching/README.md` had two stale prose claims — it said the pre-check blast was unbuilt and pinned
 `it.fails` in `matching.autofire.test.ts`; the blast is built (ADR-136, the `PrecheckBlast` port) and that file
 carries no pin at all. Both corrected against the code (ADR-123 rule 2).
+
+**Review battery: `security-reviewer` (ADR-142 — this unit adds routes). 1 CRITICAL · 0 HIGH · 0 MEDIUM · 1 LOW;
+both fixed in-unit, 0 recorded, 0 pinned.**
+
+- **★ C-1 (CRITICAL) — FIXED, RED first. `0024` is what made ADR-158's hold reachable, and nothing on the read
+  side enforced it.** `0016`'s parent SELECT policy does hide a held row — `int.rpc-0024` proves it — but only
+  for a query run **as the parent**, and `dbConnectionStore` reads at `{ scope: "service" }` by design (`0007`
+  gives `connection_requests` no client write policy and the cascades run as `system`, with no session to read
+  under). So RLS never fires on the application's own reads: `connections.forParent` returned the held row,
+  S-P-08 rendered a card for it and the rail rendered rows 4-6 from it — and `2d`'s own new name lookup put the
+  nanny's **first name** on those lines. The state it fails on is the everyday one the feature exists for (L3:
+  above `MATCHING.minVerificationLevel`, below L4). It was inert before this unit, because until `0024` the flag
+  could never be `true`; this unit is what activates it, which is why it is this unit's to close.
+  **Fix:** `visibleToParent` — one rule, one home, applied at the **two parent-facing** consumption points
+  (`loadParentConnections`, and `railRest` before rows 4-6) and deliberately **not** inside
+  `connections.forParent`, because the machinery must keep seeing held rows: P-7's close cascade closes them with
+  everything else (a filter there would leave a live connection behind a closed position that nobody can cancel)
+  and K-1's duplicate and pending-cap checks count them. Defence in depth on top: `forParent` does **not look up
+  a name at all** for a held row, so a future consumer that forgets to filter still cannot name her. The rule is
+  stage-blind — a held row is hidden at every stage, terminal ones included — and **absent is not held**, so
+  every row written before `0024` still shows. Seven claims in `connections.held-invisible.test.ts`, all red
+  first, plus the note at `closeLiveConnections` saying why that one call site does not filter.
+- **★ The admin drawer's read was silently wrong, and the reviewer's "no issues" on the name lookup is what
+  surfaced it.** The parent surfaces' read is `nanny_public`, keyed on `nannies.id`. 03 §3.2's subject for a
+  `nanny-commission` booking is `{ kind: 'nanny', nannyId: UserId }` — her **`auth.users` id** — and
+  `nanny_public` deliberately carries **no `user_id`** (07 §5.2; the ADR-103 review's M1, pinned in `int.rls`).
+  A lookup by user id against that view matches nothing, silently, on **every** row: a fallback that always fires
+  and looks like a working feature. So the admin drawer uses `admin-verification.nannyNameOf` — `user_profiles`,
+  keyed on the user id, session scope with RLS as the second gate (07 §5.2) — which already existed for exactly
+  this question, and `admin` may import `admin-verification` (01 §2.3). **The planner's ruling said one read for
+  all three; it holds for the two parent surfaces and cannot hold for the admin one, and the reason is
+  structural rather than a matter of taste.** Recorded here rather than worked around.
+- **L-1 (LOW) — FIXED.** `NannyAddChildPitch` carried `data-pitch-variant`, which maps 1:1 to the under-3 signal
+  04 §4.1 row 5 says is captured and **never shown to her** — it would have put the signal in her own page
+  source. The attribute is gone; the variant is asserted on the pure `addChildPitchCopy`, where it belongs.
+- **What the battery confirmed:** the `nannyId` handed to every name lookup is server-derived at all three call
+  sites and never client-supplied; `0024` changes no grant, no `search_path`, no policy, and its UPDATE branch
+  cannot write or clear the held pair even with a stale value riding along in `p_columns`; `0007`'s CHECK cannot
+  be half-satisfied from either the SQL or the TypeScript, because every write path sets both fields or neither;
+  the widened `nanny_leads` read is keyed on the caller's own row and cannot be steered to another person's lead,
+  returns one boolean, and degrades to "unknown" (⇒ the active wording) on every failure; both new routes derive
+  everything from the session's own user id and render nothing to an unauthenticated or wrong-role caller; and no
+  attribute, response field or copy branch on either nanny screen distinguishes a held nanny from an unheld one.
 
 **Long functions.** Every file this unit touched that carried an `eslint.long-functions.json` entry had it
 **removed and the function actually split**: `db-connection-store.ts`, `connection-preconditions.ts`,

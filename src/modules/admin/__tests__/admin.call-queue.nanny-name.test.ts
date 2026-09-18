@@ -1,7 +1,15 @@
 // The admin drawer's half of kickoff debt 2 (04 §7.1 `{nanny}`). `1f` recorded it: a nanny-commission row read
 // `Nanny commission call · nanny <uuid>`, because `admin` may not read a table (fix: A-11 / A-24) and no
-// connector answered a person by id. `2d` gave `connections` that method — one `nanny_public` read, injected —
-// and `admin` already imports `connections` (01 §2.3), so nothing new crosses a boundary.
+// connector answered a person by id.
+//
+// ★ **It is NOT the parent surfaces' read.** The other two `{nanny}` surfaces go through
+// `connections.nannyNameOf` over `nanny_public`; this row cannot. 03 §3.2's subject for a `nanny-commission`
+// booking is `{ kind: 'nanny', nannyId: UserId }` — her **`auth.users` id** — while `nanny_public` is keyed on
+// `nannies.id` and deliberately carries **no `user_id`** (07 §5.2; the ADR-103 review's M1, pinned in `int.rls`).
+// A lookup by user id against that view would match nothing, silently, on every row: a fallback that always
+// fires and looks like a working feature. The view also excludes exactly the nannies an admin surface is about.
+// So this row uses `admin-verification.nannyNameOf` — `user_profiles`, keyed on the user id, session scope with
+// RLS as the second gate — which already existed for precisely this question.
 //
 // Written RED: the row carried the raw id.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +19,7 @@ import {
 } from "@/modules/scheduling";
 import { configurePositions } from "@/modules/positions";
 import { configureCallLayer, stubCallLayer } from "@/modules/call-layer";
-import { configureConnections, stubConnections } from "@/modules/connections";
+import { configureAuth, stubAuth } from "@/modules/auth";
 import { ok } from "@/modules/platform";
 import type {
   Actor,
@@ -19,6 +27,7 @@ import type {
   AvailabilityRule,
   Booking,
   BookingId,
+  Email,
   ISO,
   RuleId,
   UserId,
@@ -52,7 +61,9 @@ const nannyBooking: Booking = {
   version: 1,
 } as Booking;
 
-function withStack(namesByNanny: Readonly<Record<string, string>>) {
+const ADMIN_ID = "11111111-1111-4111-8111-111111111111" as UserId;
+
+function withStack(profiles: ReadonlyArray<Record<string, unknown>>) {
   configureScheduling({
     ...createSchedulingStub({ clock: () => NOW as ISO, rules }),
     listSchedule: async () =>
@@ -63,7 +74,20 @@ function withStack(namesByNanny: Readonly<Record<string, string>>) {
     listOpenCalls: async () => ok([]),
   });
   configurePositions({ getForMatching: async () => ok(null) } as never);
-  configureConnections(stubConnections({ namesByNanny }));
+  configureAuth(
+    stubAuth({
+      users: [
+        {
+          id: ADMIN_ID,
+          email: "reviewer@example.test" as Email,
+          role: "admin",
+          mfaVerified: true,
+        },
+      ],
+      signedInUserId: ADMIN_ID,
+      tables: { user_profiles: profiles },
+    }),
+  );
 }
 
 describe("S-A-03 / S-A-04 — the nanny-commission row names her (kickoff debt 2)", () => {
@@ -80,7 +104,7 @@ describe("S-A-03 / S-A-04 — the nanny-commission row names her (kickoff debt 2
   };
 
   it("reads her name, not her id", async () => {
-    withStack({ [NANNY as string]: "Priya" });
+    withStack([{ user_id: NANNY, first_name: "Priya", last_name: "Okafor" }]);
 
     const row = await firstRow();
 
@@ -88,8 +112,8 @@ describe("S-A-03 / S-A-04 — the nanny-commission row names her (kickoff debt 2
     expect(row?.about).not.toContain(NANNY as string);
   });
 
-  it("falls back to the id's short form when the view has no row for her — never a bare uuid", async () => {
-    withStack({});
+  it("falls back to the id's short form when there is no profile row — never a bare uuid", async () => {
+    withStack([]);
 
     const row = await firstRow();
 

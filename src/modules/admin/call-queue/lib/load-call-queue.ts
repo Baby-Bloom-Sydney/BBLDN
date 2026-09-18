@@ -9,7 +9,7 @@ import { log } from "@/modules/platform";
 import { positions } from "@/modules/positions";
 import { scheduling } from "@/modules/scheduling";
 import { callLayer, londonSlotWords } from "@/modules/call-layer";
-import { connections } from "@/modules/connections";
+import { nannyNameOf } from "@/modules/admin-verification";
 import type {
   Actor,
   CallListItem,
@@ -33,21 +33,23 @@ const LOOK_BACK_DAYS = 7;
 
 /**
  * Kickoff debt 2 (04 §7.1 `{nanny}`) — `1f` shipped this line with a raw uuid on it, because `admin` may not read
- * a table (fix: A-11 / A-24) and no connector answered a person by id. `connections.nannyNameOf` is that method
- * now: one `nanny_public` read, injected into `connections` at boot, and `admin` already imports `connections`.
+ * a table (fix: A-11 / A-24) and no connector answered a person by id.
  *
- * A refusal or a nanny the view has no row for (isolated, below the pool) falls back to the id's **short form**,
- * the shape `admin-verification.nannyNameOf` already uses for the same case — never the whole identifier.
+ * ★ **The parent surfaces' read cannot answer this one, and the reason is structural.** The other two `{nanny}`
+ * surfaces read `nanny_public` through `connections.nannyNameOf`. This row cannot: 03 §3.2's subject for a
+ * `nanny-commission` booking is `{ kind: 'nanny', nannyId: UserId }` — her **`auth.users` id** — while
+ * `nanny_public` is keyed on `nannies.id` and **deliberately carries no `user_id`** (07 §5.2; the ADR-103
+ * review's M1, pinned in `int.rls`). A lookup by user id against that view would match nothing, silently, on
+ * every row — a fallback that always fires and looks like a working feature. The view also excludes exactly the
+ * nannies an admin surface is about (isolated, below the pool).
+ *
+ * So the admin surface uses the **admin-side** read that already exists for precisely this question:
+ * `admin-verification.nannyNameOf` over `user_profiles`, keyed on the user id, at session scope with RLS as the
+ * second gate (07 §5.2) — no service-role use, no new road, and the same short-form fallback it already used.
+ * `admin` may import `admin-verification` (01 §2.3).
  */
-const SHORT = 8;
-
 async function aboutNanny(nannyId: UserId): Promise<string> {
-  const read = await connections.nannyNameOf(nannyId as string as never);
-  const name =
-    read.ok && read.value !== null
-      ? read.value
-      : `nanny ${(nannyId as string).slice(0, SHORT)}`;
-  return `Nanny commission call · ${name}`;
+  return `Nanny commission call · ${await nannyNameOf(nannyId)}`;
 }
 
 async function decorate(item: CallListItem): Promise<CallQueueRow> {

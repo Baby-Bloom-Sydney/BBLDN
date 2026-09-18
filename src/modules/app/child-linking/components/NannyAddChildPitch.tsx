@@ -46,14 +46,16 @@ export function NannyAddChildPitch({
     url: null,
     error: null,
   });
-  // kickoff debt 14 — the words follow the signal; the offer does not (see `add-child-pitch-copy.ts`)
+  // kickoff debt 14 — the words follow the signal; the offer does not (see `add-child-pitch-copy.ts`).
+  //
+  // Nothing on this page carries the variant as data (`security-reviewer` LOW): `copy.variant` maps 1:1 to the
+  // under-3 signal, which 04 §4.1 row 5 says is captured and **never shown to her**, so a `data-` attribute
+  // holding it would put the signal in her own page source. The variant is asserted on the pure
+  // `addChildPitchCopy` instead, where it belongs; the screen renders only the words.
   const copy = addChildPitchCopy(worksWithUnderThrees);
 
   return (
-    <main
-      className="mx-auto max-w-2xl px-4 py-10 md:py-14"
-      data-pitch-variant={copy.variant}
-    >
+    <main className="mx-auto max-w-2xl px-4 py-10 md:py-14">
       <section aria-labelledby="add-child-heading">
         <h1
           id="add-child-heading"

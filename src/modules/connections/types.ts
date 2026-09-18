@@ -107,10 +107,19 @@ export type ConnectionSummary = {
   readonly meetingOutcome?: MeetingOutcome;
   readonly trialDate?: ISODate;
   /**
-   * 04 §7.1 `{nanny}` — her first name, absent when the `nannyNameOf` port answered nothing. Absent rather than
-   * empty on purpose: every consumer's fallback is the nameless line it already had.
+   * 04 §7.1 `{nanny}` — her first name, absent when the `nannyNameOf` port answered nothing, and **always**
+   * absent on a held row (see below). Absent rather than empty on purpose: every consumer's fallback is the
+   * nameless line it already had.
    */
   readonly nannyFirstName?: string;
+  /**
+   * ★ ADR-158 (2) — the silent hold. Carried on the summary because the **parent-facing** consumers must drop
+   * the row (`visibleToParent`) while the machinery must keep it (P-7's close cascade; K-1's duplicate and
+   * pending-cap checks). `connections.forParent` therefore answers held rows and the screens filter, never the
+   * other way round. A held row also carries **no name**: `forParent` does not look one up for a nanny a family
+   * may not be told about.
+   */
+  readonly heldForVerification?: boolean;
 };
 
 // ── The inside (`1g`) ──

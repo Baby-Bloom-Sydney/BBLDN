@@ -8,6 +8,7 @@ import { auth } from "@/modules/auth";
 import type { ParentId } from "@/modules/shared-types";
 import { connections } from "./default-connections";
 import { connectionCardView } from "./connection-card-view";
+import { visibleToParent } from "./visible-to-parent";
 import type { ParentConnectionsLoad } from "../types";
 
 export async function loadParentConnections(): Promise<ParentConnectionsLoad> {
@@ -16,8 +17,9 @@ export async function loadParentConnections(): Promise<ParentConnectionsLoad> {
   const owner = session.value.userId as string as ParentId;
   const rows = await connections.forParent(owner);
   if (!rows.ok) return { kind: "failed" };
-  // Newest first: the nanny a family acted on most recently is the one she came back for.
-  const ordered = [...rows.value].sort((a, b) =>
+  // ★ ADR-158 (2): a held connection is not this family's to see. The store reads at service scope, so `0016`'s
+  // parent policy never fires on it — the filter here is the gate, not a second belt (see `visible-to-parent.ts`).
+  const ordered = [...visibleToParent(rows.value)].sort((a, b) =>
     (b.meetingAt ?? "").localeCompare(a.meetingAt ?? ""),
   );
   return {

@@ -34,4 +34,7 @@ export { CONNECTIONS_PATHS } from "./lib/connections-paths";
 // S-P-08 — the read the route calls and the list it renders (01 §2.5 "thin").
 export { loadParentConnections } from "./lib/load-parent-connections";
 export { connectionCardView } from "./lib/connection-card-view";
+// ★ ADR-158 (2) — the one place the silent hold is enforced on the read side. Every **parent-facing** consumer
+// of `forParent` passes its rows through this; the machinery deliberately does not (see the file's header).
+export { visibleToParent } from "./lib/visible-to-parent";
 export { ParentConnections } from "./components/ParentConnections";

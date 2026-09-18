@@ -37,6 +37,11 @@ import { LIVE_STAGES } from "./live-stages";
 const asConnections = <T>(result: Result<T>): ConnectionsResult<T> =>
   result as Result<T, ConnectionsErrorDetails>;
 
+/**
+ * ★ ADR-158 (2): a held row travels with its flag and **without a name**. The summary keeps the flag because
+ * `visibleToParent` is what drops the row at the two parent-facing screens, and the machinery (P-7's close
+ * cascade; K-1's duplicate and pending-cap checks) must still see it.
+ */
 const summaryOf = (
   row: ConnectionRecord,
   firstName: string | null,
@@ -56,16 +61,31 @@ const summaryOf = (
       : { meetingOutcome: row.meetingOutcome }),
     ...(row.trialDate === undefined ? {} : { trialDate: row.trialDate }),
     ...(firstName === null ? {} : { nannyFirstName: firstName }),
+    ...(row.heldForVerification === undefined
+      ? {}
+      : { heldForVerification: row.heldForVerification }),
   });
 
-/** One lookup per distinct nanny; a refusal is a missing name, never a failed read of the family's own list. */
+/**
+ * One lookup per distinct nanny; a refusal is a missing name, never a failed read of the family's own list.
+ *
+ * ★ **Held rows are not looked up at all** (ADR-158 (2)). `visibleToParent` already drops them from both screens,
+ * so this is defence in depth rather than the gate — but a name we never read is a name that cannot leak through
+ * a future consumer that forgets to filter, and the read costs nothing to skip.
+ */
 async function namesFor(
   rows: ReadonlyArray<ConnectionRecord>,
   read: NannyNameReader | undefined,
 ): Promise<ReadonlyMap<string, string>> {
   const found = new Map<string, string>();
   if (read === undefined) return found;
-  const ids = [...new Set(rows.map((row) => row.nannyId as string))];
+  const ids = [
+    ...new Set(
+      rows
+        .filter((row) => row.heldForVerification !== true)
+        .map((row) => row.nannyId as string),
+    ),
+  ];
   await Promise.all(
     ids.map(async (id) => {
       const name = await read(id as NannyId);
