@@ -74,3 +74,59 @@ describe("config — the environment is read only by the two readers (01 §1.3 r
     ).toBeGreaterThan(20);
   });
 });
+
+/**
+ * L-009 `3e` (Q-4) — **the gate that carries ADR-172's safety rule must live in a job that can be required.**
+ *
+ * `check:config-literals` is the mechanism behind ADR-172 (4): it is what stops a wrong child-safety
+ * instruction returning to the tree after `3c` deleted seventy of them. It passed — inside `banned-literals`,
+ * whose `check:banned-words` step is red on `main` by construction (ADR-124) until F-d rewrites the legacy
+ * parent surfaces. A job that is expected to be red cannot be a required check, so the safety control was
+ * green and nobody was obliged to look.
+ *
+ * The fix is a split by colour, and these cases are what keep it split: a later edit that folds the config
+ * gates back in beside `banned-words` fails here rather than silently un-requiring them again.
+ */
+describe("ci — the green gates are not in a job that is allowed to be red (Q-4)", () => {
+  const workflow = readFileSync(
+    resolve(REPO_ROOT, ".github/workflows/ci.yml"),
+    "utf8",
+  );
+
+  /** The steps of one job, by its `jobname:` key at two-space indentation. */
+  function jobBody(name: string): string {
+    const start = workflow.indexOf(`\n  ${name}:\n`);
+    expect(start, `job ${name} is missing from ci.yml`).toBeGreaterThan(-1);
+    const rest = workflow.slice(start + 1);
+    const next = rest.search(/\n {2}[a-z][a-z0-9-]*:\n/);
+    return next === -1 ? rest : rest.slice(0, next);
+  }
+
+  it("★ `config-gates` runs check:config-literals — the job that carries the safeguarding rule", () => {
+    expect(jobBody("config-gates")).toContain("npm run check:config-literals");
+  });
+
+  it("★ and it does NOT run check:banned-words, which is red until F-d", () => {
+    expect(jobBody("config-gates")).not.toContain("npm run check:banned-words");
+  });
+
+  it("★ banned-literals keeps the red step and nothing else, so its colour says only one thing", () => {
+    const body = jobBody("banned-literals");
+    expect(body).toContain("npm run check:banned-words");
+    expect(body).not.toContain("npm run check:config-literals");
+    expect(body).not.toContain("npm run env:check");
+    expect(body).not.toContain("npm run crons:check");
+    expect(body).not.toContain("npm run check:env-reads");
+  });
+
+  it("the three other green gates moved with it, not left behind", () => {
+    const body = jobBody("config-gates");
+    for (const step of [
+      "npm run env:check",
+      "npm run crons:check",
+      "npm run check:env-reads",
+    ]) {
+      expect(body).toContain(step);
+    }
+  });
+});
