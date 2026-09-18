@@ -134,6 +134,12 @@ declare
   v_removed integer := 0;
   v_nulled  integer := 0;
   v_n       integer;
+  -- ★ What `p_limit` actually bounded on this arm (database pass, HIGH). For eight of the ten arms that is the
+  --   number of rows touched, and `removed`/`nulled` answer it. For `money` and `consent` it is the number of
+  --   **subjects** selected, and each subject carries any number of rows — so comparing the row total against
+  --   `p_limit` reported `capped` for a class that had finished. Measured: two due subjects with 300 stale
+  --   payment events each answered `capped: true, removed: 600` with nothing left waiting.
+  v_bounded integer := null;
 begin
   if p_limit is null or p_limit <= 0 then
     raise exception 'retention_sweep_class: a batch limit is required and must be positive (got %)', p_limit
@@ -198,6 +204,10 @@ begin
     -- Per subject rather than per row: deleting a single old payment event while a current subscription runs
     -- would leave books that do not add up, which is the opposite of what a six-year window is for.
     when 'money' then
+      -- `on commit drop` fires at the real commit, so a second call to the same class inside one transaction
+      -- would raise `42P07`. No caller does that today (one RPC per class), and this makes the file honest
+      -- about it rather than depending on that staying true.
+      drop table if exists pg_temp.due_money;
       create temporary table due_money on commit drop as
         select m.parent_user_id
           from (
@@ -210,6 +220,7 @@ begin
          group by m.parent_user_id
         having max(m.at) < v_cutoff
          limit p_limit;
+      select count(*) into v_bounded from due_money;
 
       -- Children first: `guarantee_events` and `refund_requests` are `on delete restrict` from the spine.
       -- ★ Each delete re-asserts the window in its own snapshot (item 1 above): membership in the batch is not
@@ -234,15 +245,18 @@ begin
     -- 07 §6.2 row 11 — six years after the **account scrub**, in the row's own words. A living account's
     -- consent trail has no anchor and is therefore never reached, whatever its age.
     when 'consent' then
+      drop table if exists pg_temp.due_consent;
       create temporary table due_consent on commit drop as
-        select r.subject_user_id
+        -- `distinct`: a subject can hold more than one completed erasure row, and without it she would occupy
+        -- several of the batch's slots for one subject's worth of work (database pass, LOW).
+        select distinct r.subject_user_id
           from public.account_erasure_requests r
          where r.state = 'completed'
            and r.subject_user_id is not null
            and r.completed_at is not null
            and r.completed_at < v_cutoff
-         order by r.completed_at
          limit p_limit;
+      select count(*) into v_bounded from due_consent;
 
       delete from public.biometric_consent_records b where b.user_id in (select subject_user_id from due_consent);
       get diagnostics v_n = row_count; v_removed := v_removed + v_n;
@@ -256,7 +270,8 @@ begin
         select k.id from public.cookie_consent_records k
          where k.superseded_by is not null and k.created_at < v_cutoff
          order by k.created_at
-         limit p_limit)
+         limit p_limit
+         for update nowait)
       delete from public.cookie_consent_records k using due where k.id = due.id;
       get diagnostics v_removed = row_count;
 
@@ -266,7 +281,8 @@ begin
          where k.created_at < v_cutoff
            and not exists (select 1 from public.cookie_consent_records o where o.superseded_by = k.id)
          order by k.created_at
-         limit p_limit)
+         limit p_limit
+         for update nowait)
       delete from public.cookie_consent_records k using due where k.id = due.id;
       get diagnostics v_removed = row_count;
 
@@ -333,7 +349,7 @@ begin
     'cutoff',  v_cutoff,
     -- ruling (5): the caller needs to know a batch was capped, because "0 left" and "500 done, more waiting"
     -- are the same number of rows removed and completely different states.
-    'capped',  greatest(v_removed, v_nulled) >= p_limit);
+    'capped',  coalesce(v_bounded, greatest(v_removed, v_nulled)) >= p_limit);
 end
 $$;
 
@@ -341,7 +357,36 @@ comment on function public.retention_sweep_class(text, jsonb, integer) is
   '07 §6.2 (L-009 3h): one class of the retention schedule, one bounded batch, one transaction. Every window and anchor arrives in p_spec from config/retention.ts (ADR-179) — a missing window raises and an anchor column that does not exist raises, because a retention date this job knew by itself would be a second owner of a legal fact. Nulls where §6.2 nulls and deletes where it deletes; no safeguarding decision is removed by any arm (07 §6.2 row 4 and ADR-170 disagree about its window, and that is pinned, not chosen). Owned by bbldn_retention because rows 11, 12 and 14 touch append-only tables whose trigger exempts exactly that identity.';
 
 -- ---------------------------------------------------------------------------
--- 3. What the retention identity may touch, enumerated (`0028` / `0030`'s discipline)
+-- 3. The indexes the sweep's predicates need
+-- ---------------------------------------------------------------------------
+--
+-- ★ **Measured, not assumed** (database pass, HIGH). With realistic volumes seeded and rolled back, three arms
+-- planned a full scan of the busiest tables in the schema, nightly: `events` at 300k rows was a parallel
+-- sequential scan (`shared hit=5163`), `email_logs` at 200k the same (`hit=2896`), `cookie_consent_records` at
+-- 50k a plain seq scan. That is precisely the shape this file's own preamble says a sweep must not have — the
+-- point of one bounded batch per class is short transactions, and a seq scan of `events` is not short.
+--
+-- `email_logs`' index is on the **expression** the arm orders and filters by, because `coalesce(sent_at,
+-- failed_at)` is what 07 §6.2 row 13 means by "after the send resolved" and an index on either column alone
+-- would not serve it. The three smaller ones are partial, matching their arm's predicate exactly, so they cost
+-- nothing on the rows the arm never looks at.
+create index if not exists events_ts_idx
+  on public.events (ts);
+create index if not exists email_logs_resolved_at_idx
+  on public.email_logs ((coalesce(sent_at, failed_at)));
+create index if not exists cookie_consent_records_created_at_idx
+  on public.cookie_consent_records (created_at);
+create index if not exists vetting_submissions_raw_response_checked_at_idx
+  on public.vetting_submissions (checked_at) where raw_response is not null;
+create index if not exists nanny_placements_ended_at_idx
+  on public.nanny_placements (ended_at) where state = 'ENDED';
+create index if not exists admin_notifications_acknowledged_at_idx
+  on public.admin_notifications (acknowledged_at) where acknowledged_at is not null;
+create index if not exists account_erasure_requests_completed_at_idx
+  on public.account_erasure_requests (completed_at) where state = 'completed';
+
+-- ---------------------------------------------------------------------------
+-- 4. What the retention identity may touch, enumerated (`0028` / `0030`'s discipline)
 -- ---------------------------------------------------------------------------
 -- ★ **These lists are documentation, not the authority, and saying so is the honest part.** `0016:288` grants
 -- `bbldn_retention` SELECT / INSERT / UPDATE / DELETE on **all tables in schema public** — so the enumerated
@@ -361,7 +406,39 @@ grant usage, create on schema public to bbldn_retention;
 revoke delete on table public.verifications       from bbldn_retention;
 revoke delete on table public.vetting_submissions from bbldn_retention;
 
-grant select, update (raw_response)                        on table public.vetting_submissions      to bbldn_retention;
+-- ★ **And the same gap on UPDATE, which is the half that reaches the decision itself** (database pass, CRITICAL).
+-- `grant update (raw_response)` below narrows nothing on its own: a column grant never revokes a pre-existing
+-- table-wide one, and `0016:288` handed this identity UPDATE on every column of both tables. Measured before
+-- this block: `has_column_privilege('bbldn_retention', 'public.vetting_submissions', 'status', 'update')` was
+-- **true**, as was `verifications.dbs_outcome`. `prevent_safeguarding_record_loss()` does not stand in the way
+-- either — its UPDATE arm returns early for `is_safeguarding_retention_job()`, which is exactly this identity,
+-- without running the `nanny_id` and pseudonym checks it applies to everyone else. So "the decision, its
+-- outcome, its date and its author are untouched by this job" was true of the arms written today and nothing
+-- else. It is a privilege now.
+--
+-- The table grant goes and the columns come back **by name**. The lists are not invented here: they are exactly
+-- what `0027`'s pseudonymiser writes (`nanny_id`, `subject_pseudonym`), what `0028`'s step 3 nulls on
+-- `verifications`, and this file's own `raw_response`. Getting one wrong breaks the right to erasure rather than
+-- failing quietly, which is why it is safe to state as a list: `int.account-erasure`'s 32 cases assert every one
+-- of those nulls by execution.
+revoke update on table public.verifications       from bbldn_retention;
+revoke update on table public.vetting_submissions from bbldn_retention;
+
+grant update (
+  -- `0027`'s pseudonymiser
+  nanny_id, subject_pseudonym,
+  -- `0028` step 3: the evidence, the extracted fields, the vendor handles and the rejection reasons
+  identity_document_ref, identity_selfie_ref, identity_extracted, identity_ai_reasoning, identity_ai_issues,
+  identity_user_guidance, surname, given_names, date_of_birth, nationality,
+  dbs_certificate_ref, dbs_certificate_number, dbs_extracted, dbs_ai_reasoning, dbs_user_guidance,
+  rtw_document_ref, rtw_share_code, rtw_extracted, rtw_user_guidance, cross_check_note,
+  identity_provider_ref, dbs_provider_ref, rtw_provider_ref,
+  identity_rejection_reason, dbs_rejection_reason, rtw_rejection_reason
+) on table public.verifications to bbldn_retention;
+-- Not granted, and this is the list that matters: `dbs_outcome`, every `*_status`, every `*_decided_*`,
+-- `dbs_update_service_checked_by` and every `*_provider_key` — the decision, when it was made and who made it.
+
+grant select, update (raw_response, nanny_id, subject_pseudonym) on table public.vetting_submissions to bbldn_retention;
 grant select, delete                                       on table public.nanny_placements         to bbldn_retention;
 grant select, delete                                       on table public.parent_subscriptions     to bbldn_retention;
 grant select, delete                                       on table public.payment_events           to bbldn_retention;
@@ -373,6 +450,8 @@ grant select, delete                                       on table public.cooki
 grant select, delete, update (subject, body_html, body_text) on table public.email_logs             to bbldn_retention;
 grant select, delete                                       on table public.admin_notifications      to bbldn_retention;
 grant select, update (visitor_id, attribution, request_id) on table public.events                   to bbldn_retention;
+-- The `consent` arm also READS `account_erasure_requests` for its anchor; that SELECT is `0028`'s grant and is
+-- not repeated here.
 -- `contact_messages.related_subscription_id` and the five `nanny_placements` back-references are all
 -- `on delete set null`, so the money and placement deletes above update rows this role holds no privilege on.
 -- A referential action runs with the privileges of the constraint, not of the caller — the deletes are the
@@ -485,6 +564,35 @@ begin
      or has_table_privilege('bbldn_retention', 'public.verifications', 'delete')
      or has_table_privilege('bbldn_retention', 'public.nanny_suspension_lifts', 'delete') then
     raise exception '0031: the sweep identity can delete a safeguarding record — 07 §6.2 row 4 and ADR-170 both forbid a clock doing that';
+  end if;
+
+  -- 12. ★ The sweep's predicates have indexes, or the nightly run is a full scan of the busiest tables in the
+  --     schema (database pass, HIGH). Asserted by name rather than by plan: a plan is a decision the planner
+  --     makes at run time, an index is a fact about the schema.
+  if (select count(*) from pg_indexes
+       where schemaname = 'public'
+         and indexname in ('events_ts_idx', 'email_logs_resolved_at_idx',
+                           'cookie_consent_records_created_at_idx',
+                           'vetting_submissions_raw_response_checked_at_idx',
+                           'nanny_placements_ended_at_idx',
+                           'admin_notifications_acknowledged_at_idx',
+                           'account_erasure_requests_completed_at_idx')) <> 7 then
+    raise exception '0031: an arm''s predicate has no index — the nightly sweep would seq-scan events or email_logs';
+  end if;
+
+  -- 13. ★ And it cannot rewrite one either (database pass, CRITICAL). DELETE was the half this file closed
+  --     first; UPDATE is the half that reaches the decision itself, and a column grant does not narrow a
+  --     table-wide one, so both had to be revoked before the columns came back by name.
+  if has_column_privilege('bbldn_retention', 'public.verifications', 'dbs_outcome', 'update')
+     or has_column_privilege('bbldn_retention', 'public.vetting_submissions', 'status', 'update')
+     or has_column_privilege('bbldn_retention', 'public.vetting_submissions', 'decided_by', 'update')
+     or has_column_privilege('bbldn_retention', 'public.verifications', 'dbs_update_service_checked_by', 'update') then
+    raise exception '0031: the sweep identity can rewrite a safeguarding decision';
+  end if;
+  -- And the erasure can still do its work, or the right to erasure is what this revoke broke.
+  if not has_column_privilege('bbldn_retention', 'public.verifications', 'dbs_certificate_number', 'update')
+     or not has_column_privilege('bbldn_retention', 'public.vetting_submissions', 'subject_pseudonym', 'update') then
+    raise exception '0031: the revoke took a column 0027 or 0028 writes — the erasure would fail';
   end if;
 end;
 $$;

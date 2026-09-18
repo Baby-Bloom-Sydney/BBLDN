@@ -27,6 +27,12 @@
 -- vetting decision — ADR-165 (2)'s "hole" exactly — and it costs the reverted code nothing, because no job
 -- before or after `0031` deletes a safeguarding record.
 --
+-- ⚠️ **AND ONE MORE IT LEAVES ALONE, for a different reason.** The seven indexes `0031` adds are **kept**. They
+-- are not a security clause and dropping them would not restore a hole — they are simply useful to anything that
+-- filters those tables by date, they cost a write amplification nobody has complained about, and re-creating
+-- `events_ts_idx` on a large table during an incident is exactly the kind of long lock a rollback exists to
+-- avoid. A twin that removes them would trade a real risk for a tidy schema.
+--
 -- One transaction: a rollback that fails midway must not leave half the objects standing.
 
 begin;

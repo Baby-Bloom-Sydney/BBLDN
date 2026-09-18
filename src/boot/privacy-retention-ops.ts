@@ -19,6 +19,7 @@ import type {
   PrivacyErrorDetails,
   PrivacyStore,
   RetentionClassOutcome,
+  RetentionSpec,
 } from "@/modules/platform";
 
 const service = { scope: "service" as const };
@@ -51,41 +52,54 @@ function outcomeOf(raw: unknown, name: string): RetentionClassOutcome | null {
   });
 }
 
+/** The call itself, lifted out so the connector below stays inside the 50-line rule (build-standard L1). */
+async function callSweep(
+  port: DataAccessPort,
+  input: {
+    readonly class: string;
+    readonly spec: RetentionSpec["spec"];
+    readonly limit: number;
+  },
+) {
+  return port.run(
+    {
+      name: "platform.privacy.sweepRetentionClass",
+      exec: async (q) => {
+        try {
+          return {
+            kind: "answered" as const,
+            value: await q.rpc("retention_sweep_class", {
+              p_class: input.class,
+              // Rebuilt as plain JSON rather than cast: the payload the database receives is written
+              // down here, once, and a readonly config value is not a wire format.
+              p_spec: {
+                window:
+                  input.spec.window === null ? null : { ...input.spec.window },
+                anchors: input.spec.anchors.map((anchor) => ({
+                  table: anchor.table,
+                  column: anchor.column,
+                })),
+              },
+              p_limit: input.limit,
+            }),
+          };
+        } catch (thrown) {
+          const code = (thrown as { code?: string }).code ?? "";
+          if (RETRYABLE.has(code)) return { kind: "retry" as const };
+          throw thrown;
+        }
+      },
+    },
+    service,
+  );
+}
+
 export function privacyRetentionOps(
   port: DataAccessPort,
 ): Pick<PrivacyStore, "sweepRetentionClass"> {
   return Object.freeze({
-    sweepRetentionClass: async ({ class: name, spec, limit }) => {
-      const run = await port.run(
-        {
-          name: "platform.privacy.sweepRetentionClass",
-          exec: async (q) => {
-            try {
-              return {
-                kind: "answered" as const,
-                value: await q.rpc("retention_sweep_class", {
-                  p_class: name,
-                  // Rebuilt as plain JSON rather than cast: the payload the database receives is written
-                  // down here, once, and a readonly config value is not a wire format.
-                  p_spec: {
-                    window: spec.window === null ? null : { ...spec.window },
-                    anchors: spec.anchors.map((anchor) => ({
-                      table: anchor.table,
-                      column: anchor.column,
-                    })),
-                  },
-                  p_limit: limit,
-                }),
-              };
-            } catch (thrown) {
-              const code = (thrown as { code?: string }).code ?? "";
-              if (RETRYABLE.has(code)) return { kind: "retry" as const };
-              throw thrown;
-            }
-          },
-        },
-        service,
-      );
+    sweepRetentionClass: async (input) => {
+      const run = await callSweep(port, input);
       if (!run.ok) return run as never;
       if (run.value.kind === "retry")
         return err<PrivacyErrorDetails>(
@@ -93,7 +107,7 @@ export function privacyRetentionOps(
           "That class could not be swept just now.",
           { reason: "retry" },
         ) as never;
-      const outcome = outcomeOf(run.value.value, name);
+      const outcome = outcomeOf(run.value.value, input.class);
       if (outcome === null)
         return err<PrivacyErrorDetails>(
           "INTERNAL",
