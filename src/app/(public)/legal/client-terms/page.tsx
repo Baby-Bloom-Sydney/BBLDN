@@ -847,7 +847,6 @@ export default function ClientTermsPage() {
 
         <hr />
 
-
         <h2>20. Online Safety</h2>
         <p>
           20.1. Baby Bloom complies with the Online Safety Act 2021 (Cth). The

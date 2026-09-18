@@ -365,8 +365,8 @@ export default function PrivacyPolicyPage() {
         <p>
           <strong>Government bodies:</strong> We may disclose information to the
           NSW WWCC registry, the Document Verification Service, the eSafety
-          Commissioner, or law enforcement agencies where required or
-          authorised by law.
+          Commissioner, or law enforcement agencies where required or authorised
+          by law.
         </p>
         <p>
           <strong>Authorised Baby Bloom staff:</strong> Your personal
@@ -1049,7 +1049,6 @@ export default function PrivacyPolicyPage() {
         </p>
 
         <hr />
-
 
         <h2>19. Children&apos;s Online Privacy Code Readiness</h2>
         <p>

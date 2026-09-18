@@ -688,7 +688,6 @@ export default function ProfessionalTermsPage() {
 
         <hr />
 
-
         <h2>16. Code of Conduct &amp; Professional Standards</h2>
         <p>
           16.1. All Childcare Professionals on Baby Bloom must comply with the{" "}

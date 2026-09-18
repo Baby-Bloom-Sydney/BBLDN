@@ -547,7 +547,6 @@ export default function CodeOfConductPage() {
 
         <hr />
 
-
         <h2>7. Online Safety</h2>
         <p>
           Baby Bloom complies with the Online Safety Act 2021 (Cth). You must
@@ -855,10 +854,10 @@ export default function CodeOfConductPage() {
             </ul>
             <p>
               However, appeals are <strong>not</strong> a re-trial. If Baby
-              Bloom found you endangered a child, the appeal cannot overturn that
-              finding unless
-              you have <strong>compelling new evidence</strong> that the
-              original finding was factually wrong.
+              Bloom found you endangered a child, the appeal cannot overturn
+              that finding unless you have{" "}
+              <strong>compelling new evidence</strong> that the original finding
+              was factually wrong.
             </p>
             <p>
               A senior staff member (different from those involved in the
@@ -932,11 +931,10 @@ export default function CodeOfConductPage() {
         <p>
           <strong>&ldquo;Serious breach&rdquo;:</strong> A violation that poses
           a risk to child safety, involves dishonesty, or is a repeated
-          violation of a rule after prior warning. Examples include: physical harm
-          to a child, gross negligence in supervision, deliberate deception
-          about qualifications
-          or identity, reckless conduct that endangers a child, or criminal
-          conduct.
+          violation of a rule after prior warning. Examples include: physical
+          harm to a child, gross negligence in supervision, deliberate deception
+          about qualifications or identity, reckless conduct that endangers a
+          child, or criminal conduct.
         </p>
         <p>
           <strong>&ldquo;Fraud&rdquo;:</strong> Knowingly or intentionally

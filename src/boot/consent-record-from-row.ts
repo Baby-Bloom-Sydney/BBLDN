@@ -34,11 +34,14 @@ function contextOf(row: ConsentRow): ConsentContext {
 export function consentRecordFromRow(row: ConsentRow): ConsentRecord | null {
   if (row.party === "admin") return null; // the table's CHECK forbids it; a row that has it is not a consent
   const document =
-    row.document_id === null || row.document_version === null
+    row.document_id === null ||
+    row.document_version === null ||
+    row.document_content_hash === null
       ? null
       : Object.freeze({
           id: row.document_id as LegalDocumentId,
           version: row.document_version,
+          contentHash: row.document_content_hash,
         });
   return Object.freeze({
     id: row.id as ConsentRecordId,

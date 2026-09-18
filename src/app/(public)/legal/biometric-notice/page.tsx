@@ -392,8 +392,8 @@ export default function BiometricNoticePage({
         </p>
         <ul>
           <li>
-            Government agencies (law enforcement) if required by law or
-            court order.
+            Government agencies (law enforcement) if required by law or court
+            order.
           </li>
           <li>
             Childcare regulators (if Baby Bloom is asked to verify your

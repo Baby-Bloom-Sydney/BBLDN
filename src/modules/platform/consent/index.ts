@@ -4,6 +4,8 @@
 // (`consent.stub.ts`) is the stub behind the same port.
 export type * from "./types";
 export { CONSENT_PURPOSES } from "./lib/consent-purposes";
+export { RENEWABLE_PURPOSES } from "./lib/renewable-purposes";
+export { RENEWAL_CARRY } from "./lib/renewal-carry";
 export { createConsent } from "./lib/create-consent";
 export { memoryConsentStore } from "./consent.stub";
 export { consent } from "./lib/default-consent";

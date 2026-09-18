@@ -30,7 +30,13 @@ function harness(overrides: Partial<ConsentDeps> = {}) {
   const lines: LogLine[] = [];
   const clockState = { now: at(0) };
   const store = memoryConsentStore({
-    documents: { "client-tos": { version: 3, requiresReacceptance: false } },
+    documents: {
+      "client-tos": {
+        version: 3,
+        contentHash: "client-tos-v3",
+        requiresReacceptance: false,
+      },
+    },
   });
   const idState = { n: 0 };
   const api = createConsent({
@@ -64,7 +70,11 @@ describe("platform/consent — recordConsent + hasConsent", () => {
       agreementId: "AGR-01",
       checkpointId: "cp-1",
       checkpointText: "I agree",
-      document: { id: "client-tos", version: 3 },
+      document: {
+        id: "client-tos",
+        version: 3,
+        contentHash: "client-tos-v3",
+      },
       consentGiven: true,
       context,
     });
@@ -90,7 +100,11 @@ describe("platform/consent — recordConsent + hasConsent", () => {
       agreementId: "AGR-01",
       checkpointId: "cp",
       checkpointText: "t",
-      document: { id: "client-tos", version: 2 },
+      document: {
+        id: "client-tos",
+        version: 2,
+        contentHash: "other",
+      },
       consentGiven: true,
       context,
     });
@@ -200,6 +214,7 @@ describe("platform/consent — recordConsent + hasConsent", () => {
         currentDocument: {
           id: "client-tos",
           version: 3,
+          contentHash: "client-tos-v3",
           requiresReacceptance: false,
         },
       },
@@ -217,6 +232,7 @@ describe("platform/consent — recordBiometricConsent (AGR-04; 02 §4.1 invarian
   const valid = {
     userId: USER,
     noticeVersion: 1,
+    noticeContentHash: "stub-hash-v1",
     noticeOpenedAt: at(0),
     noticeScrollCompletedAt: at(0.001),
     checkboxesEnabledAt: at(0.001),

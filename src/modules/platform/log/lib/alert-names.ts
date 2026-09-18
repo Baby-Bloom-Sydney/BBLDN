@@ -15,4 +15,7 @@ export const ALERT_NAMES = Object.freeze([
   "ALERT_CSP_VIOLATION",
   "ALERT_DISPLACEMENT_CAP",
   "ALERT_UPLOAD_MALWARE",
+  // `audit-consent-expiry` found a day-one legal document with no version at all (01 §4b append, L-009 `3c`).
+  // Not a warning: with no row, every consent road that names it fails closed with `document-required`.
+  "ALERT_CONSENT_DOCUMENT_MISSING",
 ] as const);

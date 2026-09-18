@@ -50,9 +50,19 @@ export type ConsentContext = {
   readonly sessionId?: string;
 };
 
+/**
+ * What a signature is bound to (**ruling 5.1**, L-009 `3c`). The version says *which row*; the content hash says
+ * *which words*. Both travel, always, because either alone fails the requirement: a version is a pointer that a
+ * later edit could re-point, and a hash alone cannot be ordered, cited to a user, or keyed on for re-acceptance.
+ * `0026` makes the pair a single composite foreign key to `legal_documents (document_id, version, content_hash)`,
+ * so the database refuses a signature naming words that version never had — the type here is the same claim,
+ * made where a caller can see it.
+ */
 export type DocumentVersion = {
   readonly id: LegalDocumentId;
   readonly version: number;
+  /** `legal_documents.content_hash` of the version accepted — the exact words, not a pointer at them. */
+  readonly contentHash: string;
 };
 
 type ConsentInputBase = {
@@ -95,6 +105,8 @@ export type ConsentRecord = ConsentInputBase & {
 export type BiometricConsentInput = {
   readonly userId: UserId;
   readonly noticeVersion: number;
+  /** ruling 5.1 — Art 9(2)(a) consent that cannot be shown to attach to the notice she scrolled is not explicit. */
+  readonly noticeContentHash: string;
   readonly noticeOpenedAt: Instant;
   readonly noticeScrollCompletedAt: Instant;
   readonly checkboxesEnabledAt: Instant;
@@ -149,6 +161,36 @@ export type ConsentPolicy = {
   readonly currentDocument?: CurrentDocument;
 };
 
+/**
+ * **Ruling 5.2** (L-009 `3c`): annual renewal re-asks only for the purposes whose *document* changed since the
+ * user's last signature; the unchanged ones are carried forward, and the carry is itself recorded.
+ *
+ * Why not re-ask for everything: a consent request a user has no reason to act on is the one that teaches her to
+ * click through consent requests, and Art 7(1) already holds the earlier signature — it does not expire because
+ * a year passed, it expires because the words changed. Re-asking for unchanged words would also destroy the one
+ * fact the trail is for: it would overwrite "she accepted THESE words on THAT day" with a later date for the
+ * same words. What the year buys is the *check*, not a new signature.
+ *
+ * Why the carry is recorded rather than inferred: without a row, "no new consent this year" and "we never ran
+ * the renewal" look identical a year later, which is precisely the question an accountability request asks.
+ */
+export type RenewalItem = {
+  readonly purpose: LegalDocumentId;
+  /** what the document says now */
+  readonly current: CurrentDocument;
+  /** what she last accepted, absent when she never has */
+  readonly signed?: DocumentVersion;
+};
+
+export type RenewalPlan = {
+  /** the purposes to put back in front of her, because the words are not the ones she accepted */
+  readonly reAsk: ReadonlyArray<RenewalItem>;
+  /** the purposes whose words are unchanged: carried forward, each to be recorded as a carry */
+  readonly carryForward: ReadonlyArray<RenewalItem>;
+  /** a document purpose with no current version at all — the seed is missing, which is an outage, not a renewal */
+  readonly unavailable: ReadonlyArray<LegalDocumentId>;
+};
+
 /** `details.reason` of a `VALIDATION` from the connector. */
 export type ConsentErrorDetails = {
   readonly reason:
@@ -185,6 +227,22 @@ export type Consent = ConsentReader & {
   ): Promise<Result<ConsentPolicy, ConsentErrorDetails>>;
   /** latest row for `(userId, purpose)` says `consentGiven: true` */
   hasConsent(userId: UserId, purpose: ConsentPurpose): Promise<Result<boolean>>;
+  /**
+   * Ruling 5.2 — what this user's annual renewal must actually ask. Pure read: it writes nothing, so the caller
+   * decides what to do with a plan it cannot show her right now.
+   */
+  dueForRenewal(
+    userId: UserId,
+    purposes?: ReadonlyArray<LegalDocumentId>,
+  ): Promise<Result<RenewalPlan, ConsentErrorDetails>>;
+  /**
+   * FATE `10.19` / `07.72` / `08.34` — the `audit-consent-expiry` cron's inside. Audits the *documents*: a
+   * day-one purpose with no current version at all, and a re-acceptance deadline that has gone by.
+   */
+  auditExpiry(
+    now: Instant,
+    purposes?: ReadonlyArray<LegalDocumentId>,
+  ): Promise<Result<{ readonly handled: number; readonly skipped: number }>>;
 };
 
 /**

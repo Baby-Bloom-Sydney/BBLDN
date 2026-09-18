@@ -14,6 +14,7 @@ export function biometricInsertRow(
     id: record.id,
     user_id: record.userId,
     notice_version: record.noticeVersion,
+    notice_content_hash: record.noticeContentHash,
     notice_opened_at: record.noticeOpenedAt,
     notice_scroll_completed_at: record.noticeScrollCompletedAt,
     checkboxes_enabled_at: record.checkboxesEnabledAt,
