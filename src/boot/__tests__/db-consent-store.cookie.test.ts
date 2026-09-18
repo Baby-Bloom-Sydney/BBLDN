@@ -90,3 +90,78 @@ describe("dbConsentStore — cookie_consent_records (read half)", () => {
     ).toEqual({ ok: true, value: null });
   });
 });
+
+// ---------------------------------------------------------------------------
+// L-009 `3g` — the renewal sweep's read (FATE `10.18`). The SQL is `int.renewal-sweep-read`'s; what is
+// asserted here is the **seam**: the argument names `0029` declares, the service scope, and the row mapping.
+// A read that answered `[]` because it named `p_purpose` wrong would look exactly like "nobody is due", which
+// is the failure mode the sweep cannot detect for itself.
+// ---------------------------------------------------------------------------
+describe("dbConsentStore — subjectsDueForRenewal (0029)", () => {
+  it("★ calls `consent_subjects_due_for_renewal` with 0029's own argument names", async () => {
+    const fake = fakeDataPort({});
+    fake.state.rpcAnswer = () => [];
+
+    await dbConsentStore(fake.port).subjectsDueForRenewal({
+      purpose: "client-tos",
+      before: "2026-01-01T00:00:00.000Z" as never,
+      limit: 250,
+    });
+
+    expect(fake.rpcs).toEqual([
+      {
+        name: "consent_subjects_due_for_renewal",
+        args: {
+          p_purpose: "client-tos",
+          p_before: "2026-01-01T00:00:00.000Z",
+          p_limit: 250,
+        },
+      },
+    ]);
+  });
+
+  it("★ maps `subject_user_id` out of the rows — a mis-mapped column reads as 'nobody is due'", async () => {
+    const fake = fakeDataPort({});
+    fake.state.rpcAnswer = () => [
+      { subject_user_id: "u-1" },
+      { subject_user_id: "u-2" },
+    ];
+
+    const result = await dbConsentStore(fake.port).subjectsDueForRenewal({
+      purpose: "client-tos",
+      before: "2026-01-01T00:00:00.000Z" as never,
+      limit: 250,
+    });
+
+    expect(result).toEqual({ ok: true, value: ["u-1", "u-2"] });
+  });
+
+  it("answers an empty list when the read returns nothing at all", async () => {
+    const fake = fakeDataPort({});
+    fake.state.rpcAnswer = () => undefined;
+
+    const result = await dbConsentStore(fake.port).subjectsDueForRenewal({
+      purpose: "client-tos",
+      before: "2026-01-01T00:00:00.000Z" as never,
+      limit: 250,
+    });
+
+    expect(result).toEqual({ ok: true, value: [] });
+  });
+
+  it("★ runs at SERVICE scope — a cross-subject read under a session would see one person", async () => {
+    const fake = fakeDataPort({});
+    fake.state.rpcAnswer = () => [];
+
+    await dbConsentStore(fake.port).subjectsDueForRenewal({
+      purpose: "client-tos",
+      before: "2026-01-01T00:00:00.000Z" as never,
+      limit: 250,
+    });
+
+    const call = fake.calls.find(
+      (entry) => entry.name === "platform.consent.subjectsDueForRenewal",
+    );
+    expect(call?.scope).toBe("service");
+  });
+});
