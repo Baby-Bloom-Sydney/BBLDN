@@ -224,6 +224,10 @@ describe("dbVettingStore — the ledger over 0022 (ADR-154)", () => {
             L3_PROVISIONALLY_VERIFIED: ["dbs", "identity"],
             L4_FULLY_VERIFIED: ["dbs", "identity"],
           },
+          // REVIEW-3 security H-3: the deciding admin reaches the definer, which writes it to
+          // `vetting_submissions.decided_by` in the decision's own transaction rather than trusting the
+          // best-effort `vetting.decision-recorded` emit to be the only record of who decided.
+          p_decided_by: "admin-1",
         },
       },
     ]);

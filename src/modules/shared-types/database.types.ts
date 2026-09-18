@@ -3704,6 +3704,7 @@ export type Database = {
         Row: {
           checked_at: string | null
           created_at: string
+          decided_by: string | null
           evidence_id: string
           evidence_type: string
           id: string
@@ -3719,6 +3720,7 @@ export type Database = {
         Insert: {
           checked_at?: string | null
           created_at?: string
+          decided_by?: string | null
           evidence_id: string
           evidence_type: string
           id?: string
@@ -3734,6 +3736,7 @@ export type Database = {
         Update: {
           checked_at?: string | null
           created_at?: string
+          decided_by?: string | null
           evidence_id?: string
           evidence_type?: string
           id?: string
@@ -4388,6 +4391,7 @@ export type Database = {
       }
       record_vetting_decision: {
         Args: {
+          p_decided_by?: string
           p_decision: string
           p_expires_at?: string
           p_note?: string

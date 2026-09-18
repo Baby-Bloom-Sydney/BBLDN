@@ -247,9 +247,12 @@ export function dbVettingStore(port: DataAccessPort): VettingSubmissionStore {
     },
     // ADR-157 (2) / ADR-159: the admin decision in one transaction — `record_vetting_decision()` at service
     // scope (named in the module README, 07 §5.1 rule 5): the ledger + the section through
-    // `apply_vetting_check_result(…, 'admin')`, the note, for DBS the outcome and the cross-check, then the sync.
-    // The actor's authority was checked by the action (`auth.requireRole`) before this adapter was reached; the
-    // definer never sees an admin id for the decision itself — the event carries it (03 §9.3).
+    // `apply_vetting_check_result(…, 'admin')`, the decider, the note, for DBS the outcome and the cross-check,
+    // then the sync. The actor's authority was checked by the action (`auth.requireRole`) before this adapter was
+    // reached; `p_decided_by` is the durable record of *who* — REVIEW-3's security H-3, because the event that also
+    // carries the id is best-effort by design (03 §9), so one dropped emit used to leave the database unable to say
+    // which admin approved a criminal-record check. The definer re-validates the id against `user_roles` and
+    // refuses to record at all without one.
     recordDecision: async (input) =>
       asVetting(
         await port.run<CheckResult>(
@@ -263,6 +266,7 @@ export function dbVettingStore(port: DataAccessPort): VettingSubmissionStore {
                 p_note: input.note,
                 p_expires_at: input.expiresAt,
                 p_required: REQUIRED as never,
+                p_decided_by: input.actor.id as string,
               });
               const status: CheckStatus =
                 input.decision === "verified"

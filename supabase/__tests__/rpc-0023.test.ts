@@ -177,10 +177,11 @@ const decide = (
   decision: "verified" | "rejected",
   reason: string | null = null,
   note: string | null = null,
+  decidedBy: string | null = null,
 ) =>
   asService<{ out: Record<string, unknown> }>(
-    `select public.record_vetting_decision($1::uuid, $2::text, $3::text, $4::text, null::timestamptz, $5::jsonb) as out`,
-    [submissionId, decision, reason, note, REQUIRED],
+    `select public.record_vetting_decision($1::uuid, $2::text, $3::text, $4::text, null::timestamptz, $5::jsonb, $6::uuid) as out`,
+    [submissionId, decision, reason, note, REQUIRED, decidedBy ?? fx.admin],
   ).then((rows) => rows[0]!.out);
 
 const sync = (nannyId: string, required = REQUIRED) =>
@@ -526,6 +527,65 @@ describe("record_vetting_decision() — the admin's one write (ADR-157 (2); ADR-
       [nannyId],
     );
     expect(pool).toHaveLength(0);
+  });
+
+  // REVIEW-3 security H-3. `record_update_service_check()` takes `p_checked_by`, validates it against `user_roles`
+  // and writes it into `verifications.dbs_update_service_checked_by` in the same transaction. The far more
+  // consequential decision — verifying or rejecting a person's DBS check — did not, and the only record of WHICH
+  // admin decided was the `vetting.decision-recorded` event, which 03 §9 makes best-effort by design (a failed emit
+  // is a `log.warn` and nothing else). So a dropped emit left the database unable to say who approved a criminal-
+  // record check. The attribution is now a column, written inside the decision's own transaction, and the decider
+  // is validated the same way the sibling definer validates its checker.
+  it("records WHICH admin decided, durably and in the same transaction (REVIEW-3 security H-3)", async () => {
+    const { identity, dbs } = await verifyToL3(NANNY);
+    const { rows } = await db.query<{ id: string; decided_by: string | null }>(
+      `select s.id::text as id, s.decided_by::text as decided_by
+         from public.vetting_submissions s where s.id = any($1::uuid[]) order by s.submitted_at`,
+      [[identity, dbs]],
+    );
+    expect(rows).toHaveLength(2);
+    for (const row of rows) expect(row.decided_by).toBe(fx.admin);
+  });
+
+  it("refuses a decider who is not an admin, and one that is absent (REVIEW-3 security H-3)", async () => {
+    const consent = await giveBiometricConsent(NANNY);
+    const identity = await submit(
+      NANNY,
+      EV(1),
+      "identity",
+      "identity-document",
+      {
+        identity_evidence_type: "passport",
+        identity_document_ref: `${NANNY}/identity-document/doc.jpg`,
+        surname: "Okafor",
+        given_names: "Amara",
+        date_of_birth: "1990-04-12",
+        biometric_consent_id: consent,
+      },
+    );
+    expect(
+      await refusalOf(() =>
+        decide(identity.submission_id, "verified", null, null, NANNY),
+      ),
+    ).toMatch(/must be an admin/);
+    expect(
+      await refusalOf(() =>
+        asService(
+          `select public.record_vetting_decision($1::uuid, 'verified', null::text, null::text, null::timestamptz, $2::jsonb, null::uuid)`,
+          [identity.submission_id, REQUIRED],
+        ),
+      ),
+    ).toMatch(/must be an admin/);
+    // and nothing was written: the section is untouched and the row carries no decider
+    const { rows } = await db.query<{
+      status: string;
+      decided_by: string | null;
+    }>(
+      `select s.status::text as status, s.decided_by::text as decided_by
+         from public.vetting_submissions s where s.id = $1`,
+      [identity.submission_id],
+    );
+    expect(rows[0]).toMatchObject({ status: "needs_admin", decided_by: null });
   });
 
   it("refuses an older identity attempt once a newer one exists (STALE_SUBMISSION, as 0022 does)", async () => {

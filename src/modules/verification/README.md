@@ -104,10 +104,23 @@ behind the connector's own `requireAdmin` or a cron shell; the sweeps' reads of 
 8. **`override` stays refused** (03 §4.3's arm for a provider that is not a `ManualDecisionProvider`); none is
    bound, so no road reaches it.
 9. **The hold at K-row creation** (ADR-158 (2)) is `connections`' — `connections.hold.pin.test.ts` names it.
+10. **One signed-URL TTL for every kind of evidence** (`security-reviewer` L-5). `openEvidence` mints every reveal at
+    `SECURITY.signedUrlTtlSeconds.verification` (1 h) — the identity document, the selfie, the right-to-work document
+    and the **DBS certificate image**, which is the one most likely to carry conviction detail. The TTL is 07 §6's to
+    split; a second key (`…verification.dbs`) and one lookup by section is the whole change. Not taken here because a
+    security config value is not a build unit's to re-rule.
+11. **`adminOverview` reads the whole ledger** (`security-reviewer` L-6). The counters behind the queue's header call
+    `listSubmissions({})` with no filter and no limit, so every render of the tab scans `vetting_submissions`. Correct
+    today (a handful of rows, and the numbers must count every state), wrong at volume: the fix is a counts-by-status
+    read on the store rather than a filter here, which is a `VettingSubmissionStore` contract change — owner: whoever
+    next opens 03 §4.2. Bound it before the ledger is large.
 
 <!-- audit
 Last edited: 2026-09-18T19:30+10:00 — BB-LDN-Planner-070926/2c
-Notes: 2c — the level's one writer, the silent hold's two arms, the queue's road, the outcome comms, the three named jobs; service-scope uses named; gaps 7–9.
+Notes: 2c — security-reviewer pass: H-3 closed (vetting_submissions.decided_by, written and validated inside the
+decision's transaction — the best-effort event is no longer the only record of who decided) and M-4 closed (the
+limiter now precedes the first read on decide(), as on the other two roads); L-5 and L-6 recorded as gaps 10–11.
+Prior: 2c — the level's one writer, the silent hold's two arms, the queue's road, the outcome comms, the three named jobs; service-scope uses named; gaps 7–9.
 Prior: 2026-09-18T12:10+10:00 — BB-LDN-Planner-070926/2b
 Notes: the inside built (L-008 2b): the wizard, the status page, the notice consent, the upload road, the four submit paths, processing; ADR-153/154/155; data handled, service-scope uses, limits, the consent gate, resume, what 2c must know, six gaps.
 Prior: 2026-09-16T13:55+10:00 — BB-LDN-Planner-070926/F-b

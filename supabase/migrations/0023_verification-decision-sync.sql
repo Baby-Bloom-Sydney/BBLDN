@@ -334,6 +334,27 @@ grant execute on function public.sync_nanny_verification_state(uuid, jsonb) to s
 -- ---------------------------------------------------------------------------
 -- 3. `record_vetting_decision()` — the admin's one write (ADR-157 (2); ADR-159)
 -- ---------------------------------------------------------------------------
+-- **Who decided is a column, not only an event** (REVIEW-3 security H-3). `record_update_service_check()` below
+-- takes `p_checked_by`, validates it against `user_roles` and writes it into
+-- `verifications.dbs_update_service_checked_by` inside its own transaction. The DBS / identity decision — the more
+-- consequential of the two — recorded the deciding admin only in `vetting.decision-recorded`, and 03 §9 makes that
+-- emit best-effort by design ("an emit that fails is logged and never fails the submission it describes"). One
+-- dropped emit therefore left the database unable to say which admin approved a person's criminal-record check.
+-- `vetting_submissions.decided_by` closes it: same transaction, same validation as the sibling.
+
+alter table public.vetting_submissions
+  add column if not exists decided_by uuid references auth.users (id) on delete set null;
+
+comment on column public.vetting_submissions.decided_by is
+  'REVIEW-3 security H-3 (0023): the admin who recorded this decision, written by record_vetting_decision() in the same transaction as the ledger row. NULL until decided. The vetting.decision-recorded event carries the same id, but that emit is best-effort (03 §9) - this column is the durable record.';
+
+create index if not exists vetting_submissions_decided_by_idx
+  on public.vetting_submissions (decided_by)
+  where decided_by is not null;
+
+-- 0022's 6-argument form is replaced, not overloaded: two signatures would mean a caller could reach the one that
+-- records nobody (07 §5.1 rule 5's shape - one road, no quiet second).
+drop function if exists public.record_vetting_decision(uuid, text, text, text, timestamptz, jsonb);
 
 create or replace function public.record_vetting_decision(
   p_submission_id uuid,
@@ -341,7 +362,8 @@ create or replace function public.record_vetting_decision(
   p_reject_reason text default null,
   p_note          text default null,
   p_expires_at    timestamptz default null,
-  p_required      jsonb default null
+  p_required      jsonb default null,
+  p_decided_by    uuid default null
 )
 returns jsonb
 language plpgsql
@@ -353,6 +375,12 @@ declare
   v_applied jsonb;
   v_sync    jsonb;
 begin
+  -- The decider first, before anything is read or written: an unattributable decision is not recorded at all.
+  if p_decided_by is null
+     or not exists (select 1 from public.user_roles r where r.user_id = p_decided_by and r.role = 'admin') then
+    raise exception 'record_vetting_decision: the decider must be an admin (07 §5.4 row 6; REVIEW-3 H-3)'
+      using errcode = '42501';
+  end if;
   if p_decision not in ('verified', 'rejected') then
     raise exception 'record_vetting_decision: % is not a decision (03 §4.2 ManualDecision)', p_decision
       using errcode = '22023';
@@ -372,11 +400,13 @@ begin
   v_applied := public.apply_vetting_check_result(
     p_submission_id, p_decision, p_reject_reason, p_reject_reason, null, 'admin', p_expires_at);
 
-  if p_note is not null then
-    update public.vetting_submissions s
-       set raw_response = coalesce(s.raw_response, '{}'::jsonb) || jsonb_build_object('note', p_note)
-     where s.id = p_submission_id;
-  end if;
+  -- The decider and the note land on the same row in the same statement: attribution cannot be lost while the
+  -- decision it describes survives.
+  update public.vetting_submissions s
+     set decided_by   = p_decided_by,
+         raw_response = case when p_note is null then s.raw_response
+                             else coalesce(s.raw_response, '{}'::jsonb) || jsonb_build_object('note', p_note) end
+   where s.id = p_submission_id;
 
   -- The admin is the check (03 §4.4): the DBS decision carries the outcome and the cross-check.
   if v_sub.section = 'dbs' then
@@ -410,11 +440,11 @@ begin
 end;
 $$;
 
-comment on function public.record_vetting_decision(uuid, text, text, text, timestamptz, jsonb) is
-  'ADR-157 (2) / ADR-159: the admin decision in one transaction - apply_vetting_check_result(..., admin), the note on the ledger, for dbs the outcome (verified => cleared + cross-check passed; rejected adverse => barred + L0 + suspended, I-V5; other rejections => unset), then the sync. service_role only; the person''s authority is the action''s (auth.requireRole, 07 §5.4).';
+comment on function public.record_vetting_decision(uuid, text, text, text, timestamptz, jsonb, uuid) is
+  'ADR-157 (2) / ADR-159: the admin decision in one transaction - the decider validated as an admin and written to vetting_submissions.decided_by (REVIEW-3 H-3), apply_vetting_check_result(..., admin), the note on the ledger, for dbs the outcome (verified => cleared + cross-check passed; rejected adverse => barred + L0 + suspended, I-V5; other rejections => unset), then the sync. service_role only; the person''s authority is ALSO the action''s (auth.requireRole, 07 §5.4) - this is the durable record of it, not a substitute for it.';
 
-revoke all on function public.record_vetting_decision(uuid, text, text, text, timestamptz, jsonb) from public;
-grant execute on function public.record_vetting_decision(uuid, text, text, text, timestamptz, jsonb) to service_role;
+revoke all on function public.record_vetting_decision(uuid, text, text, text, timestamptz, jsonb, uuid) from public, anon, authenticated;
+grant execute on function public.record_vetting_decision(uuid, text, text, text, timestamptz, jsonb, uuid) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- 4. `record_update_service_check()` — the level-4 action (ADR-157 (3); 04 §4.1 row 15; B-19 default)
@@ -1094,6 +1124,22 @@ begin
   end if;
   if exists (select 1 from pg_proc p where p.oid = v_oid and p.prosrc ~ 'auth\.uid\(\)') then
     raise exception '0023: create_nanny_account() must act for p_user_id, never auth.uid() (ADR-163)';
+  end if;
+
+  -- REVIEW-3 H-3: the decision is attributable from the database alone, and refuses to record without a decider
+  if not exists (
+    select 1 from information_schema.columns c
+     where c.table_schema = 'public' and c.table_name = 'vetting_submissions' and c.column_name = 'decided_by'
+  ) then
+    raise exception '0023: vetting_submissions.decided_by is missing (REVIEW-3 H-3)';
+  end if;
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'record_vetting_decision'
+       and p.prosrc ~ 'the decider must be an admin'
+       and p.prosrc ~ 'decided_by\s*=\s*p_decided_by'
+  ) then
+    raise exception '0023: record_vetting_decision() must validate the decider as an admin and write decided_by (REVIEW-3 H-3)';
   end if;
 
   -- REVIEW-3 M-5: the consent instant is stamped server-side

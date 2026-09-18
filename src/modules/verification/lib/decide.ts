@@ -39,6 +39,11 @@ export async function decide(
 ): Promise<Result<DecisionOutcome, VerificationErrorDetails>> {
   const admin = await requireAdmin();
   if (!admin.ok) return admin;
+  // The limiter is consumed **before the first read**, as `openEvidence` and `recordUpdateServiceCheck` already do
+  // (REVIEW-3 security M-4): it used to sit after `readSubmission`, so every call bought one unmetered
+  // service-scope query. Role first, budget second, work third — the same order on all three admin roads.
+  const limited = await consumeAdminRouteLimit(admin.value);
+  if (!limited.ok) return limited;
   const entry = await readSubmission(input.submissionId);
   if (!entry.ok) return entry as Result<never, VerificationErrorDetails>;
   const section =
@@ -46,8 +51,6 @@ export async function decide(
   if (entry.value === null || section === null) return unavailable();
   if (input.decision === "rejected" && input.reason === undefined)
     return reasonRequired();
-  const limited = await consumeAdminRouteLimit(admin.value);
-  if (!limited.ok) return limited;
 
   const provider = getProvider(entry.value.evidenceType);
   if (!provider.ok) return unavailable();

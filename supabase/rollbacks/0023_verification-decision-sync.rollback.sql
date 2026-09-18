@@ -17,6 +17,28 @@
 -- delivery become indistinguishable again (the ADR-156 defect returns) and the unprocessed index goes back to
 -- `processed_at is null`. On a database where no webhook has ever landed (every environment today) that is no
 -- data at all.
+--
+-- **The deciding admin's id.** `vetting_submissions.decided_by` is dropped with every value in it. The event log's
+-- `vetting.decision-recorded` still names the actor, but that emit is best-effort by design (03 §9), so after this
+-- file the database alone cannot say which admin approved or rejected a given DBS check. **Export the column
+-- before running this on any database where a real decision has been recorded.**
+--
+-- ⚠️ **TWO SECURITY REGRESSIONS, one accepted and one refused.**
+--
+-- 1. **REFUSED — ADR-162's level term is KEPT.** `is_active_nanny()` is restored to the `0005` shape in every
+--    respect *except* the verification-level term, which stays inlined. Dropping it would re-open REVIEW-3's
+--    CRITICAL C-1 (an applied, unverified nanny reading every OPEN position and every child's `needs_details` —
+--    Art 9 data) in the middle of an incident, with nothing in the tree depending on the gap. A rollback undoes a
+--    feature; it does not undo a measured security fix. See the note at the function itself.
+--
+-- 2. **ACCEPTED, AND IT MUST BE HOT-PATCHED — ADR-163 is undone.** `create_nanny_account()` goes back to `0021`'s
+--    8-argument, `auth.uid()`-reading form with EXECUTE to `authenticated`, because the code this rollback
+--    accompanies calls exactly that signature and would otherwise have no signup road at all. That restores the
+--    escalation ADR-163 closed: an invited nanny's own session can call the RPC with `p_isolated = false` and enter
+--    the matching pool outside the apply funnel. **If the rolled-back state is to be left running for more than the
+--    length of the incident, revoke EXECUTE from `authenticated` by hand** (`revoke execute on function
+--    public.create_nanny_account(text, text, boolean, text, text, text, uuid, jsonb) from authenticated;`) and
+--    accept that invited signup refuses until the code is rolled forward again.
 
 begin;
 
@@ -349,6 +371,15 @@ create index if not exists nannies_matching_idx
   on public.nannies (verification_level)
   where profile_visible and not is_isolated;
 
+-- **The level term STAYS, and that is deliberate — this file is not a bit-for-bit inverse here.**
+-- REVIEW-3's C-1 measured that `0005`'s body (`not is_isolated and suspended_at is null`, no level term) lets an
+-- applied nanny at `L0_SIGNED_UP` read every OPEN position and every child's `needs_details` — Art 9 child health
+-- data — through the seven RLS policies keyed on this function. A rollback exists to undo *this migration's
+-- feature* under incident pressure; it has no business re-opening a measured CRITICAL on the way past, and nothing
+-- in the pre-`0023` tree depends on the missing term (the gap was the defect, never a behaviour). So the term is
+-- inlined here — `nanny_visible()` is dropped below, so it cannot be called — and `nannies_matching_idx` and
+-- `nanny_public` above keep the `0005` / `0016` forms, which already carried it. Re-applying `0023` over this is
+-- safe: every object is `create or replace`.
 create or replace function public.is_active_nanny()
 returns boolean
 language sql
@@ -358,9 +389,16 @@ set search_path = ''
 as $$
   select exists (
     select 1 from public.nannies n
-    where n.user_id = auth.uid() and not n.is_isolated and n.suspended_at is null
+    where n.user_id = auth.uid()
+      and not n.is_isolated
+      and n.suspended_at is null
+      and n.verification_level in ('L3_PROVISIONALLY_VERIFIED', 'L4_FULLY_VERIFIED')
   );
 $$;
+
+comment on function public.is_active_nanny() is
+  'I-5 / AC-N-22..26 (0005), with ADR-162''s level term kept through the 0023 rollback: a nanny who may see the marketplace at all - not isolated, not suspended AND in the pool. REVIEW-3 C-1 is not re-opened by rolling back.';
+
 revoke all on function public.is_active_nanny() from public;
 grant execute on function public.is_active_nanny() to authenticated, service_role;
 
@@ -370,7 +408,12 @@ drop function if exists public.nanny_visible(boolean, public.verification_level)
 drop function if exists public.sweep_stale_verification_processing(integer);
 drop function if exists public.expire_verification_section(uuid, jsonb);
 drop function if exists public.record_update_service_check(uuid, public.update_service_result, boolean, uuid, jsonb);
+drop function if exists public.record_vetting_decision(uuid, text, text, text, timestamptz, jsonb, uuid);
 drop function if exists public.record_vetting_decision(uuid, text, text, text, timestamptz, jsonb);
+
+-- REVIEW-3 H-3 undone: the durable attribution of every recorded decision goes with the column. See WHAT IS LOST.
+drop index if exists public.vetting_submissions_decided_by_idx;
+alter table public.vetting_submissions drop column if exists decided_by;
 drop function if exists public.sync_nanny_verification_state(uuid, jsonb);
 drop function if exists public.verification_sections_verified(public.verifications, jsonb);
 
