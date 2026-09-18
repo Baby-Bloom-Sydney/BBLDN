@@ -1179,7 +1179,62 @@ Prior: 2026-09-15T15:20+10:00 — BB-LDN-Planner-070926/S1 (S1 shipped locally).
 Prior: 2026-09-15T13:55+10:00 — BB-LDN-Planner-070926/S0 (seeded at bootstrap).
 -->
 
-## Files created / modified in the current unit (`3c` — the safeguarding deletions, the draft seed, ruling 5.1's binding, renewal and the expiry cron; L-009 Phase 3)
+## Files created / modified in the current unit (`3e` — ADR-170's safeguarding half, the gate split, the cookie route; L-009 Phase 3)
+
+**What this unit is.** The unit `3c` asked for. Its 131-key cascade audit found four person-cascades that erased
+a nanny's entire vetting history — who approved her DBS check, what the outcome was, who lifted a bar — in one
+`delete from auth.users`, for **any** role, and it shipped them as four `it.fails` pins rather than fixing them
+inside a consent unit. This is that fix, plus the two questions `3c` recorded.
+
+- **`supabase/migrations/0027_safeguarding-survives-erasure.sql`** (new) — **ADR-170's safeguarding half**.
+  `verifications.nanny_id`, `vetting_submissions.nanny_id` and `nanny_suspension_lifts.nanny_id` from
+  `on delete cascade` to **`set null`**; `vetting_submissions.verification_id` to **`restrict`**. `set null` and
+  not `restrict` — the opposite of `0026`'s consent half — because 07 §6.1 step 3 **hard-deletes the `nannies`
+  row** on the product path while §6.2 row 4 keeps the DBS decision, so `restrict` would make the erasure job
+  refuse on its own path. New **`subject_pseudonym`** on all three tables carrying the former `nannies.id`,
+  written by **`pseudonymise_safeguarding_subject()`** (BEFORE DELETE on `nannies`, `SECURITY DEFINER` owned by
+  `bbldn_retention`), with `<table>_subject_present_check` turning a forgotten pseudonym into a **refused
+  delete** rather than a silent detach. New **`is_safeguarding_retention_job()`** — `bbldn_retention` alone, so
+  the `supabase_admin` exemption `is_retention_job()` grants is closed for these tables — plus
+  `prevent_safeguarding_row_modification()` (full append-only, `nanny_suspension_lifts`) and
+  `prevent_safeguarding_record_loss()` (DELETE / TRUNCATE refused and the subject unmovable, on the two tables
+  that are live state and cannot be append-only). The trigger probes all three children **`for update nowait`**
+  so an erasure can never be the waiting side of a deadlock with `record_vetting_decision` (database pass, HIGH).
+  Also **REVIEW-4 M-15**, taken with the file: `verifications_rtw_status_idx`, the partial index its two siblings
+  have and the five-minute cron's third statement did not.
+- **`supabase/rollbacks/0027_…rollback.sql`** (new) — **ADR-165 (1) / ADR-177**: keeps all three security
+  clauses (the four keys stay off `cascade`, the guards stay attached, the columns stay nullable), drops the
+  pseudonym machinery, and **announces** what that destroys. Its detach carve-out is narrow in columns _and_ in
+  identity — the parent must actually be gone — which the database pass caught as a HIGH before it ran anywhere.
+- **`supabase/__tests__/safeguarding-erasure.test.ts`** (new, 30 cases) — proof by invocation on a live stack:
+  delete the person on both paths, the decisions survive, all three rows carry the **same** pseudonym, and no
+  role the application can become can edit or delete them. **`rollback-0027-safeguarding.test.ts`** (new, 9) is
+  ADR-165 (3) for the twin. `consent-erasure-binding.test.ts` — **`3c`'s four pins flipped by behaviour**.
+- **`.github/workflows/ci.yml` + `config.repo.test.ts`** — `3c`'s **Q-4**. `check:config-literals` carries
+  ADR-172's `safeguarding` rule and lived in `banned-literals`, which is red on `main` by construction until F-d
+  — so the safety control passed inside a job nobody is required to look at. The four green, load-bearing steps
+  move to a new **`config-gates`** job; `banned-literals` keeps only `check:banned-words`. **Branch protection is
+  BAI's** — the job does not add itself.
+- **`src/app/api/legal/cookie-consent/route.ts`** (rewritten) + **`parse-cookie-choice.ts`**,
+  **`_lib/visitor-cookie.ts`** (new) — `3c`'s **Q-2**, measured: the visitor id came from the request body, the
+  insert ran at service scope with no limiter, and a second choice raised `23505` on
+  `cookie_consent_records_current_idx`, so **a visitor could not change her mind**. Now: the id comes from an
+  HttpOnly, signed cookie the server mints (HKDF from `CRON_SECRET` under its own label — recorded for
+  ratification); the write goes through `consent.recordCookieConsent` → `record_cookie_consent`, which
+  supersedes; and `SECURITY.rateLimits.cookieConsent` is consumed before the body is parsed and fails closed.
+  Its recorded gap leaves `limiter-call-sites.allow.json` (16/22 → **17/22**).
+- **`src/modules/config/security.ts`** — `SECURITY.retention.erasureRetains`: 07 §6.1's "what is retained and
+  why" as a value, including the safeguarding class, so the erasure job's confirmation cannot omit it; and
+  `visitorCookie`. **`refine-env.ts`** holds `CRON_SECRET` to 32 characters outside development, because it now
+  backs two security properties (security pass, MEDIUM).
+
+**Stale and not this unit's to rewrite:** the **Current state** table at the top of this file still describes
+Phase 1 (trunk `2c71045`, PR #32, `1i` in flight). It has not tracked L-008 or L-009 and a unit-sized guess at
+its Trunk / Phase / Tree-size rows would be worse than the staleness. Recorded in L-009 PROGRESS as owed.
+
+---
+
+## Files created / modified in the prior unit (`3c` — the safeguarding deletions, the draft seed, ruling 5.1's binding, renewal and the expiry cron; L-009 Phase 3)
 
 **What this unit is.** Two commits. The first is **ADR-172**, which the brief put before everything else: a
 wrong-jurisdiction _safety instruction_ is deleted the day it is found and is never replaced by a guess. The
