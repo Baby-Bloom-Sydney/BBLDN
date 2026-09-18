@@ -204,6 +204,33 @@ describe("config.env — guards (07 §7 item 1; 07 §5.5; 06 §2.2; 06 §4.1 C)"
     expect(error.names).toContain("PURCHASE_PROVIDER");
   });
 
+  // Security pass MEDIUM (L-009 `3e`): `CRON_SECRET` now backs TWO security properties — the `/api/cron/*`
+  // Bearer and, through HKDF, the key material behind the signed visitor cookie — and the registry's
+  // `kind: "string"` is `min(1)`, so nothing stopped a deployed environment carrying a typed passphrase.
+  it("★ refuses a CRON_SECRET too short to be key material, in production", () => {
+    expect(
+      failure(() => parseEnv({ ...production, CRON_SECRET: "short" })).names,
+    ).toContain("CRON_SECRET");
+  });
+
+  it("★ and in preview, because preview is a deployed environment too", () => {
+    expect(
+      failure(() =>
+        parseEnv({
+          ...production,
+          VERCEL_ENV: "preview",
+          CRON_SECRET: "short",
+        }),
+      ).names,
+    ).toContain("CRON_SECRET");
+  });
+
+  it("accepts the length the deployed environments actually carry", () => {
+    expect(
+      parseEnv(production).server.CRON_SECRET.length,
+    ).toBeGreaterThanOrEqual(32);
+  });
+
   // ADR-141 (REVIEW-2 H-11 / M-9): the other two stubs were legal in the production column. `stub-email`
   // reports every reset, invite and app-ready mail as sent while nothing leaves the building; the 20-area seed
   // tells 271 of 291 real London districts they are out of area. Same shape as the guard above.

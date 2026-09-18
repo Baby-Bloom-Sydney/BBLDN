@@ -22,6 +22,14 @@ const declarePolicies = <T extends Record<string, RateLimit>>(
     ),
   ) as Readonly<{ readonly [K in keyof T]: RateLimit }>;
 
+/**
+ * 07 §6.2 row 12 — how long the cookie choice stands before the banner asks again. Named once because two
+ * things read it and they must not drift: the retention window on the record below, and the `Max-Age` of the
+ * cookie that carries the visitor id (`visitorCookie`). A visitor whose cookie outlived her record would be
+ * counted as having answered a question whose answer we had already dropped.
+ */
+const COOKIE_EXPIRY_DAYS = 365;
+
 const RATE_LIMITS = declarePolicies({
   publicRead: {
     key: "ip",
@@ -168,6 +176,29 @@ export const SECURITY = Object.freeze({
     invite: Object.freeze({ name: "bb_invite", maxAgeSeconds: 3600 }),
     nannyLead: Object.freeze({ name: "bb_nanny_lead", maxAgeSeconds: 86400 }),
   }),
+  // **The visitor id is ours to mint, not the caller's to name** (07 §2.9; L-009 `3e`).
+  //
+  // The legacy `POST /api/legal/cookie-consent` took `visitor_id` from the request body, so anyone could write
+  // a cookie-consent record against any identifier they chose — and, because
+  // `cookie_consent_records_current_idx` is UNIQUE on `(visitor_id) where superseded_by is null`, could also
+  // collide with a real visitor's current row. The id now travels in an **HttpOnly, signed** cookie the server
+  // mints on first contact: a body value is ignored, a tampered cookie is treated as no cookie, and a fresh id
+  // is minted rather than an error returned, because the visitor's actual request is to record a choice.
+  //
+  // `SameSite=Strict`, and the first draft's `Lax` was wrong for a stated reason that did not survive the
+  // security pass (LOW, 2026-09-19): the justification given was "the banner must work on a first visit that
+  // arrived from a link", but this cookie is never read on the arriving navigation — it does not exist until
+  // the page's own same-origin `fetch` POST sets it, and a same-origin request is same-site whatever the
+  // referrer. `Strict` is therefore equally functional and closes `Lax`'s top-level-navigation carve-out.
+  // `Secure` is set outside development.
+  //
+  // It is **strictly necessary** in PECR's sense only insofar as it carries a consent record; ADR-175 (a) is
+  // explicit that the analytics `visitor_id` is NOT claimed strictly necessary, and this is not that value's
+  // home — this cookie exists so a person can *change her mind*, which is the withdrawal right (07 §6).
+  visitorCookie: Object.freeze({
+    name: "bb_visitor",
+    maxAgeSeconds: COOKIE_EXPIRY_DAYS * 24 * 60 * 60,
+  }),
   inviteLookupBlock: Object.freeze({ failedPerHour: 5, blockMinutes: 60 }), // 07 §8 row 7
   burstAlertMultiple: 10, // ALERT_RATE_LIMIT_BURST when a key trips ≥ 10× in an hour (07 §8)
   signedUrlTtlSeconds: Object.freeze({
@@ -211,7 +242,7 @@ export const SECURITY = Object.freeze({
     consentYearsAfterScrub: 6,
     cookieConsentRecordMonths: 13,
     cookieConsentSupersededDays: 30,
-    cookieExpiryDays: 365, // the consent cookie itself — re-prompt after 12 months (07 §6.2 row 12 `config.consent.cookieExpiryDays`)
+    cookieExpiryDays: COOKIE_EXPIRY_DAYS, // the consent cookie itself — re-prompt after 12 months (07 §6.2 row 12 `config.consent.cookieExpiryDays`)
     emailBodyDays: 90,
     emailMetadataMonths: 24,
     adminNotificationsMonths: 12,
@@ -221,6 +252,33 @@ export const SECURITY = Object.freeze({
     parentLeadsDays: 90,
     backupMaxDays: 35,
     pendingScanObjectHours: UPLOADS.scanPendingMaxHours,
+    // 07 §6.1 — **what an erasure keeps, and the reason, in the words the person is owed.** Art 17(3) is what
+    // makes keeping these rows lawful and Art 12 is what makes telling her about them mandatory, so the two
+    // belong in one list rather than in a screen's copy and a job's comment. `delete-account`'s confirmation and
+    // the settings screen both read it; neither exists yet (01 §4e — that cron is still handler-less), and that
+    // is exactly why the list is here rather than waiting for them: the sentence 07 §6.1 promises must not be
+    // something the first builder of that screen has to remember to write.
+    //
+    // The third row is the one `0027` made true and the one most likely to be left out, because it applies to
+    // nannies only and it is the least comfortable to say. It is said anyway: she is told that a vetting
+    // decision about her is kept, that her identity is removed from it, and why.
+    erasureRetains: Object.freeze([
+      Object.freeze({
+        what: "Payment and subscription records",
+        why: "UK tax and company law require us to keep them, and they may be needed to settle a dispute.",
+        lawfulBasis: "Art 17(3)(b) and (e)",
+      }),
+      Object.freeze({
+        what: "A record of the permissions you gave, and when",
+        why: "We have to be able to show what you agreed to and when you agreed to it.",
+        lawfulBasis: "Art 17(3)(b)",
+      }),
+      Object.freeze({
+        what: "Safeguarding decisions made about you, with your name and contact details removed",
+        why: "Where a background-check decision has been made about someone who cares for children, we are accountable for that decision and have to be able to show who made it and why. Your identity is removed from the record; the decision itself is kept.",
+        lawfulBasis: "Art 17(3)(b) and (e)",
+      }),
+    ] as const),
   }),
   csp: Object.freeze({
     supabaseOrigin: new URL(publicEnv.NEXT_PUBLIC_SUPABASE_URL).origin,

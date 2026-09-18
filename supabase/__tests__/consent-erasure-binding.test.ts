@@ -14,11 +14,9 @@
 //      subject holds consent evidence raises, and the evidence is still there afterwards. The product path is
 //      07 §6.1's scrub-and-retain; this is the backstop for the emergency hard delete.
 //
-// The four PINNED cases at the end are ADR-170's **other** half — the safeguarding cascades. They are audited,
-// reported in L-009 PROGRESS, and left to their own unit on purpose: they are `verification` / `vetting`
-// schema, they interact with ADR-168's terminal bar and with `0008` / `0023` / `0025`'s verify blocks and twins,
-// and a schema-wide erasure change riding inside a consent unit is how a safeguarding regression ships unseen.
-// They are pinned rather than written down so the defect cannot decay into a note nobody reads.
+// The four cases at the end were ADR-170's **other** half — the safeguarding cascades — pinned `it.fails` by
+// `3c` rather than written down, so the defect could not decay into a note nobody reads. `3e` closed them in
+// `0027`; they are ordinary cases now, and the behaviour behind them is `int.safeguarding-erasure`.
 import { createHash } from "node:crypto";
 import type { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -231,52 +229,40 @@ describe("int.consent — ADR-170 (the consent half): erasure is refused, never 
 });
 
 /**
- * PINNED — ADR-170's **other** half, audited by `3c` and left to its own unit.
+ * ADR-170's **other** half, audited by `3c` and closed by `3e` in `0027` — these four were `it.fails` pins and
+ * are ordinary cases now.
  *
- * One `delete from auth.users` today propagates `auth.users → nannies → verifications → vetting_submissions`
- * and `→ nanny_suspension_lifts`, and none of those tables carries `prevent_row_modification()`, so nothing
- * stands in the way for any role. The complete safeguarding history of a person who cared for children — which
- * admin approved her DBS check, what the outcome was, who lifted a bar and why — is erased by one statement,
- * and `nanny_suspension_lifts` does this while its *other* person key, `decided_by`, is already `restrict` with
- * a written justification: *"an audit row whose author can be deleted is not an audit row."* The reasoning was
- * applied to the author of the lift and not to its subject.
+ * What they pinned: one `delete from auth.users` propagated `auth.users → nannies → verifications →
+ * vetting_submissions` and `→ nanny_suspension_lifts`, and none of those tables carried an append-only trigger,
+ * so nothing stood in the way for any role. The complete safeguarding history of a person who cared for
+ * children — which admin approved her DBS check, what the outcome was, who lifted a bar and why — was erased by
+ * one statement, and `nanny_suspension_lifts` did this while its *other* person key, `decided_by`, was already
+ * `restrict` with a written justification: *"an audit row whose author can be deleted is not an audit row."*
+ * The reasoning had been applied to the author of the lift and not to its subject.
  *
- * Red on the shipped tree; green when the four keys stop cascading from a person.
- * **Owner: the `verification` / `vetting` schema unit (ADR-170's safeguarding half).** L-009 PROGRESS carries
- * the full 131-row cascade audit and the recommendation that this is its own unit.
+ * They stay here, where the audit that found them lives, and they are deliberately **catalogue** assertions.
+ * The behaviour behind them — delete the person, the decisions survive, pseudonymised and unmodifiable — is
+ * `supabase/__tests__/safeguarding-erasure.test.ts`, because a `confdeltype` is a claim about the schema and
+ * not about what happens when somebody actually deletes a person.
  */
-describe("int.consent — PINNED: ADR-170's safeguarding half (owner: the verification/vetting schema unit)", () => {
-  it.fails(
-    "★ PINNED — verifications.nanny_id must not cascade from a person (ADR-170)",
-    async () => {
-      expect(await onDelete("verifications", "nanny_id")).not.toBe("c");
-    },
-  );
+describe("int.consent — ADR-170's safeguarding half, closed by 0027 (was four pins)", () => {
+  it("★ verifications.nanny_id does not cascade from a person (ADR-170)", async () => {
+    expect(await onDelete("verifications", "nanny_id")).not.toBe("c");
+  });
 
-  it.fails(
-    "★ PINNED — vetting_submissions.nanny_id must not cascade from a person (ADR-170)",
-    async () => {
-      expect(await onDelete("vetting_submissions", "nanny_id")).not.toBe("c");
-    },
-  );
+  it("★ vetting_submissions.nanny_id does not cascade from a person (ADR-170)", async () => {
+    expect(await onDelete("vetting_submissions", "nanny_id")).not.toBe("c");
+  });
 
-  it.fails(
-    "★ PINNED — vetting_submissions.verification_id must not carry the second path to the same deletion (ADR-170)",
-    async () => {
-      expect(await onDelete("vetting_submissions", "verification_id")).not.toBe(
-        "c",
-      );
-    },
-  );
+  it("★ vetting_submissions.verification_id does not carry the second path to the same deletion (ADR-170)", async () => {
+    expect(await onDelete("vetting_submissions", "verification_id")).not.toBe(
+      "c",
+    );
+  });
 
-  it.fails(
-    "★ PINNED — nanny_suspension_lifts.nanny_id must not cascade: its own decided_by is already restrict (ADR-168, ADR-170)",
-    async () => {
-      expect(await onDelete("nanny_suspension_lifts", "nanny_id")).not.toBe(
-        "c",
-      );
-    },
-  );
+  it("★ nanny_suspension_lifts.nanny_id does not cascade: its own decided_by is already restrict (ADR-168, ADR-170)", async () => {
+    expect(await onDelete("nanny_suspension_lifts", "nanny_id")).not.toBe("c");
+  });
 });
 
 /**

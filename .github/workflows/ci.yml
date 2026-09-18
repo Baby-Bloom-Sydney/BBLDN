@@ -13,12 +13,16 @@
 #                                        ADR-142 (2)); a recorded gap carries its reason in limiter-call-sites.allow.json
 #                                        + scripts/ci/check-action-limits.mjs — the inverse (REVIEW-3 R-3 / M-1): a
 #                                        server action that reaches no limiter fails; same job, same allow file
-#   1 lint            → banned-literals scripts/ci/check-config-literals.mjs · banned-words static pre-check ·
-#                                        env:check (.env.example) · crons:check (vercel.json) · process.env grep outside config
+#   1 lint            → config-gates    scripts/ci/check-config-literals.mjs (including ADR-172's `safeguarding`
+#                                        rule) · env:check (.env.example) · crons:check (vercel.json) ·
+#                                        process.env grep outside config. GREEN today — joins the required list
+#                                        per ADR-109 once it is green on `main` (L-009 `3e`, Q-4)
+#   1 lint            → banned-literals banned-words static pre-check ONLY — red on the legacy parent surfaces
+#                                        until F-d, and it is the only step left here for that reason
 #   2 typecheck       → typecheck       tsc --noEmit --pretty false
 #   3–6 tests         → test            vitest --coverage → diff-cover ≥ 80 % changed lines · contract · integration
 #                                        (supabase start) · e2e (next build → playwright)              [red until S2–S5, E1]
-#   5 integration     → integration     supabase start + db reset (0000..0023 from empty) → vitest --project
+#   5 integration     → integration     supabase start + db reset (0000..NN from empty, the whole ordered set) → vitest --project
 #                                        integration. The same suites `test` runs, in a job that can block a
 #                                        merge (REVIEW-3 M-10 / R-6); same-repo PRs + pushes to main; no secrets
 #   7 build + budgets → build           next build · size-limit [Phase 1 baseline] · prod-guard · bundle string scan
@@ -54,7 +58,7 @@ env:
   # 07 §7: real values live in Vercel env + the keychain, never here). Kept in step with .env.test — the config.env
   # suite parses this block. Names: src/modules/config/lib/env-schema.ts (50; .env.example is generated from it).
   NEXT_PUBLIC_APP_URL: http://localhost:3000
-  CRON_SECRET: placeholder-cron-secret
+  CRON_SECRET: placeholder-cron-secret-0000000000000
   ADMIN_API_TOKEN: placeholder-admin-token
   SYSTEM_PARENT_ID: 00000000-0000-4000-8000-000000000000
   ADMIN_EMAIL: admin@example.test
@@ -163,8 +167,24 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm run check:action-limits
 
-  banned-literals:
-    name: banned-literals
+  # ── L-009 `3e` (Q-4) — the green gates, split out of `banned-literals` so that somebody is required to look ──
+  #
+  # These four steps all pass today and every one of them guards a claim a merge rests on. Until this split they
+  # sat in the same job as `banned-words`, which is **red on `main` by construction** (ADR-124: the legacy parent
+  # surfaces are not rewritten until F-d). A red job cannot be a required check, so `banned-literals` is not one
+  # — and that made `check:config-literals` a control nobody is obliged to read, including ADR-172's
+  # `safeguarding` rule, which is the mechanism that keeps a wrong child-safety instruction from returning to the
+  # tree. `3c` shipped that rule into a job whose own result nobody has to look at; this is the other half of it.
+  #
+  # The split is deliberately by *colour*, not by subject: everything that is green and load-bearing moves here,
+  # and `banned-literals` keeps exactly the one step that is expected to be red. When F-d turns `banned-words`
+  # green the two can merge back, or `banned-literals` joins the required list on its own — either is fine, and
+  # neither is urgent once this job is required.
+  #
+  # **Branch protection is BAI's** (06 §3.4): this job does not add itself. It joins the required-check list per
+  # ADR-109 once it is green on `main`.
+  config-gates:
+    name: config-gates
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -173,11 +193,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: check-config-literals (05 §6; AC-X-23) — legacy tree excluded by literal-exclusions.json until F-d
+      - name: check-config-literals (05 §6; AC-X-23) — jurisdiction (ADR-171) + safeguarding (ADR-172, `everywhere`); legacy tree excluded by literal-exclusions.json until F-d
         run: npm run check:config-literals
-      - name: banned-words static pre-check (05 §5) — red on the legacy parent surfaces until F-d
-        if: ${{ !cancelled() }}
-        run: npm run check:banned-words
       - name: .env.example = generated from the env schema (06 §2.5; HANDOFF §5.4)
         if: ${{ !cancelled() }}
         run: npm run env:check
@@ -188,6 +205,20 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm run check:env-reads
 
+  # ── The one step that is allowed to be red, alone in its own job so that it says nothing about the others ──
+  banned-literals:
+    name: banned-literals
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: banned-words static pre-check (05 §5) — red on the legacy parent surfaces until F-d
+        run: npm run check:banned-words
+
   # ── REVIEW-3 M-10 / R-6 — the behavioural proof of every SQL-only control, in a job that can block a merge ──
   #
   # `int.rpc-*`, `int.rls`, `int.storage-rls` and `db.constraints` are the ONLY place the column allow-lists, the
@@ -197,7 +228,7 @@ jobs:
   # excellent tests with no teeth, and REVIEW-3's CRITICAL is the worked example of what that costs: the gap it
   # found lives in exactly the seam between a mock and a column.
   #
-  # The stack is started **in the runner** and `supabase db reset` applies `0000`–`0025` forward from empty, so
+  # The stack is started **in the runner** and `supabase db reset` applies `0000`–`00NN` forward from empty (the whole set, whatever its head), so
   # this job also proves on every PR that the whole ordered migration set still applies to an empty database —
   # the other thing nothing checked. No secrets and no hosted project: `bb-ldn-preview` is behind (B-45) and a
   # preview-backed job would be red for reasons that are not the code's. Joins the required checks when it is
@@ -236,7 +267,7 @@ jobs:
       - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
         with:
           version: 2.117.0
-      - name: supabase start + db reset — the ordered set 0000..0025 applied forward from empty (02 §6)
+      - name: supabase start + db reset — the whole ordered set applied forward from empty (02 §6)
         run: |
           supabase start
           supabase db reset

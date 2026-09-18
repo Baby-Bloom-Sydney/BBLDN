@@ -65,6 +65,29 @@ function stripePrefixNames(values: Parsed): string[] {
   return names;
 }
 
+/**
+ * `CRON_SECRET` now carries **two** security properties, not one (security pass MEDIUM, 2026-09-19): it is the
+ * Bearer every `/api/cron/*` route compares against, and — via HKDF under its own label — the key material
+ * behind the signed visitor cookie (`app/api/_lib/visitor-cookie.ts`). Its entropy floor went up with the
+ * second use, and nothing enforced a floor at all: the registry says `kind: "string"`, which is `min(1)`.
+ *
+ * 32 characters is a 128-bit value in hex and a 192-bit one in base64url, so it is the smallest length that
+ * cannot be met by a passphrase somebody typed. Development is exempt on purpose — a local stack is not a place
+ * to make anyone invent secrets, and every deployed environment is preview or production.
+ */
+const CRON_SECRET_MIN_LENGTH = 32;
+
+function cronSecretStrengthNames(
+  values: Parsed,
+  environment: Environment,
+): string[] {
+  if (environment === "development") return [];
+  const secret = values.CRON_SECRET;
+  return typeof secret === "string" && secret.length < CRON_SECRET_MIN_LENGTH
+    ? ["CRON_SECRET"]
+    : [];
+}
+
 export function refineEnv(
   values: Parsed,
   environment: Environment,
@@ -74,5 +97,6 @@ export function refineEnv(
     ...stubGuardNames(values, environment),
     ...productionStubProviderNames(values, environment),
     ...stripePrefixNames(values),
+    ...cronSecretStrengthNames(values, environment),
   ];
 }
