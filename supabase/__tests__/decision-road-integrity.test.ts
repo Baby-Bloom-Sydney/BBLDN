@@ -66,6 +66,7 @@ import { connect } from "./db-client";
 const NANNY = "000000d1-0000-4000-8000-000000000000";
 const ADMIN = "000000d9-0000-4000-8000-000000000000";
 const EVIDENCE = "000000f1-0000-4000-8000-000000000000";
+const EVIDENCE_2 = "000000f2-0000-4000-8000-000000000000";
 
 /** `VETTING.requiredChecksByLevel` as the adapters compute it — the shape, not a test invention. */
 const REQUIRED = {
@@ -107,8 +108,19 @@ async function asNanny(sql: string): Promise<void> {
     JSON.stringify({ sub: NANNY, role: "authenticated" }),
   ]);
   await db.query("set local role authenticated");
-  await db.query(sql);
-  await db.query("reset role");
+  try {
+    await db.query(sql);
+  } finally {
+    // `reset role` must run even when the statement raised, or every later query in this transaction runs as
+    // `authenticated` and the suite's own fixtures start failing for the wrong reason. Its own failure is
+    // swallowed on purpose: a raise inside the statement aborts the transaction, so this query fails too, and
+    // the error the CALLER needs is the first one, not `25P02`. `refusal()`'s savepoint does the real cleanup.
+    try {
+      await db.query("reset role");
+    } catch {
+      /* the statement's own error is the one that matters */
+    }
+  }
 }
 
 type NannyState = {
@@ -128,6 +140,50 @@ async function stateOfNanny(): Promise<NannyState> {
     [NANNY],
   );
   return rows[0];
+}
+
+/**
+ * Everything here runs inside one transaction, and a `raise` aborts a transaction: without a savepoint the
+ * first refused call would make every later query fail with `25P02` for the wrong reason. Each expected refusal
+ * therefore runs inside its own savepoint, which is rolled back whether it raised or not — so a refusal that
+ * silently SUCCEEDS also leaves no trace, and the assertion after it is measuring the real state.
+ */
+async function refusal(sql: () => Promise<unknown>): Promise<string> {
+  await db.query("savepoint probe");
+  try {
+    await sql();
+    await db.query("rollback to savepoint probe");
+    return "";
+  } catch (error) {
+    await db.query("rollback to savepoint probe");
+    return error instanceof Error ? error.message : String(error);
+  } finally {
+    await db.query("release savepoint probe");
+  }
+}
+
+async function nannyPartyId(): Promise<string> {
+  const { rows } = await db.query<{ id: string }>(
+    `select id from public.nannies where user_id = $1`,
+    [NANNY],
+  );
+  return rows[0].id;
+}
+
+async function lift(decider: string, reason: string): Promise<void> {
+  await db.query(
+    `select public.lift_nanny_suspension($1::uuid, $2, $3::uuid)`,
+    [await nannyPartyId(), reason, decider],
+  );
+}
+
+async function liftRowCount(): Promise<number> {
+  const { rows } = await db.query<{ n: string }>(
+    `select count(*)::text as n from public.nanny_suspension_lifts l
+       join public.nannies n on n.id = l.nanny_id where n.user_id = $1`,
+    [NANNY],
+  );
+  return Number(rows[0].n);
 }
 
 async function decide(reason: string): Promise<void> {
@@ -182,22 +238,111 @@ describe("int.decision — an adverse DBS bars, and the bar holds (03 §4.3 / I-
   });
 
   /**
-   * PINNED — REVIEW-4 C-2. A second decision on the SAME submission id, with any non-`adverse` reason, resets
-   * `dbs_outcome` to `unset` and the sync then clears `suspended_at` because it derives the suspension from
-   * `dbs_outcome = 'barred'` alone. Measured: `suspended` goes `t → f`.
+   * ★ REVIEW-4 C-2's pin, FLIPPED by `0025` (ADR-168 (a)). A second decision on the SAME submission id with
+   * any non-`adverse` reason still resets `dbs_outcome` to `unset` — `record_vetting_decision`'s else-branch is
+   * unchanged — but the sync no longer derives `suspended_at` at all, so the bar it did not set is the bar it
+   * cannot lift. Measured before `0025`: `suspended` went `t → f`. Measured after: it stays `t`.
    *
-   * **Owner: `2c` / the migration's author** — a guard in a new migration, not a twin and not a review agent's.
+   * The outcome moving off `barred` is deliberate and is not the finding: what keeps her out of the pool is
+   * `suspended_at` (`is_active_nanny()`, `nanny_is_visible()`, and `0022:180`'s SUSPENDED gate on resubmission
+   * all read that column, not the outcome). The bar is the suspension.
    */
-  it.fails(
-    "★ PINNED — re-deciding the same submission cannot lift the bar (owner: `2c`, a new migration)",
-    async () => {
-      await decide("mismatch");
+  it("★ re-deciding the same submission cannot lift the bar (ADR-168 (a))", async () => {
+    await decide("mismatch");
 
-      const after = await stateOfNanny();
-      expect(after.suspended).toBe(true);
-      expect(after.outcome).toBe("barred");
-    },
-  );
+    const after = await stateOfNanny();
+    expect(after.suspended).toBe(true);
+    expect(after.level).toBe("L0_SIGNED_UP");
+  });
+
+  it("she still cannot resubmit while the bar stands — `0022`'s SUSPENDED gate reads the column the sync kept", async () => {
+    const message = await refusal(() =>
+      asNanny(
+        `select public.submit_verification_evidence('${EVIDENCE_2}'::uuid, 'dbs', 'dbs-certificate',
+                'stub-manual', 'needs_admin',
+                '{"dbs_certificate_ref":"x/dbs/b.pdf","dbs_certificate_number":"001234567891",
+                  "dbs_issue_date":"2026-01-03","dbs_update_service_consent_at":null}'::jsonb)`,
+      ),
+    );
+
+    expect(message).toMatch(/SUSPENDED|suspended/);
+  });
+});
+
+describe("int.decision — lifting a bar is its own act, recorded (ADR-168 (b))", () => {
+  it("an unattributable lift is refused before anything is read or written", async () => {
+    const message = await refusal(() =>
+      lift(NANNY, "the DBS was another person's"),
+    );
+
+    expect(message).toMatch(/must be an admin/);
+    expect((await stateOfNanny()).suspended).toBe(true);
+    expect(await liftRowCount()).toBe(0);
+  });
+
+  it("a blank reason is refused — a lift with no reason answers half the question", async () => {
+    const message = await refusal(() => lift(ADMIN, "   "));
+
+    expect(message).toMatch(/needs a reason/);
+    expect((await stateOfNanny()).suspended).toBe(true);
+    expect(await liftRowCount()).toBe(0);
+  });
+
+  it("★ the explicit lift works, and the audit row records who, why and what it walked back", async () => {
+    const before = await stateOfNanny();
+    expect(before.suspended).toBe(true);
+
+    await lift(ADMIN, "  Identified as a different person; DBS reissued.  ");
+
+    const after = await stateOfNanny();
+    expect(after.suspended).toBe(false);
+    expect(after.outcome).toBe("unset");
+
+    const { rows } = await db.query<{
+      reason: string;
+      decided_by: string;
+      previous_dbs_outcome: string;
+      attributed: boolean;
+    }>(
+      `select l.reason, l.decided_by::text, l.previous_dbs_outcome::text,
+              l.decided_at is not null as attributed
+         from public.nanny_suspension_lifts l
+         join public.nannies n on n.id = l.nanny_id
+        where n.user_id = $1`,
+      [NANNY],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual({
+      reason: "Identified as a different person; DBS reissued.",
+      decided_by: ADMIN,
+      previous_dbs_outcome: "unset",
+      attributed: true,
+    });
+  });
+
+  it("lifting a suspension that is not there refuses rather than recording a second lift", async () => {
+    const message = await refusal(() => lift(ADMIN, "again"));
+
+    expect(message).toMatch(/is not suspended/);
+    expect(await liftRowCount()).toBe(1);
+  });
+
+  it("neither anon nor authenticated may execute the lift, and neither may read its audit rows", async () => {
+    const { rows } = await db.query<{
+      anon_exec: boolean;
+      auth_exec: boolean;
+      anon_read: boolean;
+    }>(
+      `select has_function_privilege('anon', 'public.lift_nanny_suspension(uuid, text, uuid)', 'EXECUTE') as anon_exec,
+              has_function_privilege('authenticated', 'public.lift_nanny_suspension(uuid, text, uuid)', 'EXECUTE') as auth_exec,
+              has_table_privilege('anon', 'public.nanny_suspension_lifts', 'SELECT') as anon_read`,
+    );
+    expect(rows[0]).toEqual({
+      anon_exec: false,
+      auth_exec: false,
+      anon_read: false,
+    });
+  });
 });
 
 describe("int.decision — the ledger hands the application an id its own stores can resolve", () => {

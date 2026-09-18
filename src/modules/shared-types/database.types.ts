@@ -2531,6 +2531,51 @@ export type Database = {
           },
         ]
       }
+      nanny_suspension_lifts: {
+        Row: {
+          decided_at: string
+          decided_by: string
+          id: string
+          nanny_id: string
+          previous_dbs_outcome: Database["public"]["Enums"]["dbs_outcome"]
+          reason: string
+          suspended_since: string
+        }
+        Insert: {
+          decided_at?: string
+          decided_by: string
+          id?: string
+          nanny_id: string
+          previous_dbs_outcome: Database["public"]["Enums"]["dbs_outcome"]
+          reason: string
+          suspended_since: string
+        }
+        Update: {
+          decided_at?: string
+          decided_by?: string
+          id?: string
+          nanny_id?: string
+          previous_dbs_outcome?: Database["public"]["Enums"]["dbs_outcome"]
+          reason?: string
+          suspended_since?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nanny_suspension_lifts_nanny_id_fkey"
+            columns: ["nanny_id"]
+            isOneToOne: false
+            referencedRelation: "nannies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nanny_suspension_lifts_nanny_id_fkey"
+            columns: ["nanny_id"]
+            isOneToOne: false
+            referencedRelation: "nanny_public"
+            referencedColumns: ["nanny_id"]
+          },
+        ]
+      }
       parent_leads: {
         Row: {
           area: string | null
@@ -4287,6 +4332,10 @@ export type Database = {
       is_privileged_writer: { Args: never; Returns: boolean }
       is_retention_job: { Args: never; Returns: boolean }
       lift_nanny_isolation: { Args: never; Returns: boolean }
+      lift_nanny_suspension: {
+        Args: { p_decided_by: string; p_nanny_id: string; p_reason: string }
+        Returns: Json
+      }
       nanny_is_visible: { Args: { p_nanny_id: string }; Returns: boolean }
       nanny_leave_child: {
         Args: { p_child_id: string; p_reason: string }
