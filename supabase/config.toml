@@ -63,11 +63,14 @@ enabled = true
 schema_paths = []
 
 [db.seed]
-# If enabled, seeds the database after migrations during a db reset.
-enabled = true
-# Specifies an ordered list of seed files to load during db reset.
-# Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+# **Off deliberately** (TRIAGE `12.09`, the `2f` unit). The CLI's default loads `./seed.sql` after every
+# `supabase db reset` — including the reset CI's `integration` job runs on its own stack, and including one
+# unit's reset in the container set every worktree shares. A seed that loads itself decides what every
+# integration suite's world looks like without anyone asking for it, so London's is a script you invoke:
+# `npm run seed:dev` (see supabase/seed/README.md). Leaving this `true` pointed at a file that does not exist
+# was a dangling default: the first person to drop a file at that path would have armed it by accident.
+enabled = false
+sql_paths = []
 
 [db.network_restrictions]
 # Enable management of network restrictions.

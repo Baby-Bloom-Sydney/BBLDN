@@ -15,6 +15,7 @@
     "test:watch": "vitest --project unit",
     "test:coverage": "vitest run --project unit --coverage",
     "test:db": "vitest run --project integration",
+    "seed:dev": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON supabase/seed/run.mts",
     "types:generate": "supabase gen types typescript --local > src/modules/shared-types/database.types.ts",
     "test:e2e": "playwright test",
     "test:shell-smoke": "bash scripts/ci/shell-smoke.sh",

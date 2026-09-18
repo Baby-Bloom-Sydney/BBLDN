@@ -210,7 +210,7 @@ jobs:
       - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
         with:
           version: 2.117.0
-      - name: supabase start + db reset — the ordered set 0000..0023 applied forward from empty (02 §6)
+      - name: supabase start + db reset — the ordered set 0000..0024 applied forward from empty (02 §6)
         run: |
           supabase start
           supabase db reset
