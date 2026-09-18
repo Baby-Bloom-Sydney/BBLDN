@@ -2822,6 +2822,7 @@ export type Database = {
         Row: {
           event_type: string
           id: string
+          outcome: string | null
           parent_user_id: string | null
           payload: Json
           processed_at: string | null
@@ -2834,6 +2835,7 @@ export type Database = {
         Insert: {
           event_type: string
           id?: string
+          outcome?: string | null
           parent_user_id?: string | null
           payload: Json
           processed_at?: string | null
@@ -2846,6 +2848,7 @@ export type Database = {
         Update: {
           event_type?: string
           id?: string
+          outcome?: string | null
           parent_user_id?: string | null
           payload?: Json
           processed_at?: string | null
@@ -4214,6 +4217,10 @@ export type Database = {
         }
         Returns: string
       }
+      expire_verification_section: {
+        Args: { p_required?: Json; p_submission_id: string }
+        Returns: Json
+      }
       family_access_reason: {
         Args: { p_parent_user_id: string }
         Returns: string
@@ -4360,6 +4367,27 @@ export type Database = {
         }
         Returns: string
       }
+      record_update_service_check: {
+        Args: {
+          p_checked_by: string
+          p_nanny_id: string
+          p_required?: Json
+          p_result: Database["public"]["Enums"]["update_service_result"]
+          p_subscribed: boolean
+        }
+        Returns: Json
+      }
+      record_vetting_decision: {
+        Args: {
+          p_decision: string
+          p_expires_at?: string
+          p_note?: string
+          p_reject_reason?: string
+          p_required?: Json
+          p_submission_id: string
+        }
+        Returns: Json
+      }
       remove_nanny_from_child: {
         Args: { p_child_id: string; p_reason: string }
         Returns: string
@@ -4450,6 +4478,14 @@ export type Database = {
         }
         Returns: Json
       }
+      sweep_stale_verification_processing: {
+        Args: { p_stale_minutes: number }
+        Returns: number
+      }
+      sync_nanny_verification_state: {
+        Args: { p_nanny_id: string; p_required: Json }
+        Returns: Json
+      }
       update_nanny_profile: {
         Args: { p_contact?: Json; p_profile?: Json }
         Returns: boolean
@@ -4514,6 +4550,13 @@ export type Database = {
         Returns: number
       }
       user_has_child_access: { Args: { p_child_id: string }; Returns: boolean }
+      verification_sections_verified: {
+        Args: {
+          p_row: Database["public"]["Tables"]["verifications"]["Row"]
+          p_sections: Json
+        }
+        Returns: boolean
+      }
       verification_submission_columns: {
         Args: {
           p_columns: Json

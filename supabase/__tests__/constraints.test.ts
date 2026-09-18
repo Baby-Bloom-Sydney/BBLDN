@@ -938,3 +938,89 @@ describe("db.constraints — what 0022 added (the wizard's four definers + the l
     expect(await kept("contact")).toEqual({});
   });
 });
+
+describe("db.constraints — what 0023 added (the level's one writer + the decision definers; ADR-157, ADR-156 folded)", () => {
+  const SERVICE_ROADS = [
+    "sync_nanny_verification_state",
+    "record_vetting_decision",
+    "record_update_service_check",
+    "expire_verification_section",
+    "sweep_stale_verification_processing",
+  ] as const;
+
+  const oneFunction = async (name: string) => {
+    const { rows } = await db.query<{
+      secdef: boolean;
+      config: string | null;
+      anon: boolean;
+      auth: boolean;
+      service: boolean;
+    }>(
+      `select p.prosecdef as secdef, array_to_string(p.proconfig, ',') as config,
+              has_function_privilege('anon', p.oid, 'execute') as anon,
+              has_function_privilege('authenticated', p.oid, 'execute') as auth,
+              has_function_privilege('service_role', p.oid, 'execute') as service
+         from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+        where ns.nspname = 'public' and p.proname = $1`,
+      [name],
+    );
+    expect(rows.length, `${name} overload count`).toBe(1);
+    return rows[0]!;
+  };
+
+  it.each(SERVICE_ROADS)(
+    "%s exists once, SECURITY DEFINER, search_path pinned, service_role only (I-V2: never a client's)",
+    async (name) => {
+      const fn = await oneFunction(name);
+      expect(fn.secdef).toBe(true);
+      expect(fn.config).toBe('search_path=""');
+      expect(fn.anon).toBe(false);
+      expect(fn.auth).toBe(false);
+      expect(fn.service).toBe(true);
+    },
+  );
+
+  it("verification_sections_verified() is the pure helper: IMMUTABLE, not a definer, service_role only", async () => {
+    const { rows } = await db.query<{ volatile: string; secdef: boolean }>(
+      `select p.provolatile as volatile, p.prosecdef as secdef from pg_proc p
+         join pg_namespace ns on ns.oid = p.pronamespace
+        where ns.nspname = 'public' and p.proname = 'verification_sections_verified'`,
+    );
+    expect(rows[0]).toEqual({ volatile: "i", secdef: false });
+  });
+
+  it("only the sync assigns verifications.level / nannies.verification_level (one writer, R-8) — the barring statement excepted by name", async () => {
+    const { rows } = await db.query<{ proname: string }>(
+      `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.prosrc ~ 'verification_level\\s*='`,
+    );
+    expect(rows.map((r) => r.proname)).toEqual(["sync_nanny_verification_state"]);
+    const { rows: level } = await db.query<{ proname: string }>(
+      `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.prosrc ~ '\\ylevel\\s*=' and p.prosrc ~ 'public\\.verifications'
+        order by p.proname`,
+    );
+    expect(level.map((r) => r.proname)).toEqual([
+      "record_vetting_decision",
+      "sync_nanny_verification_state",
+    ]);
+  });
+
+  it("payment_events.outcome exists with its CHECK, and the unprocessed index keys on it (ADR-156)", async () => {
+    const { rows } = await db.query<{ data_type: string; is_nullable: string }>(
+      `select data_type, is_nullable from information_schema.columns
+        where table_schema = 'public' and table_name = 'payment_events' and column_name = 'outcome'`,
+    );
+    expect(rows[0]).toEqual({ data_type: "text", is_nullable: "YES" });
+    expect(await checkDef("payment_events_outcome_check")).toMatch(/applied.*ignored.*unresolved/);
+    expect(await indexDef("payment_events_unprocessed_idx")).toMatch(/WHERE \(outcome IS NULL\)/);
+  });
+
+  it("0023 added no client write policy to verifications, vetting_submissions or connection_requests", async () => {
+    const { rows } = await db.query<{ tablename: string; cmd: string }>(
+      `select tablename, cmd from pg_policies where schemaname = 'public'
+         and tablename in ('verifications', 'vetting_submissions') and cmd <> 'SELECT'`,
+    );
+    expect(rows).toEqual([]);
+  });
+});

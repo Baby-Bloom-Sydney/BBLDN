@@ -16,6 +16,7 @@ import type {
   RejectReason,
   Result,
   SubmissionId,
+  Url,
   UserId,
 } from "@/modules/shared-types";
 import type { StorageRef } from "@/modules/auth";
@@ -182,7 +183,7 @@ export type VerificationStore = {
 export type ContactWriter = (contact: ContactInput) => Promise<Result<unknown>>;
 
 export type VerificationDeps = {
-  readonly store: VerificationStore;
+  readonly store: VerificationStore & VerificationDecisionStore;
   readonly contactWriter: ContactWriter;
 };
 
@@ -222,11 +223,46 @@ export type Verification = {
   applyCheckResult(
     result: CheckResult,
   ): Promise<Result<VerificationState, VerificationErrorDetails>>;
-  /** `2c`'s — refuses `not-built` until the admin road lands */
+  /**
+   * 03 §4.3's road for a provider that is NOT a `ManualDecisionProvider`. None is bound (03 §4.4: `stub-manual`
+   * answers every type), so it stays refused by name; `decide` below is the road the queue takes.
+   */
   override(
     nannyId: UserId,
     decision: AdminDecision,
   ): Promise<Result<VerificationState, VerificationErrorDetails>>;
+
+  // ── The queue's road (ADR-159): every method re-checks `auth.requireRole('admin')` itself ──
+
+  listQueue(
+    query: QueueQuery,
+  ): Promise<Result<ReadonlyArray<QueueEntry>, VerificationErrorDetails>>;
+  readQueueRecord(
+    submissionId: SubmissionId,
+  ): Promise<Result<QueueRecord, VerificationErrorDetails>>;
+  /** signed URLs (1 h) + `vetting.evidence-viewed` per open (07 §4.32) */
+  openEvidence(
+    submissionId: SubmissionId,
+  ): Promise<Result<EvidenceOpen, VerificationErrorDetails>>;
+  /** `getProvider(type).record()` → `record_vetting_decision()`; the subject is the submission's nanny */
+  decide(
+    input: DecisionInput,
+  ): Promise<Result<DecisionOutcome, VerificationErrorDetails>>;
+  /** the level-4 action (04 §4.1 row 15) */
+  recordUpdateServiceCheck(
+    input: UpdateServiceInput,
+  ): Promise<Result<LevelSync, VerificationErrorDetails>>;
+  adminOverview(): Promise<Result<AdminOverview, VerificationErrorDetails>>;
+
+  // ── The named jobs (ADR-161; 03 §4.3) — run at service scope by the cron shells ──
+
+  sweepStaleProcessing(
+    now: Instant,
+  ): Promise<Result<SweepResult, VerificationErrorDetails>>;
+  sweepReminders(
+    now: Instant,
+  ): Promise<Result<SweepResult, VerificationErrorDetails>>;
+  sweepExpiry(now: Instant): Promise<Result<SweepResult, VerificationErrorDetails>>;
 };
 
 export type VerificationRegistry = {
@@ -366,3 +402,175 @@ export type BiometricNoticeConsentProps = {
 
 /** what the storage ref is, as this module carries it (`auth`'s `StorageRef`; never a URL — I-V7) */
 export type EvidenceRef = StorageRef;
+
+// ── The level, the decision and the queue (`2c`; ADR-157 · ADR-158 · ADR-159 · ADR-161) ──
+
+export type DbsOutcome = EnumValue<"dbs_outcome">;
+export type UpdateServiceResult = EnumValue<"update_service_result">;
+
+/** The facts 02 §4.3's derivation reads — the memory double's input and the SQL sync's, pinned equal by test. */
+export type LevelFacts = {
+  readonly sections: Readonly<Record<VerificationSection, SectionStatus>>;
+  readonly dbsOutcome: DbsOutcome;
+  readonly crossCheckPassed: boolean;
+  /** an admin recorded an Update Service check with result `no_change` (the B-19 default) */
+  readonly updateServiceConfirmed: boolean;
+};
+
+/** What `sync_nanny_verification_state()` answers (ADR-157 (1)). */
+export type LevelSync = {
+  readonly fromLevel: VerificationLevel;
+  readonly toLevel: VerificationLevel;
+  readonly suspended: boolean;
+  /** held connections released at L4 (ADR-158 arm 2) */
+  readonly released: number;
+};
+
+/** 03 §4.3: the queue "lists sections in `needs-admin` or stale `pending`". */
+export type QueueFilter = "needs-admin" | "stale-pending";
+
+export type QueueQuery = {
+  readonly tab: VerificationSection;
+  readonly filter: QueueFilter;
+};
+
+/** One ledger row as the queue lists it — ids and states, no name: the admin panel decorates (03 §3.6). */
+export type QueueEntry = {
+  readonly submissionId: SubmissionId;
+  readonly nannyId: UserId;
+  readonly section: VerificationSection;
+  readonly evidenceType: EvidenceType;
+  readonly status: CheckStatus["kind"];
+  readonly submittedAt: Instant;
+  readonly checkedAt?: Instant;
+};
+
+/** The declared (S4) fields the admin sees only inside a reveal (07 §4.32) — the nanny typed them. */
+export type DeclaredFields = {
+  readonly surname?: string;
+  readonly givenNames?: string;
+  readonly dateOfBirth?: ISODate;
+  readonly idType?: IdentityEvidenceKind;
+  readonly certificateNumber?: string;
+  readonly issueDate?: ISODate;
+  readonly rtwKind?: RightToWorkEvidenceKind;
+  readonly shareCode?: string;
+};
+
+/** The base-table facts an admin's read carries beyond the view (`readAdminRecord`, session scope under RLS). */
+export type AdminRecord = {
+  readonly nannyId: UserId;
+  readonly level: VerificationLevel;
+  readonly suspended: boolean;
+  readonly declared: DeclaredFields;
+  readonly documents: ReadonlyArray<{
+    readonly section: EvidenceObjectSection;
+    readonly ref: EvidenceRef;
+  }>;
+  readonly dbsOutcome: DbsOutcome;
+  readonly crossCheckPassed: boolean;
+  readonly updateService: {
+    readonly consentAt?: Instant;
+    readonly lastCheckedAt?: Instant;
+    readonly lastResult?: UpdateServiceResult;
+    readonly subscribed?: boolean;
+  };
+};
+
+/** S-A-16's open row: the ledger entry, the nanny's section states and the admin-only record. */
+export type QueueRecord = {
+  readonly entry: QueueEntry;
+  readonly state: VerificationState;
+  readonly record: AdminRecord;
+  readonly note?: string;
+};
+
+/** A reveal (07 §4.32): short-lived signed URLs, one event per open. */
+export type EvidenceOpen = {
+  readonly documents: ReadonlyArray<{
+    readonly section: EvidenceObjectSection;
+    readonly url: Url;
+    readonly expiresAt: Instant;
+  }>;
+  readonly declared: DeclaredFields;
+};
+
+export type DecisionInput = {
+  readonly submissionId: SubmissionId;
+  readonly decision: "verified" | "rejected";
+  readonly reason?: RejectReason;
+  readonly note?: string;
+  readonly expiresAt?: Instant;
+};
+
+export type DecisionOutcome = {
+  readonly nannyId: UserId;
+  readonly section: VerificationSection;
+  readonly status: SectionStatus;
+  readonly sync: LevelSync;
+};
+
+export type UpdateServiceInput = {
+  readonly nannyId: UserId;
+  readonly result: UpdateServiceResult;
+  readonly subscribed: boolean;
+};
+
+/** 04 §6.4 S-A-16's counters (05 AC-A-17). */
+export type AdminOverview = {
+  readonly pending: number;
+  readonly verifiedToday: number;
+  readonly rejectedToday: number;
+  readonly fullyVerified: number;
+};
+
+/** A verified section with a known expiry — what `vetting-expiry` walks (03 §4.3). */
+export type SectionExpiry = {
+  readonly nannyId: UserId;
+  readonly section: VerificationSection;
+  readonly submissionId: SubmissionId;
+  readonly expiresAt: Instant;
+};
+
+/** A nanny still below the pool with a section open — what the reminder funnel walks (`08.11`; ADR-161). */
+export type ReminderCandidate = {
+  readonly nannyId: UserId;
+  readonly level: VerificationLevel;
+  readonly lastChangeAt: Instant;
+};
+
+export type SweepResult = {
+  readonly handled: number;
+  readonly skipped: number;
+};
+
+/** The decision-side port (ADR-157) — the `0023` definers at service scope, plus the admin's reads. */
+export type VerificationDecisionStore = {
+  /** the base-table facts an admin may read (02 §4.3 "admin all"); `null` before her first write */
+  readAdminRecord(
+    nannyId: UserId,
+  ): Promise<Result<AdminRecord | null, VerificationErrorDetails>>;
+  /** `sync_nanny_verification_state()` — idempotent; the memory double derives with `deriveLevel` */
+  syncLevel(nannyId: UserId): Promise<Result<LevelSync, VerificationErrorDetails>>;
+  /** `record_update_service_check()` — the level-4 action; `checkedBy` is the session's admin */
+  recordUpdateServiceCheck(
+    input: UpdateServiceInput & { readonly checkedBy: UserId },
+  ): Promise<Result<LevelSync, VerificationErrorDetails>>;
+  /** `expire_verification_section()` */
+  expireSection(
+    submissionId: SubmissionId,
+  ): Promise<Result<LevelSync, VerificationErrorDetails>>;
+  /** `sweep_stale_verification_processing()` — answers the count moved to review */
+  sweepStale(
+    staleMinutes: number,
+  ): Promise<Result<number, VerificationErrorDetails>>;
+  listExpiries(): Promise<
+    Result<ReadonlyArray<SectionExpiry>, VerificationErrorDetails>
+  >;
+  listReminderCandidates(
+    belowLevel: VerificationLevel,
+  ): Promise<Result<ReadonlyArray<ReminderCandidate>, VerificationErrorDetails>>;
+  countByLevel(): Promise<
+    Result<Readonly<Record<VerificationLevel, number>>, VerificationErrorDetails>
+  >;
+};

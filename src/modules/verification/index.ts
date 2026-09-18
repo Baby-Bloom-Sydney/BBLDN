@@ -32,6 +32,10 @@ export { identitySchema } from "./lib/identity-schema";
 export { dbsSchema } from "./lib/dbs-schema";
 export { rightToWorkSchema } from "./lib/right-to-work-schema";
 
+// The level rule (ADR-157), pure — pinned equal to `sync_nanny_verification_state()` by `int.rpc-0023`.
+export { deriveLevel } from "./lib/derive-level";
+export { requiredSectionsByLevel } from "./lib/required-sections-by-level";
+
 // Screens.
 export { VerificationWizard } from "./components/VerificationWizard";
 export { VerificationStatusPage } from "./components/VerificationStatusPage";
