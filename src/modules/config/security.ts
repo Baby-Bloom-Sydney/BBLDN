@@ -135,6 +135,15 @@ const RATE_LIMITS = declarePolicies({
   // keyed on the nanny, at twice the rate an honest screen spends, with a day ceiling that stops a runaway
   // loop long before it stops a real session. Fails closed (not on `failOpenOnLimiterOutage`).
   // Owner: 07 §8 — a row for the poll to ratify the numbers (REVIEW-3 R-3; P2-HARDEN).
+  // 07 §8 row 20 (new with L-009 `3f`) — the erasure roads. No existing row fits: this is an authenticated,
+  // irreversible, per-person write, and borrowing `profileSteps`' budget would let a hundred attempts a day at
+  // the one action nobody should need twice. A person asks to be erased once; five is generous and still bounds
+  // a script. The admin road's two steps are covered by `adminRoutes` (row 14) and are not this.
+  accountErasure: {
+    key: "user",
+    perDay: 5,
+    note: "row 20 — 07 §6.1's self-service road; fails closed",
+  },
   verificationPolls: {
     key: "user",
     perMinute: 60,

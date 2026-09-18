@@ -7,6 +7,7 @@ import type { AppErrorDetails, ClientAppError } from "@/modules/shared-types";
 export type * from "./log/types";
 export type * from "./events/types";
 export type * from "./consent/types";
+export type * from "./privacy/types";
 export type * from "./rate-limit/types";
 export type * from "./upload-scan/types";
 export type * from "./unit-of-work/types";

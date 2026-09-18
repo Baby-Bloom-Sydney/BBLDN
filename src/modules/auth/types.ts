@@ -2,7 +2,11 @@
 // contract spells, plus the driver seam the inside is built on. Values live in index.ts. **Types only**, so a client
 // component may `import type` from the connector without dragging the Supabase SDK into its bundle.
 import type { NextRequest, NextResponse } from "next/server";
-import type { ClientResult, UnitOfWorkJoin } from "@/modules/platform";
+import type {
+  ClientResult,
+  ErasureOutcome,
+  UnitOfWorkJoin,
+} from "@/modules/platform";
 import type { BucketKey } from "@/modules/config";
 import type {
   Actor,
@@ -296,6 +300,22 @@ export type GateDecision =
   | { readonly kind: "redirect"; readonly to: string };
 
 /** The set-password action's shape, so the client component never imports the connector barrel. */
+/**
+ * 07 §6.1's self-service road. It takes nothing: the subject is the session's, and a parameter would be an
+ * invitation to pass somebody else's id. The answer is the outcome, so the screen can tell the person what
+ * actually happened rather than assuming it worked.
+ */
+export type DeleteMyAccountAction = () => Promise<
+  ClientResult<ErasureOutcome, AuthErrorDetails>
+>;
+
+/** The props of the one self-service erasure surface; both settings screens render it (07 §6.1). */
+export type DeleteMyAccountProps = {
+  readonly action: DeleteMyAccountAction;
+  /** what the surface does after a completed erasure — the session is banned, so it is a navigation, not state */
+  readonly onErased?: () => void;
+};
+
 export type SetPasswordAction = (
   previous: unknown,
   formData: FormData,

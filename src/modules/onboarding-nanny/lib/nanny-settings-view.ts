@@ -80,11 +80,17 @@ function sectionsOf(
     Object.freeze({
       id: "close" as const,
       heading: "Close your account",
-      // Deliberate friction, and the same shape refunds take: a person handles it, so the screen asks her to
-      // write to us rather than offering a button that would delete a verification history by accident.
-      line: "Tell us and we'll close it, and remove the personal details we keep.",
+      // **This section used to be a link to Contact us, and that was wrong.** The written justification was
+      // friction — "a person handles it, so the screen asks her to write to us rather than offering a button
+      // that would delete a verification history by accident" — and the first half of it was sound while the
+      // second half was already untrue: `0027` made a vetting decision survive an erasure, pseudonymised, so
+      // there is no verification history left to delete by accident. 07 §6.1 names this screen and
+      // `/parent/settings` as roads that **call the job** (Art 17), and a right that can only be exercised by
+      // writing to us is a right behind a queue. The friction stays where it belongs — she types DELETE, and the
+      // screen tells her what is kept before she does — and asking a person is still offered below it.
+      line: "You can delete it here. We will show you what we have to keep, and why, before you confirm.",
       href: URLS.paths.support,
-      linkLabel: "Ask us to close it",
+      linkLabel: "Or ask a person to do it for you",
     }),
   ]);
 }

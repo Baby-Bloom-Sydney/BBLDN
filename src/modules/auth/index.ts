@@ -38,4 +38,9 @@ export { gateDecision } from "./lib/gate-decision";
 // connector and renders; the action is passed to the client component as a prop so the client bundle never
 // reaches the connector barrel (01 §2.5 "route files are thin").
 export { setPasswordAction } from "./actions/set-password-action";
+
+// 07 §6.1's self-service erasure road (B-46). It lives here because the account is `auth`'s subject and the
+// session is the only authority it takes; `auth` may import `platform`, which owns the job itself (ADR-116).
+export { deleteMyAccountAction } from "./actions/delete-my-account-action";
+export { DeleteMyAccount } from "./components/DeleteMyAccount";
 export { SetPasswordForm } from "./components/SetPasswordForm";

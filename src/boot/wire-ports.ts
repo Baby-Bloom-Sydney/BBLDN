@@ -20,6 +20,7 @@ import { wireCallLayer } from "./wire-call-layer";
 import { wireComms } from "./wire-comms";
 import { wireConnections } from "./wire-connections";
 import { wireConsent } from "./wire-consent";
+import { wirePrivacy } from "./wire-privacy";
 import { wireEvents } from "./wire-events";
 import { wireMatching } from "./wire-matching";
 import { wireParentProfileStore } from "./wire-parent-profile-store";
@@ -42,6 +43,7 @@ export function wirePorts(env: ParsedEnv): BootReport {
     wireAuth(unitOfWork.binding.join),
     wireEvents(env.environment),
     wireConsent(),
+    wirePrivacy(),
     wireRateLimiter(env.environment),
     wireAreas(env.server.AREAS_SOURCE),
     wireComms(env.server.EMAIL_PROVIDER),
