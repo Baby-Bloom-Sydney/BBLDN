@@ -1000,7 +1000,47 @@ Twelve units merged with **no review battery** (1a, 1b, 1c, 1d, 1e, 1g, P1-FIX, 
 
 **Gates** — all local (B-42): `typecheck` · `lint` · `prettier --check .` · `vitest run` · `lint:boundaries` · `check:allowed-imports` · `check:config-literals` · `check:claude-md` · `check:boot-guard` (6/6) · `npm run build` — **all 0**. ★ **`build` and `check:boot-guard` need `scripts/ci/lib/smoke-env.sh` sourced**: a bare `npm run build` fails at page-data collection because the legacy Sydney `/api/verification-status` route constructs a Resend client at module scope, and boot-guard's two positive controls then fail for want of a complete `.next`. That is REVIEW-1's H-4 still open, and it is why `main` can look build-red when it is not.
 
+## Files created / modified in the current unit (2f — the development seed, and the `12.09` fixture audit; L-008 Phase 2)
+
+**The audit first, because it is most of the answer.** TRIAGE row `12.09` was written against the _Sydney_ repo and
+names files by their Sydney paths. In BBLDN: `page-client-mocks.ts`, `mock-data.ts`, `seed-verifications.sql`,
+`reset-test-user.sql`, `wipe-test-parent.sql`, the `bb/test/*` harnesses, `tests/e2e/artifacts/**` and the brandkit
+demo data **do not exist** (the S1 Remove sweep and the F-\* rebuilds took them). The London tree's own fixtures —
+`src/modules/auth/__tests__/fixtures/seeded-users.ts`, `supabase/__tests__/rls-fixtures.ts`,
+`src/modules/config/__tests__/env-fixtures.ts`, `src/modules/platform/__tests__/fixtures/event-props.ts`,
+`src/modules/verification/__tests__/fixtures/comms-double.ts`, `src/modules/scheduling/__tests__/fake-scheduling-port.ts`,
+`src/modules/auth/__tests__/fixtures/fake-driver.ts` — carry **no Sydney fact**: `@example.test` addresses, `+447700900xxx`
+mobiles, `SW4 Clapham`, measured by grep over the whole tree. The Sydney-fact fixtures that remain
+(`src/__tests__/auth/signUp.spec.ts`'s `VALID_AU_MOBILE`, `src/app/api/address-search/route.test.ts`'s Photon fixtures,
+`src/lib/format/date.test.ts`, `src/lib/chat/proactive/seed-defaults.ts`'s `Australia/Sydney`, `tests/e2e/autofire-on-signup.spec.ts`)
+are **all inside the parked legacy tree** listed in `literal-exclusions.json`, and each one honestly tests the Sydney code
+beside it. Re-basing them would make the assertions lie about the code they cover, and the fate row's own note says not to
+rework parked code — they go when F-d takes the tree (HANDOFF §7). **So the thing `12.09` actually owed London was the
+one seed that had no owner:** 06 §2.3 described `supabase/seed.sql` and no such file existed, while `config.toml` still
+pointed `[db.seed]` at it — a dangling default the next person to drop a file there would have armed by accident.
+
+- **`supabase/seed/`** (new, 12 files + README) — `run.mts` (the entry: gates → connect → one transaction → report),
+  `lib/target-refusals.ts` (the environment signal `resolveEnvironment` reads + a project-ref **allow-list**),
+  `lib/real-data-refusals.ts` (what the target database says about itself), `lib/pick-seed-areas.ts`,
+  `lib/seed-plan.ts`, `lib/synthetic-person.ts`, `lib/synthetic-dbs-number.ts`, `lib/verification-columns.ts`,
+  `lib/verification-values.ts`, `lib/apply-seed.ts`, `lib/write-person.ts`, `lib/write-seeded-nanny.ts`,
+  `lib/write-verification-row.ts`, `lib/write-parent-world.ts`, `lib/types.ts`.
+- **`supabase/__tests__/seed.test.ts`** (new) — `int.seed`, 25 cases, RED first, inside a rolled-back transaction.
+- **`supabase/config.toml`** — `[db.seed] enabled = false`, `sql_paths = []`, with the reason in the file.
+- **`package.json`** — `seed:dev`.
+- **`.github/workflows/ci.yml`** — the integration step's label corrected from `0000..0023` to `0000..0024`.
+- **Not touched:** `supabase/migrations/**` (a seed is data), any `src/` module, any route, any action.
+
+**What it writes** (measured on a local stack, then `supabase db reset`): 36 synthetic people — 1 admin · 25 verified
+nannies, 5 in each of 5 real `areas` rows · 7 nannies one per state the queue and the level model must tell apart · 1
+isolated nanny · 2 parents with an OPEN position and the held connection. **No level written by hand**:
+`sync_nanny_verification_state()` derives every one, called with the same `p_required` `src/boot` computes.
+
 <!-- audit
+Last edited: 2026-09-19T19:05+10:00 — BB-LDN-Planner-070926/2f
+Notes: 2f — one section appended (the 12.09 fixture audit and the development seed). The Current state table was NOT
+rewritten: it has been stale since 1i and correcting it from a build branch would collide with 2c / 2d / P2-HARDEN,
+all still open. No migration, no route, no action; nothing under src/ touched.
 Last edited: 2026-09-19T15:10+10:00 — BB-LDN-Planner-070926/2d
 Notes: 2d section added — 0024 (the K-row hold write, one function body, verified forward-from-empty then twin
 then re-applied on the local stack), kickoff debt 2 (one nanny_public name read, three call sites, the fourth
