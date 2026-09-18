@@ -49,7 +49,7 @@ export async function submitDbs(
   if (!certificate.ok) return certificate;
   const signed = await signEvidence(certificate.value);
   if (!signed.ok) {
-    await removeEvidenceObjects([certificate.value]);
+    await removeEvidenceObjects(nannyId, [certificate.value]);
     return signed;
   }
   const evidence: Evidence = {
@@ -71,6 +71,6 @@ export async function submitDbs(
     "dbs",
     [evidence],
     [certificate.value],
-    removeEvidenceObjects,
+    (refs) => removeEvidenceObjects(nannyId, refs),
   );
 }

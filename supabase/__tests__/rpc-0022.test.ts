@@ -439,6 +439,53 @@ describe("submit_verification_evidence() — the database-reviewer closures (H2 
     ]);
   });
 
+  it("M1 (security pass): a second submission of the same evidence type while the section is pending or in review is refused", async () => {
+    const consentId = await giveBiometricConsent(NANNY);
+    await submit(
+      NANNY,
+      EVIDENCE_1,
+      "identity",
+      "identity-document",
+      identityColumns(consentId),
+    );
+    await expect(
+      submit(
+        NANNY,
+        EVIDENCE_3,
+        "identity",
+        "identity-document",
+        identityColumns(consentId),
+      ),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("SECTION_NOT_OPEN"),
+    });
+    // the selfie of the same attempt still lands
+    await submit(NANNY, EVIDENCE_2, "identity", "selfie", {
+      identity_selfie_ref: `${NANNY}/identity-selfie/s.jpg`,
+      biometric_consent_id: consentId,
+    });
+    await db.query(
+      "update public.verifications set identity_status = 'review' where nanny_id = $1",
+      [nannyId],
+    );
+    await expect(
+      submit(
+        NANNY,
+        "0022e000-0000-4000-8000-000000000009",
+        "identity",
+        "selfie",
+        {
+          identity_selfie_ref: `${NANNY}/identity-selfie/s2.jpg`,
+          biometric_consent_id: consentId,
+        },
+      ),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("SECTION_NOT_OPEN"),
+    });
+    const row = await verificationRow(nannyId);
+    expect(row.identity_attempts).toBe(1);
+  });
+
   it("H3: a check result for an older attempt of the same evidence type is refused as STALE_SUBMISSION", async () => {
     const first = await submit(NANNY, EVIDENCE_1, "dbs", "dbs-certificate", {
       dbs_certificate_ref: `${NANNY}/dbs-certificate/one.pdf`,

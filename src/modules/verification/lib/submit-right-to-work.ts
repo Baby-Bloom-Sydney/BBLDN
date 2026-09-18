@@ -43,7 +43,7 @@ async function prepareDocument(
   if (!uploaded.ok) return uploaded;
   const signed = await signEvidence(uploaded.value);
   if (!signed.ok) {
-    await removeEvidenceObjects([uploaded.value]);
+    await removeEvidenceObjects(nannyId, [uploaded.value]);
     return signed;
   }
   return ok({ documents: [signed.value], uploaded: [uploaded.value] });
@@ -90,6 +90,6 @@ export async function submitRightToWork(
     "right-to-work",
     [evidence],
     prepared.value.uploaded,
-    removeEvidenceObjects,
+    (refs) => removeEvidenceObjects(nannyId, refs),
   );
 }

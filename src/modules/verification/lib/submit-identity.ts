@@ -66,7 +66,7 @@ export async function submitIdentity(
     };
   const selfie = await uploadEvidence(nannyId, "identity-selfie", input.selfie);
   if (!selfie.ok) {
-    await removeEvidenceObjects([document.value]);
+    await removeEvidenceObjects(nannyId, [document.value]);
     return {
       ...selfie,
       error: {
@@ -80,7 +80,7 @@ export async function submitIdentity(
     uploaded.map(signEvidence),
   );
   if (!documentRef!.ok || !selfieRef!.ok) {
-    await removeEvidenceObjects(uploaded);
+    await removeEvidenceObjects(nannyId, uploaded);
     return err(
       "INTERNAL",
       "We couldn't save that just now. Try again in a moment.",
@@ -120,6 +120,6 @@ export async function submitIdentity(
     "identity",
     evidences,
     uploaded,
-    removeEvidenceObjects,
+    (refs) => removeEvidenceObjects(nannyId, refs),
   );
 }

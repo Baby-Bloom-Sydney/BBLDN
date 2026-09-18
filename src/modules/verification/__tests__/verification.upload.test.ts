@@ -7,6 +7,7 @@ import { UPLOADS } from "@/modules/config";
 import { configureUploadScanner, stubUploadScanner } from "@/modules/platform";
 import type { Email, UserId } from "@/modules/shared-types";
 import { uploadEvidence } from "../index";
+import { removeEvidenceObjects } from "../lib/remove-evidence-objects";
 import { tinyJpeg } from "./fixtures/tiny-jpeg";
 
 const NANNY = "11111111-1111-4111-8111-111111111111" as UserId;
@@ -88,5 +89,28 @@ describe("uploadEvidence", () => {
       bytes: JPEG,
     });
     expect(!result.ok && result.error.details?.reason).toBe("invalid_type");
+  });
+
+  it("removeEvidenceObjects never hands the service-scope delete a path outside the nanny's own prefix (security pass M2)", async () => {
+    const { createAuth } = await import("@/modules/auth");
+    const { fakeDriver } =
+      await import("@/modules/auth/__tests__/fixtures/fake-driver");
+    const fake = fakeDriver();
+    configureAuth(createAuth({ driver: fake.driver }));
+    const OTHER = "22222222-2222-4222-8222-222222222222";
+    await removeEvidenceObjects(NANNY, [
+      {
+        bucket: "verification-documents",
+        path: `${OTHER}/identity-document/a.jpg`,
+      },
+      {
+        bucket: "verification-documents",
+        path: `${NANNY}/identity-document/b.jpg`,
+      },
+    ]);
+    expect(fake.state.removes.map((entry) => entry.ref.path)).toEqual([
+      `${NANNY}/identity-document/b.jpg`,
+    ]);
+    expect(fake.state.removes[0]?.scope).toBe("service");
   });
 });

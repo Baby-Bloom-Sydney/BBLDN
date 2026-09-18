@@ -77,6 +77,8 @@ export const VETTING = Object.freeze({
   biometricNotice: Object.freeze({
     aiProviderDisclosed: "none — a person reviews your documents",
     processingLocationDisclosed: "United Kingdom",
+    /** the shortest open → scrolled-to-the-end interval accepted as "read" — the client stamps the instants, the server holds this floor (security pass M3). [unverified] */
+    minReadSeconds: 8,
   }),
   expiryLeadDays: 30, // `vetting-expiry` warns this far ahead — [unverified]
   retryBudget: 3, // provider-unavailable → PROVIDER_ERROR after this many (03 §4.2; 03 §12 item 29)

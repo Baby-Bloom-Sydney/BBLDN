@@ -138,3 +138,35 @@ describe("rightToWorkSchema (S-N-07) — one of three kinds (ADR-153)", () => {
     expect(rightToWorkSchema.safeParse({ kind: "visa" }).success).toBe(false);
   });
 });
+
+describe("noticeEvidenceSchema — the server holds a floor on client-stamped instants (security pass M3)", () => {
+  it("refuses an open → scrolled interval shorter than the configured floor, accepts one at or above it", async () => {
+    const { noticeEvidenceSchema } =
+      await import("../lib/notice-evidence-schema");
+    const { VETTING } = await import("@/modules/config");
+    const opened = Date.parse("2026-09-18T00:00:00.000Z");
+    const at = (ms: number) => new Date(opened + ms).toISOString();
+    const floor = VETTING.biometricNotice.minReadSeconds * 1000;
+    const tooFast = noticeEvidenceSchema.safeParse({
+      noticeOpenedAt: at(0),
+      noticeScrollCompletedAt: at(floor - 1000),
+      checkboxesEnabledAt: at(floor - 1000),
+      consent: "on",
+    });
+    expect(tooFast.success).toBe(false);
+    const read = noticeEvidenceSchema.safeParse({
+      noticeOpenedAt: at(0),
+      noticeScrollCompletedAt: at(floor),
+      checkboxesEnabledAt: at(floor + 500),
+      consent: "on",
+    });
+    expect(read.success).toBe(true);
+    const outOfOrder = noticeEvidenceSchema.safeParse({
+      noticeOpenedAt: at(floor),
+      noticeScrollCompletedAt: at(0),
+      checkboxesEnabledAt: at(floor),
+      consent: "on",
+    });
+    expect(outOfOrder.success).toBe(false);
+  });
+});

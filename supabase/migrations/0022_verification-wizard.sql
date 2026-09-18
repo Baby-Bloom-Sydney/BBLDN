@@ -190,6 +190,25 @@ begin
     raise exception 'SECTION_NOT_OPEN' using errcode = '55006';
   end if;
 
+  -- security-reviewer M1: a section already with us (`pending` · `review`) takes no second submission of the
+  -- SAME evidence type in this attempt — judged on the ledger, so identity's document → selfie pair (03 §4.3)
+  -- still lands, while a raced second document or a resubmit under review is refused here and not only by the
+  -- app's unlocked read (`assertSectionOpen`).
+  if v_section_status in ('pending', 'review') and exists (
+    select 1 from public.vetting_submissions s
+    where s.verification_id = v_row.id
+      and s.section = p_section
+      and s.evidence_type = p_evidence_type
+      and s.submitted_at >= coalesce(
+        case p_section
+          when 'identity'      then v_row.identity_status_at
+          when 'dbs'           then v_row.dbs_status_at
+          when 'right_to_work' then v_row.rtw_status_at
+        end, '-infinity'::timestamptz)
+  ) then
+    raise exception 'SECTION_NOT_OPEN' using errcode = '55006';
+  end if;
+
   -- An omitted key keeps its value; a present key is cast through the column's own type; a key outside the
   -- section's list is dropped (0021's shape).
   v_new := jsonb_populate_record(v_row, public.verification_submission_columns(p_section, p_columns));

@@ -47,5 +47,5 @@ export const recordBiometricConsentAction: BiometricConsentAction = async (
     return toActionResult(
       refuseVerification("recordBiometricConsent", recorded),
     );
-  return toActionResult(ok({ consentRecordId: recorded.value }));
+  return toActionResult(ok({ recorded: true as const }));
 };

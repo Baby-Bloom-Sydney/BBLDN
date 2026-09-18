@@ -1,7 +1,7 @@
 // The inside, assembled over its two ports (ADR-154; ADR-155): the store (0022's definers + the view read, or
 // the memory double) and the injected contact writer. Every method is one file; this is the join.
 import { err } from "@/modules/platform";
-import type { CheckResult, Evidence, UserId } from "@/modules/shared-types";
+import type { CheckResult, Evidence } from "@/modules/shared-types";
 import { readSubmission } from "@/modules/vetting-providers";
 import type {
   Verification,
@@ -71,14 +71,11 @@ export function createVerification(deps: VerificationDeps): Verification {
       if (!applied.ok) return applied;
       return getStatus(entry.value.nannyId);
     },
-    override: async (nannyId: UserId) =>
+    override: async () =>
       err<VerificationErrorDetails>(
         "INTERNAL",
         "That decision road is not built yet.",
-        {
-          reason: "not-built",
-          field: nannyId,
-        },
+        { reason: "not-built" },
       ),
   };
   return Object.freeze(inside);

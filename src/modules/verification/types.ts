@@ -277,8 +277,9 @@ export type NoticeEvidence = {
   readonly checkboxTimestamps: Readonly<Record<string, Instant>>;
 };
 
+/** S-N-10's answer: the rows are written; the record id stays server-side (security pass LOW 3). */
 export type BiometricConsentOutcome = {
-  readonly consentRecordId: ConsentRecordId;
+  readonly recorded: true;
 };
 export type BiometricConsentAction = (
   previous: unknown,
