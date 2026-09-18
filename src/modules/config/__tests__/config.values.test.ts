@@ -99,6 +99,7 @@ describe("config — one export per file (build-standard L1; 05 §7 rule 4)", ()
         "prices.ts",
         "public-env.ts",
         "public-flags.ts",
+        "retention.ts",
         "scheduling.ts",
         "security.ts",
         "senders.ts",

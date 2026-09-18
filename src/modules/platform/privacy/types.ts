@@ -107,6 +107,15 @@ export type PrivacyStore = {
       Record<string, { readonly months: number; readonly from: string }>
     >;
   }): Promise<Result<PurgeOutcome, PrivacyErrorDetails>>;
+  /**
+   * 07 §6.2 — one class of the retention schedule, one bounded batch, one transaction (`0031`). The spec is
+   * `config/retention.ts` handed across whole; the store never derives a date.
+   */
+  sweepRetentionClass(input: {
+    readonly class: string;
+    readonly spec: RetentionSpec["spec"];
+    readonly limit: number;
+  }): Promise<Result<RetentionClassOutcome, PrivacyErrorDetails>>;
   /** `0028`'s one write: every database step of 07 §6.1 or none of them. */
   runErasure(input: {
     readonly subjectUserId: string;
@@ -128,6 +137,47 @@ export type PurgeOutcome = {
   readonly reason?: string;
   /** For a `retained-*` refusal: the date the window runs out. Nothing to do until then. */
   readonly until?: string;
+};
+
+/**
+ * One class of 07 §6.2's schedule, in the shape `0031` reads it (L-009 `3h`). `spec` carries **exactly** what the
+ * SQL reads and nothing else — the window and the anchors — because a payload containing a field the job ignores
+ * reads like a field the job honours. The treatment is not sent: the arm is chosen by `class`, and `targets` is
+ * config's own documentation, joined by the gate rather than by the job.
+ */
+export type RetentionSpec = {
+  readonly class: string;
+  readonly spec: {
+    readonly window:
+      | { readonly months: number }
+      | { readonly days: number }
+      | null;
+    readonly anchors: ReadonlyArray<{
+      readonly table: string;
+      readonly column: string;
+    }>;
+  };
+};
+
+/** What `0031` answered for one class. `capped` means the batch limit was reached and more rows are waiting. */
+export type RetentionClassOutcome = {
+  readonly class: string;
+  readonly removed: number;
+  readonly nulled: number;
+  readonly capped: boolean;
+};
+
+/**
+ * What one retention run did. Four numbers rather than two, because they mean four different things:
+ * `handled` is rows acted on, `skipped` is classes the schedule carries that no job acts on today (07 §6.2's ★
+ * windows, awaiting BAI, plus the evidence log and the backups), `failed` is ADR-182's raised refusals — a class
+ * whose batch rolled back and which tomorrow retries — and `capped` names the classes with more rows waiting.
+ */
+export type RetentionSweepSummary = {
+  readonly handled: number;
+  readonly skipped: number;
+  readonly failed: number;
+  readonly capped: ReadonlyArray<string>;
 };
 
 /** What one purge run did, for the cron's run-summary line. */
@@ -167,6 +217,14 @@ export type Privacy = {
   purgeScrubbedUsers(
     now: Instant,
   ): Promise<Result<PurgeSweepSummary, PrivacyErrorDetails>>;
+  /**
+   * `/api/cron/retention-sweep` (07 §6.2): one bounded batch per acting class, per run. It is the counterpart to
+   * the erasure job — that one is a person asking, this one is time passing — and it is what eventually lets
+   * `purgeScrubbedUsers` stop answering `rows-outstanding`.
+   */
+  sweepRetention(
+    now: Instant,
+  ): Promise<Result<RetentionSweepSummary, PrivacyErrorDetails>>;
   /** `/api/cron/delete-account` (01 §4f): re-attempt every request still open. */
   sweepRequests(
     now: Instant,

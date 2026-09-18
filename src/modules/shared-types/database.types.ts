@@ -4592,6 +4592,10 @@ export type Database = {
         Args: { p_child_id: string; p_reason: string }
         Returns: string
       }
+      retention_sweep_class: {
+        Args: { p_class: string; p_limit: number; p_spec: Json }
+        Returns: Json
+      }
       revoke_child_invite: {
         Args: {
           p_invite_id: string

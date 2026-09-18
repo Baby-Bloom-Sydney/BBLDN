@@ -22,56 +22,31 @@
 // erasure, and no row of 07 §6.2 asks a timer to write one — so the treatment does not exist in this type rather
 // than existing unused.
 import { SECURITY } from "./security";
+import type { RetentionClass, RetentionTreatment } from "./types";
 
 /** So `moneyYears * MONTHS_IN_A_YEAR` reads as a sentence (`common/coding-style.md`). */
 const MONTHS_IN_A_YEAR = 12;
 
-/** The column a window runs from. Every one is checked against the catalogue by the job, which raises if it is gone. */
-export type RetentionAnchor = {
-  readonly table: string;
-  readonly column: string;
-};
+// Frozen all the way down, because `config.values` asserts it of every config value and a half-frozen schedule
+// is a legal fact somebody's code can edit at run time.
+const months = (count: number) => Object.freeze({ months: count });
+const days = (count: number) => Object.freeze({ days: count });
+const anchor = (table: string, column: string) =>
+  Object.freeze({ table, column });
 
-export type RetentionTreatment =
-  | { readonly kind: "delete" }
-  | { readonly kind: "null-columns"; readonly columns: ReadonlyArray<string> }
-  | { readonly kind: "none"; readonly because: string }
-  | {
-      readonly kind: "deferred";
-      readonly because: string;
-      readonly owner: string;
-    };
-
-export type RetentionClass = {
-  /** The name the job dispatches on and the gate joins. */
-  readonly class: string;
-  /** Its row in 07 §6.2. */
-  readonly specRow: number;
-  /** 07 §6.2's own words for what this is. */
-  readonly what: string;
-  /** `null` only for `none` and `deferred`. */
-  readonly window:
-    | { readonly months: number }
-    | { readonly days: number }
-    | null;
-  readonly anchors: ReadonlyArray<RetentionAnchor>;
-  readonly targets: ReadonlyArray<string>;
-  readonly treatment: RetentionTreatment;
-};
-
-const deferredStar = (owner: string, detail: string) =>
-  ({
+const deferredStar = (owner: string, detail: string): RetentionTreatment =>
+  Object.freeze({
     kind: "deferred",
     because: `07 §6.2 marks this window ★ — the number needs BAI's confirmation (§11 item 9) before a timer deletes real data on it. ${detail}`,
     owner,
-  }) as const;
+  });
 
-const deferredObject = (detail: string) =>
-  ({
+const deferredObject = (detail: string): RetentionTreatment =>
+  Object.freeze({
     kind: "deferred",
     because: `the object half needs the storage removal mechanism the erasure job has and the sweep does not; clearing the ref without removing the object destroys the only handle to it, which makes the deletion promise unrecoverable rather than late. ${detail}`,
     owner: "the unit that gives retention-sweep its object half",
-  }) as const;
+  });
 
 export const RETENTION = Object.freeze({
   /**
@@ -113,7 +88,7 @@ export const RETENTION = Object.freeze({
       class: "identity-objects",
       specRow: 3,
       what: "the identity document and selfie objects, 30 days after the section reaches a terminal state",
-      window: { days: SECURITY.retention.identityObjectDays },
+      window: days(SECURITY.retention.identityObjectDays),
       anchors: Object.freeze([]),
       targets: Object.freeze([]),
       treatment: deferredObject(
@@ -143,7 +118,7 @@ export const RETENTION = Object.freeze({
       class: "right-to-work-objects",
       specRow: 5,
       what: "the right-to-work document object, 30 days after a terminal status",
-      window: { days: SECURITY.retention.rightToWorkObjectDays },
+      window: days(SECURITY.retention.rightToWorkObjectDays),
       anchors: Object.freeze([]),
       targets: Object.freeze([]),
       treatment: deferredObject(
@@ -154,10 +129,8 @@ export const RETENTION = Object.freeze({
       class: "provider-responses",
       specRow: 5,
       what: "`vetting_submissions.raw_response`, nulled 12 months after `checked_at`",
-      window: { months: SECURITY.retention.rawProviderResponseMonths },
-      anchors: Object.freeze([
-        { table: "vetting_submissions", column: "checked_at" },
-      ]),
+      window: months(SECURITY.retention.rawProviderResponseMonths),
+      anchors: Object.freeze([anchor("vetting_submissions", "checked_at")]),
       targets: Object.freeze(["vetting_submissions"]),
       // The row itself is a safeguarding record and is never removed: this nulls the one column 07 §6.2 names,
       // which is the provider's raw payload and not the decision.
@@ -183,10 +156,8 @@ export const RETENTION = Object.freeze({
       class: "placements",
       specRow: 6,
       what: "the hire record, deleted 6 years after ENDED (Limitation Act 1980 s 5)",
-      window: { months: SECURITY.retention.placementsYears * MONTHS_IN_A_YEAR },
-      anchors: Object.freeze([
-        { table: "nanny_placements", column: "ended_at" },
-      ]),
+      window: months(SECURITY.retention.placementsYears * MONTHS_IN_A_YEAR),
+      anchors: Object.freeze([anchor("nanny_placements", "ended_at")]),
       targets: Object.freeze(["nanny_placements"]),
       treatment: Object.freeze({ kind: "delete" }),
     }),
@@ -221,14 +192,14 @@ export const RETENTION = Object.freeze({
       class: "money",
       specRow: 9,
       what: "the subscription spine, payment events, refunds and guarantees, 6 years after the last transaction",
-      window: { months: SECURITY.retention.moneyYears * MONTHS_IN_A_YEAR },
+      window: months(SECURITY.retention.moneyYears * MONTHS_IN_A_YEAR),
       // Per **subject**, not per row: 07 §6.2 says "6 years after the last transaction", so one recent payment
       // holds the whole set. The anchors are every column that counts as a transaction.
       anchors: Object.freeze([
-        { table: "parent_subscriptions", column: "created_at" },
-        { table: "payment_events", column: "received_at" },
-        { table: "refund_requests", column: "created_at" },
-        { table: "guarantee_events", column: "created_at" },
+        anchor("parent_subscriptions", "created_at"),
+        anchor("payment_events", "received_at"),
+        anchor("refund_requests", "created_at"),
+        anchor("guarantee_events", "created_at"),
       ]),
       targets: Object.freeze([
         "guarantee_events",
@@ -256,13 +227,13 @@ export const RETENTION = Object.freeze({
       class: "consent",
       specRow: 11,
       what: "the Art 7(1) consent trail, 6 years after the account scrub",
-      window: {
-        months: SECURITY.retention.consentYearsAfterScrub * MONTHS_IN_A_YEAR,
-      },
+      window: months(
+        SECURITY.retention.consentYearsAfterScrub * MONTHS_IN_A_YEAR,
+      ),
       // The anchor is the **scrub**, in 07 §6.2's own words — so a living account's consent trail is never
       // touched, whatever its age. The ledger is where a scrub's date is recorded.
       anchors: Object.freeze([
-        { table: "account_erasure_requests", column: "completed_at" },
+        anchor("account_erasure_requests", "completed_at"),
       ]),
       targets: Object.freeze(["consent_records", "biometric_consent_records"]),
       treatment: Object.freeze({ kind: "delete" }),
@@ -272,10 +243,8 @@ export const RETENTION = Object.freeze({
       class: "cookie-consent-superseded",
       specRow: 12,
       what: "a cookie choice a later choice replaced, 30 days on",
-      window: { days: SECURITY.retention.cookieConsentSupersededDays },
-      anchors: Object.freeze([
-        { table: "cookie_consent_records", column: "created_at" },
-      ]),
+      window: days(SECURITY.retention.cookieConsentSupersededDays),
+      anchors: Object.freeze([anchor("cookie_consent_records", "created_at")]),
       targets: Object.freeze(["cookie_consent_records"]),
       treatment: Object.freeze({ kind: "delete" }),
     }),
@@ -283,10 +252,8 @@ export const RETENTION = Object.freeze({
       class: "cookie-consent",
       specRow: 12,
       what: "a cookie consent record, 13 months from `created_at` (ICO cookie guidance)",
-      window: { months: SECURITY.retention.cookieConsentRecordMonths },
-      anchors: Object.freeze([
-        { table: "cookie_consent_records", column: "created_at" },
-      ]),
+      window: months(SECURITY.retention.cookieConsentRecordMonths),
+      anchors: Object.freeze([anchor("cookie_consent_records", "created_at")]),
       targets: Object.freeze(["cookie_consent_records"]),
       treatment: Object.freeze({ kind: "delete" }),
     }),
@@ -295,10 +262,10 @@ export const RETENTION = Object.freeze({
       class: "email-bodies",
       specRow: 13,
       what: "`email_logs` subject and bodies, nulled 90 days after the send resolved",
-      window: { days: SECURITY.retention.emailBodyDays },
+      window: days(SECURITY.retention.emailBodyDays),
       anchors: Object.freeze([
-        { table: "email_logs", column: "sent_at" },
-        { table: "email_logs", column: "failed_at" },
+        anchor("email_logs", "sent_at"),
+        anchor("email_logs", "failed_at"),
       ]),
       targets: Object.freeze(["email_logs"]),
       treatment: Object.freeze({
@@ -310,10 +277,10 @@ export const RETENTION = Object.freeze({
       class: "email-metadata",
       specRow: 13,
       what: "the `email_logs` row itself, 24 months after the send resolved",
-      window: { months: SECURITY.retention.emailMetadataMonths },
+      window: months(SECURITY.retention.emailMetadataMonths),
       anchors: Object.freeze([
-        { table: "email_logs", column: "sent_at" },
-        { table: "email_logs", column: "failed_at" },
+        anchor("email_logs", "sent_at"),
+        anchor("email_logs", "failed_at"),
       ]),
       targets: Object.freeze(["email_logs"]),
       treatment: Object.freeze({ kind: "delete" }),
@@ -322,9 +289,9 @@ export const RETENTION = Object.freeze({
       class: "admin-notifications",
       specRow: 13,
       what: "an admin notification, 12 months after it was acknowledged",
-      window: { months: SECURITY.retention.adminNotificationsMonths },
+      window: months(SECURITY.retention.adminNotificationsMonths),
       anchors: Object.freeze([
-        { table: "admin_notifications", column: "acknowledged_at" },
+        anchor("admin_notifications", "acknowledged_at"),
       ]),
       targets: Object.freeze(["admin_notifications"]),
       treatment: Object.freeze({ kind: "delete" }),
@@ -334,8 +301,8 @@ export const RETENTION = Object.freeze({
       class: "events-identifiers",
       specRow: 14,
       what: "`events.visitor_id`, `attribution` and `request_id`, nulled at 25 months",
-      window: { months: SECURITY.retention.eventsFullRowMonths },
-      anchors: Object.freeze([{ table: "events", column: "ts" }]),
+      window: months(SECURITY.retention.eventsFullRowMonths),
+      anchors: Object.freeze([anchor("events", "ts")]),
       targets: Object.freeze(["events"]),
       treatment: Object.freeze({
         kind: "null-columns",
@@ -386,7 +353,7 @@ export const RETENTION = Object.freeze({
       class: "backups",
       specRow: 17,
       what: "Supabase PITR and daily backups, ≤ 35 days",
-      window: { days: SECURITY.retention.backupMaxDays },
+      window: days(SECURITY.retention.backupMaxDays),
       anchors: Object.freeze([]),
       targets: Object.freeze([]),
       treatment: Object.freeze({

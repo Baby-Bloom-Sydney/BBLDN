@@ -19,6 +19,7 @@ import type {
 import { runErasure } from "./run-erasure";
 import { purgeScrubbedUsers } from "./purge-scrubbed-users";
 import { sweepErasureRequests } from "./sweep-erasure-requests";
+import { sweepRetention } from "./sweep-retention";
 
 const notFound = (
   reason: PrivacyErrorDetails["reason"],
@@ -94,5 +95,6 @@ export function createPrivacy(deps: PrivacyDeps): Privacy {
     runRequest: (requestId) => runRequest(requestId, deps),
     sweepRequests: (now) => sweepErasureRequests(now, deps),
     purgeScrubbedUsers: (now) => purgeScrubbedUsers(now, deps),
+    sweepRetention: (now) => sweepRetention(now, deps),
   });
 }
