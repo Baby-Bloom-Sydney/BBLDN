@@ -7,6 +7,7 @@ import type {
   BiometricConsentAction,
   VerificationActionDetails,
 } from "../types";
+import { consumeBiometricConsentLimit } from "../lib/consume-biometric-consent-limit";
 import { noticeEvidenceSchema } from "../lib/notice-evidence-schema";
 import { parseForm } from "../lib/parse-form";
 import { recordBiometricNoticeConsent } from "../lib/record-biometric-notice-consent";
@@ -30,6 +31,10 @@ export const recordBiometricConsentAction: BiometricConsentAction = async (
     );
   const parsed = parseForm(noticeEvidenceSchema, formData, FIELDS);
   if (!parsed.ok) return toActionResult(parsed);
+  // Before the AGR-04 row is appended: a refused call leaves no legal record behind (REVIEW-3 M-1).
+  const limit = await consumeBiometricConsentLimit(session.value.userId);
+  if (!limit.ok)
+    return toActionResult(refuseVerification("recordBiometricConsent", limit));
   const tickedAt = nowInstant();
   const recorded = await recordBiometricNoticeConsent(session.value.userId, {
     openedAt: parsed.value.noticeOpenedAt as never,

@@ -12,11 +12,18 @@
 // does not exist in Phase 1 — it is a recorded gap, and a stale entry (a policy that *has* acquired a call site)
 // fails too, so the file cannot quietly outlive its reason.
 //
+// **Its blind spot, and the sibling that closes it.** This gate reads the *declaration* side: a policy with no
+// consumer. REVIEW-3 M-1 found the inverse — three `"use server"` writes that named no policy at all, which this
+// gate cannot see by construction, and which on that evidence is the commoner failure. `check-action-limits.mjs`
+// reads the *action* side and runs in the same CI job (ADR-142 (2); REVIEW-3 R-3). They share one allow file:
+// `{ "policies": { … }, "actions": { … } }`.
+//
 // Reports check `limiter-call-sites`. Exit 0 = every declared policy is consumed or recorded; 1 = listed.
 import { readFileSync } from "node:fs";
 import { resolve, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { listFiles } from "./lib/list-files.mjs";
+import { codeOnly } from "./lib/code-only.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const SECURITY_CONFIG = resolve(REPO_ROOT, "src/modules/config/security.ts");
@@ -58,46 +65,6 @@ function declaredPolicyNames(body) {
   return names;
 }
 
-/**
- * The file's **code**, with comments and string / template contents blanked out.
- *
- * Without this the consumer test is a raw substring search, so `// TODO: wire rateLimits.clientEvents` in any
- * non-test file satisfies the gate for a policy nothing consumes — exactly the declared-but-unenforced state the
- * gate exists to catch (`security-reviewer`, MEDIUM). Blanking rather than deleting keeps offsets meaningless but
- * harmless; we only ever ask "does this text contain the reference".
- *
- * A quote inside a regex literal can confuse the scanner and blank more than it should. That direction is safe:
- * it can only lose a real call site and turn the gate **red**, never green.
- */
-function codeOnly(text) {
-  let out = "";
-  let i = 0;
-  while (i < text.length) {
-    const two = text.slice(i, i + 2);
-    if (two === "//") {
-      const end = text.indexOf("\n", i);
-      i = end === -1 ? text.length : end;
-      continue;
-    }
-    if (two === "/*") {
-      const end = text.indexOf("*/", i + 2);
-      i = end === -1 ? text.length : end + 2;
-      continue;
-    }
-    const quote = text[i];
-    if (quote === '"' || quote === "'" || quote === "`") {
-      i += 1;
-      while (i < text.length && text[i] !== quote)
-        i += text[i] === "\\" ? 2 : 1;
-      i += 1;
-      continue;
-    }
-    out += text[i];
-    i += 1;
-  }
-  return out;
-}
-
 function fail(message) {
   console.error(`check-limiter-call-sites: FAIL — ${message}`);
   process.exit(1);
@@ -120,7 +87,8 @@ if (declared.length === 0)
 /** @type {Record<string, string>} */
 let allowed = {};
 try {
-  allowed = JSON.parse(readFileSync(ALLOW_FILE, "utf8"));
+  // The file is shared with `check-action-limits.mjs`; this gate owns the `policies` half only.
+  allowed = JSON.parse(readFileSync(ALLOW_FILE, "utf8")).policies ?? {};
 } catch (error) {
   if (error.code !== "ENOENT") throw error;
 }
@@ -147,15 +115,15 @@ const staleAllowances = Object.keys(allowed).filter(
 
 for (const name of uncalled)
   console.error(
-    `check-limiter-call-sites: FAIL — SECURITY.rateLimits.${name} is declared but nothing outside src/modules/config/ consumes it (ADR-142 (2)). Wire its surface, or add it to scripts/ci/limiter-call-sites.allow.json with the reason it has none.`,
+    `check-limiter-call-sites: FAIL — SECURITY.rateLimits.${name} is declared but nothing outside src/modules/config/ consumes it (ADR-142 (2)). Wire its surface, or add it to "policies" in scripts/ci/limiter-call-sites.allow.json with the reason it has none.`,
   );
 for (const name of unknownAllowances)
   console.error(
-    `check-limiter-call-sites: FAIL — limiter-call-sites.allow.json names "${name}", which is not a declared policy. Remove it.`,
+    `check-limiter-call-sites: FAIL — limiter-call-sites.allow.json's "policies" names "${name}", which is not a declared policy. Remove it.`,
   );
 for (const name of staleAllowances)
   console.error(
-    `check-limiter-call-sites: FAIL — limiter-call-sites.allow.json still excuses "${name}", which now has a call site (${consumers.get(name).join(", ")}). Remove the entry.`,
+    `check-limiter-call-sites: FAIL — limiter-call-sites.allow.json's "policies" still excuses "${name}", which now has a call site (${consumers.get(name).join(", ")}). Remove the entry.`,
   );
 
 if (uncalled.length + unknownAllowances.length + staleAllowances.length > 0)

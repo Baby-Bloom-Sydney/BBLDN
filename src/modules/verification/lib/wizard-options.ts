@@ -33,7 +33,8 @@ export function wizardOptions(): WizardOptions {
     ).map((key) => ({ key, label: RTW_LABELS[key] })),
     dbsNumberLength: VETTING.dbsCertificateNumber.length,
     shareCodeLength: VETTING.shareCode.length,
-    maxBytes: UPLOADS.maxBytes,
+    // what the wizard's copy promises, so the screen can never state a size the transport refuses (R-5)
+    maxBytes: UPLOADS.maxUploadBytes,
     acceptedMimes: UPLOADS.buckets["verification-documents"].mimeTypes,
     pollMs: VETTING.processing.pollMs,
     routeAfterMs: VETTING.processing.routeAfterMs,
