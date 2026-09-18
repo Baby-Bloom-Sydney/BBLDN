@@ -20,6 +20,7 @@ import type {
   ConsentSubject,
   CookieConsentInput,
   CookieConsentRecord,
+  CookieConsentState,
   InformedActionInput,
   LegalDocumentId,
   RecordConsentInput,
@@ -174,17 +175,38 @@ async function recordCookieConsent(
   return ok(row);
 }
 
+/**
+ * The one place a cookie record becomes an answer (L-009 `3g`). `hasMarketing` is expressed over it rather than
+ * beside it, so the PECR gate and the surface that shows a visitor what she chose cannot disagree about whether
+ * a record has lapsed: before this, the expiry rule lived only inside `hasMarketing`, and any second reader
+ * would have had to remember it.
+ */
+async function currentCookieChoice(
+  subject: ConsentSubject,
+  deps: Resolved,
+): Promise<Result<CookieConsentState | null>> {
+  const current = await deps.store.currentCookie(subject);
+  if (!current.ok) return current;
+  const row = current.value;
+  if (row === null || row.expiryDate <= deps.clock()) return ok(null);
+  return ok(
+    Object.freeze({
+      choice: row.choice,
+      analyticsEnabled: row.analyticsEnabled,
+      marketingEnabled: row.marketingEnabled,
+      recordedAt: row.createdAt,
+      expiresAt: row.expiryDate,
+    }),
+  );
+}
+
 async function hasMarketing(
   subject: ConsentSubject,
   deps: Resolved,
 ): Promise<Result<boolean>> {
-  const current = await deps.store.currentCookie(subject);
-  if (!current.ok) return current;
-  return ok(
-    current.value !== null &&
-      current.value.expiryDate > deps.clock() &&
-      current.value.marketingEnabled,
-  );
+  const state = await currentCookieChoice(subject, deps);
+  if (!state.ok) return state;
+  return ok(state.value !== null && state.value.marketingEnabled);
 }
 
 async function hasConsent(
@@ -229,6 +251,7 @@ export function createConsent(deps: ConsentDeps): Consent {
     recordCookieConsent: (input) => recordCookieConsent(input, resolved),
     getPolicy: (purpose) => getPolicy(purpose, resolved),
     hasMarketing: (subject) => hasMarketing(subject, resolved),
+    currentCookieChoice: (subject) => currentCookieChoice(subject, resolved),
     hasConsent: (userId, purpose) => hasConsent(userId, purpose, resolved),
     dueForRenewal: (userId, purposes = RENEWABLE_PURPOSES) =>
       dueForRenewal(userId, purposes, resolved),

@@ -141,6 +141,25 @@ export type CookieConsentRecord = CookieConsentInput & {
   readonly createdAt: Instant;
 };
 
+/**
+ * What a visitor currently has on record, narrowed to what a surface may be told (L-009 `3g`, FATE `10.22`).
+ *
+ * Deliberately **not** `CookieConsentRecord`: that carries `visitorId`, `userId` and the `ConsentContext`'s IP,
+ * user agent and session — none of which a cookie-preference screen needs, and the visitor id in particular is
+ * HttpOnly precisely so a response never hands it back (`3e`). A route given only these five fields cannot echo
+ * an identifier by forgetting not to.
+ *
+ * An expired record answers `null`, never a stale choice: 07 §6.2 row 12 re-prompts after the window, and a
+ * screen showing a lapsed answer as current would be showing consent that no longer exists.
+ */
+export type CookieConsentState = {
+  readonly choice: CookieChoice;
+  readonly analyticsEnabled: boolean;
+  readonly marketingEnabled: boolean;
+  readonly recordedAt: Instant;
+  readonly expiresAt: Instant;
+};
+
 /** Who `hasMarketing` is asked about (03 §9.5 `ConsentReader.hasMarketing(subject)`). */
 export type ConsentSubject =
   | { readonly kind: "user"; readonly id: UserId }
@@ -225,6 +244,14 @@ export type Consent = ConsentReader & {
   getPolicy(
     purpose: ConsentPurpose,
   ): Promise<Result<ConsentPolicy, ConsentErrorDetails>>;
+  /**
+   * FATE `10.22` — what this subject chose, or `null` if she has not chosen or her record has lapsed. The
+   * banner and the preference screen read this rather than the browser's mirror of it, so what she is shown is
+   * the row, not a cookie that could disagree with it.
+   */
+  currentCookieChoice(
+    subject: ConsentSubject,
+  ): Promise<Result<CookieConsentState | null>>;
   /** latest row for `(userId, purpose)` says `consentGiven: true` */
   hasConsent(userId: UserId, purpose: ConsentPurpose): Promise<Result<boolean>>;
   /**
