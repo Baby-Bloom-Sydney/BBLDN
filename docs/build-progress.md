@@ -1038,7 +1038,7 @@ isolated nanny · 2 parents with an OPEN position and the held connection. **No 
 
 <!-- audit
 Last edited: 2026-09-21T02:10+10:00 — BB-LDN-Planner-070926/3k
-Notes: 3k — one section appended (B-49, the self-service purge; `0034`). The Current state table was NOT
+Notes: 3k — one section appended with two halves (B-49, the self-service purge, `0034`; and the client function surface, `0035`, which closes REVIEW-4 L-2). The Current state table was NOT
 rewritten: this unit changes no table, no route and no action — one function body and two column grants. The
 reproduction is in the section because it is the evidence, and so is the measurement that the caller's identity
 does not reach a referential action.
@@ -1255,6 +1255,49 @@ because no real data exists.
 - **`int.retention-grants`** gains `public.katie_prompt_edits` with its reason and reads `0032`'s and `0034`'s
   `ENUMERATED SET` blocks together; **`int.retention-execute`** gains the release's two `%I`-only templates in
   `KNOWN_DYNAMIC_SQL`, on `3j`'s own rule that the inexhaustible part is enumerated.
+
+### …and the second half of the same unit: the client function surface (`0035`)
+
+`3j`'s Q-2, and **REVIEW-4's L-2 closes with it**. `0032` enumerated what the retention identity may touch and
+`0033` what it may call; both are about one NOLOGIN role a stranger cannot reach. This is the same discipline
+pointed at the role a **public anon key** gets you.
+
+- ★ **Measured from the catalogue before anything changed**, by effective privilege rather than a direct-ACL
+  read: **26** functions in `public` executable by `authenticated` and **4** by `anon`, **21** of them
+  `SECURITY DEFINER` owned by `postgres`, and every one a live `POST /rest/v1/rpc/<name>`. Grant option 0,
+  membership in the direction that would matter 0, PUBLIC-executable 0.
+- **`supabase/migrations/0035_client-function-surface-enumerated.sql`** (new) — **six** revokes, leaving
+  **20 / 2**. Each survivor carries a reason and, per ADR-186, a **from where**: 7 policy predicates, 1
+  non-definer trigger callee, 2 view callees, 10 named RPCs with their call sites and the scope each is made
+  at. Each revocation was searched for four ways first — `src/`, `pg_policies`, every other function body, and
+  every view definition.
+- ★ **The fifth surface, found by execution rather than by reading.** The first draft revoked **eight** and the
+  next full run came back red: `permission denied for function nanny_visible` from an **`anon`**
+  `select … from public.nanny_public`, and the same for `family_access_reason` from `family_access`. All nine
+  views in `public` are `security_invoker = off`, so their _table_ reads are checked as the view owner — **but
+  a function named inside a view body is still checked against the querying role.** Owner substitution applies
+  to relations, not to EXECUTE. Both functions stay, named to their views, and the gate grew a view-scan half
+  (`3j`'s D-2: the fix for an incomplete claim is another enumeration, not a weaker claim).
+- ★ **Three measurements correcting `0000:329`.** Its
+  `alter default privileges … revoke execute on functions from public, anon, authenticated` writes a correct
+  row (`{postgres=X, service_role=X}`) and is **inert**: a function created immediately afterwards still
+  carries `=X` (PUBLIC), and re-issuing the revoke changes nothing. Its stated claim — _"Default: no client
+  role may execute anything in public"_ — has been false since `0000`. And `supabase_admin`'s own default
+  **does** name `anon` and `authenticated`; `postgres` is not a superuser here, so
+  `alter default privileges for role supabase_admin …` answers _permission denied_ — named as a limit
+  (ADR-180's rule) with an ownership assertion that keeps it inert.
+- **`supabase/__tests__/client-functions.test.ts`** (`int.client-functions`, new, **22** cases) — effective
+  privilege, the enumerated surface both ways, the migration/gate cross-check, PUBLIC, grant option,
+  membership, default privileges, the view scan, and the inlining assertion that keeps `nannies_matching_idx`
+  honest. Driven the other way with a blanket re-grant, a newly created function (which is PUBLIC-executable
+  on creation — the measurement above, as an executable fact) and a grant routed through `PUBLIC`.
+- **`supabase/rollbacks/0035_…rollback.sql`** + **`rollback-0035-client-surface.test.ts`** (new, **6** cases) —
+  ADR-165 arm (1) in its plainest form: every statement the twin could contain hands a stranger something
+  back. Empty in both halves; its verify block checks the six by name, the side door (`PUBLIC`), and that the
+  twenty the client genuinely reaches are still there.
+- **`docs/review-sweep-190926.md`** — **REVIEW-4 L-2 struck through and closed**, with the note that it was
+  taken further than the register asked and why narrowing to `authenticated, service_role` would not have been
+  enough.
 
 ## Files created / modified in the current unit (`3j` — the blanket function EXECUTE grant; L-009 Phase 3)
 
