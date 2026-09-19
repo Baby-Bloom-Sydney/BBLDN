@@ -46,6 +46,12 @@ type Grant = {
   readonly table: readonly string[];
   /** columns carrying `UPDATE` where the table-level `UPDATE` is deliberately withheld. */
   readonly updateColumns?: readonly string[];
+  /**
+   * ★ columns carrying `SELECT` where the table-level `SELECT` is deliberately withheld (`3k`, security pass
+   * MEDIUM). `katie_prompt_edits` is the first entry that needs it: the release reads only the key it is
+   * about to null, so a table-level `SELECT` would have handed this identity the prompt-edit text.
+   */
+  readonly selectColumns?: readonly string[];
   /** why this table is in the set at all — the job, and what it does there. */
   readonly why: string;
 };
@@ -229,9 +235,10 @@ const ENUMERATED: Readonly<Record<string, Grant>> = {
   },
   // ── B-49's release (0034) ────────────────────────────────────────────────────────────────────────────────
   "public.katie_prompt_edits": {
-    table: ["SELECT"],
+    table: [],
+    selectColumns: ["applied_by"],
     updateColumns: ["applied_by"],
-    why: "B-49 (0034): the purge nulls `applied_by` itself, because the `on delete set null` cascade runs as postgres and prevent_row_modification() refuses it. SELECT because the release's `for update nowait` reads the key it is about to null; no table-level UPDATE, so what a prompt edit actually said is unreachable; no DELETE at all",
+    why: "B-49 (0034): the purge nulls `applied_by` itself, because the `on delete set null` cascade runs as postgres and prevent_row_modification() refuses it. BOTH halves are column-scoped — the release's `for update nowait` reads only the key it is about to null, so a table-level SELECT would have handed this identity the prompt-edit text (security pass, MEDIUM). No table-level UPDATE, no DELETE at all, and refuse_reference_rewrite() keeps the one writable column release-only",
   },
   // ── storage ──────────────────────────────────────────────────────────────────────────────────────────────
   "storage.objects": {
@@ -366,7 +373,11 @@ describe("int.retention-grants — what the role can actually do (effective priv
       actual[row.rel] = row.effective.split(",").sort();
     }
     const expected: Record<string, string[]> = {};
-    for (const rel of NAMED) expected[rel] = [...ENUMERATED[rel]!.table].sort();
+    for (const rel of NAMED) {
+      // an entry whose every privilege is column-scoped holds nothing table-wide, and says so by omission
+      const table = [...ENUMERATED[rel]!.table].sort();
+      if (table.length > 0) expected[rel] = table;
+    }
     expect(actual).toEqual(expected);
   });
 
@@ -418,12 +429,18 @@ describe("int.retention-grants — what the role can actually do (effective priv
 
 describe("int.retention-grants — the enumerated set is the authority (ADR-185)", () => {
   it("★ holds a table privilege on exactly the relations the enumerated set names, and on nothing else", () => {
-    expect(tableAcl.map((r) => r.rel).sort()).toEqual(NAMED);
+    // an entry whose every privilege is column-scoped holds nothing table-wide — `katie_prompt_edits` is the
+    // first (`3k`), and it is the narrowest an entry can be while still being in the set at all
+    expect(tableAcl.map((r) => r.rel).sort()).toEqual(
+      NAMED.filter((rel) => ENUMERATED[rel]!.table.length > 0),
+    );
   });
 
   it("★ holds a column privilege only on relations the enumerated set names", () => {
     const withColumns = [...new Set(columnAcl.map((r) => r.rel))].sort();
-    const expected = NAMED.filter((rel) => ENUMERATED[rel]?.updateColumns);
+    const expected = NAMED.filter(
+      (rel) => ENUMERATED[rel]?.updateColumns ?? ENUMERATED[rel]?.selectColumns,
+    );
     expect(withColumns).toEqual(expected);
   });
 
@@ -432,21 +449,28 @@ describe("int.retention-grants — the enumerated set is the authority (ADR-185)
       tableAcl.map((r) => [r.rel, r.privs.split(",").sort()]),
     );
     const expected = Object.fromEntries(
-      NAMED.map((rel) => [rel, [...ENUMERATED[rel]!.table].sort()]),
+      NAMED.map((rel) => [rel, [...ENUMERATED[rel]!.table].sort()]).filter(
+        ([, privs]) => (privs as string[]).length > 0,
+      ),
     );
     expect(actual).toEqual(expected);
   });
 
-  it("holds exactly the UPDATE columns each entry lists, where it lists any", () => {
+  it("holds exactly the UPDATE and SELECT columns each entry lists, where it lists any", () => {
+    // one row per (relation, column) with its privilege list, so a column holding both lands in both buckets
     const actual: Record<string, string[]> = {};
     for (const row of columnAcl) {
-      expect(row.privs).toBe("UPDATE");
-      (actual[row.rel] ??= []).push(row.col);
+      for (const priv of row.privs.split(",")) {
+        expect(["UPDATE", "SELECT"]).toContain(priv);
+        (actual[`${row.rel}:${priv}`] ??= []).push(row.col);
+      }
     }
     const expected: Record<string, string[]> = {};
     for (const rel of NAMED) {
-      const cols = ENUMERATED[rel]?.updateColumns;
-      if (cols) expected[rel] = [...cols].sort();
+      const upd = ENUMERATED[rel]?.updateColumns;
+      if (upd) expected[`${rel}:UPDATE`] = [...upd].sort();
+      const sel = ENUMERATED[rel]?.selectColumns;
+      if (sel) expected[`${rel}:SELECT`] = [...sel].sort();
     }
     for (const key of Object.keys(actual)) actual[key]!.sort();
     expect(actual).toEqual(expected);
@@ -462,7 +486,13 @@ describe("int.retention-grants — the enumerated set is the authority (ADR-185)
   it("every entry says why it is there, because a privilege without a reason is one nobody can remove", () => {
     for (const [rel, grant] of Object.entries(ENUMERATED)) {
       expect(grant.why.length, rel).toBeGreaterThan(20);
-      expect(grant.table.length, rel).toBeGreaterThan(0);
+      // every entry holds SOMETHING, table-wide or by column — an entry that grants nothing is not an entry
+      expect(
+        grant.table.length +
+          (grant.updateColumns?.length ?? 0) +
+          (grant.selectColumns?.length ?? 0),
+        rel,
+      ).toBeGreaterThan(0);
     }
   });
 

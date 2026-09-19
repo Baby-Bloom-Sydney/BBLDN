@@ -1236,7 +1236,21 @@ because no real data exists.
   ledger write and is one sub-transaction, so a refusal leaves nothing half-released and nothing stamped
   `purged_at`. **Applied `0000`-`0034` from empty**; the verify block derives the release set from the
   catalogue and then drives a self-service purge end to end, rolling its probe back through a sentinel.
-- **`supabase/__tests__/self-service-purge.test.ts`** (`int.self-service-purge`, new, **40** cases) - both
+- ★ **The security pass inverted this file on the half it keeps, and the fix is a value control.** A
+  column grant is _column_-scoped and says nothing about the **value**; the append-only guards pass any
+  write once `is_retention_job()` is true; and `postgres` is a member of `bbldn_retention` with admin
+  option (`0000` grants it so migrations can set a function's owner). Driven by the reviewer:
+  `set local role bbldn_retention; update cookie_consent_records set user_id = '<another account>'`
+  **succeeded** — and the pin that was supposed to stop it is a `prosrc` regex in a test, which ad-hoc SQL
+  never goes near. Closed by `refuse_reference_rewrite()` on all three release columns, **no role exempt**:
+  a foreign key naming a person may be released to NULL and never moved to another person. The same pass's
+  MEDIUM narrowed `katie_prompt_edits` to `select (applied_by), update (applied_by)`, so the prompt-edit
+  text is unreadable to this identity as well as unwritable.
+- **`supabase/rollbacks/0028_erasure-job.rollback.sql`** (amended, not the migration) — it asserted
+  **exactly two** triggers on `account_erasure_requests` and went red with _"lost its guard"_ when `0034`
+  lawfully added a third. Now asserted **by name**, which is what the claim always was. Third instance of
+  one pattern (`3j` on `0033`'s twin, `3k` on `0032`'s and now this).
+- **`supabase/__tests__/self-service-purge.test.ts`** (`int.self-service-purge`, new, **43** cases) - both
   roads; each released row surviving with its reference nulled rather than deleted; the catalogue/enumeration
   agreement driven the other way with a **real fourth guarded key**; the guard still refusing from six
   assumable roles **and from `postgres` itself**, asserted as _"the reference did not move"_ rather than

@@ -27,10 +27,15 @@
 --     guard consulting `is_retention_job()` — it nulls the same column Postgres was about to null, for the
 --     same row, in the same transaction.
 --   · **The two column grants stay.** `update (user_id)` on `cookie_consent_records` and
---     `select, update (applied_by)` on `katie_prompt_edits`. Both are column-scoped: the consent choice and
---     its flags, and the content of a prompt edit, remain unwritable by the retention identity, and no DELETE
+--     `select (applied_by), update (applied_by)` on `katie_prompt_edits`. Every half is column-scoped: the
+--     consent choice and its flags stay unwritable, the prompt-edit text stays unreadable, and no DELETE
 --     was granted on `katie_prompt_edits` at all. Reverting them would narrow the role by two columns and
 --     break the right to erasure to do it.
+--   · **`refuse_reference_rewrite()` and its three triggers stay.** They are the value half of the fix
+--     (security pass, HIGH): a column grant is column-scoped and says nothing about *what* is written into
+--     the column, so without them the retention identity — reachable by `set role` from the console, since
+--     `0000` makes `postgres` a member — could re-point a consent record at a different person. The
+--     invariant admits no role at all, so dropping it would widen the schema for everybody.
 --   · **`is_retention_job()` was never touched**, so there is nothing to put back there either. That is the
 --     whole shape of the fix (ADR-186): the guard still refuses `postgres`, and the cascade was given nothing
 --     to write instead of the guard being taught to allow it.
@@ -84,6 +89,12 @@ begin
     raise exception '0034 twin: more than one function body carries the release (ADR-186)';
   end if;
 
+  -- 2b. ★ The value half of the fix is still attached to all three release columns.
+  if (select count(*) from pg_trigger t join pg_proc p on p.oid = t.tgfoid
+       where p.proname = 'refuse_reference_rewrite' and not t.tgisinternal) <> 3 then
+    raise exception '0034 twin: refuse_reference_rewrite() no longer guards all three release columns — a release could become a rewrite';
+  end if;
+
   -- 3. ★ The two column grants are still there, and still column-scoped.
   if not has_column_privilege('bbldn_retention', 'public.cookie_consent_records', 'user_id', 'UPDATE')
      or not has_column_privilege('bbldn_retention', 'public.katie_prompt_edits', 'applied_by', 'UPDATE') then
@@ -91,6 +102,7 @@ begin
   end if;
   if has_table_privilege('bbldn_retention', 'public.cookie_consent_records', 'UPDATE')
      or has_table_privilege('bbldn_retention', 'public.katie_prompt_edits', 'UPDATE')
+     or has_table_privilege('bbldn_retention', 'public.katie_prompt_edits', 'SELECT')
      or has_table_privilege('bbldn_retention', 'public.katie_prompt_edits', 'DELETE') then
     raise exception '0034 twin: a column grant became a table grant';
   end if;

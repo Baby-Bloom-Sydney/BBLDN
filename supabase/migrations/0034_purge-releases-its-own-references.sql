@@ -60,8 +60,16 @@
 -- and before the delete, so the FK never has to act."* The defect is that the sentence was applied to one
 -- column of one table when the catalogue named three.
 --
--- The "from where" is therefore structural rather than asserted: the capability lives in one body, reachable
--- only by the identity that owns it, and a gate asserts no second retention-owned body names these tables.
+-- ⚠️ **The first draft of this paragraph claimed the "from where" was *structural*. It was not, and the
+-- security pass proved it** — see section 1b. ⚠️ And the text match has a second, smaller limit the reviewer
+-- named and this file accepts rather than hides (`3j`'s D-2): a semantically identical call spelled
+-- differently — positional `%1$I`, extra whitespace, `quote_ident()` instead of `format()` — would evade the
+-- regex. It is **defence in depth, not the control**: the control is section 1b's trigger, which does not
+-- care which body performs the write, or whether a body performs it at all. The capability does live in one body, and a gate does assert
+-- that no second retention-owned body carries the release template; but a `prosrc` regex is a text match, not
+-- a database control, and ad-hoc SQL under `set role bbldn_retention` never goes near it. What makes this
+-- file safe is therefore **two** things, not one: the release lives in one body, *and* the value it may write
+-- is constrained by a trigger that admits no role at all. The second is the structural half.
 --
 -- ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 -- WHAT THIS COSTS IN PRIVILEGE — two column grants, and why they are the narrowest thing that works
@@ -74,9 +82,14 @@
 --     release needs `update (user_id)` and nothing else, so the consent choice, its flags, its IP and its
 --     expiry stay unwritable by this identity. Asserted by driving an UPDATE of `analytics_enabled` to
 --     `42501`.
---   · `katie_prompt_edits` — held **nothing**. It gets `select` and `update (applied_by)`: table-level UPDATE
---     is withheld so no arm, now or later, can rewrite what a prompt edit actually said, and DELETE is not
---     granted at all. Asserted by driving an UPDATE of `after_content` and a DELETE to `42501`.
+--   · `katie_prompt_edits` — held **nothing**. It gets `select (applied_by), update (applied_by)`: **both**
+--     halves are column-scoped (security pass, MEDIUM — the first draft's table-level `SELECT` would have
+--     handed this identity blanket read access to the prompt-edit text), table-level UPDATE is withheld so no
+--     arm can rewrite what a prompt edit actually said, and DELETE is not granted at all. Asserted by driving
+--     a read of `after_content`, an UPDATE of it, and a DELETE, each to `42501`.
+--
+-- ⚠️ **And a column grant is column-scoped, not value-scoped** — which is section 1b, and it is the thing
+-- neither of these bullets could carry on its own.
 --
 -- ★ A row lock is an UPDATE privilege and a column grant satisfies it (`3i`, measured), which is why the
 -- release takes `for update nowait` on the same column it is about to null and needs no wider grant to do it.
@@ -111,12 +124,86 @@ begin;
 -- flags, the IP, the user agent and the expiry stay unwritable by this identity.
 grant update (user_id) on table public.cookie_consent_records to bbldn_retention;
 
--- B-49: the same for `applied_by`. `select` is table-level because the release's `for update nowait` reads
--- the key it is about to null; UPDATE is column-scoped so the *content* of a prompt edit — what was changed
--- and why — can never be rewritten by a retention job, and DELETE is not granted at all.
-grant select, update (applied_by) on table public.katie_prompt_edits to bbldn_retention;
+-- B-49: the same for `applied_by`. ★ **Both halves are column-scoped** (security pass, MEDIUM): the release's
+-- `for update nowait` reads only the key it is about to null, so a table-level `SELECT` would have handed this
+-- identity blanket read access to the *content* of every prompt edit — what was changed and why — which this
+-- file's own comments claim stays unreachable. It does now. DELETE is not granted at all.
+grant select (applied_by), update (applied_by) on table public.katie_prompt_edits to bbldn_retention;
 
 -- ENUMERATED SET — END
+
+-- ---------------------------------------------------------------------------
+-- ★ 1b. A reference may be RELEASED, never RE-POINTED — the value invariant the column grant cannot carry.
+--
+-- **The security pass's HIGH, and it is a correction to this file's own claim.** The header above said the
+-- "from where" was structural. It was not: a column grant is *column*-scoped and says nothing about the
+-- **value**, and `prevent_cookie_consent_modification()` / `prevent_row_modification()` pass any write once
+-- `is_retention_job()` is true. Driven by the reviewer, rolled back:
+--
+--     set local role bbldn_retention;
+--     update public.cookie_consent_records set user_id = '<some other account>' where visitor_id = 'x';
+--
+-- succeeded. `postgres` is a member of `bbldn_retention` with admin option — `0000` grants it so migrations
+-- can set a function's owner — so an operator at a console could re-point a consent record at a different
+-- person, and the pin that was supposed to prevent it is a `prosrc` regex in a test, which ad-hoc SQL does
+-- not go near. ADR-186 again, turned on this file: a control on the wrong axis is still an argument.
+--
+-- So the invariant becomes a database control on the axis that matters — **the value** — and it is stated
+-- once, for every role, with no exemption at all:
+--
+--     a foreign key naming a person may be set to NULL; it may never be moved to a different person.
+--
+-- That is strictly stronger than pinning a caller, because it does not depend on who is asking, and it is
+-- true of the release, of the cascade it replaces, and of anybody at a console. Nothing in the tree
+-- legitimately re-points these three columns — searched in `src/` (three INSERTs and one read filter) and in
+-- every function body (none) — so the invariant costs nothing it should not cost. It is the same shape as
+-- `refuse_primary_key_rewrite()` (`0032` §3), one column class over.
+-- ---------------------------------------------------------------------------
+create or replace function public.refuse_reference_rewrite()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_old jsonb := to_jsonb(old);
+  v_new jsonb := to_jsonb(new);
+  v_col text;
+begin
+  -- tg_argv carries the column names this trigger guards, so one function serves all three tables.
+  foreach v_col in array tg_argv loop
+    if v_new ->> v_col is not null and (v_new ->> v_col) is distinct from (v_old ->> v_col) then
+      raise exception
+        '%.%: %s may be released to NULL but never re-pointed at another person (B-49, 07 §5.8 rule 7)',
+        tg_table_schema, tg_table_name, v_col
+        using errcode = 'restrict_violation';
+    end if;
+  end loop;
+  return new;
+end;
+$$;
+
+comment on function public.refuse_reference_rewrite() is
+  'B-49 / 07 §5.8: a foreign key naming a person may be set to NULL and never moved to a different person. Guards exactly the columns 0034''s release loop is allowed to null, on the value rather than on the caller — a column grant is column-scoped and says nothing about what is written into it, and is_retention_job() admits the write once the identity is right. No role is exempt: nothing in the tree re-points these columns, and an operator who genuinely must is writing a migration.';
+
+revoke all on function public.refuse_reference_rewrite() from public;
+
+-- `drop … if exists` first, so the file re-applies — `0027`'s house style.
+drop trigger if exists account_erasure_requests_refuse_requester_rewrite on public.account_erasure_requests;
+create trigger account_erasure_requests_refuse_requester_rewrite
+  before update of requested_by on public.account_erasure_requests
+  for each row execute function public.refuse_reference_rewrite('requested_by');
+
+-- `drop … if exists` first, so the file re-applies — `0027`'s house style.
+drop trigger if exists cookie_consent_records_refuse_user_rewrite on public.cookie_consent_records;
+create trigger cookie_consent_records_refuse_user_rewrite
+  before update of user_id on public.cookie_consent_records
+  for each row execute function public.refuse_reference_rewrite('user_id');
+
+-- `drop … if exists` first, so the file re-applies — `0027`'s house style.
+drop trigger if exists katie_prompt_edits_refuse_author_rewrite on public.katie_prompt_edits;
+create trigger katie_prompt_edits_refuse_author_rewrite
+  before update of applied_by on public.katie_prompt_edits
+  for each row execute function public.refuse_reference_rewrite('applied_by');
 
 -- ---------------------------------------------------------------------------
 -- 2. The job releases its own references.
@@ -415,6 +502,7 @@ declare
   v_answer   jsonb;
   v_cookie   uuid;
   v_katie    uuid;
+  v_rewrote  boolean := false;
 begin
   -- 1. ★ The array in the function body is the catalogue's answer, not a typed three. A fourth guarded
   --    `set null` key added by a later migration fails here on the first apply.
@@ -455,8 +543,53 @@ begin
      or not has_column_privilege('bbldn_retention', 'public.katie_prompt_edits', 'applied_by', 'UPDATE') then
     raise exception '0034: the release cannot reach a column it must null';
   end if;
+  if has_table_privilege('bbldn_retention', 'public.katie_prompt_edits', 'SELECT') then
+    raise exception '0034: a table-level SELECT was granted on katie_prompt_edits — the prompt-edit text must stay unreadable to this identity';
+  end if;
+  if not has_column_privilege('bbldn_retention', 'public.katie_prompt_edits', 'applied_by', 'SELECT') then
+    raise exception '0034: the release cannot read the key it must lock';
+  end if;
   if has_table_privilege('bbldn_retention', 'public.katie_prompt_edits', 'DELETE') then
     raise exception '0034: the retention identity can delete a prompt edit — B-49 asked for a release, not a removal';
+  end if;
+
+  -- 3b. ★ **The value invariant, driven rather than described** (security pass, HIGH). A release must be a
+  --     release: the reference may go to NULL and may never be moved to another person. Tried as the identity
+  --     that holds the grant, which is the identity that could actually do it.
+  begin
+    insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+                            raw_app_meta_data, raw_user_meta_data, banned_until, created_at, updated_at)
+    values ('00000000-0000-0000-0000-000000000000', v_probe, 'authenticated', 'authenticated',
+            'deleted+' || v_probe::text || '@invalid', null, now(), '{}'::jsonb, '{}'::jsonb,
+            'infinity'::timestamptz, now(), now());
+    insert into public.cookie_consent_records
+      (visitor_id, user_id, consent_choice, analytics_enabled, marketing_enabled, expiry_date)
+    values ('rewrite-' || v_probe::text, v_probe, 'accept_all', true, true, now() + interval '1 year');
+
+    begin
+      set local role bbldn_retention;
+      update public.cookie_consent_records
+         set user_id = '00000000-0000-4000-8000-0000000000ff'::uuid
+       where visitor_id = 'rewrite-' || v_probe::text;
+      reset role;
+      v_rewrote := true;
+    exception
+      when restrict_violation then reset role;  -- the invariant fired, which is the point
+    end;
+
+    raise exception using errcode = 'P0001', message = '0034: rewrite probe rollback';
+  exception
+    when raise_exception then
+      if sqlerrm <> '0034: rewrite probe rollback' then raise; end if;
+  end;
+  if v_rewrote then
+    raise exception '0034: the retention identity re-pointed a consent record at another person — a release is not a rewrite';
+  end if;
+
+  -- 3c. ★ The invariant is a trigger on all three release columns, not a claim about one.
+  if (select count(*) from pg_trigger t join pg_proc p on p.oid = t.tgfoid
+       where p.proname = 'refuse_reference_rewrite' and not t.tgisinternal) <> 3 then
+    raise exception '0034: refuse_reference_rewrite() does not guard all three release columns';
   end if;
 
   -- 4. ★ Driven end to end, on the road that was broken, then rolled back. A sub-block whose last act is a

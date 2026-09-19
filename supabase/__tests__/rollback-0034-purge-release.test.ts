@@ -144,6 +144,19 @@ describe("int.rollback-0034 — the twin restores nothing, and proves it", () =>
     await db.query("rollback to savepoint twin");
   });
 
+  it("★ the value half of the fix survives it too — a release may not become a rewrite", async () => {
+    await db.query("savepoint twin");
+    await db.query(stripped.sql);
+
+    const { rows } = await db.query<{ n: string }>(
+      `select count(*)::text as n from pg_trigger t join pg_proc p on p.oid = t.tgfoid
+        where p.proname = 'refuse_reference_rewrite' and not t.tgisinternal`,
+    );
+    expect(rows[0]!.n).toBe("3");
+
+    await db.query("rollback to savepoint twin");
+  });
+
   it("★ and the guard it deliberately never touched is still the guard", async () => {
     await db.query("savepoint twin");
     await db.query(stripped.sql);

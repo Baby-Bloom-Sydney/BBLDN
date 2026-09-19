@@ -613,6 +613,92 @@ describe("int.self-service-purge — the new privilege is narrow, and pinned to 
     expect(rows.map((r) => r.fn)).toEqual(["public.purge_scrubbed_user"]);
   });
 
+  it("★ ★ the retention identity may RELEASE a reference and may not RE-POINT it (security pass, HIGH)", async () => {
+    // The reviewer's own attack, as an executable case. A column grant is *column*-scoped and says nothing
+    // about the **value**; the append-only guards pass any write once `is_retention_job()` is true; and
+    // `postgres` is a member of `bbldn_retention` with admin option, because `0000` grants it so migrations
+    // can set a function's owner. So this succeeded before `refuse_reference_rewrite()`, and the pin that was
+    // supposed to prevent it was a `prosrc` regex that ad-hoc SQL never goes near.
+    const victim = await scrubbedSubject();
+    const other = await scrubbedSubject();
+    await db.query(
+      `insert into public.cookie_consent_records
+         (visitor_id, user_id, consent_choice, analytics_enabled, marketing_enabled, expiry_date)
+       values ($1, $2, 'accept_all', true, true, now() + interval '1 year')`,
+      [`repoint-${victim}`, victim],
+    );
+
+    const repoint = await asRole(
+      "bbldn_retention",
+      `update public.cookie_consent_records set user_id = '${other}' where visitor_id = 'repoint-${victim}'`,
+    );
+    expect(repoint).toMatchObject({ raised: true, code: "23001" });
+
+    // …and the release itself still works, which is the half that must not break.
+    const release = await asRole(
+      "bbldn_retention",
+      `update public.cookie_consent_records set user_id = null where visitor_id = 'repoint-${victim}'`,
+    );
+    expect(release.raised).toBe(false);
+  });
+
+  it("★ the same invariant on the other two release columns, and it holds for EVERY role", async () => {
+    const victim = await scrubbedSubject();
+    const other = await scrubbedSubject();
+    await completedRequest(victim, "self-service", victim);
+    await db.query(
+      `insert into public.katie_prompt_edits (section, applied_by) values ($1, $2)`,
+      [`repoint-${victim}`, victim],
+    );
+
+    for (const role of [null, "bbldn_retention", "supabase_admin"]) {
+      const ledger = role
+        ? await asRole(
+            role,
+            `update public.account_erasure_requests set requested_by = '${other}' where subject_user_id = '${victim}'`,
+          )
+        : await (async () => {
+            await db.query("savepoint direct");
+            try {
+              await db.query(
+                `update public.account_erasure_requests set requested_by = '${other}' where subject_user_id = '${victim}'`,
+              );
+              await db.query("rollback to savepoint direct");
+              return { raised: false, code: undefined as string | undefined };
+            } catch (error) {
+              await db.query("rollback to savepoint direct");
+              return { raised: true, code: (error as { code?: string }).code };
+            }
+          })();
+      expect(ledger.raised, `${role ?? "postgres"} → requested_by`).toBe(true);
+    }
+
+    // ★ the WHERE keys on `applied_by`, not on `section`: the identity's SELECT is column-scoped to
+    // `applied_by` alone, so reading `section` in a predicate answers `42501` before the invariant is even
+    // consulted. Two controls in front of one column, and the case says which one it is measuring.
+    const katie = await asRole(
+      "bbldn_retention",
+      `update public.katie_prompt_edits set applied_by = '${other}' where applied_by = '${victim}'`,
+    );
+    expect(katie).toMatchObject({ raised: true, code: "23001" });
+  });
+
+  it("★ and the retention identity cannot read what a prompt edit said (security pass, MEDIUM)", async () => {
+    expect(
+      await asRole(
+        "bbldn_retention",
+        `select after_content from public.katie_prompt_edits where false`,
+      ),
+    ).toMatchObject({ raised: true, code: "42501" });
+    // the one column the release needs is readable, which is what makes `for update nowait` possible
+    expect(
+      await asRole(
+        "bbldn_retention",
+        `select applied_by from public.katie_prompt_edits where false`,
+      ),
+    ).toMatchObject({ raised: false });
+  });
+
   it("★ the release set carries no table the retention identity cannot already reach lawfully", async () => {
     for (const [table, column] of RELEASES) {
       const { rows } = await db.query<{ ok: boolean }>(
