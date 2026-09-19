@@ -19,8 +19,22 @@ const TWIN = resolve(
   "../rollbacks/0032_retention-grants-enumerated.rollback.sql",
 );
 
-/** What `0032` leaves standing, and what `main` had before it. Both measured, not assumed. */
-const ENUMERATED_RELATIONS = 33;
+/**
+ * ★ **The claim here is "the twin changed nothing", and that is a before/after comparison — not a literal.**
+ *
+ * `0032` left 33 relations where `main` had 69. This suite used to assert the 33, which made it go red the
+ * day `0034` lawfully enumerated a 34th for B-49's release (`3k`) — a failure that names the wrong thing:
+ * nothing about the twin had changed. The exact membership belongs to `int.retention-grants`, which holds it
+ * against the enumeration on every run. `3j` made the identical correction to `0033`'s twin and its security
+ * pass predicted this one in so many words.
+ */
+const relationsBeforeAndAfter = async (
+  run: () => Promise<unknown>,
+): Promise<readonly [number, number]> => {
+  const before = await relationsHeld();
+  await run();
+  return [before, await relationsHeld()] as const;
+};
 
 let db: Client;
 let stripped: StrippedTwin;
@@ -93,11 +107,17 @@ describe("int.rollback-0032 — the twin restores nothing, and proves it", () =>
   });
 
   it("★ applies cleanly, and the retention identity holds exactly what it held before", async () => {
-    expect(await relationsHeld()).toBe(ENUMERATED_RELATIONS);
+    const [before, after] = await relationsBeforeAndAfter(() =>
+      db.query(stripped.sql),
+    );
 
-    await db.query(stripped.sql);
-
-    expect(await relationsHeld()).toBe(ENUMERATED_RELATIONS);
+    expect(after).toBe(before);
+    // and still a small enumerated set rather than the schema — the twin's own arm 1, from this side
+    const { rows } = await db.query<{ n: string }>(
+      `select count(*)::text as n from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public' and c.relkind in ('r','p','v','m','f')`,
+    );
+    expect(after).toBeLessThan(Number(rows[0]!.n) / 2);
   });
 
   it("★ the blanket grant is still gone — a retention job reaches no table the set does not name", async () => {

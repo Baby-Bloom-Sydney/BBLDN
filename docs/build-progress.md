@@ -1037,7 +1037,12 @@ isolated nanny · 2 parents with an OPEN position and the held connection. **No 
 `sync_nanny_verification_state()` derives every one, called with the same `p_required` `src/boot` computes.
 
 <!-- audit
-Last edited: 2026-09-20T21:30+10:00 — BB-LDN-Planner-070926/3j
+Last edited: 2026-09-21T02:10+10:00 — BB-LDN-Planner-070926/3k
+Notes: 3k — one section appended (B-49, the self-service purge; `0034`). The Current state table was NOT
+rewritten: this unit changes no table, no route and no action — one function body and two column grants. The
+reproduction is in the section because it is the evidence, and so is the measurement that the caller's identity
+does not reach a referential action.
+Prior: Last edited: 2026-09-20T21:30+10:00 — BB-LDN-Planner-070926/3j
 Notes: 3j — one section appended (the blanket function EXECUTE grant, ADR-185 one layer over; `0033`). The Current
 state table was NOT rewritten, for `3i`'s reason: this unit changes no table, no route and no action, only
 privileges. The measurement is in the section because it is the evidence: 56 of 88 public functions were
@@ -1195,6 +1200,61 @@ Prior: 2026-09-15T17:40+10:00 — BB-LDN-Planner-070926/S2 (S2 shipped locally).
 Prior: 2026-09-15T15:20+10:00 — BB-LDN-Planner-070926/S1 (S1 shipped locally).
 Prior: 2026-09-15T13:55+10:00 — BB-LDN-Planner-070926/S0 (seeded at bootstrap).
 -->
+
+## Files created / modified in the current unit (`3k` — B-49, the self-service purge; L-009 Phase 3)
+
+**`3j`'s Q-1, taken as its own unit for ADR-185's own reason.** Before this unit, **every self-service erasure
+failed its 30-day purge, for ever** — a live Article 17 defect, pre-existing in `0030`, not blocking today only
+because no real data exists.
+
+- ★ **Reproduced before anything was changed**, on `0000`-`0033` applied from empty, with a properly scrubbed
+  subject and a completed self-service request 31 days old:
+  `23001 account_erasure_requests: UPDATE refused`, raised from
+  `UPDATE ONLY "public"."account_erasure_requests" SET "requested_by" = NULL` inside
+  `delete from auth.users`. The suite was written first and ran **11 of its 39 cases red**; the other 28 are
+  the controls that had to hold both before and after.
+- ★ **The caller's identity does not reach the cascade, driven rather than argued.** Called under
+  `set local role bbldn_retention`, with `select public.is_retention_job()` returning **true** one statement
+  earlier, the same refusal comes back: `purge_auth_user()` is a `SECURITY DEFINER` owned by the deploying
+  role (ADR-183), so Postgres' referential action runs as `postgres`. That is why admitting `postgres` to the
+  guard would have been a widening of 33 `postgres`-owned definers and the console, not a fix (ADR-186).
+- **Three keys, not one**, derived from the catalogue: `account_erasure_requests.requested_by`,
+  `cookie_consent_records.user_id`, `katie_prompt_edits.applied_by` - every single-column
+  `on delete set null` key into `auth.users` whose table carries an UPDATE guard consulting
+  `is_retention_job()`. Each driven to its own `23001`.
+- **Measured and _not_ a defect, recorded so it is not re-derived:** the transitive road is clean.
+  `nannies.user_id` is `on delete cascade` and every safeguarding key beneath it is `set null` onto guards
+  that do not consult `is_retention_job()` for an UPDATE - a nanny purges clean, driven with and without a
+  verification row.
+
+- **`supabase/migrations/0034_purge-releases-its-own-references.sql`** (new) - `create or replace` of
+  `purge_scrubbed_user()` adding a **release loop** immediately before the delete, plus two **column** grants
+  (`update (user_id)` on `cookie_consent_records`; `select, update (applied_by)` on `katie_prompt_edits`). The
+  guard is untouched and byte-identical. The loop reads the **catalogue**, so a fourth guarded key is
+  attempted rather than ignored and becomes a **recorded** `reference-refused` naming the table - which closes
+  `3j`'s other half, that `0030`'s blocker scan reads `confdeltype = 'r'` only. The loop runs before any
+  ledger write and is one sub-transaction, so a refusal leaves nothing half-released and nothing stamped
+  `purged_at`. **Applied `0000`-`0034` from empty**; the verify block derives the release set from the
+  catalogue and then drives a self-service purge end to end, rolling its probe back through a sentinel.
+- **`supabase/__tests__/self-service-purge.test.ts`** (`int.self-service-purge`, new, **40** cases) - both
+  roads; each released row surviving with its reference nulled rather than deleted; the catalogue/enumeration
+  agreement driven the other way with a **real fourth guarded key**; the guard still refusing from six
+  assumable roles **and from `postgres` itself**, asserted as _"the reference did not move"_ rather than
+  _"an error was raised"_ (the first draft was green on an empty table for the wrong reason); and ADR-186's
+  pin - exactly one body in the schema carries the release template.
+- **`supabase/rollbacks/0034_purge-releases-its-own-references.rollback.sql`** + **`rollback-0034-purge-release.test.ts`**
+  (new, **6** cases) - ADR-165 arm (1) on a defect fix rather than a privilege clause: both statements the twin
+  could contain re-break Article 17 (restoring `0030`'s body puts the defect back; revoking the two grants
+  makes the purge answer `reference-refused` for ever, which looks like a configuration mistake). Empty in
+  both halves; its verify block **runs the job**.
+- **`supabase/rollbacks/0032_...rollback.sql`** + **`rollback-0032-grants.test.ts`** (amended, not the
+  migration) - both asserted the literal **33** enumerated relations, so a lawful 34th turned them red with
+  _"a blanket grant is back"_. `3j`'s security pass predicted exactly this when it made the same correction to
+  `0033`'s twin. Now a comparison (a small fraction of `public`) and a before/after, with the exact membership
+  left where it belongs, in `int.retention-grants`.
+- **`int.retention-grants`** gains `public.katie_prompt_edits` with its reason and reads `0032`'s and `0034`'s
+  `ENUMERATED SET` blocks together; **`int.retention-execute`** gains the release's two `%I`-only templates in
+  `KNOWN_DYNAMIC_SQL`, on `3j`'s own rule that the inexhaustible part is enumerated.
 
 ## Files created / modified in the current unit (`3j` — the blanket function EXECUTE grant; L-009 Phase 3)
 

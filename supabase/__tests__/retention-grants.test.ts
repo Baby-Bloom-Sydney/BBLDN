@@ -30,10 +30,15 @@ import type { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { connect } from "./db-client";
 
-const MIGRATION = resolve(
-  __dirname,
-  "../migrations/0032_retention-grants-enumerated.sql",
-);
+const MIGRATIONS = [
+  resolve(__dirname, "../migrations/0032_retention-grants-enumerated.sql"),
+  // `0034` adds B-49's two release grants in its own `ENUMERATED SET` block. Read together, because a grant
+  // written in a later migration is exactly as real as one written in `0032` and must be just as enumerated.
+  resolve(
+    __dirname,
+    "../migrations/0034_purge-releases-its-own-references.sql",
+  ),
+];
 
 /** A table-level privilege the enumerated set grants, or a column list where the grant is per column. */
 type Grant = {
@@ -159,8 +164,8 @@ const ENUMERATED: Readonly<Record<string, Grant>> = {
   // ── the sweep's own classes (07 §6.2) ────────────────────────────────────────────────────────────────────
   "public.cookie_consent_records": {
     table: ["SELECT", "DELETE"],
-    updateColumns: ["id"],
-    why: "0031's two cookie classes — superseded at 30 days, the rest at 13 months; `update (id)` is the arm's row lock (0032 §2h)",
+    updateColumns: ["id", "user_id"],
+    why: "0031's two cookie classes — superseded at 30 days, the rest at 13 months; `update (id)` is the arm's row lock (0032 §2h); `update (user_id)` is B-49's release, because the `on delete set null` cascade runs as postgres and the append-only guard refuses it (0034)",
   },
   "public.admin_notifications": {
     table: ["SELECT", "DELETE"],
@@ -221,6 +226,12 @@ const ENUMERATED: Readonly<Record<string, Grant>> = {
     table: ["SELECT"],
     updateColumns: ["nanny_id", "subject_pseudonym"],
     why: "0027's pseudonymiser writes exactly these two; 0030 counts the rows. Who lifted the bar, when and why is unreachable — ADR-170's rule applied to the third table, which 0031's brief did not name",
+  },
+  // ── B-49's release (0034) ────────────────────────────────────────────────────────────────────────────────
+  "public.katie_prompt_edits": {
+    table: ["SELECT"],
+    updateColumns: ["applied_by"],
+    why: "B-49 (0034): the purge nulls `applied_by` itself, because the `on delete set null` cascade runs as postgres and prevent_row_modification() refuses it. SELECT because the release's `for update nowait` reads the key it is about to null; no table-level UPDATE, so what a prompt edit actually said is unreachable; no DELETE at all",
   },
   // ── storage ──────────────────────────────────────────────────────────────────────────────────────────────
   "storage.objects": {
@@ -477,17 +488,19 @@ describe("int.retention-grants — the enumerated set is the authority (ADR-185)
   });
 
   it("★ the migration's grant block and this list name the same tables, so neither drifts alone", () => {
-    const sql = readFileSync(MIGRATION, "utf8");
-    const start = sql.indexOf("ENUMERATED SET — START");
-    const end = sql.indexOf("ENUMERATED SET — END");
-    expect(start).toBeGreaterThan(-1);
-    expect(end).toBeGreaterThan(start);
-    const block = sql.slice(start, end);
     const named = new Set<string>();
-    for (const match of block.matchAll(
-      /^grant [^;]*? on table ((?:public|storage)\.[a-z_]+)/gms,
-    )) {
-      named.add(match[1]!);
+    for (const migration of MIGRATIONS) {
+      const sql = readFileSync(migration, "utf8");
+      const start = sql.indexOf("ENUMERATED SET — START");
+      const end = sql.indexOf("ENUMERATED SET — END");
+      expect(start, migration).toBeGreaterThan(-1);
+      expect(end, migration).toBeGreaterThan(start);
+      const block = sql.slice(start, end);
+      for (const match of block.matchAll(
+        /^grant [^;]*? on table ((?:public|storage)\.[a-z_]+)/gms,
+      )) {
+        named.add(match[1]!);
+      }
     }
     expect([...named].sort()).toEqual(NAMED);
   });
