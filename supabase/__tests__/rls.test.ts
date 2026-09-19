@@ -277,18 +277,25 @@ describe("int.rls — append-only tables (AC-X-37, 02 C-4)", () => {
     expect(code).toBe("23001");
   });
 
+  // ★ The probe writes what §6.2 row 14 actually asks for — the identifiers nulled, the row kept — rather than
+  // deleting the row. **The claim is unchanged**: ownership is the exemption, and a definer owned by
+  // `bbldn_retention` is the one caller `prevent_row_modification()` lets past. What changed underneath it is
+  // the *privilege*: `0032` (ADR-185) revoked `0016:288`'s blanket DML, so this identity no longer holds DELETE
+  // on `events` — row 14's delete half is ★, deferred until BAI confirms the number, and `0031` has no arm for
+  // it. A probe that deleted was measuring the blanket grant as much as the trigger. The case below asserts the
+  // refusal, so the pair says both halves.
   it("a SECURITY DEFINER owned by bbldn_retention is the one thing that passes", async () => {
     await db.query("savepoint job_probe");
     await db.query(
-      `insert into public.events (name, source, actor_kind, props)
-       values ('visit', 'server', 'visitor', '{}'::jsonb)`,
+      `insert into public.events (name, source, actor_kind, props, visitor_id)
+       values ('visit', 'server', 'visitor', '{}'::jsonb, 'v-probe')`,
     );
     // the shape 0000's header specifies for the Phase 1 retention jobs: a SECURITY DEFINER
     // owned by bbldn_retention. Ownership is the authorisation; the job name is a log field.
     await db.query(
       `create function pg_temp.probe_sweep() returns integer
        language plpgsql security definer set search_path = ''
-       as $fn$ declare n integer; begin delete from public.events; get diagnostics n = row_count; return n; end $fn$`,
+       as $fn$ declare n integer; begin update public.events set visitor_id = null where visitor_id is not null; get diagnostics n = row_count; return n; end $fn$`,
     );
     await db.query(
       `alter function pg_temp.probe_sweep() owner to bbldn_retention`,
@@ -298,6 +305,27 @@ describe("int.rls — append-only tables (AC-X-37, 02 C-4)", () => {
     );
     expect(Number(rows[0].probe_sweep)).toBeGreaterThan(0);
     await db.query("rollback to savepoint job_probe");
+  });
+
+  it("★ …and the same definer may not DELETE an event row — the control that refuses is the grant, not the trigger (ADR-185; §6.2 row 14's ★)", async () => {
+    await db.query("savepoint job_delete_probe");
+    await db.query(
+      `create function pg_temp.probe_delete() returns integer
+       language plpgsql security definer set search_path = ''
+       as $fn$ declare n integer; begin delete from public.events; get diagnostics n = row_count; return n; end $fn$`,
+    );
+    await db.query(
+      `alter function pg_temp.probe_delete() owner to bbldn_retention`,
+    );
+    let code = "NO_ERROR";
+    try {
+      await db.query("select pg_temp.probe_delete()");
+    } catch (error) {
+      code = (error as { code?: string }).code ?? "UNKNOWN";
+    }
+    await db.query("rollback to savepoint job_delete_probe");
+    // 42501, not the trigger's 23001: a privilege the identity does not hold is refused before any row is read.
+    expect(code).toBe("42501");
   });
 
   it("no client role holds TRUNCATE on an append-only table (security review H3)", async () => {
