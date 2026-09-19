@@ -110,10 +110,11 @@ const ENUMERATED_FUNCTIONS: Readonly<Record<string, Enumerated>> = {
     why: "the four guard_* column guards (children, user_profiles, inbox_messages, admin_notifications) and prevent_cookie_consent_modification call it while running as the deleting role",
   },
   // ── the three jobs' own entry points, owned by this role ──────────────────────────────────────────────────
-  "public.erase_account(p_user_id uuid, p_request_id uuid, p_deleted_objects jsonb)": {
-    via: "owner",
-    why: "0028's entry point; invoked by service_role, runs as bbldn_retention",
-  },
+  "public.erase_account(p_user_id uuid, p_request_id uuid, p_deleted_objects jsonb)":
+    {
+      via: "owner",
+      why: "0028's entry point; invoked by service_role, runs as bbldn_retention",
+    },
   "public.collect_erasure_objects(p_user_id uuid)": {
     via: "owner",
     why: "0028 reads the subject's storage paths by prefix",
@@ -281,7 +282,7 @@ describe("int.retention-execute — the enumerated set is the authority (ADR-185
     }
   });
 
-  it("★ every `via: \"owner\"` entry really is owned by this role, and no other entry is", () => {
+  it('★ every `via: "owner"` entry really is owned by this role, and no other entry is', () => {
     const byName = new Map(functions.map((f) => [f.fn, f]));
     for (const [fn, entry] of Object.entries(ENUMERATED_FUNCTIONS)) {
       const row = byName.get(fn);
@@ -326,7 +327,7 @@ describe("int.retention-execute — the enumerated set is the authority (ADR-185
 });
 
 describe("int.retention-execute — the body half: no definer reaches outside the set", () => {
-  it("★ every function owned by `bbldn_retention` pins `search_path=\"\"` — this suite's own precondition", () => {
+  it('★ every function owned by `bbldn_retention` pins `search_path=""` — this suite\'s own precondition', () => {
     expect(bodies.length).toBeGreaterThan(0);
     for (const row of bodies) {
       expect(row.config ?? [], row.fn).toContain('search_path=""');
@@ -391,14 +392,11 @@ describe("int.retention-execute — what the identity is refused, and by which c
       "public.record_vetting_decision(gen_random_uuid(), 'approved', null, null, null, '{}'::jsonb, gen_random_uuid())",
       "a DBS outcome no admin made",
     ],
-  ])(
-    "★ is refused `%s` — %s",
-    async (call) => {
-      await expect(asRetention(`select ${call}`)).rejects.toMatchObject({
-        code: "42501",
-      });
-    },
-  );
+  ])("★ is refused `%s` — %s", async (call) => {
+    await expect(asRetention(`select ${call}`)).rejects.toMatchObject({
+      code: "42501",
+    });
+  });
 
   // ★ The trigger functions every retention write fires are the whole reason `0016:291` gave for existing,
   // and the reason is false. Measured twice, and the two answers are the finding:
@@ -440,7 +438,9 @@ describe("int.retention-execute — what the identity is refused, and by which c
       ),
     ).resolves.toBeDefined();
     await expect(
-      asRetention(`update public.user_profiles set first_name = null where false`),
+      asRetention(
+        `update public.user_profiles set first_name = null where false`,
+      ),
     ).resolves.toBeDefined();
   });
 
@@ -451,7 +451,9 @@ describe("int.retention-execute — what the identity is refused, and by which c
   });
 
   it("still calls what the three jobs need, proved by calling it", async () => {
-    await expect(asRetention(`select public.is_retention_job()`)).resolves.toBeDefined();
+    await expect(
+      asRetention(`select public.is_retention_job()`),
+    ).resolves.toBeDefined();
     await expect(
       asRetention(`select public.is_safeguarding_retention_job()`),
     ).resolves.toBeDefined();

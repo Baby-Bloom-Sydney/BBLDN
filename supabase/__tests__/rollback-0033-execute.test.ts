@@ -65,7 +65,9 @@ describe("int.rollback-0033 — the twin restores nothing, and proves it", () =>
       .split("\n")
       .filter((line) => !line.trimStart().startsWith("--"))
       .join("\n");
-    expect(executable.toLowerCase()).not.toMatch(/\bgrant\b[\s\S]{0,40}\bexecute\b/);
+    expect(executable.toLowerCase()).not.toMatch(
+      /\bgrant\b[\s\S]{0,40}\bexecute\b/,
+    );
   });
 
   it("★ applies cleanly, and the retention identity can call exactly what it could before", async () => {
@@ -100,14 +102,20 @@ describe("int.rollback-0033 — the twin restores nothing, and proves it", () =>
     await db.query(stripped.sql);
 
     // measured live before `0033`: this one returned successfully as `bbldn_retention`
-    expect(await canExecute("public.set_access_window(uuid, integer)")).toBe(false);
+    expect(await canExecute("public.set_access_window(uuid, integer)")).toBe(
+      false,
+    );
     expect(
       await canExecute("public.open_dfy_access(uuid, uuid, integer, integer)"),
     ).toBe(false);
     expect(
-      await canExecute("public.start_family_trial_if_first(uuid, integer, boolean)"),
+      await canExecute(
+        "public.start_family_trial_if_first(uuid, integer, boolean)",
+      ),
     ).toBe(false);
-    expect(await canExecute("public.connect_child_invite(text, uuid)")).toBe(false);
+    expect(await canExecute("public.connect_child_invite(text, uuid)")).toBe(
+      false,
+    );
   });
 
   it("★ nothing in `public` is PUBLIC-executable again — `0016:279`'s intent stays restored", async () => {
@@ -129,7 +137,9 @@ describe("int.rollback-0033 — the twin restores nothing, and proves it", () =>
     expect(await canExecute("public.purge_auth_user(uuid)")).toBe(true);
     expect(await canExecute("public.auth_user_purge_state(uuid)")).toBe(true);
     expect(await canExecute("public.is_retention_job()")).toBe(true);
-    expect(await canExecute("public.is_safeguarding_retention_job()")).toBe(true);
+    expect(await canExecute("public.is_safeguarding_retention_job()")).toBe(
+      true,
+    );
     expect(await canExecute("public.is_privileged_writer()")).toBe(true);
     expect(await canExecute("public.money_last_activity_at(uuid)")).toBe(true);
   });

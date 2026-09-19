@@ -1037,7 +1037,17 @@ isolated nanny · 2 parents with an OPEN position and the held connection. **No 
 `sync_nanny_verification_state()` derives every one, called with the same `p_required` `src/boot` computes.
 
 <!-- audit
-Last edited: 2026-09-20T15:40+10:00 — BB-LDN-Planner-070926/3i
+Last edited: 2026-09-20T21:30+10:00 — BB-LDN-Planner-070926/3j
+Notes: 3j — one section appended (the blanket function EXECUTE grant, ADR-185 one layer over; `0033`). The Current
+state table was NOT rewritten, for `3i`'s reason: this unit changes no table, no route and no action, only
+privileges. The measurement is in the section because it is the evidence: 56 of 88 public functions were
+effectively executable by the retention identity, 53 by direct grant and 3 only via EXECUTE TO PUBLIC, of which 38
+were SECURITY DEFINER and 33 owned by postgres — and `select public.set_access_window(...)` succeeded as that role
+before the change. Two mechanisms recorded: EXECUTE TO PUBLIC is the default for a new function (so `0016:279`'s
+one-shot sweep stopped being true at `0018`), and `0016:291`'s own justification is wrong — a firing trigger checks
+no EXECUTE, a CHECK constraint and a column DEFAULT do, so the real dependency is the three predicates the
+non-definer guard bodies call. The gate has a body half that `search_path=""` makes exhaustive.
+Prior: 2026-09-20T15:40+10:00 — BB-LDN-Planner-070926/3i
 Notes: 3i — one section appended (the blanket retention grant, ADR-185; `0032`). The Current state table was NOT
 rewritten — it has been stale since 1i and this unit changes no table, no route and no action, only privileges.
 The measurement is in the section because it is the evidence the ruling rests on: 69 relations held a grant, 64 of
@@ -1185,6 +1195,81 @@ Prior: 2026-09-15T17:40+10:00 — BB-LDN-Planner-070926/S2 (S2 shipped locally).
 Prior: 2026-09-15T15:20+10:00 — BB-LDN-Planner-070926/S1 (S1 shipped locally).
 Prior: 2026-09-15T13:55+10:00 — BB-LDN-Planner-070926/S0 (seeded at bootstrap).
 -->
+
+## Files created / modified in the current unit (`3j` — the blanket function EXECUTE grant; L-009 Phase 3)
+
+**ADR-185 one layer over, and its own unit for ADR-185's own reason.** `3i` closed the table surface and named
+what it left standing: `0016:291`'s `grant execute on all functions in schema public to bbldn_retention`. That
+grant outranked `0032` completely, because the three retention jobs run through six `SECURITY DEFINER`
+functions **owned by that role** — so every statement inside them executes with that identity.
+
+- ★ **Measured from the catalogue before anything changed**, on `0000`–`0032` applied from empty: **56** of the
+  88 functions in `public` were effectively executable by `bbldn_retention`. A direct-ACL read would have said
+  **53** — the functions that existed at `0016`, the same migration-order rule `0032` found for tables — and the
+  other **3** are reachable only through `EXECUTE TO PUBLIC`. Of the 56, **38** are `SECURITY DEFINER` and
+  **33** are owned by `postgres`.
+- ★ **The escalation, driven rather than argued.** As `bbldn_retention`,
+  `select public.set_access_window(gen_random_uuid(), 5)` **returned successfully** — the retention identity
+  moving a family's access-end window through a `postgres`-owned definer. `open_dfy_access`,
+  `start_family_trial_if_first` and `connect_child_invite` all passed the privilege check and failed only on
+  their own business logic. One `perform public.open_dfy_access(...)` added inside `erase_account` would run as
+  `postgres` and reach every table `0032` had just put out of reach; no table grant can close that, and nothing
+  in the tree would have noticed.
+- ★ **`EXECUTE TO PUBLIC` is the default for a new function, which is the opposite of the table case.** `0032`
+  could say "a new table gets nothing" because `pg_default_acl` is empty and Postgres agrees. Here Postgres does
+  not: `0016:279` revokes from `PUBLIC` **once**, at `0016`, so
+  `position_call_mirror_no_answer_count_never_falls()` (`0018`), `prevent_erasure_request_modification()`
+  (`0028`) and `refuse_primary_key_rewrite()` (`0032`, `3i`'s own) all inherited it. `0016`'s own comment — "the
+  sweep is what makes the list closed" — has not been true since `0018`.
+- ★ **`0016:291`'s justification was wrong, and the correction is the enumeration.** It says the grant exists for
+  "the trigger functions the writes fire". Measured against temporary objects on the local stack: a firing
+  trigger checks **no** `EXECUTE`, and neither does index maintenance over a partial-index predicate; a `CHECK`
+  constraint function and a column `DEFAULT` function both **do**. The real dependency is one layer down — a
+  **non-`SECURITY DEFINER`** trigger body runs as the invoking role, so the functions **it** calls need the
+  privilege. Enumerating the triggers on `0032`'s 33 tables gives exactly three: `is_retention_job()`,
+  `is_safeguarding_retention_job()` and `is_privileged_writer()`. This also corrects one sentence of `3i`'s,
+  which recorded that an index predicate's `EXECUTE` is checked.
+
+- **`supabase/migrations/0033_retention-execute-enumerated.sql`** — revokes `execute on all functions in schema
+public` from `bbldn_retention` **and from `PUBLIC`**, then re-grants **12 functions, one line each with its
+  reason and how it is reached**: three ADR-183 escalations called from a body (`scrub_auth_user`,
+  `purge_auth_user`, `auth_user_purge_state`), three predicates the guard triggers call, and six owned by the
+  role itself. It re-grants the three `PUBLIC` trigger functions to `service_role` by name so nothing is left
+  without a caller. It changes no function body, no policy, no constraint and no row. **Applied `0000`–`0033`
+  from empty**; the verify block **caught its own author on the first apply** — the first draft asserted _zero_
+  foreign-owned definers were reachable and failed naming ADR-183's three, which are deliberately there. The
+  claim was wrong, not the database, and the block now names them as an exact list so a **fourth or a
+  substitution** fails the apply, which is what makes ADR-180's "a second requires an ADR" true of the database
+  rather than only of the prose.
+- **`supabase/__tests__/retention-execute.test.ts`** (new, **23** cases) — `int.retention-execute`, beside
+  `int.retention-grants` in the **`integration`** job for the same reason: the fact lives in the catalogue of a
+  database with every migration applied. Asked as an **effective** privilege (`has_function_privilege`), which
+  follows role membership, `PUBLIC` and ownership — `3i`'s D-3 taken as the starting method rather than
+  rediscovered. Plus the four structural assertions (`WITH GRANT OPTION`, `pg_default_acl` for functions, the
+  `auth` schema, no overloads).
+- ★ **…and a second half a privilege check cannot have: it reads the bodies.** The suite fails if any
+  `bbldn_retention`-owned function _references_ a `public` function outside the set. The privilege half stops
+  the call at run time; the body half stops it in review, which is the only place
+  `perform public.open_dfy_access(...)` is actually seen by a person. **It is a control rather than a heuristic
+  only because `search_path=""` is pinned on every definer** — with an empty search path an unqualified call
+  cannot resolve, so every call must be schema-qualified and the scan is exhaustive. `db.constraints` already
+  asserts the pin schema-wide; the suite re-asserts it for the six retention-owned functions as its own
+  precondition, and `0033`'s verify block refuses to apply without it.
+- **Driven the other way, seven routes, each applied to the live stack and removed again** — baseline 0 failed /
+  23 passed; a simulated `0034` re-issuing `0016:291` verbatim **8 failed**; one stray `EXECUTE` on
+  `open_dfy_access` **3**; a new function inheriting `EXECUTE TO PUBLIC` **2**; the helper-role route (blanket
+  grant to a helper, helper granted to the role) **8**; an `alter default privileges` rule **1**; a grantable
+  `EXECUTE` **1**; and a `perform public.open_dfy_access(...)` added inside `money_last_activity_at` **2** —
+  then restored, 0 failed / 23 passed.
+- **`supabase/rollbacks/0033_retention-execute-enumerated.rollback.sql`** + **`rollback-0033-execute.test.ts`**
+  (new, **7** cases) — ADR-165 arm (1) on ADR-177's test: the twin completes having correctly done nothing,
+  because the reverted code **can** run without the blanket grant (proved by running all three jobs, 97 cases).
+  Unlike `0032`'s twin it creates no object either, so it is empty in both halves and the verify block is the
+  only thing distinguishing it from a twin nobody wrote. The specific calls that succeeded on `main` —
+  `set_access_window` among them — are asserted still refused after it.
+- **Proof by execution, per job, after the revoke**: `int.account-erasure` · `int.safeguarding-erasure` ·
+  `int.purge-scrubbed-users` · `int.retention-sweep` — **97 passed, unchanged**. The enumerated set is a
+  superset of what all three exercise, which is what licenses arm (1) rather than arm (2).
 
 ## Files created / modified in the current unit (`3i` — the blanket retention grant; L-009 Phase 3)
 
