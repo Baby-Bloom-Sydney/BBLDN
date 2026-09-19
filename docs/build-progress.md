@@ -1266,10 +1266,12 @@ pointed at the role a **public anon key** gets you.
   read: **26** functions in `public` executable by `authenticated` and **4** by `anon`, **21** of them
   `SECURITY DEFINER` owned by `postgres`, and every one a live `POST /rest/v1/rpc/<name>`. Grant option 0,
   membership in the direction that would matter 0, PUBLIC-executable 0.
-- **`supabase/migrations/0035_client-function-surface-enumerated.sql`** (new) — **six** revokes, leaving
-  **20 / 2**. Each survivor carries a reason and, per ADR-186, a **from where**: 7 policy predicates, 1
-  non-definer trigger callee, 2 view callees, 10 named RPCs with their call sites and the scope each is made
-  at. Each revocation was searched for four ways first — `src/`, `pg_policies`, every other function body, and
+- **`supabase/migrations/0035_client-function-surface-enumerated.sql`** (new) — **seven** revokes, leaving
+  **19 / 1**. Each survivor carries a reason and, per ADR-186, a **from where**: 7 policy predicates, 1
+  non-definer trigger callee, 2 view callees, 9 named RPCs at session scope. ★ **`anon`'s entire remaining
+  surface is one view callee** — `get_invite_preview` reads like an anon endpoint and is not one: the live tree
+  calls it once, at service scope, and its only client-scope caller is a legacy export nothing imports which
+  passes `invite_token:` to a parameter named `p_token`. Each revocation was searched for four ways first — `src/`, `pg_policies`, every other function body, and
   every view definition.
 - ★ **The fifth surface, found by execution rather than by reading.** The first draft revoked **eight** and the
   next full run came back red: `permission denied for function nanny_visible` from an **`anon`**

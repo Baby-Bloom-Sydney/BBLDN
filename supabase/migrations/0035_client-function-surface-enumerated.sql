@@ -13,9 +13,9 @@
 --
 -- | What | Before | After |
 -- |---|---|---|
--- | Functions in `public` executable by `authenticated` | **26** | **20** |
--- | …by `anon` | **4** | **2** |
--- | …`SECURITY DEFINER` owned by `postgres` among them | 21 | 16 |
+-- | Functions in `public` executable by `authenticated` | **26** | **19** |
+-- | …by `anon` | **4** | **1** |
+-- | …`SECURITY DEFINER` owned by `postgres` among them | 21 | 15 |
 -- | Functions in `public` executable by `PUBLIC` | 0 | 0 — asserted, not assumed |
 -- | `EXECUTE` held `WITH GRANT OPTION` | 0 | 0 — asserted |
 -- | Roles `anon` / `authenticated` are a member of | 0 | 0 — asserted, the direction that would matter |
@@ -40,7 +40,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
 -- The enumeration with a reason **and a call site** per entry lives in `int.client-functions`'s
--- `CLIENT_SURFACE`, because that is where it is checked every run. In summary, the 20 are:
+-- `CLIENT_SURFACE`, because that is where it is checked every run. In summary, the 19 are:
 --
 --   · **7 policy predicates** — `is_admin`, `is_nanny`, `is_parent`, `is_active_nanny`, `current_nanny_id`,
 --     `current_parent_id`, `user_has_child_access`. A policy expression is evaluated as the **querying**
@@ -51,16 +51,17 @@
 --   · **2 view callees** — `nanny_visible(boolean, verification_level)` from `nanny_public` (readable by
 --     `anon`) and `family_access_reason(uuid)` from `family_access` (readable by `authenticated`). See the
 --     section below: a view body is the fifth surface and this file learned it by breaking.
---   · **10 named RPCs**, each with its `.rpc()` call site and the scope it is made at. Nine are session
---     scope — they take no user id and act for `auth.uid()`, so a service-scope call would mean "no session"
---     and be refused. The tenth, `get_invite_preview(text)`, is **the one `anon` entry**: a signed-out
---     visitor opening an invite link, and the definer's own redaction gate keys on `auth.uid()` being null.
+--   · **9 named RPCs**, each with its `.rpc()` call site and the scope it is made at. All nine are **session
+--     scope** — they take no user id and act for `auth.uid()`, so a service-scope call would mean "no
+--     session" and be refused. ★ **There is no `anon` RPC left at all**: `get_invite_preview(text)` looked
+--     like one and is called only at service scope (see the revoke block), so `anon`'s whole remaining
+--     surface is one view callee.
 --
 -- ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 -- WHAT GOES, AND THE MEASUREMENT PER LINE
 -- ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
--- Each of the six was searched for four ways before it was taken — and the fourth was added after two of
+-- Each of the seven was searched for four ways before it was taken — and the fourth was added after two of
 -- the original eight came back (see below): `src/` (excluding generated types), the
 -- policy catalogue (`pg_policies.qual` / `with_check`), every other function body in `public`, and every
 -- **view definition** in `public`.
@@ -131,6 +132,17 @@ revoke execute on function public.nanny_profile_columns(jsonb) from anon, authen
 -- The same shape one domain over: called only by `submit_verification_evidence()`, a `postgres`-owned definer.
 revoke execute on function public.verification_submission_columns(verification_section, jsonb) from anon, authenticated;
 
+-- ★ **The invite preview, and the reason it leaves the client surface even though it reads like an anon
+-- endpoint.** The live tree calls it in exactly one place —
+-- `modules/app/child-linking/lib/db-child-linking-store.ts` `invitePreview()` — at **`{ scope: "service" }`**,
+-- with the reason written above the call: *"The anon path (02 §7): a signed-out visitor has no session to run
+-- as."* `/invite/[token]` reaches it through `loadInviteLanding`, which uses that store. The only client-scope
+-- caller is `lib/actions/bapp/child-invites.ts`'s `getInvitePreview()`, a legacy Sydney export that **nothing
+-- imports** and which passes `invite_token:` to a function whose parameter is `p_token` — so it could not
+-- succeed if it were called. `service_role` keeps EXECUTE, so the live path is untouched; asserted by the
+-- verify block below.
+revoke execute on function public.get_invite_preview(text) from anon, authenticated;
+
 -- ★ The safeguarding guards' own predicate. `prevent_safeguarding_row_modification()` and
 -- `prevent_safeguarding_record_loss()` are *invoker* triggers, so at first reading a client write would need
 -- this — but the three tables that carry them (`verifications`, `vetting_submissions`,
@@ -156,7 +168,6 @@ declare
     'public.current_nanny_id()',
     'public.current_parent_id()',
     'public.family_access_reason(uuid)',
-    'public.get_invite_preview(text)',
     'public.get_pending_invites_for_recipient()',
     'public.is_active_nanny()',
     'public.is_admin()',
@@ -170,8 +181,7 @@ declare
     'public.submit_verification_evidence(uuid, verification_section, text, text, vetting_submission_status, jsonb)',
     'public.update_nanny_profile(jsonb, jsonb)',
     'public.user_has_child_access(uuid)'];
-  v_anon_kept text[] := array['public.get_invite_preview(text)',
-                              'public.nanny_visible(boolean, verification_level)'];
+  v_anon_kept text[] := array['public.nanny_visible(boolean, verification_level)'];
   v_count    int;
   v_lang     text;
   v_vol      "char";
@@ -261,7 +271,12 @@ begin
     raise exception '0035: nanny_visible is % / %, not an inlinable sql IMMUTABLE invoker — the index predicate would now check EXECUTE', v_lang, v_vol;
   end if;
 
-  -- 7. ★ Driven rather than asserted: the sharpest revocation, refused as the role that had it.
+  -- 7. ★ The invite preview left the client surface but not the app: `service_role` is how it is reached.
+  if not has_function_privilege('service_role', 'public.get_invite_preview(text)', 'EXECUTE') then
+    raise exception '0035: get_invite_preview is unreachable by service_role — /invite/[token] is broken';
+  end if;
+
+  -- 8. ★ Driven rather than asserted: the sharpest revocation, refused as the role that had it.
   begin
     set local role anon;
     perform public.nanny_is_visible('00000000-0000-4000-8000-000000000000'::uuid);

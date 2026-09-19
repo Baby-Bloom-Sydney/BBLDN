@@ -3,8 +3,8 @@
 --
 -- ★ **This twin restores nothing, and this is the plainest case of arm (1) in the folder.**
 --
--- `0035` contains six `revoke execute … from anon, authenticated` and nothing else. Undoing it means handing
--- a stranger holding the public anon key, and every signed-in user, the right to call six functions the
+-- `0035` contains seven `revoke execute … from anon, authenticated` and nothing else. Undoing it means handing
+-- a stranger holding the public anon key, and every signed-in user, the right to call seven functions the
 -- application never calls — among them **`nanny_is_visible(uuid)`, REVIEW-4's L-2**: a `SECURITY DEFINER`
 -- owned by `postgres`, over a `FORCE RLS` table, answering a question about a named nanny to anybody who
 -- asks. "A rollback twin never restores a security hole" is the whole sentence.
@@ -16,19 +16,21 @@
 --
 -- ⚠️ **WHAT IT DELIBERATELY DOES NOT UNDO — all of it, named.**
 --
---   · **The six revokes stay.** Each was searched for four ways before it was taken — `src/`, the policy
+--   · **The seven revokes stay.** Each was searched for four ways before it was taken — `src/`, the policy
 --     catalogue, every other function body, and every **view definition** — and the fourth search exists
---     because the first draft of `0035` revoked eight and two came back red from a view body. What is left
+--     because the first draft of `0035` revoked eight, two came back red from a view body, and a seventh went
+--     the other way once its only client-scope caller turned out to be dead. What is left
 --     has no caller on any of the four surfaces.
---   · **The twenty that stayed, stayed.** `0035` removed nothing the app reaches: seven policy predicates,
---     one non-definer trigger callee, two view callees and ten named RPCs, each with its call site. Proved by
+--   · **The nineteen that stayed, stayed.** `0035` removed nothing the app reaches: seven policy
+--     predicates, one non-definer trigger callee, two view callees and nine named RPCs, each with its call
+--     site. Proved by
 --     running the whole integration suite against the applied set, not by reading.
 --   · **Nothing here re-opens `PUBLIC`.** `0033` revoked it and `0035` asserts it is still zero. A grant to
 --     `PUBLIC` reaches both client roles without naming either, so restoring one would undo this file by a
 --     side door.
 --
 -- ⚠️ **AND THEREFORE: there is no rollback path from this file. The recovery is roll-forward.** If a client
--- path is found that genuinely needs one of the six, the fix is a new migration granting **that one**, with
+-- path is found that genuinely needs one of the seven, the fix is a new migration granting **that one**, with
 -- its reason and its call site, plus the matching entry in `int.client-functions` — not a blanket re-grant at
 -- 3 a.m. And if the need is a *new* function, remember what `0035`'s header measured: it will already be
 -- reachable by `anon` and `authenticated` the moment it exists, because the world default for a function is
@@ -70,11 +72,11 @@ begin
     raise exception '0035 twin: authenticated can execute % of % functions in public — the surface is back',
       v_authed, v_total;
   end if;
-  if v_anon > 4 then
+  if v_anon > 2 then
     raise exception '0035 twin: anon can execute % functions in public — the surface is back', v_anon;
   end if;
 
-  -- 2. ★ The six by name, one at a time so a failure says which.
+  -- 2. ★ The seven by name, one at a time so a failure says which.
   if has_function_privilege('anon', 'public.nanny_is_visible(uuid)', 'EXECUTE')
      or has_function_privilege('authenticated', 'public.nanny_is_visible(uuid)', 'EXECUTE') then
     raise exception '0035 twin: nanny_is_visible is client-reachable again — REVIEW-4 L-2 is open';
@@ -83,8 +85,10 @@ begin
      or has_function_privilege('authenticated', 'public.family_has_access(uuid)', 'EXECUTE')
      or has_function_privilege('authenticated', 'public.nanny_profile_columns(jsonb)', 'EXECUTE')
      or has_function_privilege('authenticated', 'public.verification_submission_columns(verification_section, jsonb)', 'EXECUTE')
-     or has_function_privilege('authenticated', 'public.is_safeguarding_retention_job()', 'EXECUTE') then
-    raise exception '0035 twin: one of the five other revoked functions is client-reachable again';
+     or has_function_privilege('authenticated', 'public.is_safeguarding_retention_job()', 'EXECUTE')
+     or has_function_privilege('anon', 'public.get_invite_preview(text)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.get_invite_preview(text)', 'EXECUTE') then
+    raise exception '0035 twin: one of the six other revoked functions is client-reachable again';
   end if;
 
   -- 3. ★ And the side door: nothing in `public` is PUBLIC-executable, which would reach both roles without
@@ -102,7 +106,7 @@ begin
      or not has_function_privilege('authenticated', 'public.family_access_reason(uuid)', 'EXECUTE')
      or not has_function_privilege('authenticated', 'public.is_admin()', 'EXECUTE')
      or not has_function_privilege('authenticated', 'public.user_has_child_access(uuid)', 'EXECUTE')
-     or not has_function_privilege('anon', 'public.get_invite_preview(text)', 'EXECUTE') then
+     or not has_function_privilege('service_role', 'public.get_invite_preview(text)', 'EXECUTE') then
     raise exception '0035 twin: a function the client genuinely reaches has gone';
   end if;
 end;

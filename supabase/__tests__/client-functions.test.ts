@@ -118,11 +118,6 @@ const CLIENT_SURFACE: Readonly<Record<string, Entry>> = {
     via: "rpc",
     why: "boot/db-parent-profile-store.ts, session scope — it writes the signed-in parent's own profile",
   },
-  "public.get_invite_preview(text)": {
-    anon: true,
-    via: "rpc",
-    why: "lib/actions/bapp/child-invites.ts uses the user-scoped client deliberately so the JWT — or its absence — reaches the definer's own auth.uid() redaction gate. **anon is the whole point**: a signed-out visitor opening an invite link",
-  },
   "public.get_pending_invites_for_recipient()": {
     via: "rpc",
     why: "modules/app/child-linking/lib/db-child-linking-store.ts, session scope — it answers for auth.uid() and for nobody else",
@@ -156,6 +151,8 @@ const CLIENT_SURFACE: Readonly<Record<string, Entry>> = {
  * search for each" is.
  */
 const REVOKED: Readonly<Record<string, string>> = {
+  "public.get_invite_preview(text)":
+    "★ it reads like an anon endpoint and is not one. The live tree calls it once, in modules/app/child-linking's invitePreview() at { scope: \"service\" }, with the reason written above the call — a signed-out visitor has no session to run as; /invite/[token] reaches it through loadInviteLanding. The only client-scope caller is lib/actions/bapp/child-invites.ts's getInvitePreview(), a legacy export nothing imports which passes `invite_token:` to a function whose parameter is `p_token`, so it could not succeed if it were called. service_role keeps EXECUTE",
   "public.nanny_is_visible(uuid)":
     "**REVIEW-4 L-2.** An anon-reachable SECURITY DEFINER over a FORCE RLS table with no caller anywhere — not in src/, not in a policy, not in another body",
   "public.child_has_family_access(uuid)":

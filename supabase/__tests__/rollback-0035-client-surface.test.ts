@@ -1,6 +1,6 @@
 // `int.rollback-0035` — **ADR-165 (3) for `0035`**: apply forward → twin → and assert the surface is still shut.
 //
-// The plainest arm (1) in the folder: `0035` is six `revoke execute … from anon, authenticated` and nothing
+// The plainest arm (1) in the folder: `0035` is seven `revoke execute … from anon, authenticated` and nothing
 // else, so every statement its twin could contain hands a stranger with the public anon key something back.
 // It is empty in both halves, and this file is the only thing that distinguishes it from a twin nobody wrote.
 import { resolve } from "node:path";
@@ -14,7 +14,7 @@ const TWIN = resolve(
   "../rollbacks/0035_client-function-surface-enumerated.rollback.sql",
 );
 
-/** The six `0035` takes away. Named here so a failure says which one came back. */
+/** The seven `0035` takes away (ten role-and-function pairs). Named here so a failure says which one came back. */
 const REVOKED: ReadonlyArray<readonly [string, string]> = [
   ["anon", "public.nanny_is_visible(uuid)"],
   ["authenticated", "public.nanny_is_visible(uuid)"],
@@ -27,11 +27,13 @@ const REVOKED: ReadonlyArray<readonly [string, string]> = [
   ],
   ["authenticated", "public.is_safeguarding_retention_job()"],
   ["anon", "public.is_safeguarding_retention_job()"],
+  ["anon", "public.get_invite_preview(text)"],
+  ["authenticated", "public.get_invite_preview(text)"],
 ];
 
 /** What must survive the twin, because a twin that shut a door by breaking the app is the worse failure. */
 const KEPT: ReadonlyArray<readonly [string, string]> = [
-  ["anon", "public.get_invite_preview(text)"],
+  ["service_role", "public.get_invite_preview(text)"],
   ["anon", "public.nanny_visible(boolean, verification_level)"],
   ["authenticated", "public.family_access_reason(uuid)"],
   ["authenticated", "public.is_admin()"],
@@ -71,7 +73,7 @@ describe("int.rollback-0035 — the twin restores nothing, and proves it", () =>
     expect(stripped.sql).not.toMatch(/^\s*--\s*grant\s+execute/im);
   });
 
-  it("★ runs, and not one of the six comes back", async () => {
+  it("★ runs, and not one of the seven comes back", async () => {
     await db.query("savepoint twin");
     await db.query(stripped.sql);
 
@@ -116,9 +118,9 @@ describe("int.rollback-0035 — the twin restores nothing, and proves it", () =>
     expect(await canExecute("anon", "public.nanny_is_visible(uuid)")).toBe(
       false,
     );
-    expect(await canExecute("anon", "public.get_invite_preview(text)")).toBe(
-      true,
-    );
+    expect(
+      await canExecute("service_role", "public.get_invite_preview(text)"),
+    ).toBe(true);
 
     await db.query("rollback to savepoint twin");
   });
