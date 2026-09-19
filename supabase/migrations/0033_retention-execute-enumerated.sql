@@ -141,6 +141,13 @@
 -- actually be seen. That half is sound rather than approximate **only because `search_path=""` is pinned** —
 -- already asserted by `db.constraints`, and re-asserted in the suite because it is the suite's own precondition.
 --
+-- ⚠️ **With one limit, measured and stated rather than glossed:** `search_path` makes the scan exhaustive for
+-- calls *written into* a body, and does nothing about a name assembled at run time. `purge_scrubbed_user`
+-- contains one `execute format(...)` — a fixed `select exists` template with two `%I` identifier slots, the
+-- subject bound as `$1`, no `%s` and no call site. So the suite **enumerates the dynamic SQL too**, on the same
+-- rule as the privilege half: a new `execute` in a retention-owned body fails CI and is read by a person.
+-- Driven both ways — a second `execute format` building a call into a `%s` slot fails two cases.
+--
 -- One transaction. A half-applied privilege change is a schema nobody can reason about.
 
 begin;

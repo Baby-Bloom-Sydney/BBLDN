@@ -30,10 +30,16 @@
 //
 // ★ The body half is sound rather than a heuristic **because every definer in `public` pins `search_path=""`**
 // (asserted already by `db.constraints`, "every SECURITY DEFINER in public pins search_path"). With an empty
-// search path an unqualified call cannot resolve, so every call a body makes has to be written
-// `schema.function(` — and a scan for that pattern is exhaustive. A case below re-asserts the pin for the six
-// retention-owned functions specifically, because it is this suite's own precondition and a suite that depends
-// on another file's invariant should say so out loud.
+// search path an unqualified call cannot resolve, so every call written into a body has to be written
+// `schema.function(` — and a scan for that pattern is exhaustive **for statically written calls**. A case
+// below re-asserts the pin for the six retention-owned functions specifically, because it is this suite's own
+// precondition and a suite that depends on another file's invariant should say so out loud.
+//
+// ⚠️ **And `search_path` does nothing about dynamic SQL**, which is the one construct that evades the scan: a
+// name assembled at run time is not in `prosrc` to be found. The first draft of this file claimed
+// exhaustiveness without that qualification and was wrong — `purge_scrubbed_user` contains an
+// `execute format(...)`. So the dynamic SQL is **enumerated too**, in `KNOWN_DYNAMIC_SQL` at the foot of the
+// body-half block, with the same rule: a new one fails CI and is read by a person.
 //
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // HOW TO CHANGE IT
@@ -363,6 +369,74 @@ describe("int.retention-execute — the body half: no definer reaches outside th
       }
     }
     expect([...new Set(offenders)].sort()).toEqual([]);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+  // ★ THE LIMIT OF THE TWO CASES ABOVE, STATED RATHER THAN GLOSSED (ADR-180's rule about naming a limit)
+  // ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+  //
+  // `search_path=""` makes those scans exhaustive **for calls written into the body**. It does nothing about a
+  // call assembled at run time: `execute format(...)` builds a string Postgres never sees until it executes,
+  // so a regex over `prosrc` cannot see a function name that is not there yet.
+  //
+  // There is exactly **one** piece of dynamic SQL in a retention-owned body today, found by measuring rather
+  // than by trusting the first draft of this file, which claimed exhaustiveness without qualification. It is
+  // benign — a fixed `select exists` template with two `%I` identifier slots, the subject bound as `$1`, and
+  // no call site anywhere in it. `%I` quotes an identifier and cannot introduce a call; `%s`, which could,
+  // does not appear.
+  //
+  // So the control is not a better paragraph but an enumeration, the same shape as the privilege half:
+  // **every `execute format(...)` in a retention-owned body must be on this list.** A new one fails CI and is
+  // read by a person, which is the only place a dynamically-built escalation could be caught at all.
+  const KNOWN_DYNAMIC_SQL: Readonly<Record<string, string>> = {
+    "select exists (select 1 from public.%I where %I = $1)":
+      "purge_scrubbed_user: the rows-outstanding precondition, over the `restrict` keys to auth.users read from the catalogue (07 §6.1 step 6). Identifiers only, subject bound as $1, no call site",
+  };
+
+  it("★ every piece of dynamic SQL in a retention-owned body is enumerated — the one thing `search_path` cannot make exhaustive", () => {
+    const found: string[] = [];
+    for (const row of bodies) {
+      for (const match of row.src.matchAll(
+        /\bexecute\s+(?:format\s*\(\s*)?'((?:[^']|'')*)'/gi,
+      )) {
+        found.push(match[1]!.replace(/''/g, "'"));
+      }
+    }
+    expect([...new Set(found)].sort()).toEqual(
+      Object.keys(KNOWN_DYNAMIC_SQL).sort(),
+    );
+  });
+
+  // The security property is about the **slots**, not the prose around them: `%I` quotes an identifier and
+  // `%L` quotes a literal, and neither can carry a function call. `%s` interpolates raw text and could carry
+  // anything, which is the one thing that must never appear. The keyword check is the belt: the only `(` in
+  // an enumerated template must follow a SQL keyword, never a name that might be a function.
+  const SQL_KEYWORDS_BEFORE_PAREN = new Set([
+    "exists",
+    "in",
+    "values",
+    "and",
+    "or",
+    "not",
+    "from",
+    "select",
+  ]);
+
+  it("★ and no enumerated template can introduce a call — every slot is `%I`/`%L`, never `%s`", () => {
+    for (const [template, why] of Object.entries(KNOWN_DYNAMIC_SQL)) {
+      expect(why.length, template).toBeGreaterThan(20);
+      const slots = [...template.matchAll(/%[a-zA-Z]/g)].map((m) => m[0]);
+      expect(slots.length, `${template} has no slot`).toBeGreaterThan(0);
+      for (const slot of slots) {
+        expect(["%I", "%L"], `${template}: %s carries raw SQL`).toContain(slot);
+      }
+      for (const match of template.matchAll(/([a-z0-9_]+)\s*\(/gi)) {
+        expect(
+          SQL_KEYWORDS_BEFORE_PAREN,
+          `${template}: "${match[1]}(" looks like a call`,
+        ).toContain(match[1]!.toLowerCase());
+      }
+    }
   });
 });
 
