@@ -4,14 +4,16 @@
 -- ★ **This twin restores no privilege, and that is the whole of it.**
 --
 -- `0033` is a privilege change and contains nothing else: no function body, no policy, no constraint, no row.
--- Undoing it means two statements —
+-- Undoing it would mean re-issuing the two blanket grants its section 1 revoked — and **restoring a privilege
+-- is restoring a hole**, which is the sentence ADR-165 exists to say. `0033` is a security clause from its
+-- first line to its last, so the security clause is forward-only and this file runs and changes nothing.
 --
---     grant execute on all functions in schema public to bbldn_retention;
---     grant execute on all functions in schema public to public;
---
--- — and **restoring a privilege is restoring a hole**, which is the sentence ADR-165 exists to say. `0033` is a
--- security clause from its first line to its last, so the security clause is forward-only and this file runs
--- and changes nothing.
+-- ⚠️ **The two statements are described here rather than written out, and that is deliberate** (security pass,
+-- LOW). The first draft printed them verbatim two lines above the warning not to run them. They were
+-- `--`-commented and inert — but the reader this header is written for is an operator mid-incident looking for
+-- something to paste, and handing them the exact re-open, inside the file whose entire subject is not
+-- re-opening it, is a footgun with a caption on it. Anyone who genuinely needs the statements can read `0033`
+-- section 1 and invert it, which is a deliberate enough act to be the whole point.
 --
 -- ⚠️ **WHAT IT DELIBERATELY DOES NOT UNDO — all of it, named.**
 --
@@ -66,17 +68,29 @@ commit;
 do $$
 declare
   v_reachable int;
+  v_total     int;
   v_definers  int;
   v_public    int;
 begin
-  -- 1. ★ Neither blanket grant came back. Twelve functions, which is the enumerated set and nothing else;
-  --    the state before `0033` was 56.
+  -- 1. ★ Neither blanket grant came back. The state before `0033` was 56 of 88; it is now a small enumerated
+  --    set.
+  --
+  --    ⚠️ **Asserted as "a small fraction", not as the literal 12** (security pass, LOW). A hardcoded 12 makes
+  --    this twin raise *"a blanket grant is back"* the day `0034` legitimately enumerates a thirteenth — a
+  --    false alarm pointing an operator at the wrong thing, in a file they are reading precisely because
+  --    something has already gone wrong. What this twin can honestly claim is that it restored nothing, which
+  --    is the *comparison* below, not a magic number: the count is well under the total, and every foreign
+  --    definer beyond ADR-183's three is still out of reach (section 2).
   select count(*) into v_reachable
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
      and has_function_privilege('bbldn_retention', p.oid, 'EXECUTE');
-  if v_reachable <> 12 then
-    raise exception '0033 twin: bbldn_retention can execute % functions, not the enumerated 12 — a blanket grant is back', v_reachable;
+  select count(*) into v_total
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public';
+  if v_reachable > v_total / 2 then
+    raise exception '0033 twin: bbldn_retention can execute % of % functions in public — a blanket grant is back',
+      v_reachable, v_total;
   end if;
 
   -- 2. ★ The escalation path is still shut: no foreign-owned definer beyond ADR-183's three.

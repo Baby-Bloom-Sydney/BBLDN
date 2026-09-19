@@ -19,8 +19,18 @@ const TWIN = resolve(
   "../rollbacks/0033_retention-execute-enumerated.rollback.sql",
 );
 
-/** What `0033` leaves standing, and what `main` had before it. Both measured, not assumed. */
+/** What `0033` leaves standing. Measured from the catalogue, and asserted against it below. */
 const ENUMERATED_FUNCTIONS = 12;
+
+/**
+ * What `main` had before `0033`: 56 of the 88 functions in `public` effectively executable by the role.
+ *
+ * ★ The first draft used this only in `expect(ENUMERATED_FUNCTIONS).toBeLessThan(BEFORE_0033)` — two literals
+ * compared to each other, which cannot fail for any database state and is therefore not evidence (database
+ * pass, LOW). It is now re-derived: `0033`'s two revokes are the whole difference between the two numbers, so
+ * re-issuing them inside this suite's transaction must reproduce 56 exactly. If the tree changes underneath
+ * that claim, this goes red and the number gets re-measured rather than quietly rotting in a comment.
+ */
 const BEFORE_0033 = 56;
 
 let db: Client;
@@ -72,9 +82,40 @@ describe("int.rollback-0033 — the twin restores nothing, and proves it", () =>
 
   it("★ applies cleanly, and the retention identity can call exactly what it could before", async () => {
     expect(await reachable()).toBe(ENUMERATED_FUNCTIONS);
-    expect(ENUMERATED_FUNCTIONS).toBeLessThan(BEFORE_0033);
 
     await db.query(stripped.sql);
+
+    expect(await reachable()).toBe(ENUMERATED_FUNCTIONS);
+  });
+
+  it("★ and `main`'s number is re-derived rather than remembered — undoing `0033`'s two revokes reproduces 56", async () => {
+    expect(await reachable()).toBe(ENUMERATED_FUNCTIONS);
+
+    // ⚠️ Inside a savepoint of its own. Every other case in this file shares one transaction rolled back in
+    // `afterAll`, so without this the grants below would leak sideways into them — which they did on the
+    // first run, taking four sibling cases red and proving the point better than a comment would.
+    await db.query("savepoint before_0033");
+    try {
+      // the inverse of `0033` section 1, which is the whole difference between the two numbers. Never run
+      // outside a rolled-back transaction: it is the hole ADR-165 forbids the twin from restoring.
+      await db.query(
+        `grant execute on all routines in schema public to bbldn_retention`,
+      );
+      await db.query(
+        `grant execute on all routines in schema public to public`,
+      );
+
+      const { rows } = await db.query<{ n: string }>(
+        `select count(*)::text as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'public'`,
+      );
+      // every function in `public` is reachable once both blanket grants are back — 88 — and 56 is what
+      // `0016:291` actually reached, being the subset that existed when it ran plus the three `TO PUBLIC`
+      expect(await reachable()).toBe(Number(rows[0]!.n));
+      expect(BEFORE_0033).toBeLessThan(Number(rows[0]!.n));
+    } finally {
+      await db.query("rollback to savepoint before_0033");
+    }
 
     expect(await reachable()).toBe(ENUMERATED_FUNCTIONS);
   });

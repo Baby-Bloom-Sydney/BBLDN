@@ -83,10 +83,29 @@
 -- `prevent_erasure_request_modification`, `prevent_safeguarding_row_modification`,
 -- `prevent_safeguarding_record_loss` and the four `guard_*` column guards.
 --
--- This also corrects one sentence of `3i`'s: it recorded that an index predicate's EXECUTE *is* checked
--- (`nanny_visible()` on `nannies`). Measured here, index maintenance checks nothing — and `pg_depend` says
--- `nannies_matching_idx` is the schema's **only** index, constraint or default depending on a `public`
--- function at all, so nothing in the enumerated set turns on it.
+-- ★ **The index-predicate row deserves its own paragraph, because the first draft of this file got it wrong
+-- and a reviewer drove the opposite result.** `3i` recorded that an index predicate's EXECUTE *is* checked
+-- (`nanny_visible()` on `nannies`); this file first said it is not. **Both measurements were correct, on
+-- different function shapes, and the variable is inlining:**
+--
+--   | predicate function                              | INSERT | UPDATE | DELETE |
+--   |-------------------------------------------------|--------|--------|--------|
+--   | `language sql` IMMUTABLE, not a definer (inlinable) | OK  | OK     | OK     |
+--   | `language plpgsql` (not inlinable)              | 42501  | 42501  | OK     |
+--
+-- An inlinable SQL function is folded into the plan and never called, so no privilege is consulted; anything
+-- else is a real call and is checked on INSERT and UPDATE (never on DELETE — removing an index entry does not
+-- re-evaluate the predicate). `nanny_visible(boolean, verification_level)` is `language sql` IMMUTABLE and not
+-- a definer, so it is inlined and the retention role does not need EXECUTE on it — which is why
+-- `int.account-erasure` is green today with `has_function_privilege` **false** for it.
+--
+-- ⚠️ **That makes it load-bearing and fragile.** Rewriting `nanny_visible` in plpgsql, or making it
+-- `SECURITY DEFINER`, or granting the retention role a real UPDATE on `nannies`, would each make a retention
+-- write raise `42501 permission denied for function nanny_visible` with nothing in the diff to explain it. So
+-- it is not left to a comment: `int.retention-execute` asserts that **every** function reached by an index
+-- predicate, CHECK constraint or column DEFAULT on a table this role may INSERT or UPDATE is either in the
+-- enumerated set **or** still of the inlinable shape. `pg_depend` says `nannies_matching_idx` is the schema's
+-- only such object today, which is what keeps that assertion cheap.
 --
 -- ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 -- ★ THE RULE THIS FILE ESTABLISHES, FOR WHOEVER WRITES THE NEXT MIGRATION
@@ -123,6 +142,18 @@
 --     suite are owned by `bbldn_retention`; revoking EXECUTE from the owner of a function is theatre, because
 --     the owner can re-grant at will. They are listed with the others rather than quietly omitted, and
 --     `money_last_activity_at` is genuinely exercised from inside `retention_sweep_class`.
+--   · ★ **It drops `0030:177`'s grant on `subjects_ready_to_purge(timestamptz, integer)` and does not re-grant
+--     it** (database pass, HIGH — I had removed it without noticing, which is the point of the finding). It is
+--     the one post-`0016` explicit retention EXECUTE grant this file takes. It is **not** re-granted, because
+--     the rule this file sets is that a function no job calls gets nothing and nothing calls it as this role:
+--     `src/boot/privacy-purge-ops.ts` reaches it by `q.rpc(...)` with `scope: "service"`, and `set role`
+--     appears nowhere in `src/` or `scripts/`, so the grant was already dead when this file found it.
+--     ⚠️ **And the reviewer found something worse while proving that:** the function is `SECURITY INVOKER`, and
+--     `0028:293` revoked `account_erasure_requests` from `service_role`, so **the purge's candidate listing has
+--     been broken since `0028` on the one path the application actually uses** — `42501 permission denied for
+--     table account_erasure_requests`. That is `0028`/`0030`'s defect, not this file's, it is unchanged by this
+--     file, and it is recorded as this unit's Q-1 rather than fixed here, because a retention *job* repair
+--     riding inside a privilege PR is the shape ADR-185 forbids.
 --   · **It changes no function body, no policy, no constraint and no row.** It is a privilege change and
 --     nothing else, so that what breaks — if anything breaks — is unambiguous.
 --
@@ -148,7 +179,13 @@
 -- rule as the privilege half: a new `execute` in a retention-owned body fails CI and is read by a person.
 -- Driven both ways — a second `execute format` building a call into a `%s` slot fails two cases.
 --
--- One transaction. A half-applied privilege change is a schema nobody can reason about.
+-- ⚠️ **One transaction for the privilege change, and the verify block is deliberately outside it** — `0032`'s
+-- shape, and the cost is worth stating rather than the header claiming otherwise (database pass, MEDIUM). The
+-- assertions read **committed** state, which is what makes a passing claim a claim about the database an
+-- operator will find. The price is that a verify failure leaves the grants applied and the migration
+-- unrecorded: the recovery is to fix forward and re-run, not to reach for the twin, which is forbidden from
+-- restoring anything. The first draft of this file failed its own verify block on the first apply, and that
+-- apply had already changed the database — exactly the shape being described.
 
 begin;
 
@@ -160,8 +197,14 @@ begin;
 -- `anon` and `authenticated`, so no named client grant is touched — see "what this file does not do".
 -- ---------------------------------------------------------------------------
 
-revoke execute on all functions in schema public from bbldn_retention;
-revoke execute on all functions in schema public from public;
+-- ⚠️ **`ALL ROUTINES`, not `ALL FUNCTIONS`** (database pass, MEDIUM). `ON ALL FUNCTIONS` covers functions and
+-- aggregates and **not procedures**, which need `ON ALL PROCEDURES` or `ON ALL ROUTINES`. There is no procedure
+-- in `public` today (`prokind = 'p'` count is 0) and the gate *would* catch one, since it reads `pg_proc`
+-- unfiltered — but an operator reacting to that red gate by copying this statement would find the procedure
+-- still reachable, and a remediation that does not work is worse than none. Driven: after
+-- `revoke execute on all functions`, a newly created procedure was **still callable** by the role.
+revoke execute on all routines in schema public from bbldn_retention;
+revoke execute on all routines in schema public from public;
 
 -- ---------------------------------------------------------------------------
 -- 2. ENUMERATED FUNCTIONS — START
@@ -170,11 +213,23 @@ revoke execute on all functions in schema public from public;
 -- line, and therefore no privilege.
 -- ---------------------------------------------------------------------------
 
--- 2a. The erasure's and the purge's own narrow escalations (ADR-183) ----------------------------------------
+-- 2a. The erasure's and the purge's own escalations (ADR-183) -----------------------------------------------
 --
 -- `auth`'s privileges are not re-grantable, so 07 §6.1 step 5 cannot run under the retention role directly.
--- These three are `postgres`-owned definers with one job each, and `erase_account` / `purge_scrubbed_user`
--- call them by name from inside their own bodies.
+-- These three are `postgres`-owned definers with one statement each, and `erase_account` /
+-- `purge_scrubbed_user` call them by name from inside their own bodies.
+--
+-- ⚠️ **"One statement each" is not the same as "narrow", and a reviewer was right to press on it.**
+-- `scrub_auth_user` and `purge_auth_user` carry **no precondition of their own** — no state check, no window,
+-- no ownership test. Every gate that makes them safe lives in the caller. And `purge_auth_user`'s single
+-- `delete from auth.users` fans out over **13 `ON DELETE CASCADE` and ~30 `ON DELETE SET NULL`** keys from
+-- `public`, reaching `user_roles`, `development_images`, `child_invites` and `subscribe_invites` — tables this
+-- role holds no DELETE on and which are not among `0032`'s 33 relations at all. That is this file's own
+-- thesis turned on it: the privilege being exercised is not the caller's.
+--
+-- So these three are **pinned to their callers** (verify block section 7b, and three cases in
+-- `int.retention-execute`), because a grant that says *who* may call and never *from where* closes nothing for
+-- the functions it keeps.
 
 -- 07 §6.1 step 5: the tombstone and the ban on one `auth.users` row, and nothing else
 grant execute on function public.scrub_auth_user(uuid)           to bbldn_retention;
@@ -243,12 +298,24 @@ commit;
 
 do $$
 declare
+  -- ★ **With identity arguments, not bare names** (security pass, MEDIUM). The first draft compared
+  -- `nspname || '.' || proname`, so a `SECURITY DEFINER` **overload** — `scrub_auth_user(uuid, text)`, owned by
+  -- `postgres`, granted to this role — walked straight past this block while the suite caught it. Belt failed,
+  -- braces held; a migration applied without `int.retention-execute` therefore got nothing from section 4's
+  -- headline claim that "adding one fails the apply". Driven by the reviewer, closed here.
   v_named   text[] := array[
-    'public.auth_user_purge_state', 'public.collect_erasure_objects', 'public.erase_account',
-    'public.is_privileged_writer', 'public.is_retention_job', 'public.is_safeguarding_retention_job',
-    'public.money_last_activity_at', 'public.pseudonymise_safeguarding_subject',
-    'public.purge_auth_user', 'public.purge_scrubbed_user', 'public.retention_sweep_class',
-    'public.scrub_auth_user'
+    'public.auth_user_purge_state(p_user_id uuid)',
+    'public.collect_erasure_objects(p_user_id uuid)',
+    'public.erase_account(p_user_id uuid, p_request_id uuid, p_deleted_objects jsonb)',
+    'public.is_privileged_writer()',
+    'public.is_retention_job()',
+    'public.is_safeguarding_retention_job()',
+    'public.money_last_activity_at(p_user_id uuid)',
+    'public.pseudonymise_safeguarding_subject()',
+    'public.purge_auth_user(p_user_id uuid)',
+    'public.purge_scrubbed_user(p_user_id uuid, p_windows jsonb)',
+    'public.retention_sweep_class(p_class text, p_spec jsonb, p_limit integer)',
+    'public.scrub_auth_user(p_user_id uuid)'
   ];
   v_held    text[];
   v_extra   text[];
@@ -259,7 +326,7 @@ begin
   select coalesce(array_agg(distinct fn order by fn), '{}')
     into v_held
     from (
-      select n.nspname || '.' || p.proname as fn
+      select n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' as fn
         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
        where n.nspname = 'public'
          and has_function_privilege('bbldn_retention', p.oid, 'EXECUTE')
@@ -340,11 +407,18 @@ begin
   ) then
     raise exception '0033: bbldn_retention holds a grantable EXECUTE and can widen itself';
   end if;
+  -- ★ **`grantee = 0` as well as the role** (security pass, MEDIUM). Checking only the direct form leaves the
+  -- one grantee that reaches this role without naming it: `alter default privileges … grant execute on
+  -- functions to PUBLIC` arms the rule for every function created afterwards, and a migration that arms it and
+  -- creates no function passed this block clean, leaving the trap for whoever adds the next one. Driven by the
+  -- reviewer; one operand closes it.
   if exists (
     select 1 from pg_default_acl d, lateral aclexplode(d.defaclacl) a
-     where a.grantee = 'bbldn_retention'::regrole and d.defaclobjtype = 'f'
+     where a.grantee in ('bbldn_retention'::regrole, 0)
+       and a.privilege_type = 'EXECUTE'
+       and d.defaclobjtype in ('f', 'p')
   ) then
-    raise exception '0033: a default-privilege rule grants bbldn_retention EXECUTE on every function created from now on';
+    raise exception '0033: a default-privilege rule grants EXECUTE on every routine created from now on, to bbldn_retention or to PUBLIC';
   end if;
 
   -- 6. ★ The body half's precondition. Every retention-owned function pins `search_path=""` — which is what
@@ -363,6 +437,111 @@ begin
   --    been read as anything wider.
   if not has_schema_privilege('bbldn_retention', 'public', 'usage') then
     raise exception '0033: bbldn_retention lost USAGE on public and every grant above is unreachable';
+  end if;
+
+  -- 7b. ★ **The enumeration says *who* may call; this says *from where*** (security pass, HIGH — the finding
+  --     that matters most in this file). Sections 1 and 2 close the escalation for the 76 functions they
+  --     revoked and leave it open for the 12 they kept. Two of those twelve — `scrub_auth_user` and
+  --     `purge_auth_user` — are **unconditional account destruction with no precondition of their own**:
+  --     every gate lives in the intended caller. A reviewer added one line to the existing body of
+  --     `retention_sweep_class` (no new function, no new grant, owner and `search_path` preserved), called it
+  --     as this role, and deleted an arbitrary `auth.users` row — an admin — with `public.user_roles`
+  --     cascading away behind it, a table `has_table_privilege` says this role cannot DELETE and which is not
+  --     among `0032`'s 33 relations. Every assertion above stayed green.
+  --
+  --     So the pair is the unit. `int.retention-execute` checks all three pins over normalised bodies; this
+  --     is the apply-time half, deliberately blunt — a substring over `prosrc` — because a migration applied
+  --     without the suite must still not be able to add the call.
+  if exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and pg_get_userbyid(p.proowner) = 'bbldn_retention'
+       and p.proname <> 'erase_account'
+       and p.prosrc like '%public.scrub\_auth\_user%'
+  ) then
+    raise exception '0033: a retention-owned body other than erase_account() names scrub_auth_user() — an unconditional auth tombstone whose only gate is its caller';
+  end if;
+  if exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and pg_get_userbyid(p.proowner) = 'bbldn_retention'
+       and p.proname <> 'purge_scrubbed_user'
+       and (p.prosrc like '%public.purge\_auth\_user%' or p.prosrc like '%public.auth\_user\_purge\_state%')
+  ) then
+    raise exception '0033: a retention-owned body other than purge_scrubbed_user() names purge_auth_user() — an unconditional account delete that cascades past every table grant';
+  end if;
+  -- …and the two pins guard something: the intended callers really do name them, or the check is theatre.
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'erase_account'
+       and p.prosrc like '%public.scrub\_auth\_user%'
+  ) or not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'purge_scrubbed_user'
+       and p.prosrc like '%public.purge\_auth\_user%'
+  ) then
+    raise exception '0033: a pinned escalation is not named by the caller it is pinned to — the pin protects nothing';
+  end if;
+
+  -- 8. ★ **The reach question is asked of every schema, not only `public`** (database pass, HIGH). Every
+  --    assertion above filters `nspname = 'public'`, so a `0034` that creates `zz_jobs` and a definer inside
+  --    it would escalate with all of them green — the reviewer drove exactly that and got `postgres` back
+  --    from a function the gate never looked at. A function in a schema the role cannot enter is unreachable
+  --    whatever its ACL says, so the cheap and total form of the question is the schema list.
+  --
+  --    ⚠️ `auth` is the one that matters and it was asserted **nowhere**: ADR-183's whole premise is that
+  --    `auth`'s privileges are not re-grantable, and what actually stops the role is USAGE — `select auth.uid()`
+  --    answers `42501 permission denied for schema auth`. That fact now has a line.
+  if exists (
+    select 1 from pg_namespace n
+     where n.nspname not in ('public', 'storage', 'pg_catalog', 'information_schema')
+       and n.nspname not like 'pg_%'
+       and has_schema_privilege('bbldn_retention', n.oid, 'USAGE')
+  ) then
+    raise exception '0033: bbldn_retention holds USAGE on a schema beyond public and storage — the enumeration does not reach there: %',
+      (select array_agg(n.nspname order by n.nspname) from pg_namespace n
+        where n.nspname not in ('public','storage','pg_catalog','information_schema')
+          and n.nspname not like 'pg_%'
+          and has_schema_privilege('bbldn_retention', n.oid, 'USAGE'));
+  end if;
+  if has_schema_privilege('bbldn_retention', 'auth', 'USAGE') then
+    raise exception '0033: bbldn_retention can enter the auth schema — ADR-183''s narrow definers are no longer the only road';
+  end if;
+
+  -- 9. ★ **Trigger dispatch is the third road, and neither half above watches it** (database pass, HIGH, and
+  --    the sharpest finding of the pass). A `SECURITY DEFINER` trigger function owned by `postgres` runs as
+  --    `postgres` when a retention write fires it — while `has_function_privilege` for this role is **false**
+  --    (a firing trigger checks no EXECUTE, §"what the role actually needs" layer 2) and the call appears in
+  --    no body, because it is dispatch rather than text. The reviewer demonstrated the write end to end.
+  --
+  --    So the overlap is **enumerated**, like everything else here: a foreign-owned definer trigger may fire on
+  --    an event this role can perform only if it is named below with its reason. Two are, and one of them —
+  --    `nanny_placements_enforce_i3` — genuinely fires on `0028`'s UPDATE today. Both bodies are read-only
+  --    (they read and raise), which is why this is a boundary to hold rather than a hole to close.
+  if exists (
+    select 1
+      from pg_trigger t
+      join pg_class c on c.oid = t.tgrelid
+      join pg_proc p on p.oid = t.tgfoid
+     where not t.tgisinternal
+       and p.prosecdef
+       and pg_get_userbyid(p.proowner) <> 'bbldn_retention'
+       and (   ((t.tgtype::int &  4) <> 0 and has_table_privilege('bbldn_retention', c.oid, 'INSERT'))
+            or ((t.tgtype::int &  8) <> 0 and has_table_privilege('bbldn_retention', c.oid, 'DELETE'))
+            or ((t.tgtype::int & 16) <> 0 and (has_table_privilege('bbldn_retention', c.oid, 'UPDATE')
+                                               or has_any_column_privilege('bbldn_retention', c.oid, 'UPDATE'))))
+       and t.tgname <> all (array['nanny_placements_enforce_i3', 'nannies_guard_vaccination_consent'])
+  ) then
+    raise exception '0033: a SECURITY DEFINER trigger owned by another role fires on a retention write and is not enumerated: %',
+      (select array_agg(t.tgname order by t.tgname)
+         from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_proc p on p.oid = t.tgfoid
+        where not t.tgisinternal and p.prosecdef
+          and pg_get_userbyid(p.proowner) <> 'bbldn_retention'
+          and (   ((t.tgtype::int &  4) <> 0 and has_table_privilege('bbldn_retention', c.oid, 'INSERT'))
+               or ((t.tgtype::int &  8) <> 0 and has_table_privilege('bbldn_retention', c.oid, 'DELETE'))
+               or ((t.tgtype::int & 16) <> 0 and (has_table_privilege('bbldn_retention', c.oid, 'UPDATE')
+                                                  or has_any_column_privilege('bbldn_retention', c.oid, 'UPDATE'))))
+          and t.tgname <> all (array['nanny_placements_enforce_i3', 'nannies_guard_vaccination_consent']));
   end if;
 end;
 $$;

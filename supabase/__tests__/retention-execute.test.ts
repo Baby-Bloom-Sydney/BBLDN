@@ -65,6 +65,26 @@ type Enumerated = {
   readonly why: string;
   /** how it is reached: a body call, a guard trigger's callee, or ownership. */
   readonly via: "body" | "trigger-callee" | "owner";
+  /**
+   * ★ **For a `via: "body"` entry, the *only* functions whose bodies may name it** (security pass, HIGH).
+   *
+   * The first draft enumerated *who* may call and never *from where*, and a reviewer showed what that costs.
+   * The migration's own threat model is a line added inside a retention-owned definer; the enumeration closes
+   * that for the 76 functions it revoked and leaves it wide open for the 12 it kept. Two of those 12 —
+   * `scrub_auth_user` and `purge_auth_user` — are account destruction with **no precondition inside the
+   * function**: every gate lives in the intended caller.
+   *
+   * Driven: one line added to the existing body of `retention_sweep_class` — no new function, no new grant,
+   * `create or replace` preserving owner and `search_path=""` — deleted an arbitrary `auth.users` row (an
+   * admin) and cascaded `public.user_roles` away with it, a table `has_table_privilege` says this role cannot
+   * DELETE and which is not among `0032`'s 33 relations at all. **Both halves stayed green**: the body half
+   * because the callee is allowed, the privilege half because the privilege is granted, and the migration's
+   * verify block because it counts rather than scopes.
+   *
+   * So the pair is the unit, not the grantee. The information was already here, in prose, in `why`; it simply
+   * was not checked.
+   */
+  readonly callableFrom?: readonly string[];
 };
 
 /**
@@ -87,15 +107,18 @@ const ENUMERATED_FUNCTIONS: Readonly<Record<string, Enumerated>> = {
   // ── the erasure's and the purge's own escalations (ADR-183) ───────────────────────────────────────────────
   "public.scrub_auth_user(p_user_id uuid)": {
     via: "body",
-    why: "erase_account step 5: auth's privileges are not re-grantable, so the tombstone and ban are their own narrow definer (ADR-183)",
+    callableFrom: ["public.erase_account"],
+    why: "erase_account step 5: auth's privileges are not re-grantable, so the tombstone and ban are their own narrow definer (ADR-183). It carries no precondition of its own — every gate is in erase_account — which is why the caller is pinned and not merely described",
   },
   "public.purge_auth_user(p_user_id uuid)": {
     via: "body",
-    why: "purge_scrubbed_user: the 30-day hard delete of the auth.users row, 07 §6.1 step 6",
+    callableFrom: ["public.purge_scrubbed_user"],
+    why: "purge_scrubbed_user: 07 §6.1 step 6's hard delete. ⚠️ NOT narrow — `delete from auth.users` fans out over 13 CASCADE and ~30 SET NULL keys, reaching tables 0032 denies this role outright (user_roles, development_images, child_invites). It is an unconditional account destruction whose only gate is its caller, so the caller is pinned",
   },
   "public.auth_user_purge_state(p_user_id uuid)": {
     via: "body",
-    why: "purge_scrubbed_user reads whether the row is already scrubbed and banned before it purges",
+    callableFrom: ["public.purge_scrubbed_user"],
+    why: "purge_scrubbed_user reads whether the row is already scrubbed and banned before it purges; it takes the row lock the purge then holds",
   },
   // ── the sweep's own helper ────────────────────────────────────────────────────────────────────────────────
   "public.money_last_activity_at(p_user_id uuid)": {
@@ -270,13 +293,33 @@ describe("int.retention-execute — what the identity can actually call (effecti
     expect(rows).toEqual([]);
   });
 
-  it("★ reaches no function in `auth` beyond the four the platform grants to PUBLIC, and none it owns", async () => {
-    const { rows } = await db.query<{ fn: string }>(
-      `select p.proname as fn
-         from pg_proc p join pg_namespace n on n.oid = p.pronamespace, lateral aclexplode(p.proacl) a
-        where n.nspname = 'auth' and a.grantee = 'bbldn_retention'::regrole`,
+  // ★ The first draft of this case asked `aclexplode(proacl) where grantee = 'bbldn_retention'` — a
+  // **direct-ACL read**, the exact method this file's own preamble condemns. A reviewer showed it vacuous: all
+  // four `auth` functions are effectively reachable *via `PUBLIC`*, so the query returned zero rows and would
+  // have stayed green through a fifth, or a `SECURITY DEFINER` one.
+  //
+  // What actually contains the role is **schema USAGE** — `select auth.uid()` answers
+  // `42501 permission denied for schema auth` — and that fact was asserted nowhere in the tree, even though
+  // ADR-183's entire premise rests on it. It has a line now, and the general form is below it: a function in a
+  // schema the role cannot enter is unreachable whatever its ACL says, which is why the schema list is the
+  // cheap and total form of the reach question.
+  it("★ cannot enter the `auth` schema at all — the control ADR-183 actually rests on, asserted for the first time", async () => {
+    const { rows } = await db.query<{ usage: boolean }>(
+      `select has_schema_privilege('bbldn_retention', 'auth', 'USAGE') as usage`,
     );
-    expect(rows.map((r) => r.fn)).toEqual([]);
+    expect(rows[0]!.usage).toBe(false);
+  });
+
+  it("★ holds USAGE on `public` and `storage` and on no other schema — so a definer created in `0034`'s new schema cannot be the way round this list", async () => {
+    const { rows } = await db.query<{ nspname: string }>(
+      `select n.nspname
+         from pg_namespace n
+        where n.nspname not in ('pg_catalog', 'information_schema')
+          and n.nspname not like 'pg\\_%'
+          and has_schema_privilege('bbldn_retention', n.oid, 'USAGE')
+        order by 1`,
+    );
+    expect(rows.map((r) => r.nspname)).toEqual(["public", "storage"]);
   });
 });
 
@@ -332,11 +375,230 @@ describe("int.retention-execute — the enumerated set is the authority (ADR-185
   });
 });
 
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════
+// ★ THE THIRD ROAD: DISPATCH. Neither the privilege half nor the body half watches it.
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════
+//
+// A `SECURITY DEFINER` trigger function owned by `postgres` runs **as `postgres`** when a retention write
+// fires it. It is invisible to the privilege half (a firing trigger checks no EXECUTE, so
+// `has_function_privilege` is false) and invisible to the body half (the call is dispatch, not text). A
+// reviewer drove the whole thing: a role holding neither EXECUTE on the function nor INSERT on the target
+// wrote to the target, the row recording `current_user = postgres`.
+//
+// It is closed the way everything else here is closed — by enumeration. A foreign-owned definer trigger may
+// fire on an event this role can perform only if it is named, with its reason. Two are. One of them genuinely
+// fires today.
+const ENUMERATED_DEFINER_TRIGGERS: Readonly<Record<string, string>> = {
+  nanny_placements_enforce_i3:
+    "enforce_placement_position_active on nanny_placements, AFTER INSERT/UPDATE — fires on 0028's real UPDATE (it nulls the notes and roster). The body reads nanny_positions and connection_requests and raises; it writes nothing",
+  nannies_guard_vaccination_consent:
+    "guard_nanny_vaccination_consent on nannies, BEFORE INSERT/UPDATE — overlaps only the `update (id)` row-lock grant, which 0032 §3's guard refuses to let become a write, and no arm updates nannies. The body reads and raises",
+};
+
+describe("int.retention-execute — the third road: a definer reached by trigger dispatch", () => {
+  it("★ no foreign-owned SECURITY DEFINER trigger fires on a retention write unless it is enumerated", async () => {
+    const { rows } = await db.query<{
+      tgname: string;
+      rel: string;
+      fn: string;
+      owner: string;
+    }>(
+      `select t.tgname,
+              c.relnamespace::regnamespace::text || '.' || c.relname as rel,
+              p.proname as fn,
+              pg_get_userbyid(p.proowner) as owner
+         from pg_trigger t
+         join pg_class c on c.oid = t.tgrelid
+         join pg_proc  p on p.oid = t.tgfoid
+        where not t.tgisinternal
+          and p.prosecdef
+          and pg_get_userbyid(p.proowner) <> 'bbldn_retention'
+          and (   ((t.tgtype::int &  4) <> 0 and has_table_privilege('bbldn_retention', c.oid, 'INSERT'))
+               or ((t.tgtype::int &  8) <> 0 and has_table_privilege('bbldn_retention', c.oid, 'DELETE'))
+               or ((t.tgtype::int & 16) <> 0 and (has_table_privilege('bbldn_retention', c.oid, 'UPDATE')
+                                                  or has_any_column_privilege('bbldn_retention', c.oid, 'UPDATE'))))
+        order by t.tgname`,
+    );
+    expect(rows.map((r) => r.tgname)).toEqual(
+      Object.keys(ENUMERATED_DEFINER_TRIGGERS).sort(),
+    );
+  });
+
+  it("★ every enumerated dispatch has a reason, and its body writes nothing — the reason it is a boundary and not a hole", async () => {
+    for (const [tgname, why] of Object.entries(ENUMERATED_DEFINER_TRIGGERS)) {
+      expect(why.length, tgname).toBeGreaterThan(20);
+    }
+    const { rows } = await db.query<{ tgname: string; src: string }>(
+      `select t.tgname, p.prosrc as src
+         from pg_trigger t join pg_proc p on p.oid = t.tgfoid
+        where t.tgname = any($1::text[])`,
+      [Object.keys(ENUMERATED_DEFINER_TRIGGERS)],
+    );
+    expect(rows).toHaveLength(Object.keys(ENUMERATED_DEFINER_TRIGGERS).length);
+    for (const row of rows) {
+      expect(
+        row.src.toLowerCase(),
+        `${row.tgname} writes — it is no longer merely a guard`,
+      ).not.toMatch(/\b(insert\s+into|update\s+\w|delete\s+from|perform\s)\b/);
+    }
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════
+// ★ THE FOURTH ROAD: A FUNCTION THE PLANNER CALLS FOR YOU — index predicates, CHECK constraints, DEFAULTs.
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════
+//
+// `3i` recorded that an index predicate's EXECUTE is checked; the first draft of `0033` said it is not. Both
+// were right, on different function shapes, and the variable is **inlining**:
+//
+//   | predicate function                                  | INSERT | UPDATE | DELETE |
+//   | `language sql` IMMUTABLE, not a definer (inlinable) | OK     | OK     | OK     |
+//   | `language plpgsql` (not inlinable)                  | 42501  | 42501  | OK     |
+//
+// An inlinable SQL function is folded into the plan and never called. `nanny_visible` is exactly that shape,
+// which is why `int.account-erasure` is green with `has_function_privilege` **false** for it — load-bearing,
+// and invisible. Rewriting it in plpgsql, or making it a definer, would raise `42501` from a retention write
+// with nothing in the diff to explain it. So the rule is asserted rather than trusted.
+describe("int.retention-execute — the fourth road: a function the planner calls for you", () => {
+  it("★ every function a retention-writable table's index/CHECK/DEFAULT reaches is enumerated, or still inlinable", async () => {
+    const { rows } = await db.query<{
+      fn: string;
+      rel: string;
+      via: string;
+      inlinable: boolean;
+      enumerated: boolean;
+    }>(
+      `select n.nspname || '.' || p.proname as fn,
+              t.relnamespace::regnamespace::text || '.' || t.relname as rel,
+              case d.classid::regclass::text
+                when 'pg_class' then 'index' when 'pg_constraint' then 'check'
+                when 'pg_attrdef' then 'default' else d.classid::regclass::text end as via,
+              (l.lanname = 'sql' and not p.prosecdef) as inlinable,
+              has_function_privilege('bbldn_retention', p.oid, 'EXECUTE') as enumerated
+         from pg_depend d
+         join pg_proc p on p.oid = d.refobjid
+         join pg_namespace n on n.oid = p.pronamespace
+         join pg_language l on l.oid = p.prolang
+         join pg_class t on t.oid = coalesce(
+                case d.classid::regclass::text
+                  when 'pg_class'      then (select indrelid from pg_index where indexrelid = d.objid)
+                  when 'pg_constraint' then (select conrelid from pg_constraint where oid = d.objid)
+                  when 'pg_attrdef'    then (select adrelid  from pg_attrdef  where oid = d.objid)
+                end)
+        where d.refclassid = 'pg_proc'::regclass
+          and d.classid::regclass::text in ('pg_class', 'pg_constraint', 'pg_attrdef')
+          and (has_table_privilege('bbldn_retention', t.oid, 'INSERT')
+               or has_table_privilege('bbldn_retention', t.oid, 'UPDATE')
+               or has_any_column_privilege('bbldn_retention', t.oid, 'UPDATE'))
+        order by 1, 2`,
+    );
+    const unsafe = rows
+      .filter((r) => !r.enumerated && !r.inlinable)
+      .map((r) => `${r.rel} ${r.via} -> ${r.fn}`);
+    expect(unsafe).toEqual([]);
+  });
+
+  it("★ `nanny_visible` in particular is still the inlinable shape the erasure silently depends on", async () => {
+    const { rows } = await db.query<{ lang: string; secdef: boolean }>(
+      `select l.lanname as lang, p.prosecdef as secdef
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         join pg_language l on l.oid = p.prolang
+        where n.nspname = 'public' and p.proname = 'nanny_visible'`,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.lang).toBe("sql");
+    expect(rows[0]!.secdef).toBe(false);
+  });
+});
+
 describe("int.retention-execute — the body half: no definer reaches outside the set", () => {
   it('★ every function owned by `bbldn_retention` pins `search_path=""` — this suite\'s own precondition', () => {
     expect(bodies.length).toBeGreaterThan(0);
     for (const row of bodies) {
       expect(row.config ?? [], row.fn).toContain('search_path=""');
+    }
+  });
+
+  /**
+   * ★ **Normalise before matching, because `search_path=""` forces *qualification*, not one spelling.**
+   *
+   * A reviewer compiled and ran five call forms inside a `security definer … set search_path=''` function,
+   * every one of them valid SQL and every one invisible to the first draft's regex:
+   *
+   *     public."is_retention_job"()        -- quoted identifier
+   *     public . is_retention_job()        -- whitespace around the dot
+   *     public/*c*­/.is_retention_job()     -- a comment around the dot
+   *     "public".is_retention_job()        -- quoted schema
+   *
+   * So the body is normalised first — comments stripped, quotes around identifiers removed, whitespace around
+   * the dot collapsed — and only then scanned. The fifth form the reviewer found was dynamic SQL, which no
+   * amount of normalising reaches; that is enumerated separately at the foot of this block. Each of the five
+   * is driven red in the gate's own counter-drive.
+   */
+  function normalise(src: string): string {
+    return src
+      .replace(/\/\*[\s\S]*?\*\//g, " ") // block comments, including ones inside a qualified name
+      .replace(/--[^\n]*/g, " ") // line comments
+      .replace(/"([a-z0-9_]+)"/gi, "$1") // quoted identifiers — Postgres folds unquoted to lower anyway
+      .replace(/\s*\.\s*/g, ".") // whitespace around the dot
+      .replace(/\s+/g, " ");
+  }
+
+  // ★ **The caller half** (security pass, HIGH). The case below asks *whether* a callee is allowed; this one
+  // asks *from where*. Without it, one line inside `retention_sweep_class` calling `public.purge_auth_user(...)`
+  // passes every other assertion in this file and destroys an arbitrary account — demonstrated live by a
+  // reviewer, with `public.user_roles` cascading away behind it.
+  it("★ an enumerated escalation is named only by the body it belongs to — the pair is the unit, not the grantee", () => {
+    const pinned = Object.entries(ENUMERATED_FUNCTIONS).filter(
+      ([, e]) => e.callableFrom,
+    );
+    expect(pinned.length).toBeGreaterThan(0);
+
+    const offenders: string[] = [];
+    for (const [fn, entry] of pinned) {
+      const callee = fn.slice(0, fn.indexOf("(")).toLowerCase();
+      const allowedCallers = new Set(
+        entry.callableFrom!.map((c) => c.toLowerCase()),
+      );
+      for (const row of bodies) {
+        const caller = row.fn.slice(0, row.fn.indexOf("(")).toLowerCase();
+        if (caller === callee) continue; // a function naming itself is recursion, not escalation
+        const names = normalise(row.src).toLowerCase().includes(`${callee}(`);
+        if (names && !allowedCallers.has(caller)) {
+          offenders.push(`${caller} -> ${callee}`);
+        }
+      }
+    }
+    expect(offenders.sort()).toEqual([]);
+  });
+
+  it("★ …and each pinned escalation really is named by the caller it is pinned to, or the pin is protecting nothing", () => {
+    for (const [fn, entry] of Object.entries(ENUMERATED_FUNCTIONS)) {
+      if (!entry.callableFrom) continue;
+      const callee = fn.slice(0, fn.indexOf("(")).toLowerCase();
+      for (const caller of entry.callableFrom) {
+        const row = bodies.find(
+          (b) =>
+            b.fn.slice(0, b.fn.indexOf("(")).toLowerCase() ===
+            caller.toLowerCase(),
+        );
+        expect(
+          row,
+          `${caller} is not a retention-owned function`,
+        ).toBeDefined();
+        expect(
+          normalise(row!.src).toLowerCase(),
+          `${caller} does not name ${callee} — the pin is stale`,
+        ).toContain(`${callee}(`);
+      }
+    }
+  });
+
+  it('★ every `via: "body"` entry is pinned to a caller — an escalation with no caller pin is the HIGH all over again', () => {
+    for (const [fn, entry] of Object.entries(ENUMERATED_FUNCTIONS)) {
+      if (entry.via !== "body") continue;
+      expect(entry.callableFrom, `${fn} has no callableFrom`).toBeDefined();
+      expect(entry.callableFrom!.length, fn).toBeGreaterThan(0);
     }
   });
 
@@ -347,7 +609,7 @@ describe("int.retention-execute — the body half: no definer reaches outside th
     );
     const offenders: string[] = [];
     for (const row of bodies) {
-      for (const match of row.src.matchAll(
+      for (const match of normalise(row.src).matchAll(
         /(?<![a-z0-9_.])(public\.[a-z0-9_]+)\s*\(/gi,
       )) {
         const callee = match[1]!.toLowerCase();
@@ -359,16 +621,68 @@ describe("int.retention-execute — the body half: no definer reaches outside th
     expect([...new Set(offenders)].sort()).toEqual([]);
   });
 
-  it("★ no retention-owned body reaches another schema's function either", () => {
-    const offenders: string[] = [];
+  /**
+   * ★ The `pg_catalog` built-ins the retention bodies call, enumerated rather than the schema being waved
+   * through. Widening the scan to every schema surfaced these five, and the tempting fix — "skip
+   * `pg_catalog`" — is the wrong one: `pg_catalog` also holds `pg_read_file`, `lo_import` and `pg_ls_dir`.
+   * Those are superuser-only by default ACL, so they are not reachable today, but a gate whose answer to a
+   * whole schema is "don't look" is not a gate. Five lines cost nothing and a sixth gets read by a person.
+   */
+  const KNOWN_CATALOG_CALLS: Readonly<Record<string, string>> = {
+    "pg_catalog.convert_to":
+      "erase_account: the pseudonym digest's input encoding",
+    "pg_catalog.encode": "erase_account: rendering that digest as text",
+    "pg_catalog.hashtext":
+      "erase_account: the advisory-lock key, derived from the subject",
+    "pg_catalog.pg_advisory_xact_lock":
+      "erase_account: ADR-127's one-transaction-per-subject lock, released at commit",
+    "pg_catalog.sha256": "erase_account: 07 §6.1 step 5's pseudonym",
+  };
+
+  it("★ no retention-owned body reaches another schema's function outside the enumerated built-ins", async () => {
+    // the sibling above filters table names out of `insert into public.x (`; this one had no such filter, so
+    // an ordinary `insert into storage.objects (…)` would have been reported as a call (database pass, LOW) —
+    // and the natural response to a false positive is to weaken the check
+    const { rows } = await db.query<{ fn: string }>(
+      `select n.nspname || '.' || p.proname as fn
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname <> 'public'`,
+    );
+    const otherSchemaFunctions = new Set(rows.map((r) => r.fn.toLowerCase()));
+    const reached = new Set<string>();
     for (const row of bodies) {
-      for (const match of row.src.matchAll(
-        /(?<![a-z0-9_.])((?:auth|storage|extensions|graphql|vault|pgbouncer)\.[a-z0-9_]+)\s*\(/gi,
+      for (const match of normalise(row.src).matchAll(
+        /(?<![a-z0-9_.])([a-z0-9_]+\.[a-z0-9_]+)\s*\(/gi,
       )) {
-        offenders.push(`${row.fn} -> ${match[1]!.toLowerCase()}`);
+        const callee = match[1]!.toLowerCase();
+        if (callee.startsWith("public.")) continue;
+        if (!otherSchemaFunctions.has(callee)) continue;
+        reached.add(callee);
       }
     }
-    expect([...new Set(offenders)].sort()).toEqual([]);
+    expect([...reached].sort()).toEqual(
+      Object.keys(KNOWN_CATALOG_CALLS).sort(),
+    );
+  });
+
+  it("★ every enumerated built-in has a reason and is PUBLIC-executable — the role reaches it the way every role does", async () => {
+    for (const [fn, why] of Object.entries(KNOWN_CATALOG_CALLS)) {
+      expect(why.length, fn).toBeGreaterThan(20);
+    }
+    const { rows } = await db.query<{ fn: string; toPublic: boolean }>(
+      `select n.nspname || '.' || p.proname as fn,
+              coalesce(bool_or(a.grantee = 0 and a.privilege_type = 'EXECUTE'), true) as "toPublic"
+         from pg_proc p
+         join pg_namespace n on n.oid = p.pronamespace
+         left join lateral aclexplode(p.proacl) a on true
+        where n.nspname || '.' || p.proname = any($1::text[])
+        group by 1`,
+      [Object.keys(KNOWN_CATALOG_CALLS)],
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.toPublic, `${row.fn} is not a PUBLIC built-in`).toBe(true);
+    }
   });
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════════════════
