@@ -68,7 +68,21 @@ describe("int.rollback-0032 — the twin restores nothing, and proves it", () =>
     expect(stripped.removed).toBe(2);
   });
 
-  it("★ contains no `grant` at all — every statement it could hold is one ADR-165 forbids", () => {
+  it("★ drops `0032` §3's three key-rewrite guards, and says what that costs", async () => {
+    const guards = `select count(*)::text as n from pg_trigger t
+       where not t.tgisinternal
+         and t.tgname in ('nannies_refuse_key_rewrite', 'admin_notifications_refuse_key_rewrite',
+                          'cookie_consent_records_refuse_key_rewrite')`;
+    const before = await db.query<{ n: string }>(guards);
+    expect(Number(before.rows[0]!.n)).toBe(3);
+
+    await db.query(stripped.sql);
+
+    const after = await db.query<{ n: string }>(guards);
+    expect(Number(after.rows[0]!.n)).toBe(0);
+  });
+
+  it("★ contains no privilege `grant` at all — every one it could hold is one ADR-165 forbids", () => {
     const executable = stripped.sql
       .split("\n")
       .filter((line) => !line.trimStart().startsWith("--"))

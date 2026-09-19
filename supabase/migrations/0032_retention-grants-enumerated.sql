@@ -260,14 +260,27 @@ grant select, update (nanny_id, subject_pseudonym)
 -- Postgres has no "may lock a row" privilege, so the choice was table-level UPDATE — the widest thing in this
 -- file, and on `nannies` it would reach `suspended_at`, `verification_level` and `is_isolated`, which is
 -- ADR-168's surface — or **the narrowest column grant that satisfies the lock**, measured to be any single
--- column. `id` is that column: no job, arm or trigger writes it, it carries no personal data and no decision,
--- and where the row matters the foreign keys referencing it refuse the update outright (`ON UPDATE NO ACTION`
--- is the default on every one of them). The verify block asserts the data columns stayed unwritable.
+-- column. `id` is that column: no job, arm or trigger writes it, and it carries no personal data and no
+-- decision. The verify block asserts the data columns stayed unwritable.
 --
--- The alternative is to stop locking — a `delete ... where id in (select ... limit n)` needs no UPDATE at all —
--- and that is a change to `0031`'s and `0028`'s contention behaviour, not to a grant. It is this unit's
--- question, not its change.
-
+-- ★ **The first draft of this paragraph said the foreign keys refuse the id rewrite, and a security pass
+-- measured that it is false on two of the three.** `admin_notifications` has **zero** inbound foreign keys and
+-- `cookie_consent_records` has one self-reference that only bites a row something already points at, so on both
+-- an `update ... set id = <anything>` under this role **succeeded** — an unconstrained rewrite of a live alert's
+-- or a consent record's primary key, which breaks every external handle to that row (an emailed link, an
+-- idempotency check) while leaving the row present, so a "did we lose an alert" audit still finds it. Only
+-- `nannies` refused, and for a reason the paragraph had not predicted either: the nine keys referencing it, plus
+-- `nanny_visible()` backing a partial index predicate, whose EXECUTE *is* checked on an ordinary update.
+--
+-- An argument that turned out to be wrong is not a control, so section 3 adds one:
+-- `refuse_primary_key_rewrite()` refuses any statement that actually changes `id` on those three tables, for
+-- **every** role — no `is_retention_job()` exemption, because this identity is the one the guard exists for. The
+-- lock still works (it needs the privilege, not the write), and §2h's claim is now true by construction rather
+-- than by an FK that was never there. Driven in `int.retention-grants`, by attempting the swap.
+--
+-- The alternative is to stop locking — a bounded delete needs no UPDATE at all — and that is a change to
+-- `0031`'s and `0028`'s contention behaviour, not to a grant. It is this unit's question, not its change.
+--
 -- 2g. Storage ------------------------------------------------------------------------------------------------
 --
 -- SELECT only. `collect_erasure_objects()` reads the subject's paths by prefix and the removal is an HTTP call
@@ -277,6 +290,50 @@ grant select on table storage.objects to bbldn_retention;
 
 -- ENUMERATED SET — END
 -- ---------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
+-- 3. ★ The row-lock grant is not a licence to rewrite the key (security pass, MEDIUM).
+--
+-- §2h grants `update (id)` on three tables so their arms can take a row lock. The first draft argued the
+-- rewrite was harmless because foreign keys would refuse it; a security pass **measured that this is false on
+-- two of the three** and performed the swap. An argument is not a control, so here is the control.
+--
+-- It refuses for **every** role, with no `is_retention_job()` exemption — this identity is the one the guard
+-- exists for, and `prevent_row_modification()`'s exemption is exactly the shape of hole `0031`'s CRITICAL was.
+-- Nothing in this schema rewrites a primary key: `BEFORE UPDATE OF id` means the trigger is not even consulted
+-- unless a statement names the column, so the cost on `acknowledged_at` and `superseded_by` writes is nil.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.refuse_primary_key_rewrite()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.id is distinct from old.id then
+    raise exception
+      'ADR-185: % is not rewritable — the retention identity holds update (id) to take a row lock, not to change the key',
+      tg_table_name
+      using errcode = 'restrict_violation';
+  end if;
+  return new;
+end;
+$$;
+
+comment on function public.refuse_primary_key_rewrite() is
+  'ADR-185 / 0032 §2h: refuses any statement that actually changes a primary key on a table whose retention grant is `update (id)`. Granted so an arm can take `for update nowait`; Postgres charges a row lock to UPDATE and offers no narrower privilege, so the write capability that comes with it is closed here instead. No role is exempt — the retention identity is the one this guard exists for.';
+
+create trigger nannies_refuse_key_rewrite
+  before update of id on public.nannies
+  for each row execute function public.refuse_primary_key_rewrite();
+
+create trigger admin_notifications_refuse_key_rewrite
+  before update of id on public.admin_notifications
+  for each row execute function public.refuse_primary_key_rewrite();
+
+create trigger cookie_consent_records_refuse_key_rewrite
+  before update of id on public.cookie_consent_records
+  for each row execute function public.refuse_primary_key_rewrite();
 
 commit;
 
@@ -379,6 +436,46 @@ begin
      or has_column_privilege('bbldn_retention', 'public.admin_notifications', 'acknowledged_at', 'update')
      or has_column_privilege('bbldn_retention', 'public.cookie_consent_records', 'superseded_by', 'update') then
     raise exception '0032: the row-lock grant widened into a data column';
+  end if;
+
+  -- 4c. ★ …and the capability that comes with the lock is closed by a control rather than by an argument
+  --     (security pass, MEDIUM). The three triggers exist, and `int.retention-grants` drives the swap.
+  if (select count(*) from pg_trigger t
+       where not t.tgisinternal
+         and t.tgname in ('nannies_refuse_key_rewrite', 'admin_notifications_refuse_key_rewrite',
+                          'cookie_consent_records_refuse_key_rewrite')) <> 3 then
+    raise exception '0032: a table carrying `update (id)` has no guard against the key being rewritten';
+  end if;
+
+  -- 4d. ★ Nothing may re-enter the role sideways (security pass, HIGH — the reverse direction). A role granted
+  --     INTO `bbldn_retention` inherits the append-only exemption and every grant above; a role granted TO it
+  --     hands it that role's privileges without touching any ACL this file wrote. Only the migration owner is
+  --     a member, which `0000` needs for `alter function ... owner to`.
+  if exists (select 1 from pg_auth_members m where m.member = 'bbldn_retention'::regrole) then
+    raise exception '0032: bbldn_retention is a member of another role — its privileges are no longer the enumerated set';
+  end if;
+  if exists (
+    select 1 from pg_auth_members m
+     where m.roleid = 'bbldn_retention'::regrole
+       and m.member <> current_user::regrole
+  ) then
+    raise exception '0032: a role other than the migration owner is a member of bbldn_retention';
+  end if;
+
+  -- 4e. ★ No default-privilege rule and no grant option (security pass, MEDIUM). A default-privilege rule is
+  --     invisible to a snapshot of today's ACLs and silently grants on every table created after it; a
+  --     grantable privilege lets this role hand its own access to a third role.
+  if exists (
+    select 1 from pg_default_acl d, lateral aclexplode(d.defaclacl) a
+     where a.grantee = 'bbldn_retention'::regrole
+  ) then
+    raise exception '0032: a default-privilege rule grants bbldn_retention on every table created from now on';
+  end if;
+  if exists (
+    select 1 from pg_class c, lateral aclexplode(c.relacl) a
+     where a.grantee = 'bbldn_retention'::regrole and a.is_grantable
+  ) then
+    raise exception '0032: bbldn_retention holds a grantable privilege and can widen itself';
   end if;
 
   -- 5. The two deferred halves stay unreachable: `events` may not be deleted from (§6.2 row 14's ★ half) and

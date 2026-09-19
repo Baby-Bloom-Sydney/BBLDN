@@ -363,6 +363,34 @@ describe("int.retention-grants — what the role can actually do (effective priv
     expect(memberships).toEqual([]);
   });
 
+  it("★ and no role but the migration owner is a member of IT — the same route, reversed (security pass, HIGH)", async () => {
+    const { rows } = await db.query<{ member: string }>(
+      `select r.rolname as member
+         from pg_auth_members m
+         join pg_roles r on r.oid = m.member
+        where m.roleid = 'bbldn_retention'::regrole
+          and r.rolname <> current_user
+        order by 1`,
+    );
+    expect(rows.map((r) => r.member)).toEqual([]);
+  });
+
+  it("★ holds no grantable privilege — it cannot widen itself (security pass, MEDIUM)", async () => {
+    const { rows } = await db.query(
+      `select 1 from pg_class c, lateral aclexplode(c.relacl) a
+        where a.grantee = 'bbldn_retention'::regrole and a.is_grantable`,
+    );
+    expect(rows).toEqual([]);
+  });
+
+  it("★ is named by no default-privilege rule — the grant invisible today that applies to every table added tomorrow (security pass, MEDIUM)", async () => {
+    const { rows } = await db.query(
+      `select 1 from pg_default_acl d, lateral aclexplode(d.defaclacl) a
+        where a.grantee = 'bbldn_retention'::regrole`,
+    );
+    expect(rows).toEqual([]);
+  });
+
   it("★ reaches no column of a relation the set does not name", () => {
     const withColumns = effective
       .filter((r) => r.anyColumn)
@@ -502,6 +530,58 @@ describe("int.retention-grants — what the identity is refused, and by which co
     ).rejects.toMatchObject({ code: "42501" });
   });
 
+  // ★ The `update (id)` grants exist so an arm can take `for update nowait`. A security pass measured that the
+  // foreign keys this file first claimed would refuse the rewrite do not exist on two of the three, and
+  // performed the swap. These three cases are the control that replaced the argument — the swap is attempted,
+  // the way the reviewer attempted it, rather than a `has_column_privilege` answer being read.
+  it.each([
+    [
+      "public.admin_notifications",
+      "admin_notifications_refuse_key_rewrite",
+      `insert into public.admin_notifications (kind, summary) values ('call_due', 'probe')`,
+    ],
+    [
+      "public.cookie_consent_records",
+      "cookie_consent_records_refuse_key_rewrite",
+      `insert into public.cookie_consent_records
+         (visitor_id, consent_choice, analytics_enabled, marketing_enabled, expiry_date)
+       values ('probe', 'reject_non_essential', false, false, now() + interval '13 months')`,
+    ],
+  ])(
+    "★ %s: the row-lock grant is refused when it tries to rewrite the key (%s)",
+    async (table, trigger, seed) => {
+      const { rows } = await db.query(
+        `select 1 from pg_trigger t where not t.tgisinternal and t.tgname = $1`,
+        [trigger],
+      );
+      expect(rows).toHaveLength(1);
+
+      // the row has to exist or the statement touches nothing and the trigger is never consulted — which is
+      // how the first draft of these cases passed for the wrong reason
+      await expect(
+        asRetention(`update ${table} set id = gen_random_uuid()`, seed),
+      ).rejects.toMatchObject({ code: "23001" });
+    },
+  );
+
+  it("★ `nannies` carries the same guard, and the lock the grants exist for still works on all three", async () => {
+    const { rows } = await db.query(
+      `select 1 from pg_trigger t
+        where not t.tgisinternal and t.tgname = 'nannies_refuse_key_rewrite'`,
+    );
+    expect(rows).toHaveLength(1);
+
+    for (const table of [
+      "public.nannies",
+      "public.admin_notifications",
+      "public.cookie_consent_records",
+    ]) {
+      await expect(
+        asRetention(`select 1 from ${table} for update nowait`),
+      ).resolves.toBeDefined();
+    }
+  });
+
   it("★ is refused every privilege on a table no job touches", async () => {
     await expect(
       asRetention(`select 1 from public.rate_limit_buckets`),
@@ -537,9 +617,11 @@ describe("int.retention-grants — what the identity is refused, and by which co
  * does. The role is NOLOGIN, so this is reachable only from a session that is already a member — the migration
  * owner — which is exactly `0000`'s stated limit on the exemption (ADR-180).
  */
-async function asRetention(sql: string): Promise<unknown> {
+async function asRetention(sql: string, seed?: string): Promise<unknown> {
   await db.query("begin");
   try {
+    // the seed runs as the migration owner, before the role is assumed — a fixture is not what is being tested
+    if (seed) await db.query(seed);
     await db.query("set local role bbldn_retention");
     return await db.query(sql);
   } finally {

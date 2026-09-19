@@ -1221,7 +1221,25 @@ documentation rather than authority.
   verify block, running at its own apply time, could never catch. The enumerated set is stated twice on purpose
   (the migration's grant block and the suite's `ENUMERATED` list) and one case asserts the two agree, so neither
   drifts alone.
-- **The twin restores nothing, and proves it.** `0032` is a security clause from its first line to its last, so
+- ★ **The `update (id)` claim was wrong, and a security pass measured it.** §2h first argued the rewrite was
+  harmless because the foreign keys would refuse it. `admin_notifications` has **zero** inbound keys and
+  `cookie_consent_records`' one self-reference only bites a row something already points at — on both, an
+  `update ... set id = <anything>` under this role **succeeded**. An argument is not a control, so `0032` §3
+  adds `refuse_primary_key_rewrite()` on all three tables, for **every** role with no `is_retention_job()`
+  exemption, since this identity is the one the guard exists for. `before update of id` means the trigger is not
+  consulted unless a statement names the column, so the cost on an `acknowledged_at` or `superseded_by` write is
+  nil. Driven both ways: the swap is attempted the way the reviewer attempted it, and with the guards dropped
+  the three cases go red.
+- **The gate's blind spots, all three closed.** `aclexplode(relacl)` filtered on the role name sees only grants
+  made to it **by name**. Both reviewers drove the ways round it: a blanket grant to a helper role later handed
+  to `bbldn_retention`; the reverse, a login role made a member of it; a grant `TO PUBLIC`; a
+  `WITH GRANT OPTION` that leaves `privilege_type` unchanged; and an `alter default privileges` rule that reads
+  as 33 relations today and silently grants on every table added afterwards. The gate now asks
+  `has_table_privilege` / `has_any_column_privilege` — which follow membership, `PUBLIC` and ownership — and
+  asserts no membership in either direction, no grantable privilege and no default-privilege rule. The
+  direct-ACL cases stay: one says _where_ a stray grant was written, the other _whether the role can do it at
+  all_, and a hole has to pass both.
+- **The twin restores no privilege, and proves it.** `0032` is a security clause from its first line to its last, so
   ADR-165 (1) leaves its twin with no statement it is allowed to make; `int.rollback-0032` is what makes "did
   nothing" a fact rather than a comment. The recovery is roll-forward: a job found to need a privilege gets a
   new migration naming the table and the reason, never a wider grant at 3 a.m.

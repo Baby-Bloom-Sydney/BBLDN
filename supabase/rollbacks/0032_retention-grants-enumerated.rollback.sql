@@ -1,7 +1,7 @@
 -- 0032_retention-grants-enumerated.rollback.sql — the twin of
 -- supabase/migrations/0032_retention-grants-enumerated.sql (06 §4.2; **ADR-165 arm (1)**).
 --
--- ★ **This twin restores nothing, and that is the whole of it.**
+-- ★ **This twin restores no privilege, and that is the whole of it.**
 --
 -- `0032` is a privilege change and contains nothing else: no function, no policy, no constraint, no row. Undoing
 -- it means one statement —
@@ -34,9 +34,28 @@
 --
 -- One transaction, so that "did nothing" is a fact about the database and not about how far it got.
 
+-- ⚠️ **AND A RUNBOOK NOTE, because the SQL comment is not where an operator looks** (security pass, LOW).
+-- An operator reaching for this file mid-incident, expecting a temporary widening so they can diagnose
+-- something, gets **nothing** — by design. There is no "just put it back for an hour" path. Diagnosis runs as
+-- the migration owner, which can already read everything; if a retention *job* genuinely needs a privilege it
+-- does not have, that is a forward migration naming the table and the reason.
+--
+-- One transaction, so that "did nothing" is a fact about the database and not about how far it got.
+
 begin;
 
--- Intentionally empty. Every statement this file could contain is one ADR-165 forbids.
+-- The privilege half is intentionally empty: every statement it could contain is one ADR-165 forbids.
+--
+-- The one thing there *is* to undo is `0032` §3 — the three `before update of id` guards, which are objects
+-- this file created rather than a privilege it removed. They go, and their reason goes with them: after this
+-- twin the `update (id)` grants are back to being defended by an argument that a security pass measured to be
+-- false on two of the three tables. **That is a cost of the rollback, not a preference**, and it is the second
+-- reason the recovery here is roll-forward.
+
+drop trigger if exists nannies_refuse_key_rewrite on public.nannies;
+drop trigger if exists admin_notifications_refuse_key_rewrite on public.admin_notifications;
+drop trigger if exists cookie_consent_records_refuse_key_rewrite on public.cookie_consent_records;
+drop function if exists public.refuse_primary_key_rewrite();
 
 commit;
 
