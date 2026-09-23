@@ -21,6 +21,7 @@ const unconfigured: PositionsReads = Object.freeze({
   getForMatching: async () => NOT_CONFIGURED,
   recordPrecheck: async () => NOT_CONFIGURED,
   findLive: async () => NOT_CONFIGURED,
+  awaitingPrecheck: async () => NOT_CONFIGURED,
 });
 
 export const POSITIONS_REGISTRY: Registry<PositionsReads> =

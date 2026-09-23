@@ -10,7 +10,9 @@
 import { auth } from "@/modules/auth";
 import {
   configurePlacements,
+  configurePlacementsJobs,
   createPlacements,
+  createPlacementsJobs,
   createPlacementsSlice,
   placementsSliceRegistration,
 } from "@/modules/placements";
@@ -21,12 +23,16 @@ import type { PortWiring } from "./types";
 export function wirePlacements(): PortWiring {
   const store = dbPlacementStore(auth.data);
   configurePlacements(createPlacements({ store }));
+  // `4d` — `placement-start-sweep`, over the **same store instance** the reads and the slice use: two stores
+  // would let the sweep read one row and `advance` write another.
+  configurePlacementsJobs(createPlacementsJobs({ store, advance }));
   registerSlice(
     placementsSliceRegistration(createPlacementsSlice({ store, advance })),
   );
   return {
     port: "placements",
-    binding: "the three L rows over nanny_placements, plus the I-3 read",
+    binding:
+      "the three L rows over nanny_placements, the I-3 read, and placement-start-sweep (L-1b)",
     reason:
       "openDfyAccess is NOT wired: ADR-093 puts app access on L-1b and 1h owns the payments inside; a fail-closed binding would take a nanny's first day down with it. placement.started is emitted regardless, which is the half 1h consumes",
   };

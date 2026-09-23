@@ -96,6 +96,15 @@ export type PlacementSource = (typeof ENUMS.placement_source)[number];
 
 export type PlacementStore = {
   get(placementId: PlacementId): Promise<Result<PlacementRecord | null>>;
+  /**
+   * `4d` — every placement **in one state**, across every family. `placement-start-sweep` is the only caller:
+   * it reads `CONFIRMED`, the state L-1b moves a row out of, which is what makes a second fire a no-op without
+   * any memory of the first. One state, not a list, because 03 §1.4's `Query` offers one equality predicate
+   * (ADR-131 (1)).
+   */
+  forState(
+    state: PlacementState,
+  ): Promise<Result<ReadonlyArray<PlacementRecord>>>;
   /** I-3's "≤ 1 non-ended placement per position", and the read `activeForPosition` answers. */
   forPosition(
     positionId: PositionId,
@@ -116,6 +125,24 @@ export type PlacementStore = {
 export type PlacementAdvanceFn = (
   input: AdvanceInput<TransitionId>,
 ) => Promise<Result<StateAfter>>;
+
+// ── The scheduled sweep (`4d`; 01 §4f) ──
+
+/**
+ * `placement-start-sweep` — 00:15 London, "`start_date <= today`" (01 §4f). It drives **L-1b**, which already
+ * exists and already cascades into K-21 and `payments.openDfyAccess`; the sweep's whole job is to find the
+ * placements whose first day has arrived, which is the half the stage model was never given.
+ */
+export type PlacementJobRun = {
+  readonly handled: number;
+  readonly skipped: number;
+};
+
+export type PlacementsJobs = {
+  readonly runStartSweep: (
+    now: Instant,
+  ) => Promise<PlacementsResult<PlacementJobRun>>;
+};
 
 export type PlacementsDeps = {
   readonly store: PlacementStore;

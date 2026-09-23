@@ -8,9 +8,16 @@
 // asserts of each job is the thing an operator cares about: **it ran once per London day, at the London time it
 // was declared at, on both sides of the boundary.**
 //
-// The five jobs `4b` re-based are named individually (`08.22` proactive · `08.23` compact-daily · `08.24`
-// cleanup-orphan-children · `08.30` soft-lock-stale-children · `08.26` snapshot-pipeline); the sweep over the whole
-// list then holds the same standard for every other cron, including any added later.
+// Five jobs are named individually and the sweep over the whole list then holds the same standard for every other
+// cron, including any added later.
+//
+// **`4d` re-based the five named ones**, because the five `4b` chose (`proactive` · `compact-daily` ·
+// `cleanup-orphan-children` · `soft-lock-stale-children` · `snapshot-pipeline`) are exactly the five BAI struck
+// off the schedule on 2026-09-23: they swept phases that do not exist. Every property they were chosen to prove
+// is kept, on a cron that is still scheduled and now has a handler — a 03:00 daily across both transitions
+// (`expire-trials`), two dailies fifteen minutes apart through BST (`delete-account` / `purge-scrubbed-users`),
+// a midnight-adjacent daily whose BST fire lands the UTC evening before (`placement-start-sweep`), and an
+// `every` cron the gate never touches (`expire-connections`).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { CRONS } from "@/modules/config";
@@ -151,9 +158,9 @@ describe.each([SPRING_FORWARD, FALL_BACK])("$name", (window) => {
   );
 });
 
-describe("the five jobs 4b re-based, named", () => {
-  it("08.23 compact-daily compacts 03:00 London on both sides of spring forward", () => {
-    const spec = specFor("/api/cron/compact-daily");
+describe("five jobs the re-base is named against", () => {
+  it("expire-trials lapses at 03:00 London on both sides of spring forward", () => {
+    const spec = specFor("/api/cron/expire-trials");
     const fires = firesBetween(
       committedSchedules.get(spec.path) ?? "",
       SPRING_FORWARD.from,
@@ -166,9 +173,9 @@ describe("the five jobs 4b re-based, named", () => {
     expect(fires).not.toContain("2026-03-30T03:00:00.000Z");
   });
 
-  it("08.24 cleanup-orphan-children and 08.30 soft-lock-stale-children keep their fifteen-minute gap through BST", () => {
-    const cleanup = specFor("/api/cron/cleanup-orphan-children");
-    const softLock = specFor("/api/cron/soft-lock-stale-children");
+  it("delete-account and purge-scrubbed-users keep their fifteen-minute gap through BST", () => {
+    const cleanup = specFor("/api/cron/delete-account");
+    const softLock = specFor("/api/cron/purge-scrubbed-users");
     const dueOn = (spec: CronSpec) =>
       firesBetween(
         committedSchedules.get(spec.path) ?? "",
@@ -176,12 +183,12 @@ describe("the five jobs 4b re-based, named", () => {
         "2026-07-02T00:00:00.000Z",
       ).filter((at) => cronIsDue(spec.london, at));
 
-    expect(dueOn(cleanup)).toEqual(["2026-07-01T02:00:00.000Z"]);
-    expect(dueOn(softLock)).toEqual(["2026-07-01T02:15:00.000Z"]);
+    expect(dueOn(cleanup)).toEqual(["2026-07-01T01:30:00.000Z"]);
+    expect(dueOn(softLock)).toEqual(["2026-07-01T01:45:00.000Z"]);
   });
 
-  it("08.26 snapshot-pipeline stamps the London date, not the UTC one — in BST it fires the UTC evening before", () => {
-    const spec = specFor("/api/cron/snapshot-pipeline");
+  it("placement-start-sweep reads the London date, not the UTC one — in BST it fires the UTC evening before", () => {
+    const spec = specFor("/api/cron/placement-start-sweep");
     const fires = firesBetween(
       committedSchedules.get(spec.path) ?? "",
       "2026-07-01T00:00:00.000Z",
@@ -189,21 +196,21 @@ describe("the five jobs 4b re-based, named", () => {
     ).filter((at) => cronIsDue(spec.london, at));
 
     expect(fires).toEqual([
-      "2026-07-01T23:05:00.000Z",
-      "2026-07-02T23:05:00.000Z",
+      "2026-07-01T23:15:00.000Z",
+      "2026-07-02T23:15:00.000Z",
     ]);
     expect(londonWallClock(fires[0]!)).toMatchObject({
       date: "2026-07-02",
       hour: 0,
-      minute: 5,
+      minute: 15,
     });
   });
 
-  it("08.22 proactive is never gated — its waking-hours window is the handler's, read off the London clock", () => {
-    const spec = specFor("/api/cron/proactive");
+  it("expire-connections is never gated — an `every` cron declares no London hour for the gate to check", () => {
+    const spec = specFor("/api/cron/expire-connections");
 
     expect(spec.london.kind).toBe("every");
-    // 06:45Z in July is 07:45 London: inside 07:00–22:00 even though the UTC hour says otherwise.
+    // 06:45Z in July is 07:45 London: due either way, and a handler that cares reads the London clock itself.
     expect(cronIsDue(spec.london, "2026-07-15T06:45:00.000Z" as Instant)).toBe(
       true,
     );
@@ -258,9 +265,9 @@ describe("end to end through runCron — the double fire reaches the handler onc
     return { ranAt, spec };
   };
 
-  it("runs compact-daily exactly once per London day across spring forward", async () => {
+  it("runs expire-trials exactly once per London day across spring forward", async () => {
     const { ranAt } = await driveAcross(
-      "/api/cron/compact-daily",
+      "/api/cron/expire-trials",
       SPRING_FORWARD,
     );
 
@@ -274,8 +281,8 @@ describe("end to end through runCron — the double fire reaches the handler onc
     ]);
   });
 
-  it("runs compact-daily exactly once per London day across fall back", async () => {
-    const { ranAt } = await driveAcross("/api/cron/compact-daily", FALL_BACK);
+  it("runs expire-trials exactly once per London day across fall back", async () => {
+    const { ranAt } = await driveAcross("/api/cron/expire-trials", FALL_BACK);
 
     expect(ranAt).toEqual([
       "2026-10-22",
@@ -287,9 +294,9 @@ describe("end to end through runCron — the double fire reaches the handler onc
     ]);
   });
 
-  it("runs snapshot-pipeline exactly once per London day across fall back, midnight included", async () => {
+  it("runs placement-start-sweep exactly once per London day across fall back, midnight included", async () => {
     const { ranAt } = await driveAcross(
-      "/api/cron/snapshot-pipeline",
+      "/api/cron/placement-start-sweep",
       FALL_BACK,
     );
 
@@ -300,7 +307,7 @@ describe("end to end through runCron — the double fire reaches the handler onc
 
   it("the discarded fire answers 200 with a run summary of zero and never calls the handler", async () => {
     const { runCron } = await import("../run-cron");
-    const path = "/api/cron/compact-daily";
+    const path = "/api/cron/expire-trials";
     let calls = 0;
     const handler = async () => {
       calls += 1;
@@ -327,7 +334,7 @@ describe("end to end through runCron — the double fire reaches the handler onc
 
   it("a repeat delivery inside the same due window still reaches the handler — idempotency is the handler's contract, not the gate's", async () => {
     const { runCron } = await import("../run-cron");
-    const path = "/api/cron/compact-daily";
+    const path = "/api/cron/expire-trials";
     let calls = 0;
     const handler = async () => {
       calls += 1;

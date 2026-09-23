@@ -19,6 +19,7 @@ import type { AppDatabase, DataAccessPort } from "@/modules/auth";
 import type { ConnectionRecord, ConnectionStore } from "@/modules/connections";
 import type {
   ConnectionId,
+  ConnectionStage,
   NannyId,
   ParentId,
   PositionId,
@@ -135,7 +136,7 @@ const patchOf = (record: ConnectionRecord) => ({
 const listBy = (
   port: DataAccessPort,
   name: string,
-  column: "position_id" | "parent_id",
+  column: "position_id" | "parent_id" | "stage",
   value: string,
 ): Promise<Result<ReadonlyArray<ConnectionRecord>>> =>
   port.run(
@@ -177,6 +178,11 @@ export function dbConnectionStore(port: DataAccessPort): ConnectionStore {
       listBy(port, "forPosition", "position_id", positionId),
     forParent: (parentId: ParentId) =>
       listBy(port, "forParent", "parent_id", parentId),
+    // `4d` — the sweeps' cohort. This is the one read that filters on `stage`, and it is still **one** stage
+    // per call, by the same equality predicate as the other two: the header's rule stands, because the set of
+    // stages a sweep acts on is `SWEPT_STAGES` in the module, never an `IN` list in this adapter.
+    forStage: (stage: ConnectionStage) =>
+      listBy(port, "forStage", "stage", stage),
     put: async (record: ConnectionRecord, uow?: UnitOfWork) =>
       port.run(
         {

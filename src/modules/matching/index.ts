@@ -11,6 +11,10 @@ export { createMatching } from "./lib/create-matching";
 
 // `1e` — the 03 §7.4 pre-check task, exported so the waves sweep composes the same task the P-2 caller runs.
 export { autofire } from "./lib/autofire";
+// `4d` — the scheduled waves sweep (01 §4f): the net under the pre-check, re-firing any OPEN position with no
+// lever. A standalone function, the shape `admin.callDueSweep` uses, because it composes two connector calls
+// and adds no state of its own.
+export { sweepPrecheckWaves } from "./lib/sweep-precheck-waves";
 // `2d` (kickoff debt 2) — the ONE read of `nanny_public` that answers a name, for the three surfaces 04 §7.1
 // writes `{nanny}` on. Boot injects it into `connections`; none of the three may import this module.
 export { publicNannyName } from "./lib/public-nanny-name";

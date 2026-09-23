@@ -20,8 +20,10 @@ import { comms } from "@/modules/comms";
 import {
   configureConnections,
   configureConnectionsDispatch,
+  configureConnectionsJobs,
   connectionsSliceRegistration,
   createConnections,
+  createConnectionsJobs,
   createConnectionsSlice,
 } from "@/modules/connections";
 import { publicNannyName } from "@/modules/matching";
@@ -57,6 +59,9 @@ async function recipientOf(parentId: ParentId) {
 export function wireConnections(): PortWiring {
   const store = dbConnectionStore(auth.data);
   configureConnectionsDispatch(advance);
+  // `4d` — the three scheduled sweeps, over the **same store instance** the reads and the slice use, for the
+  // reason stated below: two stores would let a sweep read one row and `advance` write another.
+  configureConnectionsJobs(createConnectionsJobs({ store, advance }));
   configureConnections(
     createConnections({
       store,
@@ -82,7 +87,7 @@ export function wireConnections(): PortWiring {
   return {
     port: "connections",
     binding:
-      "the 25 K rows over connection_requests, the two 03 §7.5 reads, and the one nanny_public name read",
+      "the 25 K rows over connection_requests, the two 03 §7.5 reads, the one nanny_public name read, and the three scheduled sweeps (K-8 / K-12 / K-16)",
     reason:
       "advance and positionFacts are injected rather than imported: 01 §2.3 gives connections no arrow to positions, and boot is the one place that may hold both",
   };

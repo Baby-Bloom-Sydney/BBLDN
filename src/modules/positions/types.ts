@@ -123,6 +123,36 @@ export type PositionsReads = {
   readonly findLive: (
     parentId: ParentId,
   ) => Promise<Result<PositionSummary | null>>;
+  /**
+   * `4d` — the positions `dfy-waves` re-fires: `OPEN` with **no pre-check lever**. 03 §7.4 and `autofire`'s own
+   * header name this set ("the waves sweep re-fires any `OPEN` position with no `precheck_fired_at`"); the
+   * sweep lives in `matching`, which owns the pre-check (R2) and has no store of its own, so the read is here.
+   *
+   * Ids only. `matching` re-reads each through `getForMatching`, which is the shape it already scores from —
+   * handing it whole `PositionRecord`s would put this module's record type on a second module's surface.
+   */
+  readonly awaitingPrecheck: () => Promise<Result<ReadonlyArray<PositionId>>>;
+};
+
+// ── The scheduled sweep this module owns (`4d`; 01 §4f) ──
+
+/**
+ * `close-no-candidates` — 04:15 London. 01 §4f: "P-7 → `CLOSED (no_candidates)` **after the pre-check window
+ * ends with no keen nanny**; sends `no-candidates-left`". So the cohort is a position whose `precheck.expiresAt`
+ * has passed and which has **no live connection** — the keen nanny, in the only form the data has one.
+ *
+ * A position with no pre-check lever at all is **not** here: nobody has looked for her yet, and closing her
+ * would tell a family we found nobody when we never went and asked. That one belongs to `dfy-waves`.
+ */
+export type PositionJobRun = {
+  readonly handled: number;
+  readonly skipped: number;
+};
+
+export type PositionsJobs = {
+  readonly runCloseNoCandidates: (
+    now: Instant,
+  ) => Promise<Result<PositionJobRun>>;
 };
 
 // ── The inside (Phase 1 `1e`) — the P rows, the store port and the payloads ──
@@ -204,6 +234,14 @@ export type PositionStore = {
   liveForParent(parentId: ParentId): Promise<Result<PositionRecord | null>>;
   listForParent(
     parentId: ParentId,
+  ): Promise<Result<ReadonlyArray<PositionRecord>>>;
+  /**
+   * `4d` — every position **at one stage**, across every family. The two scheduled sweeps of 01 §4f are the
+   * only callers: `close-no-candidates` reads `OPEN` / `CONNECTING`, and `dfy-waves` reads `OPEN`. One stage,
+   * not a list, because 03 §1.4's `Query` offers one equality predicate (ADR-131 (1)).
+   */
+  forStage(
+    stage: PositionStage,
   ): Promise<Result<ReadonlyArray<PositionRecord>>>;
   /** `uow` is the caller's when a transition is running; the two writes outside one (`amend`,
    * `recordPrecheck`) open their own. */

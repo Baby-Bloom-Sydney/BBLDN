@@ -7,6 +7,7 @@
 import { ok } from "@/modules/platform";
 import type {
   ConnectionId,
+  ConnectionStage,
   ParentId,
   PositionId,
 } from "@/modules/shared-types";
@@ -31,6 +32,8 @@ export function memoryConnectionStore(
       ok(Object.freeze(all().filter((row) => row.positionId === positionId))),
     forParent: async (parentId: ParentId) =>
       ok(Object.freeze(all().filter((row) => row.parentId === parentId))),
+    forStage: async (stage: ConnectionStage) =>
+      ok(Object.freeze(all().filter((row) => row.stage === stage))),
     put: async (record: ConnectionRecord) => {
       holder.current = new Map([
         ...holder.current,

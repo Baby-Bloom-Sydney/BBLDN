@@ -1,7 +1,12 @@
 // The in-memory `PlacementStore` — what the suites run the three L rows against. Replaced, never mutated.
 // The store over `nanny_placements` (`0007`) is `src/boot/db-placement-store.ts`.
 import { ok } from "@/modules/platform";
-import type { ParentId, PlacementId, PositionId } from "@/modules/shared-types";
+import type {
+  ParentId,
+  PlacementId,
+  PlacementState,
+  PositionId,
+} from "@/modules/shared-types";
 import type { PlacementRecord, PlacementStore } from "../types";
 
 export function memoryPlacementStore(
@@ -23,6 +28,8 @@ export function memoryPlacementStore(
       ok(Object.freeze(all().filter((row) => row.positionId === positionId))),
     forParent: async (parentId: ParentId) =>
       ok(Object.freeze(all().filter((row) => row.parentId === parentId))),
+    forState: async (state: PlacementState) =>
+      ok(Object.freeze(all().filter((row) => row.state === state))),
     put: async (record: PlacementRecord) => {
       holder.current = new Map([
         ...holder.current,
