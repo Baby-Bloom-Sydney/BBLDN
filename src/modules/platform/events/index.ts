@@ -10,6 +10,7 @@ export { validateEmitInput } from "./lib/validate-emit-input";
 export { createEvents } from "./lib/create-events";
 export { memorySink } from "./lib/memory-sink";
 export { consoleEventSink } from "./lib/console-event-sink";
+export { metaSink } from "./lib/meta-sink";
 export { memoryEventLogStore } from "./lib/memory-event-log-store";
 export { Events } from "./lib/default-events";
 export { configureEvents } from "./lib/configure-events";

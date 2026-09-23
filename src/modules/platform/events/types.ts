@@ -184,6 +184,51 @@ export type EventsDeps = {
   readonly defaultTimeoutMs?: number;
 };
 
+// ── The `meta` sink (03 §9.5; ADR-055) ──
+
+/**
+ * One Conversions API event. `event_id` is `EventEnvelope.id` — the shared id a browser-side pixel call must
+ * repeat for Meta to count the conversion once rather than twice (03 §9.2: "`id` = Meta event_id for pixel /
+ * CAPI dedup").
+ *
+ * `user_data` carries **hashed ids only**. There is no `em` / `ph` / `fn` field and there is not going to be
+ * one: 03 §9.2 rule 3 keeps email, phone, names and free text out of `props`, so a sink reading `props` has
+ * nothing of that kind to forward, and a sink reaching around `props` for it would be reaching for data the
+ * visitor was never told travels.
+ */
+export type MetaEventPayload = {
+  readonly event_name: string;
+  /** Unix **seconds** (Meta's unit), floored from the envelope's instant. */
+  readonly event_time: number;
+  readonly event_id: EventId;
+  readonly action_source: "website";
+  readonly event_source_url: string;
+  readonly user_data: {
+    /** SHA-256 hex of our own user or visitor id — never the id itself. */
+    readonly external_id?: string;
+    /** `fb.1.<ms>.<fbclid>`, present only when `fbclid` survived the marketing-consent strip. */
+    readonly fbc?: string;
+  };
+  readonly custom_data?: { readonly content_category: string };
+};
+
+/**
+ * What the sink is handed at boot. The dataset id and token reach it as a built `endpoint` + `accessToken`
+ * rather than as config reads, for the reason `platform` is a leaf (01 §2.4): the module must not import
+ * `config/server`, and a sink that read its own secrets could not be constructed in a test without them.
+ *
+ * `fetch` is injectable for the same reason the store is: the suite proves what is sent by running the sink,
+ * not by reading it (`ecc-lite` rule 2).
+ */
+export type MetaSinkDeps = {
+  readonly endpoint: string;
+  readonly accessToken: string;
+  /** 07 §2.9 — the only gate. Asked before every send, and a failure to answer stops the send. */
+  readonly consent: ConsentReader;
+  readonly timeoutMs?: number;
+  readonly fetch?: typeof fetch;
+};
+
 /** `withTimeout` — how a post-commit sink's failure is classified (03 §9.2 rule 1). */
 export type TimeoutDetails = {
   readonly reason: "timeout" | "INTERNAL";

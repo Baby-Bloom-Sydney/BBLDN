@@ -9,9 +9,10 @@
 // the banner exists to ask about. So it moves behind the analytics choice, which is also the only reading under
 // which the banner's Reject button means anything.
 //
-// Nothing marketing-shaped lives here yet: the Meta pixel is `4.45`'s and is unbuilt. When it lands it goes in
-// its own file behind `<ConsentGate category="marketing">`, and `consent-gate.repo.test.ts` is the gate that
-// makes that the only option rather than the recommended one.
+// Nothing marketing-shaped lives here, and nothing ever should: the Meta pixel landed with `4c` in its own
+// file, `MetaPixel.tsx`, behind `<ConsentGate category="marketing">` — a different category, a different
+// consent, a different file. `consent-gate.repo.test.ts` is the gate that makes that the only option rather
+// than the recommended one.
 import { Analytics } from "@vercel/analytics/next";
 
 export function AnalyticsScripts() {

@@ -17,6 +17,7 @@ import { KatieShell } from "@/components/katie/KatieShell";
 import { AnalyticsScripts } from "@/components/legal/AnalyticsScripts";
 import { ConsentGate } from "@/components/legal/ConsentGate";
 import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
+import { MetaPixel } from "@/components/legal/MetaPixel";
 import { MiniFooter } from "@/components/layout/MiniFooter";
 
 export const metadata: Metadata = rootMetadata;
@@ -36,6 +37,13 @@ export default function RootLayout({
               07 §10.3 says so in as many words — so this component is the control. */}
           <ConsentGate category="analytics">
             <AnalyticsScripts />
+          </ConsentGate>
+          {/* `4c`: the Meta pixel hangs on the SAME gate, one category over. It is not a second mechanism —
+              `MetaPixel` carries no consent check of its own — and the marketing toggle is the only thing that
+              mounts it. The Conversions API half is server-side and asks `consent.hasMarketing` before every
+              send, because a server send for a visitor who declined is the same violation in a different hat. */}
+          <ConsentGate category="marketing">
+            <MetaPixel />
           </ConsentGate>
           <CookieConsentBanner />
           {PUBLIC_FLAGS.DEV_MODE && <DevToolbar />}

@@ -15,6 +15,7 @@ export { MATCHING } from "./matching";
 export { CONNECTIONS } from "./connections";
 export { VETTING } from "./vetting";
 export { META_EVENTS } from "./meta-events";
+export { META } from "./meta";
 export { TEST_USER_DOMAIN } from "./testUserDomain";
 export { CRONS } from "./crons";
 export { SECURITY } from "./security";

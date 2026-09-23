@@ -7,3 +7,4 @@ export { FLAGS } from "../flags";
 export { SENDERS } from "../senders";
 export { AREAS_SOURCE } from "../areas-source";
 export { KATIE } from "../katie";
+export { META_API } from "../meta-api";
