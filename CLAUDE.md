@@ -47,53 +47,44 @@ Copied Sydney code is split to one-function-per-file and swept for literals **as
 
 ---
 
-## 3. ECC hard rules — never skip
+## 3. The vital few — this section IS the standard
 
-ECC = Everything Claude Code: `~/.claude/rules/` (rules), `~/.claude/skills/` (skills), `~/.claude/agents/` (agents). These apply to every change in this repo (`../CLAUDE.md` § ECC discipline; build-standard L5):
+ECC's full rule set is written for a funded team with a review budget. This is one person with no revenue and a hard token ceiling. What follows is the 80/20: the rules that actually caught defects across Phases 0–3, and nothing else.
 
-- **Files ≤ 800 lines, functions ≤ 50 lines** (`common/coding-style.md`). Split before, never after.
-- **No `any` in TypeScript application code.** Use `unknown` + narrow (`typescript/coding-style.md`).
-- **Immutable updates only.** Never mutate; return new objects (`common/coding-style.md`).
-- **TDD-first; 80 %+ changed-line coverage on new code** (`common/testing.md`; gate in `05-acceptance-and-test-plan.md` §9 stage 3). Code before test is a deviation that needs a written justification.
-- **`code-reviewer` + `typescript-reviewer` after every change** (`common/code-review.md`). Not optional.
-- **`security-reviewer` on auth / user input / money / API / storage paths** — scope per module in `07-security-and-data-protection.md` §10.1 (mandatory before merge).
-- **`database-reviewer` on any schema, migration, RLS or RPC change** (`02-data-model.md`; `07-security-and-data-protection.md` §5).
-- **No hardcoded secrets.** `config/env.ts` reads `process.env` once; `process.env` anywhere else fails review (`07-security-and-data-protection.md` §7).
-- **Run independent agents in parallel** — one tool-call batch (`common/agents.md`).
-- **Update the task's `PROGRESS.md` whenever your work changes status** (LDN OPERATIONS).
-- **Commit at every task boundary** (`../OPERATIONS/PROTOCOLS/COMMIT-DISCIPLINE.md`); commit shape in `06-runbook.md` §4.3.
-- **Never push, deploy, merge to `main`, or promote without BAI's explicit OK for *that* action.** Prior approvals do not roll forward (`06-runbook.md` §3.2; memory `feedback_never_deploy_without_approval`).
+**Do not read `~/.claude/rules/`. Do not read `DECISIONS.md`, the review registers, or another phase's `PROGRESS.md`.** Your brief carries the decisions you need. If it does not, ask for them — do not go looking.
 
-Before any non-trivial task: re-read the relevant ECC rules (`common/coding-style.md` · `common/testing.md` · `common/code-review.md` · `common/development-workflow.md` · `common/security.md`; `typescript/*`; for UI `web/design-quality.md` · `web/performance.md` · `web/coding-style.md`) and pick the matching agent rather than defaulting to general-purpose coding. Research before writing (`common/development-workflow.md` §0): GitHub code search → library docs → registries → adapt a proven implementation.
+### The six rules
 
-### How much process a unit carries (ADR-123 — read this before anything else in §3)
+1. **Prove it by running it, never by reading it.** Every serious defect this build produced was found by invoking the thing: a privileged function called as the wrong role succeeded; a parent's erasure left zero surviving hire records; a consent tick was being cast into a date column so no nanny could ever pass verification. Reading the code found none of them. If your claim is about behaviour, execute it.
+2. **Test first, and never bend a test to the code.** Write the failing test, watch it fail, then make it pass. Where code and a document disagree the document wins: pin the documented behaviour as a failing test and name its owner.
+3. **Fail closed.** Anything unconfigured, unknown, or refused denies rather than allows. A limiter that errors denies. An unbound port refuses.
+4. **No secret in the repo, ever.** It is public. Keys live in Vercel or the login keychain; documents carry names only.
+5. **One thing per file; cross-module imports go through `index.ts`.** This is what keeps a module swappable and a review cheap.
+6. **Gates enforce, prose does not.** Eight required checks run free on CI. If you want a rule enforced, add a gate — never a paragraph.
 
-ECC is a **project** standard applied at **checkpoints**, not a battery rerun on every task. Running all of it per task is what made units take one to three hours on 2026-09-16, and it still let tautological tests, a wrongly-green prod guard and a privileged module labelled as scaffolding through — all three were caught by the batch sweep afterwards, not by per-task review.
+### Time box
 
-| | What a unit does |
+A unit is **20–40 minutes**. Past an hour you are either doing three units' work or reading what you were not asked to read. Say so and stop rather than pressing on.
+
+### Review — when, and only then
+
+| Situation | Run |
 |---|---|
-| **Build task** | **No review agents.** Build it, pass the fast gates, merge. At most **one** skill, named in your brief. Cite `doc §x.y`, don't read whole documents. Target 20–30 minutes. |
-| **Build task that adds a server action or a route** | As above, **plus one `security-reviewer` pass over the new surface before the PR opens** — one reviewer, not the battery; CRITICAL / HIGH closed in-unit (ADR-142). A control declared in config with no call site fails `check:limiter-call-sites` (ADR-140). |
-| **Fast gates** | `typecheck` · `lint` · `prettier --check .` · `vitest run` · `lint:boundaries` · `check:allowed-imports` · `check:config-literals` · `check:claude-md`. CI runs the slow ones. Never chase a red that exists on `main` by construction. |
-| **Checkpoint** | Once a day, overnight: the **full battery over the whole diff since the last checkpoint**. Findings come back as one fix unit, not seven interruptions. |
-| **Model split** | Fable builds while BAI is present; Opus runs the checkpoint and its fixes. |
+| Ordinary build work | **nothing** — no `code-reviewer`, no `typescript-reviewer`, no `silent-failure-hunter` |
+| Your diff touches auth, money, personal data, children's data, or a privilege/grant | **one** `security-reviewer` pass |
+| You wrote a migration | **one** `database-reviewer` pass |
+| End of a phase | **one** sweep, run by the planner, not by you — and its fixes are not themselves swept |
 
-**Two rules survive unconditionally, because they are cheap and they are what actually failed:**
+Nothing else spawns an agent. Two units in flight at most, one while limits are tight.
 
-1. **Any claim your merge rests on ships as an executable test in the same PR.** "It fails closed until boot configures it" is not a merge argument unless a test proves it, run RED first. Ten of thirteen modules made that claim with no test that could have caught a regression.
-2. **A test that asserts whatever the code happens to do is worse than no test.** If the code and the document disagree, the document wins: pin the documented behaviour as a failing test and record it. Never bend the assertion to match the code.
+### Reading budget
 
-**The trigger that ends all of this:** the first moment a real person can reach the site or real data exists. Then inline review returns for auth, money, personal data and schema, permanently. Until then nothing is deployed and the database is empty, so a fault found tomorrow costs what it costs today. **If you are the unit that makes the site reachable, say so loudly — that is the day the rule flips.**
+This file · `docs/build-progress.md` · the `README.md` of each module you touch · the exact document sections your brief names. That is the whole list.
 
-### Workflow recipes (portable from Sydney's `BB/nanny-platform/CLAUDE.md`)
+### Model
 
-- **New unit of work:** `planner` / `code-architect` → `tdd-guide` writes the failing test → minimum implementation → `[code-reviewer + typescript-reviewer + silent-failure-hunter]` in one batch → fix HIGH + MEDIUM → gates (§7) → commit → PROGRESS.md.
-- **Bug fix:** failing test first → root cause, minimal patch, no surrounding refactor → `[code-reviewer + typescript-reviewer]` → full suite → commit.
-- **Security-sensitive path:** implement security-first → `[code-reviewer + typescript-reviewer + security-reviewer]` → every CRITICAL + HIGH closed before commit.
-- **Schema / migration:** `code-architect` → migration + rollback SQL → `[database-reviewer + code-reviewer]` → local Supabase, verify RLS → **BAI applies to preview / production, one OK per file** (`06-runbook.md` §4.2). Never auto-apply.
-- **Build breakage:** `build-error-resolver`, minimal diff, typecheck + build green, commit.
+**Opus for everything**, including work the plans mark `[Fable]`. Fable only when the planner names it in the brief and says why. This holds until BAI says otherwise.
 
----
 
 ## 4. Where things are decided — pointer table
 
@@ -233,8 +224,8 @@ If a fact is needed here to make a rule readable, the rule is written as a point
 
 ## Precedence
 
-1. `~/.claude/rules/` — base ECC rules. Always apply.
-2. **This file** — code-repo process rules.
+1. **This file, §3** — the vital few. It **replaces** `~/.claude/rules/` for this repo (BAI's ruling, 2026-09-23). Do not read the rules directory; if something in it matters, it is either in §3 or it is a gate.
+2. **The rest of this file** — code-repo process rules.
 3. `FOUNDATIONS/*` — what the app is (facts); they win over any code comment or README in this repo.
 4. `../OPERATIONS/PROTOCOLS/*` — team protocols referenced from here.
 5. Per-task handoff docs — task-specific notes.
@@ -244,7 +235,7 @@ Sydney's `website/` CLAUDE.md chain is reference only; it does not govern this r
 ---
 
 <!-- audit
-Last edited: 2026-09-18T00:40+10:00 — BB-LDN-Planner-070926
+Last edited: 2026-09-23T09:30+10:00 — BB-LDN-Planner-070926
 Notes (F9, review fix pass): preamble bootstrap moment → 08 §2.1 step 0 / gate A0; linked-vs-vendored ADR governs ALL ../ paths (foundations + OPERATIONS), default linked; §5 reduced to pointers only (01 §2.3–2.5 / §4a / §6.3; 03 §1.4 / §2.1 / §3; 05 §7), restated rules + unratified slice-registration default removed; §6 BRANCHES.md created at bootstrap, else stop + create from Sydney pattern; §9 seed build-progress / CHANGELOG from _project-template shape before first commit; §4 fallback keeps README §2 as authority.
-Previous: Notes: §3 checkpoint table gains the ADR-142 row (action/route units carry one security-reviewer pass; declared-and-uncalled controls fail a gate). Earlier: initial authoring (L-004 wave 4) — code-repo CLAUDE.md seed: pointers + process only; five laws as merge blocks + five-question test; ECC hard rules; pointer table mirroring README §2 with real section numbers from 00–08 + DECISIONS + build-standard; module rules (folder shape, boundary lint, service leaves, auth no-client, UnitOfWork token, slice registration default pending 03 §12 item 35 / 01 §10 O-12, scheduling importers); branch/deploy/promote condensed from 06 §3–§4 with Sydney origin; efficiency + compaction (portable half of Sydney's nanny-platform CLAUDE.md); three build ledgers; never-list; precedence. Bootstrap decisions flagged: linked vs vendored foundations; slice-registration shape.
+Previous: Notes: §3 replaced by the vital few — BAI's ruling of 2026-09-23: ECC boiled to the 80/20, no rules-directory reading, no mid-build review agents, a 20-40 minute time box, Opus for everything. Earlier: §3 checkpoint table gains the ADR-142 row (action/route units carry one security-reviewer pass; declared-and-uncalled controls fail a gate). Earlier: initial authoring (L-004 wave 4) — code-repo CLAUDE.md seed: pointers + process only; five laws as merge blocks + five-question test; ECC hard rules; pointer table mirroring README §2 with real section numbers from 00–08 + DECISIONS + build-standard; module rules (folder shape, boundary lint, service leaves, auth no-client, UnitOfWork token, slice registration default pending 03 §12 item 35 / 01 §10 O-12, scheduling importers); branch/deploy/promote condensed from 06 §3–§4 with Sydney origin; efficiency + compaction (portable half of Sydney's nanny-platform CLAUDE.md); three build ledgers; never-list; precedence. Bootstrap decisions flagged: linked vs vendored foundations; slice-registration shape.
 -->
