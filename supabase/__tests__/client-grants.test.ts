@@ -149,19 +149,39 @@ const CLIENT_RELATIONS: Readonly<Record<string, Entry>> = {
   "public.account_erasure_requests": R(
     "account_erasure_requests_own_select — the subject follows their own Art 17 request",
   ),
-  "public.agent_memory": R("agent_memory's own select policy — Katie's per-user memory"),
-  "public.availability_blocks": R("the nanny's own calendar blocks, read by the scheduling surface"),
-  "public.availability_rules": R("the nanny's own recurring availability, same surface"),
+  "public.agent_memory": R(
+    "agent_memory's own select policy — Katie's per-user memory",
+  ),
+  "public.availability_blocks": R(
+    "the nanny's own calendar blocks, read by the scheduling surface",
+  ),
+  "public.availability_rules": R(
+    "the nanny's own recurring availability, same surface",
+  ),
   "public.bloombot": R("the family's own Bloombot state"),
-  "public.bookings": R("the parties to a booking read it; the writes are service-scope"),
+  "public.bookings": R(
+    "the parties to a booking read it; the writes are service-scope",
+  ),
   "public.calendars": R("the nanny's own calendar rows"),
-  "public.chat_cost_daily": R("an admin reads the chat cost roll-up in the console"),
-  "public.chat_messages": R("the parties to a conversation read it; the writes go through the API route"),
+  "public.chat_cost_daily": R(
+    "an admin reads the chat cost roll-up in the console",
+  ),
+  "public.chat_messages": R(
+    "the parties to a conversation read it; the writes go through the API route",
+  ),
   "public.chat_summaries": R("the same conversation's summaries"),
-  "public.child_client": R("the family and the linked nanny read the link; the RPCs are the only writer"),
-  "public.child_invites": R("the issuing parent and the invited nanny read it; the RPCs are the writer"),
-  "public.connection_requests": R("the parties to a connection read it; the stage model is the writer"),
-  "public.cookie_consent_records": R("the subject reads their own cookie consent"),
+  "public.child_client": R(
+    "the family and the linked nanny read the link; the RPCs are the only writer",
+  ),
+  "public.child_invites": R(
+    "the issuing parent and the invited nanny read it; the RPCs are the writer",
+  ),
+  "public.connection_requests": R(
+    "the parties to a connection read it; the stage model is the writer",
+  ),
+  "public.cookie_consent_records": R(
+    "the subject reads their own cookie consent",
+  ),
   "public.development_images": R("the family reads their own child's images"),
   "public.email_logs": R("an admin reads the send log in the console"),
   "public.file_retention_log": R(
@@ -169,29 +189,57 @@ const CLIENT_RELATIONS: Readonly<Record<string, Entry>> = {
   ),
   "public.katie_prompt": R("an admin reads the live prompt"),
   "public.katie_prompt_edits": R("an admin reads the prompt's edit history"),
-  "public.katie_prompt_version": R("an admin reads the prompt's version pointer"),
+  "public.katie_prompt_version": R(
+    "an admin reads the prompt's version pointer",
+  ),
   "public.lead_contacts": R("an admin reads a lead's contacts in the console"),
   "public.lead_notes": R("an admin reads a lead's notes in the console"),
   "public.milestones": R("the family reads the milestone catalogue"),
-  "public.nannies": R("the connected parties read the base row; nanny_public is the browse surface"),
-  "public.nanny_contact_state": R("an admin reads a nanny's contact state; no row is visible to a family"),
+  "public.nannies": R(
+    "the connected parties read the base row; nanny_public is the browse surface",
+  ),
+  "public.nanny_contact_state": R(
+    "an admin reads a nanny's contact state; no row is visible to a family",
+  ),
   "public.nanny_placements": R("the parties to a placement read it"),
-  "public.nanny_positions": R("the parent's own position and the board an active nanny sees"),
-  "public.nanny_suspension_lifts": R("an admin reads the safeguarding lift record"),
-  "public.parent_subscriptions": R("the family reads its own subscription; the spine's writes are service"),
-  "public.parents": R("the connected nanny and the parent themselves read the row"),
+  "public.nanny_positions": R(
+    "the parent's own position and the board an active nanny sees",
+  ),
+  "public.nanny_suspension_lifts": R(
+    "an admin reads the safeguarding lift record",
+  ),
+  "public.parent_subscriptions": R(
+    "the family reads its own subscription; the spine's writes are service",
+  ),
+  "public.parents": R(
+    "the connected nanny and the parent themselves read the row",
+  ),
   "public.payment_events": R("the family reads its own payment history"),
   "public.pipeline_snapshots": R("an admin reads the pipeline roll-up"),
-  "public.position_call_mirror": R("the parent reads their own call detail; upsert_call_mirror is the writer"),
-  "public.position_children": R("the position's children, read by the parent and the board"),
+  "public.position_call_mirror": R(
+    "the parent reads their own call detail; upsert_call_mirror is the writer",
+  ),
+  "public.position_children": R(
+    "the position's children, read by the parent and the board",
+  ),
   "public.position_schedule": R("the position's schedule, same surface"),
   "public.precheck_notifications": R("an admin reads the precheck log"),
   "public.proactive_schedules": R("the family reads its own Katie schedule"),
-  "public.progress_history": R("the family reads its own child's progress history"),
-  "public.progress_scores": R("the family reads its own child's progress scores"),
-  "public.user_roles": R("the signed-in user reads their own role; signUp is the only writer"),
-  "public.verifications": R("the nanny reads her own verification, and an admin reads all of them"),
-  "public.vetting_submissions": R("the nanny reads her own submission, and an admin reads all of them"),
+  "public.progress_history": R(
+    "the family reads its own child's progress history",
+  ),
+  "public.progress_scores": R(
+    "the family reads its own child's progress scores",
+  ),
+  "public.user_roles": R(
+    "the signed-in user reads their own role; signUp is the only writer",
+  ),
+  "public.verifications": R(
+    "the nanny reads her own verification, and an admin reads all of them",
+  ),
+  "public.vetting_submissions": R(
+    "the nanny reads her own submission, and an admin reads all of them",
+  ),
 
   // ── authenticated: read only, views. Nine, and read only — the header is the whole reason.
   "public.booking_events": {
@@ -295,8 +343,8 @@ const expected = (role: "anon" | "authenticated"): Record<string, Priv[]> => {
 const sortValues = (r: Record<string, Priv[]>): Record<string, Priv[]> =>
   Object.fromEntries(
     Object.entries(r)
-      .map(([k, v]) => [k, [...v].sort()])
-      .sort(([a], [b]) => a.localeCompare(b)),
+      .map(([k, v]): readonly [string, Priv[]] => [k, [...v].sort()])
+      .sort((a, b) => a[0].localeCompare(b[0])),
   );
 
 describe("int.client-grants — the enumerated set is the whole set", () => {
@@ -307,7 +355,9 @@ describe("int.client-grants — the enumerated set is the whole set", () => {
   });
 
   it("★ `anon` holds exactly what the list says — three relations, SELECT only", async () => {
-    expect(sortValues(await held("anon"))).toEqual(sortValues(expected("anon")));
+    expect(sortValues(await held("anon"))).toEqual(
+      sortValues(expected("anon")),
+    );
   });
 
   it("★ `anon` holds no write privilege anywhere in `public` — there is no anon write policy to justify one", async () => {
@@ -371,16 +421,19 @@ describe("int.client-grants — the enumerated set is the whole set", () => {
           and not has_table_privilege(r.g, c.oid, p.cmd)
         order by 1, 2, 3`,
     );
-    expect(rows.map((r) => `${r.rel}.${r.cmd} for ${r.role} has no grant`)).toEqual(
-      [],
-    );
+    expect(
+      rows.map((r) => `${r.rel}.${r.cmd} for ${r.role} has no grant`),
+    ).toEqual([]);
   });
 
   it("★ every entry carries a reason and a `from where` — ADR-186's field, not decoration", () => {
     for (const [rel, entry] of Object.entries(CLIENT_RELATIONS)) {
       expect(entry.why.length, rel).toBeGreaterThan(20);
       expect(["policy", "view"], rel).toContain(entry.via);
-      expect(entry.authenticated.length + (entry.anon?.length ?? 0), rel).toBeGreaterThan(0);
+      expect(
+        entry.authenticated.length + (entry.anon?.length ?? 0),
+        rel,
+      ).toBeGreaterThan(0);
       for (const p of [...entry.authenticated, ...(entry.anon ?? [])])
         expect(PRIVS, rel).toContain(p);
     }
@@ -394,7 +447,8 @@ describe("int.client-grants — the enumerated set is the whole set", () => {
     expect(end).toBeGreaterThan(start);
     const block = sql.slice(start, end);
     const named = new Set<string>();
-    for (const match of block.matchAll(/\bpublic\.[a-z_]+/g)) named.add(match[0]);
+    for (const match of block.matchAll(/\bpublic\.[a-z_]+/g))
+      named.add(match[0]);
     expect([...named].sort()).toEqual(Object.keys(CLIENT_RELATIONS).sort());
   });
 });
@@ -461,7 +515,9 @@ describe("int.client-grants — the roads a direct-ACL read cannot see", () => {
         order by 1`,
     );
     for (const row of rows.filter((r) => r.role !== "supabase_admin"))
-      expect(row.acl, `${row.role}'s default`).not.toMatch(/\banon=|authenticated=/);
+      expect(row.acl, `${row.role}'s default`).not.toMatch(
+        /\banon=|authenticated=/,
+      );
   });
 
   it("★ …and `supabase_admin`'s default, which we cannot revoke, stays inert because we own every relation", async () => {
@@ -536,7 +592,9 @@ describe("int.client-grants — driven, because a privilege bit is not a behavio
       try {
         await db.query("set local role authenticated");
         await expect(
-          db.query(`insert into public.${view} (id) values (gen_random_uuid())`),
+          db.query(
+            `insert into public.${view} (id) values (gen_random_uuid())`,
+          ),
         ).rejects.toMatchObject({ code: "42501" });
       } finally {
         await db.query("rollback");

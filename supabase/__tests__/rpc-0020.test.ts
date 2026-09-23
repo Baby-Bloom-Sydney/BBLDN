@@ -258,7 +258,9 @@ describe("int.rpc-0020 — parent_leads.email (ADR-146 (2))", () => {
     // a SELECT grant either, so the read is now refused outright rather than answered with an empty set.
     await insertLead("ada@example.test");
     for (const actor of [fx.parentA, fx.admin, null]) {
-      expect(await refusedAs(db, actor, `select email from public.parent_leads`)).toBe("42501");
+      expect(
+        await refusedAs(db, actor, `select email from public.parent_leads`),
+      ).toBe("42501");
     }
   });
 });

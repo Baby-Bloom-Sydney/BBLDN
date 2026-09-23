@@ -92,7 +92,9 @@ describe("int.rollback-0036 — the twin restores nothing, and proves it", () =>
   it("★ and no `alter default privileges … grant`, which is the half nobody would notice", () => {
     // Re-arming `postgres`'s default ACL for `public` writes no grant line and blanket-grants every table a
     // future migration creates. It is the quietest way to undo this file, so it is asserted separately.
-    expect(stripped.sql).not.toMatch(/alter\s+default\s+privileges[\s\S]{0,120}\bgrant\b/i);
+    expect(stripped.sql).not.toMatch(
+      /alter\s+default\s+privileges[\s\S]{0,120}\bgrant\b/i,
+    );
   });
 
   it("★ runs, and not one of the revoked privileges comes back", async () => {
@@ -100,7 +102,9 @@ describe("int.rollback-0036 — the twin restores nothing, and proves it", () =>
     await db.query(stripped.sql);
 
     for (const [role, rel, priv] of REVOKED) {
-      expect(await can(role, rel, priv), `${role} → ${rel} ${priv}`).toBe(false);
+      expect(await can(role, rel, priv), `${role} → ${rel} ${priv}`).toBe(
+        false,
+      );
     }
 
     await db.query("rollback to savepoint twin");

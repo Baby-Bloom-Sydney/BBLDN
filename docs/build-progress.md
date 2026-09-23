@@ -1201,7 +1201,72 @@ Prior: 2026-09-15T15:20+10:00 — BB-LDN-Planner-070926/S1 (S1 shipped locally).
 Prior: 2026-09-15T13:55+10:00 — BB-LDN-Planner-070926/S0 (seeded at bootstrap).
 -->
 
-## Files created / modified in the current unit (`3k` — B-49, the self-service purge; L-009 Phase 3)
+## Files created / modified in the current unit (`3l` — the client relation surface; L-009 Phase 3)
+
+**`3k`'s Q-1, taken as its own unit for ADR-185's own reason.** `0032` enumerated what the retention identity
+may touch, `0033` what it may call, `0035` what a client role may call. Nobody had enumerated what a client
+role may **touch**.
+
+- **Measured from the catalogue before anything changed**, on `0000`-`0035` applied from empty, by effective
+  privilege (`has_table_privilege` / `has_any_column_privilege`, which follow membership, `PUBLIC` and
+  ownership) rather than a direct-ACL read: `anon` held a write privilege on **58** of the 70 relations in
+  `public` and `authenticated` on **66** (all 9 views among them); **54** carried a client write grant with
+  **no write policy of any kind**. After `0036`: `anon` **0** write / **3** read, `authenticated` **12**
+  write / **65** read.
+- ★ **`0000` §4 saw this and kept it.** Its own comment says _"Supabase grants ALL on every new table in
+  `public` to `anon` and `authenticated`"_, then revokes exactly TRUNCATE, REFERENCES and TRIGGER because
+  _"RLS does not gate any of the three"_. The unstated converse is the defect: the other four were kept
+  **because** RLS gates them, which makes RLS the only control and the grant surplus.
+- ★ **And the grant is minted, not written.** `pg_default_acl` for `postgres` in `public`, object type `r`,
+  carries `{anon=arwdm, authenticated=arwdm}` — every new table is born blanket-granted with no `grant` line
+  in any migration to find. Closable here, unlike `0035`'s function default, because Postgres' world default
+  for a relation is no privilege to anyone. `0036` §3 revokes it and the gate creates a table to prove it.
+- ★ **The blast radius was established before anything changed, and it is not uniform.** All 61 tables are
+  `ENABLE` _and_ `FORCE` RLS, so a surplus table grant is belt-and-braces — driven as a signed-in parent who
+  could read her own row: `update nanny_positions` → `UPDATE 0`, `delete position_children` → `DELETE 0`,
+  `insert position_children` → RLS refusal, `update user_profiles` (the one with a policy) → `UPDATE 1`.
+  **But a view has no RLS.** All nine are owned by `postgres` — which holds **BYPASSRLS** — at
+  `security_invoker = off`, and five were auto-updatable and carried INSERT/UPDATE/DELETE to
+  `authenticated`. Proved in one transaction, at one role, against one table: a direct
+  `insert into public.events` as `authenticated` was refused with _"new row violates row-level security
+  policy"_, and the identical insert through a probe view of exactly that shape returned **`INSERT 0 1`**,
+  row confirmed in the base table.
+- ⚠️ **What stopped the five shipped views was two accidents, not a control**, which is the reason the
+  verdict is _one column away_ rather than _belt-and-braces_: `events.source` is NOT NULL with no default and
+  no view exposes it, so every insert died on the constraint rather than on a privilege; and
+  `child_client_events` — the only one of the five whose `WHERE` a non-admin can satisfy — filters
+  `name like 'child.%'`, which `events_name_check` admits no label for, so the view is empty for everyone.
+- ★ **Declared versus used, and the answer is uncomfortable.** Tracing every `.from(…).insert|update|delete`
+  made on an _anon-key_ client finds **18 call sites across 7 tables**, and only **2** of those 7
+  (`inbox_messages`, `user_profiles`) have a policy that lets the write land. The other 16 are already dead —
+  stale Sydney-era paths; `src/lib/actions/parent.ts` still writes `nanny_positions.status`, a column this
+  schema does not have. Not repaired here (a unit, not a passenger on a privilege change), but after `0036`
+  they fail `42501` instead of `UPDATE 0`.
+
+- **`supabase/migrations/0036_client-relation-surface-enumerated.sql`** (new) — the blanket revoke across
+  `public` for `anon`, `authenticated` and `PUBLIC`; the enumerated re-grant (3 relations for `anon`, SELECT
+  only; 65 read and 12 write for `authenticated`, each write limited to the commands its own policies name);
+  and the `alter default privileges … revoke all on tables` that is the durable half. Two verify blocks: one
+  over the catalogue (write/read counts, view writes, the grant-iff-policy rule, column ACLs, `PUBLIC`, grant
+  option, membership both directions, the default-ACL row, and ownership, which is what keeps
+  `supabase_admin`'s un-revokable default inert) and one **driven as the role**, because a privilege bit is
+  not a behaviour. **Applied `0000`-`0036` from empty**, verify green on the first apply; re-applies cleanly.
+- **`supabase/rollbacks/0036_client-relation-surface-enumerated.rollback.sql`** (new) + **`rollback-0036-client-relations.test.ts`**
+  (8 cases) — ADR-165 arm (1): the twin restores nothing and asserts it, including that a table created
+  _after_ the twin is still born with no client privilege.
+- **`supabase/__tests__/client-grants.test.ts`** (new, `int.client-grants`, 20 cases) — the gate. Effective
+  privilege, the grant-iff-policy rule in **both** directions (a policy with no grant is the same defect
+  facing the other way), and the roads an ACL read cannot see. **Driven the other way on eight routes** — a
+  blanket re-grant, one table write with no policy, one view write, a grant through `PUBLIC`, a grant through
+  role membership, the default privilege re-armed, a column-level grant and a grant option — **all red**,
+  tree restored green.
+- **`rls.test.ts`, `rpc-0018.test.ts`, `rpc-0020.test.ts`** — four assertions updated. Each claimed a
+  relation was unreachable by a client role and evidenced it with an **empty result**; the refusal now
+  arrives at the privilege check instead, so each asserts the SQLSTATE. Strictly stronger, and where the two
+  mechanisms now differ per role (`nanny_contact_state` keeps its grant because a policy names it) the
+  mechanism is asserted **per pair** rather than blurred into "refused or empty".
+
+## Files created / modified in the prior unit (`3k` — B-49, the self-service purge; L-009 Phase 3)
 
 **`3j`'s Q-1, taken as its own unit for ADR-185's own reason.** Before this unit, **every self-service erasure
 failed its 30-day purge, for ever** — a live Article 17 defect, pre-existing in `0030`, not blocking today only

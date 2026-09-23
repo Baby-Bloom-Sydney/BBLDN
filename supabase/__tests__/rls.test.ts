@@ -74,9 +74,9 @@ describe("int.rls — the escalation target (07 §5.4 row 3)", () => {
     expect(await refusedAs(db, null, "select 1 from public.user_roles")).toBe(
       "42501",
     );
-    expect(await refusedAs(db, null, "select 1 from public.user_profiles")).toBe(
-      "42501",
-    );
+    expect(
+      await refusedAs(db, null, "select 1 from public.user_profiles"),
+    ).toBe("42501");
   });
 });
 
