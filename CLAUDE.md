@@ -55,12 +55,24 @@ ECC's full rule set is written for a funded team with a review budget. This is o
 
 ### The six rules
 
-1. **Prove it by running it, never by reading it.** Every serious defect this build produced was found by invoking the thing: a privileged function called as the wrong role succeeded; a parent's erasure left zero surviving hire records; a consent tick was being cast into a date column so no nanny could ever pass verification. Reading the code found none of them. If your claim is about behaviour, execute it.
-2. **Test first, and never bend a test to the code.** Write the failing test, watch it fail, then make it pass. Where code and a document disagree the document wins: pin the documented behaviour as a failing test and name its owner.
-3. **Fail closed.** Anything unconfigured, unknown, or refused denies rather than allows. A limiter that errors denies. An unbound port refuses.
-4. **No secret in the repo, ever.** It is public. Keys live in Vercel or the login keychain; documents carry names only.
-5. **One thing per file; cross-module imports go through `index.ts`.** This is what keeps a module swappable and a review cheap.
-6. **Gates enforce, prose does not.** Eight required checks run free on CI. If you want a rule enforced, add a gate — never a paragraph.
+Ordered by yield, derived from what actually found the defects in Phases 0–3. The canonical copy is the **`ecc-lite` skill** (`~/.claude/skills/ecc-lite/SKILL.md`); this section must not drift from it.
+
+1. **Prefer a gate to a rule.** If you want something enforced, write the check. A rule in prose is read by every agent for ever and obeyed sometimes; a gate is paid for once and obeyed always.
+2. **Prove it by running it, never by reading it.** Nearly every critical defect here was found by invoking the thing — a privileged function called as the wrong role, a real submission raising on a real payload, a deletion that left nothing behind. Reading the same code found none of them.
+3. **Compare what is declared against what is used.** Anything configured, granted, exported or documented that nothing calls is a defect, not tidiness. Fifteen rate-limit policies with four surfaces unprotected; sixty-nine tables granted and five ever narrowed.
+4. **Test first, and never bend a test to the code.** Write the failing test, watch it fail, then make it pass. Where code and a document disagree **the document wins**: pin the documented behaviour as a failing test and name its owner.
+5. **Fail closed.** Unknown, unconfigured or refused denies rather than allows.
+6. **One thing per file; cross-module imports through the connector; no secret in the repo.**
+
+### Three from ECC that earn their place
+
+7. **Research and reuse before writing** (ECC `development-workflow` §0) — search for an existing implementation, library or pattern first. A speed rule, and the cheapest thing in ECC.
+8. **Finish what you delegate** (ECC `agents`) — your final message is the deliverable; never end a turn with spawned work still running.
+9. **Speak severity** (ECC `code-review`) — CRITICAL blocks, HIGH warns, MEDIUM and LOW are recorded.
+
+### Parallelism
+
+Parallelise **work**, never **opinions**. Agents building modules that share no files: yes, same tokens and less wall-clock. Two or more agents reviewing the same diff: no. Bound by budget and genuine independence, not a fixed cap; push after every commit so a cut costs nothing.
 
 ### Time box
 
@@ -235,7 +247,7 @@ Sydney's `website/` CLAUDE.md chain is reference only; it does not govern this r
 ---
 
 <!-- audit
-Last edited: 2026-09-23T09:30+10:00 — BB-LDN-Planner-070926
+Last edited: 2026-09-23T11:15+10:00 — BB-LDN-Planner-070926
 Notes (F9, review fix pass): preamble bootstrap moment → 08 §2.1 step 0 / gate A0; linked-vs-vendored ADR governs ALL ../ paths (foundations + OPERATIONS), default linked; §5 reduced to pointers only (01 §2.3–2.5 / §4a / §6.3; 03 §1.4 / §2.1 / §3; 05 §7), restated rules + unratified slice-registration default removed; §6 BRANCHES.md created at bootstrap, else stop + create from Sydney pattern; §9 seed build-progress / CHANGELOG from _project-template shape before first commit; §4 fallback keeps README §2 as authority.
 Previous: Notes: §3 replaced by the vital few — BAI's ruling of 2026-09-23: ECC boiled to the 80/20, no rules-directory reading, no mid-build review agents, a 20-40 minute time box, Opus for everything. Earlier: §3 checkpoint table gains the ADR-142 row (action/route units carry one security-reviewer pass; declared-and-uncalled controls fail a gate). Earlier: initial authoring (L-004 wave 4) — code-repo CLAUDE.md seed: pointers + process only; five laws as merge blocks + five-question test; ECC hard rules; pointer table mirroring README §2 with real section numbers from 00–08 + DECISIONS + build-standard; module rules (folder shape, boundary lint, service leaves, auth no-client, UnitOfWork token, slice registration default pending 03 §12 item 35 / 01 §10 O-12, scheduling importers); branch/deploy/promote condensed from 06 §3–§4 with Sydney origin; efficiency + compaction (portable half of Sydney's nanny-platform CLAUDE.md); three build ledgers; never-list; precedence. Bootstrap decisions flagged: linked vs vendored foundations; slice-registration shape.
 -->
