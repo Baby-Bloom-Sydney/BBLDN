@@ -22,10 +22,6 @@ const ROUTE_DIR = "src/app/api/cron";
 const AWAITING_HANDLER: Readonly<Record<string, string>> = Object.freeze({
   "/api/cron/expire-subscribe-invites":
     "Phase 1h — subscribe_invites past expires_at (ADR-059, A-22)",
-  "/api/cron/close-no-candidates":
-    "Phase 1e — P-7 → CLOSED (no_candidates) (A-22)",
-  "/api/cron/dfy-waves":
-    "Phase 1e `08.25` — the matching phase shipped without wiring its own wave sweep",
   "/api/cron/usage-weekly-check":
     "Phase 2 — the results-guarantee usage check (ADR-088 G-D)",
 });

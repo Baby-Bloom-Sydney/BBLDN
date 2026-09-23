@@ -16,4 +16,5 @@ export const positions: PositionsReads = Object.freeze({
   recordPrecheck: (positionId, record) =>
     POSITIONS_REGISTRY.get().recordPrecheck(positionId, record),
   findLive: (parentId) => POSITIONS_REGISTRY.get().findLive(parentId),
+  awaitingPrecheck: () => POSITIONS_REGISTRY.get().awaitingPrecheck(),
 });

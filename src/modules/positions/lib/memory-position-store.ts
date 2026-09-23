@@ -3,7 +3,11 @@
 // The implementation over `nanny_positions` (migration `0006`) needs the marketplace tables and the RPC opener
 // (ADR-127); it is recorded as owed in the `1e` PROGRESS entry.
 import { ok } from "@/modules/platform";
-import type { ParentId, PositionId } from "@/modules/shared-types";
+import type {
+  ParentId,
+  PositionId,
+  PositionStage,
+} from "@/modules/shared-types";
 import type { PositionRecord, PositionStore } from "../types";
 
 /** 03 §2.2 / I-1 — the stages that count as a live position. */
@@ -34,6 +38,14 @@ export function memoryPositionStore(
     liveForParent: async (parentId: ParentId) =>
       ok(forParent(parentId).find((record) => LIVE.has(record.stage)) ?? null),
     listForParent: async (parentId: ParentId) => ok(forParent(parentId)),
+    forStage: async (stage: PositionStage) =>
+      ok(
+        Object.freeze(
+          [...holder.current.values()].filter(
+            (record) => record.stage === stage,
+          ),
+        ),
+      ),
     put: async (record: PositionRecord) => {
       holder.current = new Map([
         ...holder.current,

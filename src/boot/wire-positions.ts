@@ -27,7 +27,9 @@ import { areas, normaliseDistrict } from "@/modules/areas";
 import { auth } from "@/modules/auth";
 import {
   configurePositions,
+  configurePositionsJobs,
   createPositions,
+  createPositionsJobs,
   createPositionsSlice,
   registerPositionsSlice,
 } from "@/modules/positions";
@@ -52,9 +54,12 @@ export function wirePositions(): PortWiring {
   const store = dbPositionStore(auth.data);
   configurePositions(createPositions({ store }));
   registerPositionsSlice(createPositionsSlice({ store, isInServiceArea }));
+  // `4d` — `close-no-candidates`, over the **same store instance** the reads and the slice use.
+  configurePositionsJobs(createPositionsJobs({ store }));
   return {
     port: "positions",
-    binding: "create-positions + the P-row slice, over one db position store",
+    binding:
+      "create-positions + the P-row slice + close-no-candidates (P-7), over one db position store",
     reason: `the position is nanny_positions (0006) with its roster in position_schedule, read back through the keyed read at service scope. No environment gate: a store over a real schema is real wherever a database is. ${DEFINER_OWED}`,
   };
 }

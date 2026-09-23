@@ -75,5 +75,6 @@ export function stubPositions(seed: StubStageSeed = {}): PositionsReads {
         : ok(seed.forMatching),
     recordPrecheck: async () => ok(undefined),
     findLive: async () => ok(seed.live ?? null),
+    awaitingPrecheck: async () => ok(Object.freeze([])),
   });
 }

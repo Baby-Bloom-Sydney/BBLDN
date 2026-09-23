@@ -217,6 +217,21 @@ export function createPositions(deps: PositionsDeps): PositionsReads {
       return ok(record.value === null ? null : summaryOf(record.value));
     },
 
+    // `4d` — `dfy-waves`' cohort: `OPEN` and never pre-checked. `CONNECTING` is deliberately excluded — a
+    // position with a live connection has already had someone put in front of the family, so re-blasting it
+    // would be a second wave, which is `MATCHING.precheck.waves` and still 1 (@pending 08.25).
+    awaitingPrecheck: async () => {
+      const rows = await deps.store.forStage("OPEN");
+      if (!rows.ok) return rows;
+      return ok(
+        Object.freeze(
+          rows.value
+            .filter((record) => record.precheck === null)
+            .map((record) => record.positionId),
+        ),
+      );
+    },
+
     recordPrecheck: async (positionId: PositionId, record: PrecheckRecord) => {
       const found = await deps.store.get(positionId);
       if (!found.ok) return found;

@@ -33,6 +33,7 @@ import type {
   Instant,
   ParentId,
   PositionId,
+  PositionStage,
   Result,
   UnitOfWork,
 } from "@/modules/shared-types";
@@ -207,6 +208,24 @@ export function dbPositionStore(
 
     listForParent: async (parentId: ParentId) => {
       const rows = await rowsFor(parentId);
+      if (!rows.ok) return rows;
+      return hydrateAll(rows.value);
+    },
+
+    // `4d` — the two scheduled sweeps' cohort. One stage, by the same single equality predicate as the reads
+    // above; the set of stages a sweep acts on stays in the module, never as an `IN` list here.
+    forStage: async (stage: PositionStage) => {
+      const rows = await port.run(
+        {
+          name: "positions.forStage",
+          exec: async (q) =>
+            (await q
+              .from("nanny_positions")
+              .eq("stage", stage)
+              .select()) as ReadonlyArray<PositionRowRead>,
+        },
+        service,
+      );
       if (!rows.ok) return rows;
       return hydrateAll(rows.value);
     },

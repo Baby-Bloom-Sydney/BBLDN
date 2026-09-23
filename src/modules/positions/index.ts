@@ -39,6 +39,12 @@ export { registerSlice } from "./lib/register-slice";
 export { positions } from "./lib/default-positions";
 export { configurePositions } from "./lib/configure-positions";
 
+// `4d` — `close-no-candidates` (01 §4f): its own binding, driving the P-7 that already exists and already
+// cascades K-24 onto every live connection and the open call to C-4.
+export { positionsJobs } from "./lib/default-positions-jobs";
+export { configurePositionsJobs } from "./lib/configure-positions-jobs";
+export { createPositionsJobs } from "./lib/create-positions-jobs";
+
 // The stub the contract names (03 §11 test 1 `stage-model.stub.ts`).
 export { stubPositions } from "./positions.stub";
 
