@@ -20,14 +20,8 @@ const ROUTE_DIR = "src/app/api/cron";
  * complete account of what that wall is made of.
  */
 const AWAITING_HANDLER: Readonly<Record<string, string>> = Object.freeze({
-  "/api/cron/expire-connections":
-    "Phase 1g `08.21` — the connections phase shipped without wiring its own sweep",
-  "/api/cron/meeting-complete-sweep":
-    "Phase 1g — K-12 INTRO_SCHEDULED → INTRO_COMPLETE (A-22)",
   "/api/cron/placement-start-sweep":
     "Phase 1g — L-1b CONFIRMED → ACTIVE + cascade K-21 (A-22)",
-  "/api/cron/trial-complete-sweep":
-    "Phase 1h — K-16 TRIAL_ARRANGED → TRIAL_COMPLETE (A-22)",
   "/api/cron/expire-subscribe-invites":
     "Phase 1h — subscribe_invites past expires_at (ADR-059, A-22)",
   "/api/cron/close-no-candidates":

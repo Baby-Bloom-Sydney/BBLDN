@@ -172,6 +172,18 @@ export type PlacementTerms = {
 
 export type ConnectionStore = {
   get(connectionId: ConnectionId): Promise<Result<ConnectionRecord | null>>;
+  /**
+   * `4d` — every connection **at one stage**, across every family. The sweeps of 01 §4f are the only callers:
+   * each selects on the stage its K row moves a row *out of*, which is what makes a second fire a no-op without
+   * any memory of the first.
+   *
+   * One stage, not a list, because 03 §1.4's `Query` offers one equality predicate (ADR-131 (1)) and a sweep
+   * that wants two stages asks twice — restating a stage set as SQL `IN` would put the module's own vocabulary
+   * in the adapter, which is the rule `db-connection-store.ts` already states for `LIVE_STAGES`.
+   */
+  forStage(
+    stage: ConnectionStage,
+  ): Promise<Result<ReadonlyArray<ConnectionRecord>>>;
   /** Every connection on one position — I-2's "≥ 1 live connection" and K-26's blast both read it. */
   forPosition(
     positionId: PositionId,
@@ -194,6 +206,38 @@ export type ConnectionStore = {
 export type AdvanceFn = (
   input: AdvanceInput<TransitionId>,
 ) => Promise<Result<StateAfter>>;
+
+// ── The scheduled sweeps (`4d`; 01 §4f) ──
+
+/**
+ * The three connection sweeps of 01 §4f, by their `SystemJobName`. Each drives a K row that already exists and
+ * is already tested — the sweep's whole job is to **find the due rows**, which is the half the stage model was
+ * never given, and to hand each one to `advance` as `{ kind: 'system', id: <this job> }`.
+ *
+ * `expire-connections` carries K-8 only. K-10 (`ACCEPTED → SCHEDULE_EXPIRED` after
+ * `CONNECTIONS.scheduleWindowDays`) is **not swept**, and deliberately: its window runs from the acceptance,
+ * and no column on this record says when that happened — `expires_at` exists on `0007` but no K row writes it,
+ * and `StepPayload` has no field for it. Sweeping it off `createdAt` would expire a live connection early, in
+ * front of a family, by however long the request sat unanswered. Pinned with its owner in
+ * `__tests__/connection-sweeps.test.ts`; the fix belongs to whoever owns K-4 / K-5, not to a cron.
+ */
+export type ConnectionJobName =
+  | "expire-connections"
+  | "meeting-complete-sweep"
+  | "trial-complete-sweep";
+
+/** What a sweep hands back for `runCron`'s run-summary line (01 §4f). */
+export type ConnectionJobRun = {
+  readonly handled: number;
+  readonly skipped: number;
+};
+
+export type ConnectionsJobs = {
+  readonly run: (
+    job: ConnectionJobName,
+    now: Instant,
+  ) => Promise<ConnectionsResult<ConnectionJobRun>>;
+};
 
 /**
  * What a K row needs from `positions` without importing it: whether the position is live, and how many of its

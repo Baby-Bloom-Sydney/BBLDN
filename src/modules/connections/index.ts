@@ -21,6 +21,16 @@ export { LIVE_STAGES } from "./lib/live-stages";
 /** H-12 — the stages K-24 may be cascaded onto; `positions` reads it so P-7 never fans out into a refusal. */
 export { CANCELLABLE_STAGES } from "./lib/cancellable-stages";
 
+// `4d` — the three scheduled sweeps of 01 §4f (`expire-connections` K-8, `meeting-complete-sweep` K-12,
+// `trial-complete-sweep` K-16). Their own binding, beside the reads and over the same store: a cron runs under
+// the service role on a schedule, a read under a session on a request — the split `payments` already makes
+// between `payments` and `paymentsJobs`. Each sweep only *finds* the due rows; the move is the K row's.
+export { connectionsJobs } from "./lib/default-connections-jobs";
+export { configureConnectionsJobs } from "./lib/configure-connections-jobs";
+export { createConnectionsJobs } from "./lib/create-connections-jobs";
+export { SWEPT_STAGES } from "./lib/swept-stages";
+export { connectionSweepTargets } from "./lib/connection-sweep-targets";
+
 // The reads `positions` calls (03 §7.5).
 export { connections } from "./lib/default-connections";
 export { configureConnections } from "./lib/configure-connections";
