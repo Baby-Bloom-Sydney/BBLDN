@@ -74,8 +74,14 @@ mirror is not an error; only `NOT_FOUND` from the call slice is tolerated.
   belong to the K / L row that fires the cascade; P-7's K-24 cascade is pinned `it.fails`.
 - **`getJourneySteps` is keyed by `ParentId` while a session carries a `UserId`** — the seam `1d` opened is still
   a one-line pass-through in two places (`loadParentJourney`, `loadPositionPage`).
-- **No `user_profiles` / migration work.** `amend` moves the version and emits `position.amended`; it does not
-  yet apply `AmendableFields` to the row (no column map without the table).
+- ~~**`amend` does not apply `AmendableFields` to the row.**~~ **Closed by `P1-EDIT`.** The table landed with the
+  marketplace set and `0019` gave it a writer, so the gap became a live defect rather than a recorded absence:
+  `amend` bumped the version, emitted `position.amended` and answered success while the fields went nowhere. It
+  now validates the payload at the boundary (`amend-fields.ts` — a position's one amendable fact is its
+  `detail`; an unknown key fails the amend rather than being dropped), checks the 03 §2.5 actor rule and gates
+  the stage (`may-amend.ts` — a parent edits at `DRAFT` / `OPEN`, before anyone has been put in front of her;
+  past that the matchmaker does, and she is not stage-gated), then writes. The stage and the pre-check lever
+  are untouched: 04 §6.2 gives S-P-04 the state "edit (no re-fire)".
 
 **Suites.** `positions.swap.test.ts` — the part of swap test 1 F-a could prove (dispatch, unit-of-work handling
 both ways, the two refusals, re-registration as the swap, the read half over `stubPositions`).

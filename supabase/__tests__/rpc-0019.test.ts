@@ -264,6 +264,58 @@ describe("int.rpc-0019 — upsert_position writes the position and its roster in
     expect(row.minimum_nanny_age).toBe(21);
   });
 
+  // `P1-EDIT` — S-P-04's edit state writes through `positions.amend` → `dbPositionStore.put` → this function,
+  // and the roster is the fact a parent most obviously changes. `db-position-store.ts` states that a **null**
+  // roster leaves an existing one alone, so the claim that a **given** one replaces it has to be invoked, not
+  // read: without it an edit could move the district and silently keep last month's days.
+  it("replaces the roster on an edit, and leaves it alone only when none is given", async () => {
+    await upsertPosition({
+      id: POSITION_B,
+      parentId: parentBId,
+      stage: "OPEN",
+      columns: { district: "SW4" },
+      schedule: { monday: ["morning"] },
+    });
+
+    await upsertPosition({
+      id: POSITION_B,
+      parentId: parentBId,
+      stage: "OPEN",
+      columns: { district: "E8" },
+      schedule: { tuesday: ["afternoon"], thursday: ["morning"] },
+      expectedVersion: 1,
+    });
+
+    const rosterOf = async () => {
+      const { rows } = await db.query<{ schedule: unknown }>(
+        "select schedule from public.position_schedule where position_id = $1",
+        [POSITION_B],
+      );
+      expect(rows).toHaveLength(1);
+      return rows[0].schedule;
+    };
+    expect(await rosterOf()).toEqual({
+      tuesday: ["afternoon"],
+      thursday: ["morning"],
+    });
+    expect((await positionRow(POSITION_B)).district).toBe("E8");
+
+    // The recorded exception, pinned so it stays a decision: a write that carries no roster keeps the stored
+    // one. S-P-04 cannot reach it — the wizard will not advance past the days-and-times question with either
+    // list empty, so `positionDetailOf` never hands `amend` a null schedule from that screen.
+    await upsertPosition({
+      id: POSITION_B,
+      parentId: parentBId,
+      stage: "OPEN",
+      columns: { district: "N1" },
+      expectedVersion: 2,
+    });
+    expect(await rosterOf()).toEqual({
+      tuesday: ["afternoon"],
+      thursday: ["morning"],
+    });
+  });
+
   it("refuses a stale version rather than overwriting (C-9)", async () => {
     await upsertPosition({
       id: POSITION_B,

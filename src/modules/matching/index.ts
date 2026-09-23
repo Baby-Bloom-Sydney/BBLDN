@@ -36,6 +36,9 @@ export { parseWizardAnswers } from "./lib/wizard-answers-schema";
 
 // `1e` — the one conversion from the shared answers to the position P-2 opens (both roads into the stage model).
 export { positionDetailOf } from "./lib/position-detail-of";
+// `P1-EDIT` — the other direction, for S-P-04's edit state (04 §6.2): the stored detail back into the answers
+// the same question bank is prefilled from.
+export { wizardAnswersOf } from "./lib/wizard-answers-of";
 
 // Server actions (01 §4e) — passed to client components as props.
 export { saveParentLeadAction } from "./actions/save-parent-lead-action";
