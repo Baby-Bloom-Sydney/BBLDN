@@ -6,7 +6,13 @@
 export type EnvMark = "●" | "○" | "—";
 export type EnvScope = "public" | "server";
 export type EnvKind =
-  "string" | "boolean" | "number" | "enum" | "url" | "uuid" | "email";
+  | "string"
+  | "boolean"
+  | "number"
+  | "enum"
+  | "url"
+  | "uuid"
+  | "email";
 export type EnvGroup =
   | "App"
   | "Supabase"
@@ -87,7 +93,9 @@ export type VerificationLevelKey =
 
 /** Mirrors shared-types `BucketKey` (01 §6.1) — pinned equal by the config tests. */
 export type BucketKey =
-  "profile-pictures" | "verification-documents" | "development-images";
+  | "profile-pictures"
+  | "verification-documents"
+  | "development-images";
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type LocalTime = `${number}:${number}`;
@@ -177,14 +185,14 @@ export type EnvValue<E extends EnvEntry> = E["kind"] extends "boolean"
     : BaseEnvValue<E> | undefined;
 export type EnvName = keyof EnvEntries;
 export type PublicEnv = {
-  readonly [
-    K in EnvName as EnvEntries[K]["scope"] extends "public" ? K : never
-  ]: EnvValue<EnvEntries[K]>;
+  readonly [K in EnvName as EnvEntries[K]["scope"] extends "public"
+    ? K
+    : never]: EnvValue<EnvEntries[K]>;
 };
 export type ServerEnv = {
-  readonly [
-    K in EnvName as EnvEntries[K]["scope"] extends "server" ? K : never
-  ]: EnvValue<EnvEntries[K]>;
+  readonly [K in EnvName as EnvEntries[K]["scope"] extends "server"
+    ? K
+    : never]: EnvValue<EnvEntries[K]>;
 };
 export type ParsedEnv = {
   readonly environment: Environment;
@@ -219,7 +227,9 @@ export type RetentionClass = {
   readonly what: string;
   /** `null` only for `none` and `deferred`. */
   readonly window:
-    { readonly months: number } | { readonly days: number } | null;
+    | { readonly months: number }
+    | { readonly days: number }
+    | null;
   readonly anchors: ReadonlyArray<RetentionAnchor>;
   readonly targets: ReadonlyArray<string>;
   readonly treatment: RetentionTreatment;

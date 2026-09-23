@@ -1086,7 +1086,10 @@ export function NannyHubClient({
 // ── Verification Summary Tile (for hub verification tab) ──────────────────────
 
 type VerificationStepState =
-  "completed" | "current" | "action_required" | "future";
+  | "completed"
+  | "current"
+  | "action_required"
+  | "future";
 
 function VerificationSummaryTile({
   verificationData,

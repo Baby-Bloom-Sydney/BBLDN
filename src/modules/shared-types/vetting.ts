@@ -11,7 +11,9 @@ import type { ISODate, Instant, Url } from "./scalars";
 
 /** The three buckets of 01 §6.1 (fix: A-31); caps + MIME lists are `config/uploads.ts`. */
 export type BucketKey =
-  "profile-pictures" | "verification-documents" | "development-images";
+  | "profile-pictures"
+  | "verification-documents"
+  | "development-images";
 
 /** accepted set = config/vetting.ts `acceptedEvidence` */
 export type EvidenceType =

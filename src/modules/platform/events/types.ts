@@ -133,7 +133,11 @@ export type CountRow = {
  */
 export type EmitErrorDetails = {
   readonly reason:
-    "unknown-name" | "props" | "server-only-name" | "event-log" | "unexpected";
+    | "unknown-name"
+    | "props"
+    | "server-only-name"
+    | "event-log"
+    | "unexpected";
   readonly issues?: ReadonlyArray<string>;
 };
 

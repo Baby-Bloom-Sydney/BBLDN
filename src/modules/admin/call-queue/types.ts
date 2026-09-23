@@ -25,7 +25,11 @@ export type { AdminPanel, AdminPanelName } from "../types";
 
 /** Where a call sits for the admin. `awaiting-slot` is its own group (04 §5.2 step 4), not a `due` value. */
 export type CallQueueGroupName =
-  "due" | "overdue" | "upcoming" | "awaiting-slot" | "done";
+  | "due"
+  | "overdue"
+  | "upcoming"
+  | "awaiting-slot"
+  | "done";
 
 /**
  * One row of S-A-03. Everything a row shows is either the booking's own (03 §3.2) or decorated from another

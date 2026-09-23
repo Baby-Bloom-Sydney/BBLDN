@@ -240,7 +240,8 @@ type UpdateOnboardingStateArgs =
 function parseUpdateArgs(
   raw: Record<string, unknown>,
 ):
-  { ok: true; args: UpdateOnboardingStateArgs } | { ok: false; error: string } {
+  | { ok: true; args: UpdateOnboardingStateArgs }
+  | { ok: false; error: string } {
   const topic = raw.topic;
   if (
     typeof topic !== "string" ||

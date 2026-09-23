@@ -59,7 +59,9 @@ export interface ChildClient {
 export type ChildInviteDirection = "nanny_to_parent" | "parent_to_nanny";
 export type ChildInviteStatus = "pending" | "connected" | "revoked";
 export type ChildInviteRevokedReason =
-  "regenerated" | "manual" | "child_deleted";
+  | "regenerated"
+  | "manual"
+  | "child_deleted";
 
 export interface ChildInvite {
   id: string;
@@ -210,7 +212,10 @@ export interface FeedItem extends BAppLog {
  *               is a refusal.
  */
 export type OnboardingTopicStatus =
-  "pending" | "captured" | "skipped" | "deferred";
+  | "pending"
+  | "captured"
+  | "skipped"
+  | "deferred";
 
 /** One topic within the onboarding state. Discriminated by `status` so
  *  `summary` is required when (and only when) the topic was captured —

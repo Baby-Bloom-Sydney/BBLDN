@@ -566,7 +566,8 @@ describe("katie-admin — rollback_prompt_edit", () => {
     expect(active?.content).toBe("v1");
     expect(active?.version).toBe(3);
     const orig = state.editRows.find((r) => r.id === "edit-orig") as
-      Record<string, unknown> | undefined;
+      | Record<string, unknown>
+      | undefined;
     expect(orig?.status).toBe("rolled_back");
     expect(orig?.rolled_back_by_edit_id).toBeDefined();
   });

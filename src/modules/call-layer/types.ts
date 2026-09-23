@@ -237,7 +237,10 @@ export type CallDonePayload = {
 // ── S-P-01 / S-P-02 / S-P-03 view types ──
 
 export type CallPageVariant =
-  "matchmaking" | "after-connect" | "onboarding" | "after-no-answer";
+  | "matchmaking"
+  | "after-connect"
+  | "onboarding"
+  | "after-no-answer";
 
 export type CallPageView = {
   readonly positionId: PositionId;

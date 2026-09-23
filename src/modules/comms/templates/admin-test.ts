@@ -12,9 +12,7 @@ import { emailLayout } from "./lib/email-layout";
 type TestData = { readonly at?: unknown; readonly environment?: unknown };
 
 const blocks = (data: TestData) => {
-  const when = formatLondonDateTime(
-    typeof data.at === "string" ? (data.at as never) : undefined,
-  );
+  const when = formatLondonDateTime(data.at);
   const line =
     `Sending works. This message was raised by the test-email route` +
     `${data.environment === undefined ? "" : ` in ${String(data.environment)}`}` +

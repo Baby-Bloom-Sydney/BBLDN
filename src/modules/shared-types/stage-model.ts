@@ -19,7 +19,10 @@ export type CallOutcome = (typeof ENUMS.call_outcome)[number];
 export type EndReason = (typeof ENUMS.end_reason)[number];
 export type CloseReason = (typeof ENUMS.close_reason)[number];
 export type Stage =
-  PositionStage | ConnectionStage | PlacementState | CallState;
+  | PositionStage
+  | ConnectionStage
+  | PlacementState
+  | CallState;
 
 /** call = the position's call mirror (02 R-1): matchmaking · onboarding; no CallId (fix: A-4 / R1). */
 export type EntityRef =

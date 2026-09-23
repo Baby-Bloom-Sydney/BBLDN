@@ -124,7 +124,9 @@ export type QuickMatchResult = {
 
 export type ScoreErrorDetails = {
   readonly reason:
-    "distance-failed" | "invalid-input" | "scoring-not-configured";
+    | "distance-failed"
+    | "invalid-input"
+    | "scoring-not-configured";
   readonly layer?: "base" | "penalty" | "bonus";
   readonly nannyId?: NannyId;
 };

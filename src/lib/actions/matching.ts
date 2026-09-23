@@ -1049,7 +1049,8 @@ export async function getDfyConnections(
 
     const meta = notification?.metadata as Record<string, unknown> | null;
     const bd = meta?.breakdown as
-      { experience: number; schedule: number; location: number } | undefined;
+      | { experience: number; schedule: number; location: number }
+      | undefined;
     const bonuses = (meta?.overQualifiedBonuses as string[]) ?? [];
     const unmet = (meta?.unmetRequirements as string[]) ?? [];
 

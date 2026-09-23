@@ -63,7 +63,9 @@ export interface RetrievedSubscription {
 // Refunds
 // ---------------------------------------------------------------------------
 export type StripeRefundReason =
-  "duplicate" | "fraudulent" | "requested_by_customer";
+  | "duplicate"
+  | "fraudulent"
+  | "requested_by_customer";
 
 /**
  * BB's RefundReasonCategory is richer than Stripe's. The mapping lives at

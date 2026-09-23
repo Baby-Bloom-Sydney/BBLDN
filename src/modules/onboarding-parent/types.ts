@@ -16,7 +16,11 @@ import type {
 
 /** 03 §9.3 funnel row — the `signupSource` prop of `signup.completed`. Values verbatim. */
 export type SignupSource =
-  "standard_match" | "advanced_match" | "cold" | "profile" | "invite";
+  | "standard_match"
+  | "advanced_match"
+  | "cold"
+  | "profile"
+  | "invite";
 
 /** 03 §8.2 rows 1–3: the three welcome templates this module owns. */
 export type ParentWelcomeTemplate = Extract<

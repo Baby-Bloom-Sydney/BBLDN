@@ -54,7 +54,11 @@ const TTL_MS = CONSENT.renewalCheckMonths * 30 * DAY_MS;
 const NEARING_EXPIRY_MS = CONSENT.renewalNoticeDays * DAY_MS;
 
 export type MediaConsentState =
-  "active" | "nearing_expiry" | "expired" | "revoked" | "never_given";
+  | "active"
+  | "nearing_expiry"
+  | "expired"
+  | "revoked"
+  | "never_given";
 
 export interface MediaConsentGateResult {
   allowed: boolean;
@@ -85,7 +89,8 @@ export async function hasChildConsent(
   input: {
     childId: string;
     purpose:
-      typeof PARENT_APP_CONSENT_PURPOSE | typeof NANNY_ATTESTATION_PURPOSE;
+      | typeof PARENT_APP_CONSENT_PURPOSE
+      | typeof NANNY_ATTESTATION_PURPOSE;
   },
   deps: MediaConsentGateDeps,
 ): Promise<MediaConsentGateResult> {

@@ -13,10 +13,9 @@ const CALLS_PATH = "/admin/calls";
 
 type BookingData = { readonly slotAt?: unknown; readonly bookingId?: unknown };
 
-const whenOf = (data: BookingData) =>
-  formatLondonDateTime(
-    typeof data.slotAt === "string" ? (data.slotAt as never) : undefined,
-  );
+// `slotAt` is read out of an open `TemplateData` record, so the helper is the one that decides what is
+// renderable — no cast, and no guard here that would only repeat its own.
+const whenOf = (data: BookingData) => formatLondonDateTime(data.slotAt);
 
 const blocks = (data: BookingData) => {
   const when = whenOf(data);

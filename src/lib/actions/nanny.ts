@@ -189,7 +189,8 @@ export async function getPublicNannyProfile(
       personality_traits: nanny.personality_traits || null,
       professional_values: nanny.professional_values || null,
       childcare_roles: nanny.childcare_roles as
-        { role: string; duration: number }[] | null,
+        | { role: string; duration: number }[]
+        | null,
       additional_photos: additionalPhotos,
       immediate_start: nanny.immediate_start_available ?? false,
     },

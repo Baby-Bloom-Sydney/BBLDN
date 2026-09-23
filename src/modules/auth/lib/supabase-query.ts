@@ -68,18 +68,14 @@ function keyedRead<N extends ReadableName<AppDatabase>>(
   return {
     select: async (columns) =>
       unwrapRows<RowOf<AppDatabase, N>>(
-        await (
-          await client()
-        )
+        await (await client())
           .from(name)
           .select(columnList(columns))
           .eq(column, value),
       ),
     single: async () =>
       unwrapMaybeRow<RowOf<AppDatabase, N>>(
-        await (
-          await client()
-        )
+        await (await client())
           .from(name)
           .select("*")
           .eq(column, value)
@@ -122,9 +118,7 @@ export function supabaseQuery(
         ),
       update: async (id: string, patch: Readonly<Record<string, unknown>>) =>
         unwrapRow<RowOf<AppDatabase, N>>(
-          await (
-            await client()
-          )
+          await (await client())
             .from(name)
             .update(patch)
             .eq("id", id)

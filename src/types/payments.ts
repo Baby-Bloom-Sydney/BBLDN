@@ -57,7 +57,10 @@ export type RefundStatus =
   | "cancelled_by_user";
 
 export type RefundReasonCategory =
-  "major_problem" | "reasonable_cause" | "change_of_mind" | "other";
+  | "major_problem"
+  | "reasonable_cause"
+  | "change_of_mind"
+  | "other";
 
 // ---------------------------------------------------------------------------
 // Payout application state — `nannies.payout_application_status`
@@ -92,4 +95,5 @@ export type StripeMode = "test" | "live";
 // Wrappers that throw (e.g. webhook signature verify) are exempt.
 // ---------------------------------------------------------------------------
 export type StripeResult<T> =
-  { success: true; data: T } | { success: false; error: string };
+  | { success: true; data: T }
+  | { success: false; error: string };

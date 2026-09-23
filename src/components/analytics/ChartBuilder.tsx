@@ -714,11 +714,13 @@ function ChartBuilderInner({ catalog }: ChartBuilderProps) {
                     </td>
                     {chartData.map((d, di) => {
                       const val = (d as Record<string, any>)[id] as
-                        number | null;
+                        | number
+                        | null;
                       const prev =
                         di > 0
                           ? ((chartData[di - 1] as Record<string, any>)[id] as
-                              number | null)
+                              | number
+                              | null)
                           : null;
                       let pctChange: number | null = null;
                       if (val !== null && prev !== null && prev !== 0) {

@@ -102,9 +102,7 @@ export function supabaseAuthDriver(): AuthDriver<AppDatabase> {
     scope === "service" ? elevated() : serverClient();
 
   const roleOf = async (userId: string): Promise<Role | null> => {
-    const { data, error } = await (
-      await serverClient()
-    )
+    const { data, error } = await (await serverClient())
       .from("user_roles")
       .select("role")
       .eq("user_id", userId)
@@ -169,9 +167,7 @@ export function supabaseAuthDriver(): AuthDriver<AppDatabase> {
     },
     // Named service-role use (module README): `user_roles` has no client INSERT or UPDATE policy (02 §4.1).
     writeRole: async (userId: string, role: Role) => {
-      const { error } = await (
-        await elevated()
-      )
+      const { error } = await (await elevated())
         .from("user_roles")
         .upsert({ user_id: userId, role }, { onConflict: "user_id" });
       if (error !== null) throw new Error(error.message);
@@ -181,9 +177,7 @@ export function supabaseAuthDriver(): AuthDriver<AppDatabase> {
     // Signed URLs bypass RLS by design (07 §5.3 rule 2 — the buckets have no user SELECT policy), so the minter
     // is service-scoped; `DataAccessPort.signUrl` is the one caller and it validates bucket, path and TTL first.
     createSignedUrl: async (ref: StorageRef, ttlSeconds: number) => {
-      const { data, error } = await (
-        await elevated()
-      ).storage
+      const { data, error } = await (await elevated()).storage
         .from(ref.bucket)
         .createSignedUrl(ref.path, ttlSeconds);
       if (error !== null) throw new Error(error.message);
@@ -200,9 +194,7 @@ export function supabaseAuthDriver(): AuthDriver<AppDatabase> {
       opts: PutObjectOptions,
       scope: DataScope,
     ) => {
-      const { error } = await (
-        await clientFor(scope)
-      ).storage
+      const { error } = await (await clientFor(scope)).storage
         .from(ref.bucket)
         .upload(ref.path, body, {
           contentType: opts.contentType,
@@ -212,9 +204,7 @@ export function supabaseAuthDriver(): AuthDriver<AppDatabase> {
       if (error !== null) throw new Error(error.message);
     },
     removeObject: async (ref: StorageRef, scope: DataScope) => {
-      const { error } = await (
-        await clientFor(scope)
-      ).storage
+      const { error } = await (await clientFor(scope)).storage
         .from(ref.bucket)
         .remove([ref.path]);
       if (error !== null) throw new Error(error.message);
