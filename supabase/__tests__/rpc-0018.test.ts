@@ -14,7 +14,7 @@ import {
   it,
 } from "vitest";
 import { connect } from "./db-client";
-import { asRole, seedFixtures, type Fixtures } from "./rls-fixtures";
+import { asRole, refusedAs, seedFixtures, type Fixtures } from "./rls-fixtures";
 
 let db: Client;
 let fx: Fixtures;
@@ -249,12 +249,16 @@ describe("int.rpc-0018 — who may read and who may write", () => {
 
   it("a signed-out visitor reads nothing", async () => {
     await requestCall(fx.positionA);
-    const rows = await asRole(
+    // `0016` created this table after `0016:276`, so `anon` held SELECT on it by default privilege and
+    // read nothing only because no policy names `anon`. `0036` took the grant: there is no `anon` read
+    // policy here, so the grant was surplus, and "reads nothing" is now a refusal rather than an empty
+    // result — the same claim, evidenced one layer earlier.
+    const code = await refusedAs(
       db,
       null,
       `select position_id from public.position_call_mirror`,
     );
-    expect(rows).toEqual([]);
+    expect(code).toBe("42501");
   });
 
   // 07 §5.1 rule 4: the module is the one writer. No client policy covers a write, so the write is
@@ -262,29 +266,31 @@ describe("int.rpc-0018 — who may read and who may write", () => {
   it("a parent cannot write her own call's detail", async () => {
     await requestCall(fx.positionA, "Amara");
 
-    // An UPDATE with no UPDATE policy does not raise: the `USING` of a policy that does not exist is
-    // false, so the statement matches nothing and returns quietly. The claim is therefore about the
-    // row, not about an error — and it is the claim that matters, because a client write that
-    // *appeared* to succeed while changing nothing is the worse failure of the two.
-    const changed = await asRole(
+    // This comment used to end "a client write that *appeared* to succeed while changing nothing is the
+    // worse failure of the two" — and that was right, which is why `0036` removed the surplus UPDATE
+    // grant that made the quiet version possible. With no UPDATE policy on this table the grant could
+    // never carry a write, so the refusal moves from RLS (zero rows, no error) to the privilege check
+    // (`42501`). Both halves of the claim are still asserted: the statement is refused, *and* the row
+    // is untouched, because a refusal that left the row changed would be the thing worth catching.
+    const changed = await refusedAs(
       db,
       fx.parentA,
       `update public.position_call_mirror set about_nanny = 'someone else' returning position_id`,
     );
-    expect(changed).toEqual([]);
+    expect(changed).toBe("42501");
     expect((await mirrorOf(fx.positionA))?.about_nanny).toBe("Amara");
 
-    // An INSERT has no `WITH CHECK` to pass either, and that one does raise.
-    await db.query("savepoint s");
-    await expect(
-      asRole(
-        db,
-        fx.parentA,
-        `insert into public.position_call_mirror (position_id) values ($1)`,
-        ["00000000-0000-4000-8000-0000000000ff"],
-      ),
-    ).rejects.toThrow(/row-level security/);
-    await db.query("rollback to savepoint s");
+    // An INSERT had no `WITH CHECK` to pass either, and raised on RLS. After `0036` it does not reach
+    // RLS at all — there is no INSERT grant left to spend — so it raises on the privilege instead. Both
+    // are `42501`; the code is asserted rather than the message, because the message is the layer that
+    // moved and the code is the claim.
+    const inserted = await refusedAs(
+      db,
+      fx.parentA,
+      `insert into public.position_call_mirror (position_id) values ($1)`,
+      ["00000000-0000-4000-8000-0000000000ff"],
+    );
+    expect(inserted).toBe("42501");
   });
 
   it("neither anon nor authenticated may execute the definer", async () => {
