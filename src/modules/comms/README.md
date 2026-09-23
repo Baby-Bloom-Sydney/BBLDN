@@ -25,7 +25,12 @@ blank body — would be worse than one that says so (01 §4a rule 2).
 - **`resend`** (`comms/email/resend-email.ts`) is installed and selected by `EMAIL_PROVIDER`. It reads no env
   name and knows no address: boot hands it `RESEND_API_KEY` and `config`'s `SENDERS`, so the London sending
   domain is a value in `config` and not a string in this module. With no key it **refuses** rather than falling
-  back to the stub. A `SenderKey` the table does not carry answers `sender-unknown`.
+  back to the stub. A `SenderKey` the table does not carry answers `sender-unknown`. It talks to Resend's REST
+  API with `fetch` rather than the SDK — the SDK's ESM entry carries a guarded, optional
+  `await import("@react-email/render")` that this provider never reaches but webpack resolves anyway, so
+  `next build` would not compile while every unit test passed. `comms` is a service leaf every module may
+  import (01 §2.4), and an SDK dragging an optional React renderer into that graph is the coupling the leaf
+  rule protects; the HTTP conversation is driven in `comms.sender.test.ts` (8 cases over a stubbed `fetch`).
 - **Templates** (`comms/templates/`) are one file per id — `{ id, channel, from, audience, subject, html, text }`
   (03 §8.1) — over the three rendering helpers 03 §8.1 names (`formatLondonDateTime` · `appUrl` · `footer`) and
   one shell (`emailLayout`). Every interpolated value is escaped (`escape-html.ts`): the contact form is an
