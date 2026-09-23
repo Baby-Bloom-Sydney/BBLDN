@@ -30,10 +30,15 @@ import type { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { connect } from "./db-client";
 
-const MIGRATION = resolve(
-  __dirname,
-  "../migrations/0032_retention-grants-enumerated.sql",
-);
+const MIGRATIONS = [
+  resolve(__dirname, "../migrations/0032_retention-grants-enumerated.sql"),
+  // `0034` adds B-49's two release grants in its own `ENUMERATED SET` block. Read together, because a grant
+  // written in a later migration is exactly as real as one written in `0032` and must be just as enumerated.
+  resolve(
+    __dirname,
+    "../migrations/0034_purge-releases-its-own-references.sql",
+  ),
+];
 
 /** A table-level privilege the enumerated set grants, or a column list where the grant is per column. */
 type Grant = {
@@ -41,6 +46,12 @@ type Grant = {
   readonly table: readonly string[];
   /** columns carrying `UPDATE` where the table-level `UPDATE` is deliberately withheld. */
   readonly updateColumns?: readonly string[];
+  /**
+   * ★ columns carrying `SELECT` where the table-level `SELECT` is deliberately withheld (`3k`, security pass
+   * MEDIUM). `katie_prompt_edits` is the first entry that needs it: the release reads only the key it is
+   * about to null, so a table-level `SELECT` would have handed this identity the prompt-edit text.
+   */
+  readonly selectColumns?: readonly string[];
   /** why this table is in the set at all — the job, and what it does there. */
   readonly why: string;
 };
@@ -159,8 +170,8 @@ const ENUMERATED: Readonly<Record<string, Grant>> = {
   // ── the sweep's own classes (07 §6.2) ────────────────────────────────────────────────────────────────────
   "public.cookie_consent_records": {
     table: ["SELECT", "DELETE"],
-    updateColumns: ["id"],
-    why: "0031's two cookie classes — superseded at 30 days, the rest at 13 months; `update (id)` is the arm's row lock (0032 §2h)",
+    updateColumns: ["id", "user_id"],
+    why: "0031's two cookie classes — superseded at 30 days, the rest at 13 months; `update (id)` is the arm's row lock (0032 §2h); `update (user_id)` is B-49's release, because the `on delete set null` cascade runs as postgres and the append-only guard refuses it (0034)",
   },
   "public.admin_notifications": {
     table: ["SELECT", "DELETE"],
@@ -221,6 +232,13 @@ const ENUMERATED: Readonly<Record<string, Grant>> = {
     table: ["SELECT"],
     updateColumns: ["nanny_id", "subject_pseudonym"],
     why: "0027's pseudonymiser writes exactly these two; 0030 counts the rows. Who lifted the bar, when and why is unreachable — ADR-170's rule applied to the third table, which 0031's brief did not name",
+  },
+  // ── B-49's release (0034) ────────────────────────────────────────────────────────────────────────────────
+  "public.katie_prompt_edits": {
+    table: [],
+    selectColumns: ["applied_by"],
+    updateColumns: ["applied_by"],
+    why: "B-49 (0034): the purge nulls `applied_by` itself, because the `on delete set null` cascade runs as postgres and prevent_row_modification() refuses it. BOTH halves are column-scoped — the release's `for update nowait` reads only the key it is about to null, so a table-level SELECT would have handed this identity the prompt-edit text (security pass, MEDIUM). No table-level UPDATE, no DELETE at all, and refuse_reference_rewrite() keeps the one writable column release-only",
   },
   // ── storage ──────────────────────────────────────────────────────────────────────────────────────────────
   "storage.objects": {
@@ -355,7 +373,11 @@ describe("int.retention-grants — what the role can actually do (effective priv
       actual[row.rel] = row.effective.split(",").sort();
     }
     const expected: Record<string, string[]> = {};
-    for (const rel of NAMED) expected[rel] = [...ENUMERATED[rel]!.table].sort();
+    for (const rel of NAMED) {
+      // an entry whose every privilege is column-scoped holds nothing table-wide, and says so by omission
+      const table = [...ENUMERATED[rel]!.table].sort();
+      if (table.length > 0) expected[rel] = table;
+    }
     expect(actual).toEqual(expected);
   });
 
@@ -407,12 +429,18 @@ describe("int.retention-grants — what the role can actually do (effective priv
 
 describe("int.retention-grants — the enumerated set is the authority (ADR-185)", () => {
   it("★ holds a table privilege on exactly the relations the enumerated set names, and on nothing else", () => {
-    expect(tableAcl.map((r) => r.rel).sort()).toEqual(NAMED);
+    // an entry whose every privilege is column-scoped holds nothing table-wide — `katie_prompt_edits` is the
+    // first (`3k`), and it is the narrowest an entry can be while still being in the set at all
+    expect(tableAcl.map((r) => r.rel).sort()).toEqual(
+      NAMED.filter((rel) => ENUMERATED[rel]!.table.length > 0),
+    );
   });
 
   it("★ holds a column privilege only on relations the enumerated set names", () => {
     const withColumns = [...new Set(columnAcl.map((r) => r.rel))].sort();
-    const expected = NAMED.filter((rel) => ENUMERATED[rel]?.updateColumns);
+    const expected = NAMED.filter(
+      (rel) => ENUMERATED[rel]?.updateColumns ?? ENUMERATED[rel]?.selectColumns,
+    );
     expect(withColumns).toEqual(expected);
   });
 
@@ -421,21 +449,28 @@ describe("int.retention-grants — the enumerated set is the authority (ADR-185)
       tableAcl.map((r) => [r.rel, r.privs.split(",").sort()]),
     );
     const expected = Object.fromEntries(
-      NAMED.map((rel) => [rel, [...ENUMERATED[rel]!.table].sort()]),
+      NAMED.map((rel) => [rel, [...ENUMERATED[rel]!.table].sort()]).filter(
+        ([, privs]) => (privs as string[]).length > 0,
+      ),
     );
     expect(actual).toEqual(expected);
   });
 
-  it("holds exactly the UPDATE columns each entry lists, where it lists any", () => {
+  it("holds exactly the UPDATE and SELECT columns each entry lists, where it lists any", () => {
+    // one row per (relation, column) with its privilege list, so a column holding both lands in both buckets
     const actual: Record<string, string[]> = {};
     for (const row of columnAcl) {
-      expect(row.privs).toBe("UPDATE");
-      (actual[row.rel] ??= []).push(row.col);
+      for (const priv of row.privs.split(",")) {
+        expect(["UPDATE", "SELECT"]).toContain(priv);
+        (actual[`${row.rel}:${priv}`] ??= []).push(row.col);
+      }
     }
     const expected: Record<string, string[]> = {};
     for (const rel of NAMED) {
-      const cols = ENUMERATED[rel]?.updateColumns;
-      if (cols) expected[rel] = [...cols].sort();
+      const upd = ENUMERATED[rel]?.updateColumns;
+      if (upd) expected[`${rel}:UPDATE`] = [...upd].sort();
+      const sel = ENUMERATED[rel]?.selectColumns;
+      if (sel) expected[`${rel}:SELECT`] = [...sel].sort();
     }
     for (const key of Object.keys(actual)) actual[key]!.sort();
     expect(actual).toEqual(expected);
@@ -451,7 +486,13 @@ describe("int.retention-grants — the enumerated set is the authority (ADR-185)
   it("every entry says why it is there, because a privilege without a reason is one nobody can remove", () => {
     for (const [rel, grant] of Object.entries(ENUMERATED)) {
       expect(grant.why.length, rel).toBeGreaterThan(20);
-      expect(grant.table.length, rel).toBeGreaterThan(0);
+      // every entry holds SOMETHING, table-wide or by column — an entry that grants nothing is not an entry
+      expect(
+        grant.table.length +
+          (grant.updateColumns?.length ?? 0) +
+          (grant.selectColumns?.length ?? 0),
+        rel,
+      ).toBeGreaterThan(0);
     }
   });
 
@@ -477,17 +518,19 @@ describe("int.retention-grants — the enumerated set is the authority (ADR-185)
   });
 
   it("★ the migration's grant block and this list name the same tables, so neither drifts alone", () => {
-    const sql = readFileSync(MIGRATION, "utf8");
-    const start = sql.indexOf("ENUMERATED SET — START");
-    const end = sql.indexOf("ENUMERATED SET — END");
-    expect(start).toBeGreaterThan(-1);
-    expect(end).toBeGreaterThan(start);
-    const block = sql.slice(start, end);
     const named = new Set<string>();
-    for (const match of block.matchAll(
-      /^grant [^;]*? on table ((?:public|storage)\.[a-z_]+)/gms,
-    )) {
-      named.add(match[1]!);
+    for (const migration of MIGRATIONS) {
+      const sql = readFileSync(migration, "utf8");
+      const start = sql.indexOf("ENUMERATED SET — START");
+      const end = sql.indexOf("ENUMERATED SET — END");
+      expect(start, migration).toBeGreaterThan(-1);
+      expect(end, migration).toBeGreaterThan(start);
+      const block = sql.slice(start, end);
+      for (const match of block.matchAll(
+        /^grant [^;]*? on table ((?:public|storage)\.[a-z_]+)/gms,
+      )) {
+        named.add(match[1]!);
+      }
     }
     expect([...named].sort()).toEqual(NAMED);
   });

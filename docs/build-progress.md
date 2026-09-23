@@ -1037,7 +1037,12 @@ isolated nanny · 2 parents with an OPEN position and the held connection. **No 
 `sync_nanny_verification_state()` derives every one, called with the same `p_required` `src/boot` computes.
 
 <!-- audit
-Last edited: 2026-09-20T21:30+10:00 — BB-LDN-Planner-070926/3j
+Last edited: 2026-09-21T02:10+10:00 — BB-LDN-Planner-070926/3k
+Notes: 3k — one section appended with two halves (B-49, the self-service purge, `0034`; and the client function surface, `0035`, which closes REVIEW-4 L-2). The Current state table was NOT
+rewritten: this unit changes no table, no route and no action — one function body and two column grants. The
+reproduction is in the section because it is the evidence, and so is the measurement that the caller's identity
+does not reach a referential action.
+Prior: Last edited: 2026-09-20T21:30+10:00 — BB-LDN-Planner-070926/3j
 Notes: 3j — one section appended (the blanket function EXECUTE grant, ADR-185 one layer over; `0033`). The Current
 state table was NOT rewritten, for `3i`'s reason: this unit changes no table, no route and no action, only
 privileges. The measurement is in the section because it is the evidence: 56 of 88 public functions were
@@ -1195,6 +1200,120 @@ Prior: 2026-09-15T17:40+10:00 — BB-LDN-Planner-070926/S2 (S2 shipped locally).
 Prior: 2026-09-15T15:20+10:00 — BB-LDN-Planner-070926/S1 (S1 shipped locally).
 Prior: 2026-09-15T13:55+10:00 — BB-LDN-Planner-070926/S0 (seeded at bootstrap).
 -->
+
+## Files created / modified in the current unit (`3k` — B-49, the self-service purge; L-009 Phase 3)
+
+**`3j`'s Q-1, taken as its own unit for ADR-185's own reason.** Before this unit, **every self-service erasure
+failed its 30-day purge, for ever** — a live Article 17 defect, pre-existing in `0030`, not blocking today only
+because no real data exists.
+
+- ★ **Reproduced before anything was changed**, on `0000`-`0033` applied from empty, with a properly scrubbed
+  subject and a completed self-service request 31 days old:
+  `23001 account_erasure_requests: UPDATE refused`, raised from
+  `UPDATE ONLY "public"."account_erasure_requests" SET "requested_by" = NULL` inside
+  `delete from auth.users`. The suite was written first and ran **11 of its 39 cases red**; the other 28 are
+  the controls that had to hold both before and after.
+- ★ **The caller's identity does not reach the cascade, driven rather than argued.** Called under
+  `set local role bbldn_retention`, with `select public.is_retention_job()` returning **true** one statement
+  earlier, the same refusal comes back: `purge_auth_user()` is a `SECURITY DEFINER` owned by the deploying
+  role (ADR-183), so Postgres' referential action runs as `postgres`. That is why admitting `postgres` to the
+  guard would have been a widening of 33 `postgres`-owned definers and the console, not a fix (ADR-186).
+- **Three keys, not one**, derived from the catalogue: `account_erasure_requests.requested_by`,
+  `cookie_consent_records.user_id`, `katie_prompt_edits.applied_by` - every single-column
+  `on delete set null` key into `auth.users` whose table carries an UPDATE guard consulting
+  `is_retention_job()`. Each driven to its own `23001`.
+- **Measured and _not_ a defect, recorded so it is not re-derived:** the transitive road is clean.
+  `nannies.user_id` is `on delete cascade` and every safeguarding key beneath it is `set null` onto guards
+  that do not consult `is_retention_job()` for an UPDATE - a nanny purges clean, driven with and without a
+  verification row.
+
+- **`supabase/migrations/0034_purge-releases-its-own-references.sql`** (new) - `create or replace` of
+  `purge_scrubbed_user()` adding a **release loop** immediately before the delete, plus two **column** grants
+  (`update (user_id)` on `cookie_consent_records`; `select, update (applied_by)` on `katie_prompt_edits`). The
+  guard is untouched and byte-identical. The loop reads the **catalogue**, so a fourth guarded key is
+  attempted rather than ignored and becomes a **recorded** `reference-refused` naming the table - which closes
+  `3j`'s other half, that `0030`'s blocker scan reads `confdeltype = 'r'` only. The loop runs before any
+  ledger write and is one sub-transaction, so a refusal leaves nothing half-released and nothing stamped
+  `purged_at`. **Applied `0000`-`0034` from empty**; the verify block derives the release set from the
+  catalogue and then drives a self-service purge end to end, rolling its probe back through a sentinel.
+- ★ **The security pass inverted this file on the half it keeps, and the fix is a value control.** A
+  column grant is _column_-scoped and says nothing about the **value**; the append-only guards pass any
+  write once `is_retention_job()` is true; and `postgres` is a member of `bbldn_retention` with admin
+  option (`0000` grants it so migrations can set a function's owner). Driven by the reviewer:
+  `set local role bbldn_retention; update cookie_consent_records set user_id = '<another account>'`
+  **succeeded** — and the pin that was supposed to stop it is a `prosrc` regex in a test, which ad-hoc SQL
+  never goes near. Closed by `refuse_reference_rewrite()` on all three release columns, **no role exempt**:
+  a foreign key naming a person may be released to NULL and never moved to another person. The same pass's
+  MEDIUM narrowed `katie_prompt_edits` to `select (applied_by), update (applied_by)`, so the prompt-edit
+  text is unreadable to this identity as well as unwritable.
+- **`supabase/rollbacks/0028_erasure-job.rollback.sql`** (amended, not the migration) — it asserted
+  **exactly two** triggers on `account_erasure_requests` and went red with _"lost its guard"_ when `0034`
+  lawfully added a third. Now asserted **by name**, which is what the claim always was. Third instance of
+  one pattern (`3j` on `0033`'s twin, `3k` on `0032`'s and now this).
+- **`supabase/__tests__/self-service-purge.test.ts`** (`int.self-service-purge`, new, **43** cases) - both
+  roads; each released row surviving with its reference nulled rather than deleted; the catalogue/enumeration
+  agreement driven the other way with a **real fourth guarded key**; the guard still refusing from six
+  assumable roles **and from `postgres` itself**, asserted as _"the reference did not move"_ rather than
+  _"an error was raised"_ (the first draft was green on an empty table for the wrong reason); and ADR-186's
+  pin - exactly one body in the schema carries the release template.
+- **`supabase/rollbacks/0034_purge-releases-its-own-references.rollback.sql`** + **`rollback-0034-purge-release.test.ts`**
+  (new, **6** cases) - ADR-165 arm (1) on a defect fix rather than a privilege clause: both statements the twin
+  could contain re-break Article 17 (restoring `0030`'s body puts the defect back; revoking the two grants
+  makes the purge answer `reference-refused` for ever, which looks like a configuration mistake). Empty in
+  both halves; its verify block **runs the job**.
+- **`supabase/rollbacks/0032_...rollback.sql`** + **`rollback-0032-grants.test.ts`** (amended, not the
+  migration) - both asserted the literal **33** enumerated relations, so a lawful 34th turned them red with
+  _"a blanket grant is back"_. `3j`'s security pass predicted exactly this when it made the same correction to
+  `0033`'s twin. Now a comparison (a small fraction of `public`) and a before/after, with the exact membership
+  left where it belongs, in `int.retention-grants`.
+- **`int.retention-grants`** gains `public.katie_prompt_edits` with its reason and reads `0032`'s and `0034`'s
+  `ENUMERATED SET` blocks together; **`int.retention-execute`** gains the release's two `%I`-only templates in
+  `KNOWN_DYNAMIC_SQL`, on `3j`'s own rule that the inexhaustible part is enumerated.
+
+### …and the second half of the same unit: the client function surface (`0035`)
+
+`3j`'s Q-2, and **REVIEW-4's L-2 closes with it**. `0032` enumerated what the retention identity may touch and
+`0033` what it may call; both are about one NOLOGIN role a stranger cannot reach. This is the same discipline
+pointed at the role a **public anon key** gets you.
+
+- ★ **Measured from the catalogue before anything changed**, by effective privilege rather than a direct-ACL
+  read: **26** functions in `public` executable by `authenticated` and **4** by `anon`, **21** of them
+  `SECURITY DEFINER` owned by `postgres`, and every one a live `POST /rest/v1/rpc/<name>`. Grant option 0,
+  membership in the direction that would matter 0, PUBLIC-executable 0.
+- **`supabase/migrations/0035_client-function-surface-enumerated.sql`** (new) — **seven** revokes, leaving
+  **19 / 1**. Each survivor carries a reason and, per ADR-186, a **from where**: 7 policy predicates, 1
+  non-definer trigger callee, 2 view callees, 9 named RPCs at session scope. ★ **`anon`'s entire remaining
+  surface is one view callee** — `get_invite_preview` reads like an anon endpoint and is not one: the live tree
+  calls it once, at service scope, and its only client-scope caller is a legacy export nothing imports which
+  passes `invite_token:` to a parameter named `p_token`. Each revocation was searched for four ways first — `src/`, `pg_policies`, every other function body, and
+  every view definition.
+- ★ **The fifth surface, found by execution rather than by reading.** The first draft revoked **eight** and the
+  next full run came back red: `permission denied for function nanny_visible` from an **`anon`**
+  `select … from public.nanny_public`, and the same for `family_access_reason` from `family_access`. All nine
+  views in `public` are `security_invoker = off`, so their _table_ reads are checked as the view owner — **but
+  a function named inside a view body is still checked against the querying role.** Owner substitution applies
+  to relations, not to EXECUTE. Both functions stay, named to their views, and the gate grew a view-scan half
+  (`3j`'s D-2: the fix for an incomplete claim is another enumeration, not a weaker claim).
+- ★ **Three measurements correcting `0000:329`.** Its
+  `alter default privileges … revoke execute on functions from public, anon, authenticated` writes a correct
+  row (`{postgres=X, service_role=X}`) and is **inert**: a function created immediately afterwards still
+  carries `=X` (PUBLIC), and re-issuing the revoke changes nothing. Its stated claim — _"Default: no client
+  role may execute anything in public"_ — has been false since `0000`. And `supabase_admin`'s own default
+  **does** name `anon` and `authenticated`; `postgres` is not a superuser here, so
+  `alter default privileges for role supabase_admin …` answers _permission denied_ — named as a limit
+  (ADR-180's rule) with an ownership assertion that keeps it inert.
+- **`supabase/__tests__/client-functions.test.ts`** (`int.client-functions`, new, **22** cases) — effective
+  privilege, the enumerated surface both ways, the migration/gate cross-check, PUBLIC, grant option,
+  membership, default privileges, the view scan, and the inlining assertion that keeps `nannies_matching_idx`
+  honest. Driven the other way with a blanket re-grant, a newly created function (which is PUBLIC-executable
+  on creation — the measurement above, as an executable fact) and a grant routed through `PUBLIC`.
+- **`supabase/rollbacks/0035_…rollback.sql`** + **`rollback-0035-client-surface.test.ts`** (new, **6** cases) —
+  ADR-165 arm (1) in its plainest form: every statement the twin could contain hands a stranger something
+  back. Empty in both halves; its verify block checks the six by name, the side door (`PUBLIC`), and that the
+  twenty the client genuinely reaches are still there.
+- **`docs/review-sweep-190926.md`** — **REVIEW-4 L-2 struck through and closed**, with the note that it was
+  taken further than the register asked and why narrowing to `authenticated, service_role` would not have been
+  enough.
 
 ## Files created / modified in the current unit (`3j` — the blanket function EXECUTE grant; L-009 Phase 3)
 

@@ -132,12 +132,20 @@ begin
     end if;
   end loop;
 
-  if (select count(*) from pg_trigger g
-       where g.tgrelid = 'public.file_retention_log'::regclass and not g.tgisinternal) <> 2 then
-    raise exception '0028 twin: file_retention_log lost an append-only guard — the deletion evidence became rewritable';
+  -- ★ **Asserted by NAME, not by a count** (`3k`, after `0034` lawfully added a third trigger to
+  --    `account_erasure_requests` and turned this red with "lost its guard" — which named the wrong thing in
+  --    a file an operator is reading because something has already gone wrong). The claim here is *"the
+  --    append-only guard is still attached"*, and naming it says exactly that while a count says it and also
+  --    says "and nothing else was ever added", which was never the claim. Same correction `3j` made to
+  --    `0033`'s twin and `3k` made to `0032`'s; this is the third instance of one pattern.
+  if not exists (select 1 from pg_trigger g join pg_proc f on f.oid = g.tgfoid
+                  where g.tgrelid = 'public.file_retention_log'::regclass and not g.tgisinternal
+                    and f.proname = 'prevent_row_modification') then
+    raise exception '0028 twin: file_retention_log lost its append-only guard — the deletion evidence became rewritable';
   end if;
-  if (select count(*) from pg_trigger g
-       where g.tgrelid = 'public.account_erasure_requests'::regclass and not g.tgisinternal) <> 2 then
+  if not exists (select 1 from pg_trigger g join pg_proc f on f.oid = g.tgfoid
+                  where g.tgrelid = 'public.account_erasure_requests'::regclass and not g.tgisinternal
+                    and f.proname = 'prevent_erasure_request_modification') then
     raise exception '0028 twin: account_erasure_requests lost its guard — a request could be marked completed with no scrub (database pass HIGH-3)';
   end if;
   foreach v_tbl in array array['account_erasure_requests', 'file_retention_log'] loop
