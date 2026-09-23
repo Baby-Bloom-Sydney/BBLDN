@@ -15,6 +15,11 @@
 // It is wired only when `META_API.configured` (`wire-events.ts`), so an unset dataset id sends nothing and says
 // so on the boot report rather than posting to a guessed endpoint.
 //
+// **What it does not yet know, and where that is recorded.** 01 §3.1 and 03 §9.5 exclude test users from the
+// pixel and the CAPI; this sink cannot, because `user_profiles.is_test_user` is authoritative in production
+// (06 §13 O-7), `platform` is a leaf, and the envelope carries no such flag. Pinned `it.fails` in
+// `platform.meta-sink.test.ts` with its owner named, rather than dropped or faked.
+//
 // The access token is passed in the **request body**, never the query string: a URL reaches proxy logs, error
 // reporters and the `cause` of a thrown `fetch`, and a token in a log is a token that has leaked. Nothing here
 // logs the token, the endpoint, or `props`.

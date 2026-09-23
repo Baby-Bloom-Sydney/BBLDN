@@ -190,6 +190,29 @@ describe("meta sink — what it sends when she has agreed", () => {
   });
 });
 
+describe("meta sink — what it does NOT yet know, pinned rather than pretended", () => {
+  // `ecc-lite` rule 4: where the code and a document disagree, the document wins — so the documented
+  // behaviour is pinned as a failing test with a named owner rather than quietly dropped.
+  //
+  // 01 §3.1 (`config/testUserDomain.ts`) and 03 §9.5 both say test users are excluded from the pixel and the
+  // CAPI. The sink cannot do it: `user_profiles.is_test_user` is authoritative in production (06 §13 O-7),
+  // `platform` is a leaf and may not read that table, and the envelope carries no such flag. The fix is the
+  // same shape as the consent one — an `isTestUser` reader injected at boot beside the `ConsentReader` — and
+  // that is an amendment to 03 §9.5's connector, which a sink unit does not get to smuggle in.
+  //
+  // **Owner: the unit that amends 03 §9.5 to add the reader.** Until then a seeded test family's conversions
+  // reach the live dataset. The cost is bounded — the sink is bound in production only, where day one has no
+  // test users — and it is visible here rather than nowhere.
+  it.fails(
+    "★ OWED — a test user's conversion is still sent (01 §3.1 excludes them; the sink has no reader)",
+    async () => {
+      const { sink, calls } = harness();
+      await sink.handle(envelope());
+      expect(calls).toEqual([]);
+    },
+  );
+});
+
 describe("meta sink — deduplication is structural, not hopeful", () => {
   it("★ the browser's own event is not one the server sends, so no pair can be double-counted today", () => {
     const serverSends = Object.values(META_EVENTS.map);
