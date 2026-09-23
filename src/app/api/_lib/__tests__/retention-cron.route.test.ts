@@ -9,7 +9,7 @@
 // schedule carries and no job acts on today — 07 §6.2's ★ windows awaiting BAI, plus the evidence log and the
 // backups — a standing number that does not fall and is not stuck. `failed` and `capped` are the two an operator
 // should actually read, so they are logged under their own names rather than folded into the shared line.
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const SECRET = "a-configured-cron-secret";
 const PATH = "/api/cron/retention-sweep";
@@ -37,6 +37,18 @@ const stubs = (value: {
   });
   return { sweepRetention };
 };
+
+// The clock is pinned because `runCron` now gates on the London hour (02:00 London): `vercel.json` schedules a declared
+// London time at both candidate UTC hours and the gate discards the one that is not it (`4b`). A test that ran at
+// the wall-clock of whoever is running it would pass or skip by the hour of day.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-01-15T02:00:00.000Z"));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 afterEach(() => {
   vi.doUnmock("@/modules/config/server");

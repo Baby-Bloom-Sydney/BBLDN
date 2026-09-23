@@ -6,7 +6,7 @@
 // The cases that matter here are about the **join** (`3g`): the two passes both run, `handled` counts work
 // completed on both sides, and `skipped` counts work outstanding on both — because a run summary that reported
 // only the documents would show a clean night on the day a thousand people became due for a re-ask.
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const SECRET = "a-configured-cron-secret";
 const PATH = "/api/cron/audit-consent-expiry";
@@ -46,6 +46,18 @@ const stubs = (
   });
   return { auditExpiry, sweepRenewals };
 };
+
+// The clock is pinned because `runCron` now gates on the London hour (21:05 London): `vercel.json` schedules a declared
+// London time at both candidate UTC hours and the gate discards the one that is not it (`4b`). A test that ran at
+// the wall-clock of whoever is running it would pass or skip by the hour of day.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-01-15T21:05:00.000Z"));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 afterEach(() => {
   vi.doUnmock("@/modules/config/server");

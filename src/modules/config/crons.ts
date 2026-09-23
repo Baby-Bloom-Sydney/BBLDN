@@ -1,8 +1,13 @@
 // 01 §4f — every cron with its intended Europe/London time; `vercel.json` (UTC only) is generated from this file by
-// `npm run crons:generate` and checked by `crons:check` (06 §4.1 C). Generation rule: the UTC hour equals the London
-// hour, so the job fires at H (GMT) or H+1 (BST) — always on the intended London date, inside the window; handlers
-// that need the exact hour gate on London time (01 §4f). `job` = the 03 §2.5 SystemJobName; crons that move no stage
-// carry none. Parked, never created: release-payouts · schedule-upfront-cycles (N-2, ADR-022).
+// `npm run crons:generate` and checked by `crons:check` (06 §4.1 C). **Generation rule (re-based by `4b`):** a
+// London wall-clock is UTC+0 through GMT and UTC+1 through BST, so a `daily` or `weekly` time renders **both**
+// candidate UTC hours (`M H-1,H * * *`) and `runCron`'s due-gate (`api/_lib/cron-is-due.ts`) discards the one that
+// is not the declared London time. The job therefore fires twice in UTC and acts once per London day, at the hour
+// written here, in both halves of the year. Handlers derive "today" / "yesterday" from `platform.londonWallClock`.
+// 01:xx is not declarable (it does not exist on the spring-forward day and happens twice on the fall-back day) and
+// neither is 00:xx weekly (its BST candidate lands on the previous weekday) — the renderer throws on both.
+// `job` = the 03 §2.5 SystemJobName; crons that move no stage carry none. Parked, never created: release-payouts ·
+// schedule-upfront-cycles (N-2, ADR-022).
 import type { CronSpec } from "./types";
 
 const every = (minutes: number): CronSpec["london"] =>
@@ -85,7 +90,8 @@ export const CRONS: ReadonlyArray<CronSpec> = Object.freeze([
   cron({
     path: "/api/cron/proactive",
     london: every(15),
-    serves: "Katie proactive; handler gates on waking hours 07:00–22:00 London",
+    serves:
+      "Katie proactive; the handler gates on waking hours 07:00–22:00 read off `platform.londonWallClock`",
   }),
   cron({
     path: "/api/cron/compact-daily",

@@ -24,6 +24,9 @@ export { createRegistry } from "./lib/create-registry";
 
 // Clock + id minting (the one place a branded id is minted)
 export { nowInstant } from "./lib/now-instant";
+// The London wall clock at an instant (01 §4f) — "today / yesterday in London" for every cron handler, and the
+// hour the cron due-gate compares against the schedule declared in `config/crons.ts`.
+export { londonWallClock } from "./lib/london-wall-clock";
 export { newId } from "./lib/new-id";
 // ADR-102 — the one UK-mobile rule, shared by both onboarding modules (lifted from `onboarding-parent` by `2a`).
 export { normaliseUkMobile } from "./lib/normalise-uk-mobile";

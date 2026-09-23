@@ -17,35 +17,35 @@
     },
     {
       "path": "/api/cron/trial-complete-sweep",
-      "schedule": "0 4 * * *"
+      "schedule": "0 3,4 * * *"
     },
     {
       "path": "/api/cron/placement-start-sweep",
-      "schedule": "15 0 * * *"
+      "schedule": "15 0,23 * * *"
     },
     {
       "path": "/api/cron/close-no-candidates",
-      "schedule": "15 4 * * *"
+      "schedule": "15 3,4 * * *"
     },
     {
       "path": "/api/cron/vetting-expiry",
-      "schedule": "30 4 * * *"
+      "schedule": "30 3,4 * * *"
     },
     {
       "path": "/api/cron/expire-subscribe-invites",
-      "schedule": "45 4 * * *"
+      "schedule": "45 3,4 * * *"
     },
     {
       "path": "/api/cron/retention-sweep",
-      "schedule": "0 2 * * *"
+      "schedule": "0 1,2 * * *"
     },
     {
       "path": "/api/cron/delete-account",
-      "schedule": "30 2 * * *"
+      "schedule": "30 1,2 * * *"
     },
     {
       "path": "/api/cron/purge-scrubbed-users",
-      "schedule": "45 2 * * *"
+      "schedule": "45 1,2 * * *"
     },
     {
       "path": "/api/cron/proactive",
@@ -53,51 +53,51 @@
     },
     {
       "path": "/api/cron/compact-daily",
-      "schedule": "0 3 * * *"
+      "schedule": "0 2,3 * * *"
     },
     {
       "path": "/api/cron/cleanup-orphan-children",
-      "schedule": "0 3 * * *"
+      "schedule": "0 2,3 * * *"
     },
     {
       "path": "/api/cron/soft-lock-stale-children",
-      "schedule": "15 3 * * *"
+      "schedule": "15 2,3 * * *"
     },
     {
       "path": "/api/cron/dfy-waves",
-      "schedule": "0 9 * * *"
+      "schedule": "0 8,9 * * *"
     },
     {
       "path": "/api/cron/snapshot-pipeline",
-      "schedule": "5 0 * * *"
+      "schedule": "5 0,23 * * *"
     },
     {
       "path": "/api/cron/expire-trials",
-      "schedule": "0 3 * * *"
+      "schedule": "0 2,3 * * *"
     },
     {
       "path": "/api/cron/trial-reminders",
-      "schedule": "0 8 * * *"
+      "schedule": "0 7,8 * * *"
     },
     {
       "path": "/api/cron/expire-past-due",
-      "schedule": "30 3 * * *"
+      "schedule": "30 2,3 * * *"
     },
     {
       "path": "/api/cron/expire-cancelled-subscriptions",
-      "schedule": "45 3 * * *"
+      "schedule": "45 2,3 * * *"
     },
     {
       "path": "/api/cron/audit-consent-expiry",
-      "schedule": "5 21 * * *"
+      "schedule": "5 20,21 * * *"
     },
     {
       "path": "/api/cron/usage-weekly-check",
-      "schedule": "0 6 * * 1"
+      "schedule": "0 5,6 * * 1"
     },
     {
       "path": "/api/cron/payment-due-sweep",
-      "schedule": "0 7 * * *"
+      "schedule": "0 6,7 * * *"
     }
   ]
 }

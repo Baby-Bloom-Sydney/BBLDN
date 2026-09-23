@@ -1953,3 +1953,64 @@ availability write. `08.17`'s `support-reply` and `08.18`'s `admin-contact` have
 belong to the `admin/support` and `admin/users` panels, which are descriptors only. And **nothing here is
 proven against a live Resend account** — the key, the DNS records and the domain verification are BAI's, and
 every claim in this unit is driven against `stub-email`.
+
+---
+
+## Files created / modified in the current unit (4b — the cron table runs on London time; L-010 Phase 4)
+
+**The defect.** Every schedule in `config/crons.ts` is stated in Europe/London, and `vercel.json` was generated from
+it by the rule "the UTC hour equals the London hour". That is a naive offset. It is correct for the twenty-one weeks
+of GMT and an hour late for the thirty-one weeks of BST, so `trial-reminders` — declared "08:00 London morning" —
+delivered at 09:00 for most of the year, `dfy-waves` at 10:00, `compact-daily` compacted at 04:00, and
+`snapshot-pipeline` stamped the day at 01:05. Nothing in the repo tested a firing _instant_; the only cron assertion
+was a string comparison, which the inherited expressions passed.
+
+**The fix, in two halves.** A London wall-clock is not expressible as one UTC hour, so
+**`scripts/crons/lib/render-cron-block.ts`** now renders a `daily` or `weekly` time as **both** candidate UTC hours
+(`M H-1,H * * *` — the GMT one and the BST one) and **`src/app/api/_lib/cron-is-due.ts`** discards the one that is
+not the declared London time. The job fires twice in UTC and acts once per London day, at the declared hour, in
+both halves of the year. The cron **count** is unchanged (a list in the hour field is one entry, which matters
+because Vercel caps them), and no handler learns anything about BST: the gate is inside **`run-cron.ts`**, before
+the handler is reached, so every cron written today and every one added later inherits it. A not-due fire answers
+200 with a run summary of zero and logs `due=false`; an operator can tell it from a run at a glance.
+
+**Two London hours are now refused rather than mis-scheduled** (fail closed): `01:xx` daily or weekly — the hour does
+not exist on the spring-forward day and happens twice on the fall-back day — and `00:xx` weekly, whose BST candidate
+is 23:xx UTC on the _previous_ day, i.e. the wrong weekday. The renderer throws with the hours to move to. No cron
+declared today is affected.
+
+**Proved by running it, not by reading it.** `cron-london-schedule.test.ts` expands the committed `vercel.json`
+expression for each declared cron into the actual UTC instants Vercel would call it at, walks a window across each
+2026 transition — forwards on 03-29, backwards on 10-25 — and drives every one of those fires through the real
+`runCron`. It asserts, per job, one run per London day at the declared London wall-clock, with no gap and no
+repeat. **RED verified first: against the inherited naive expressions, 45 of its 89 cases fail.** `08.26`'s midnight
+case is pinned by hand because it is the one that moves UTC _date_ under BST (it fires 23:05 UTC the evening before
+and reads 00:05 on the correct London date).
+
+**Idempotency is pinned where it actually lives.** The gate turns the double UTC fire into one run; it has no durable
+memory and therefore cannot dedupe a _retry_ of the due fire. That is asserted explicitly (two deliveries inside the
+window reach the handler twice) so no later reader assumes otherwise — 01 §4f's "every handler … idempotent" remains
+the handler's contract, and each of the thirteen unwritten handlers owes it.
+
+- **`scripts/crons/lib/render-cron-block.ts`** (modified) + **`scripts/crons/lib/__tests__/render-cron-block.test.ts`**
+  (new) — both candidate UTC hours, ascending; the two unschedulable London hours refused.
+- **`src/modules/platform/lib/london-wall-clock.ts`** (new), exported from the connector, type in `platform/types.ts`
+  — the London date / hour / minute / weekday at an instant, from `LOCALE.timezone` with `Intl` owning the transition
+  dates. This is what "today / yesterday in London" (`08.23`, `08.26`) and Katie's 07:00–22:00 waking window (`08.22`)
+  read; `scheduling/lib/london-offset-minutes.ts` keeps the separate _offset_ question.
+- **`src/app/api/_lib/cron-is-due.ts`** (new) — the window is `[-5, +50]` minutes around the declared London time:
+  tolerant of Vercel's delivery jitter both ways and strictly inside the ±60 that separates the two candidate fires.
+- **`src/app/api/_lib/run-cron.ts`** (modified) — step 3 of the fail-closed order; `due` on every run-summary line.
+- **`src/app/api/_lib/__tests__/cron-declared-vs-used.test.ts`** (new) — **thirteen of the twenty-four declared crons
+  pass no handler.** That was known and expected, which is exactly how `08.43` sat written and unscheduled for a
+  week. The set is now enumerated with an owner apiece and asserted both ways: a cron added without a handler fails
+  until someone writes down who owes it, and one that gains a handler fails until it is struck off.
+- **Six cron route test files** (modified) — clocks pinned. They were passing on the hour of day they happened to be
+  run at; `run-cron.test.ts`, `erasure-cron` and `purge-cron` would have gone red at any other hour.
+- **`src/modules/config/{crons.ts,types.ts,README.md}`**, **`config.repo.test.ts`** (modified) — the generation rule
+  and the two refused hours documented where they are declared; the weekly expectation moved from `0 6 * * 1` to
+  `0 5,6 * * 1`, which is 01 §4f's rule rather than the inherited one.
+
+**Known gap left for its owner (MEDIUM).** `expire-slot-holds` is a declared `SystemJobName` with no use anywhere:
+the sweep runs (hosted by the 5-minute pass) but writes under the data-seam label `scheduling.expireHolds`, so the
+declared job name never reaches a row. Declared-not-used; owner is whoever next touches 03 §2.5 / `scheduling`.

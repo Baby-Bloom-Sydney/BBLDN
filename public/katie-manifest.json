@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-23T02:45:00.381Z",
+  "generated_at": "2026-09-23T03:04:35.553Z",
   "summary": {
     "route_count": 61,
     "page_count": 89,
@@ -813,35 +813,35 @@
     },
     {
       "path": "/api/cron/trial-complete-sweep",
-      "schedule": "0 4 * * *"
+      "schedule": "0 3,4 * * *"
     },
     {
       "path": "/api/cron/placement-start-sweep",
-      "schedule": "15 0 * * *"
+      "schedule": "15 0,23 * * *"
     },
     {
       "path": "/api/cron/close-no-candidates",
-      "schedule": "15 4 * * *"
+      "schedule": "15 3,4 * * *"
     },
     {
       "path": "/api/cron/vetting-expiry",
-      "schedule": "30 4 * * *"
+      "schedule": "30 3,4 * * *"
     },
     {
       "path": "/api/cron/expire-subscribe-invites",
-      "schedule": "45 4 * * *"
+      "schedule": "45 3,4 * * *"
     },
     {
       "path": "/api/cron/retention-sweep",
-      "schedule": "0 2 * * *"
+      "schedule": "0 1,2 * * *"
     },
     {
       "path": "/api/cron/delete-account",
-      "schedule": "30 2 * * *"
+      "schedule": "30 1,2 * * *"
     },
     {
       "path": "/api/cron/purge-scrubbed-users",
-      "schedule": "45 2 * * *"
+      "schedule": "45 1,2 * * *"
     },
     {
       "path": "/api/cron/proactive",
@@ -849,238 +849,238 @@
     },
     {
       "path": "/api/cron/compact-daily",
-      "schedule": "0 3 * * *"
+      "schedule": "0 2,3 * * *"
     },
     {
       "path": "/api/cron/cleanup-orphan-children",
-      "schedule": "0 3 * * *"
+      "schedule": "0 2,3 * * *"
     },
     {
       "path": "/api/cron/soft-lock-stale-children",
-      "schedule": "15 3 * * *"
+      "schedule": "15 2,3 * * *"
     },
     {
       "path": "/api/cron/dfy-waves",
-      "schedule": "0 9 * * *"
+      "schedule": "0 8,9 * * *"
     },
     {
       "path": "/api/cron/snapshot-pipeline",
-      "schedule": "5 0 * * *"
+      "schedule": "5 0,23 * * *"
     },
     {
       "path": "/api/cron/expire-trials",
-      "schedule": "0 3 * * *"
+      "schedule": "0 2,3 * * *"
     },
     {
       "path": "/api/cron/trial-reminders",
-      "schedule": "0 8 * * *"
+      "schedule": "0 7,8 * * *"
     },
     {
       "path": "/api/cron/expire-past-due",
-      "schedule": "30 3 * * *"
+      "schedule": "30 2,3 * * *"
     },
     {
       "path": "/api/cron/expire-cancelled-subscriptions",
-      "schedule": "45 3 * * *"
+      "schedule": "45 2,3 * * *"
     },
     {
       "path": "/api/cron/audit-consent-expiry",
-      "schedule": "5 21 * * *"
+      "schedule": "5 20,21 * * *"
     },
     {
       "path": "/api/cron/usage-weekly-check",
-      "schedule": "0 6 * * 1"
+      "schedule": "0 5,6 * * 1"
     },
     {
       "path": "/api/cron/payment-due-sweep",
-      "schedule": "0 7 * * *"
+      "schedule": "0 6,7 * * *"
     }
   ],
   "migrations": [
     {
       "filename": "0000_extensions-enums.sql",
       "bytes": 30735,
-      "modified_at": "2026-09-23T01:27:05.970Z"
+      "modified_at": "2026-09-23T01:53:53.762Z"
     },
     {
       "filename": "0001_areas.sql",
       "bytes": 36557,
-      "modified_at": "2026-09-23T01:27:05.970Z"
+      "modified_at": "2026-09-23T01:53:53.762Z"
     },
     {
       "filename": "0002_identity.sql",
       "bytes": 16144,
-      "modified_at": "2026-09-23T01:27:05.970Z"
+      "modified_at": "2026-09-23T01:53:53.762Z"
     },
     {
       "filename": "0003_legal-documents.sql",
       "bytes": 7394,
-      "modified_at": "2026-09-23T01:27:05.971Z"
+      "modified_at": "2026-09-23T01:53:53.763Z"
     },
     {
       "filename": "0004_consent.sql",
       "bytes": 23647,
-      "modified_at": "2026-09-23T01:27:05.971Z"
+      "modified_at": "2026-09-23T01:53:53.763Z"
     },
     {
       "filename": "0005_marketplace-parties.sql",
       "bytes": 17134,
-      "modified_at": "2026-09-23T01:27:05.971Z"
+      "modified_at": "2026-09-23T01:53:53.763Z"
     },
     {
       "filename": "0006_positions.sql",
       "bytes": 18825,
-      "modified_at": "2026-09-23T01:27:05.971Z"
+      "modified_at": "2026-09-23T01:53:53.763Z"
     },
     {
       "filename": "0007_connections-placements.sql",
       "bytes": 25633,
-      "modified_at": "2026-09-23T01:27:05.971Z"
+      "modified_at": "2026-09-23T01:53:53.763Z"
     },
     {
       "filename": "0008_verification.sql",
       "bytes": 13088,
-      "modified_at": "2026-09-23T01:27:05.971Z"
+      "modified_at": "2026-09-23T01:53:53.763Z"
     },
     {
       "filename": "0009_scheduling.sql",
       "bytes": 34208,
-      "modified_at": "2026-09-23T01:27:05.971Z"
+      "modified_at": "2026-09-23T01:53:53.763Z"
     },
     {
       "filename": "0010_money.sql",
       "bytes": 45746,
-      "modified_at": "2026-09-23T01:27:05.971Z"
+      "modified_at": "2026-09-23T01:53:53.763Z"
     },
     {
       "filename": "0011_events-comms.sql",
       "bytes": 27597,
-      "modified_at": "2026-09-23T01:27:05.971Z"
+      "modified_at": "2026-09-23T01:53:53.763Z"
     },
     {
       "filename": "0012_app.sql",
       "bytes": 60167,
-      "modified_at": "2026-09-23T01:27:05.971Z"
+      "modified_at": "2026-09-23T01:53:53.763Z"
     },
     {
       "filename": "0013_katie.sql",
       "bytes": 25021,
-      "modified_at": "2026-09-23T01:27:05.971Z"
+      "modified_at": "2026-09-23T01:53:53.764Z"
     },
     {
       "filename": "0014_leads.sql",
       "bytes": 13587,
-      "modified_at": "2026-09-23T01:27:05.971Z"
+      "modified_at": "2026-09-23T01:53:53.764Z"
     },
     {
       "filename": "0015_storage.sql",
       "bytes": 11543,
-      "modified_at": "2026-09-23T01:27:05.972Z"
+      "modified_at": "2026-09-23T01:53:53.764Z"
     },
     {
       "filename": "0016_rls.sql",
       "bytes": 26408,
-      "modified_at": "2026-09-23T01:27:05.972Z"
+      "modified_at": "2026-09-23T01:53:53.764Z"
     },
     {
       "filename": "0017_consent-purpose-rate-limits-profile.sql",
       "bytes": 28374,
-      "modified_at": "2026-09-23T01:27:05.972Z"
+      "modified_at": "2026-09-23T01:53:53.764Z"
     },
     {
       "filename": "0018_call-mirror.sql",
       "bytes": 20350,
-      "modified_at": "2026-09-23T01:27:05.972Z"
+      "modified_at": "2026-09-23T01:53:53.764Z"
     },
     {
       "filename": "0019_write-definers.sql",
       "bytes": 60835,
-      "modified_at": "2026-09-23T01:27:05.972Z"
+      "modified_at": "2026-09-23T01:53:53.765Z"
     },
     {
       "filename": "0020_lead-email-ignored-outcome.sql",
       "bytes": 18845,
-      "modified_at": "2026-09-23T01:27:05.973Z"
+      "modified_at": "2026-09-23T01:53:53.766Z"
     },
     {
       "filename": "0021_nanny-onboarding.sql",
       "bytes": 15926,
-      "modified_at": "2026-09-23T01:27:05.973Z"
+      "modified_at": "2026-09-23T01:53:53.766Z"
     },
     {
       "filename": "0022_verification-wizard.sql",
       "bytes": 32585,
-      "modified_at": "2026-09-23T01:27:05.973Z"
+      "modified_at": "2026-09-23T01:53:53.766Z"
     },
     {
       "filename": "0023_verification-decision-sync.sql",
       "bytes": 57973,
-      "modified_at": "2026-09-23T01:27:05.974Z"
+      "modified_at": "2026-09-23T01:53:53.767Z"
     },
     {
       "filename": "0024_connection-hold-write.sql",
       "bytes": 11450,
-      "modified_at": "2026-09-23T01:27:05.974Z"
+      "modified_at": "2026-09-23T01:53:53.767Z"
     },
     {
       "filename": "0025_suspension-is-terminal.sql",
       "bytes": 28997,
-      "modified_at": "2026-09-23T01:27:05.975Z"
+      "modified_at": "2026-09-23T01:53:53.768Z"
     },
     {
       "filename": "0026_consent-draft-seed-and-binding.sql",
       "bytes": 30467,
-      "modified_at": "2026-09-23T01:27:05.975Z"
+      "modified_at": "2026-09-23T01:53:53.769Z"
     },
     {
       "filename": "0027_safeguarding-survives-erasure.sql",
       "bytes": 36434,
-      "modified_at": "2026-09-23T01:27:05.976Z"
+      "modified_at": "2026-09-23T01:53:53.769Z"
     },
     {
       "filename": "0028_erasure-job.sql",
       "bytes": 55337,
-      "modified_at": "2026-09-23T01:27:05.977Z"
+      "modified_at": "2026-09-23T01:53:53.770Z"
     },
     {
       "filename": "0029_renewal-sweep.sql",
       "bytes": 7893,
-      "modified_at": "2026-09-23T01:27:05.978Z"
+      "modified_at": "2026-09-23T01:53:53.770Z"
     },
     {
       "filename": "0030_purge-scrubbed-users.sql",
       "bytes": 37427,
-      "modified_at": "2026-09-23T01:27:05.978Z"
+      "modified_at": "2026-09-23T01:53:53.770Z"
     },
     {
       "filename": "0031_retention-sweep.sql",
       "bytes": 39830,
-      "modified_at": "2026-09-23T01:27:05.978Z"
+      "modified_at": "2026-09-23T01:53:53.770Z"
     },
     {
       "filename": "0032_retention-grants-enumerated.sql",
       "bytes": 35450,
-      "modified_at": "2026-09-23T01:27:05.978Z"
+      "modified_at": "2026-09-23T01:53:53.771Z"
     },
     {
       "filename": "0033_retention-execute-enumerated.sql",
       "bytes": 41233,
-      "modified_at": "2026-09-23T01:27:05.979Z"
+      "modified_at": "2026-09-23T01:53:53.771Z"
     },
     {
       "filename": "0034_purge-releases-its-own-references.sql",
       "bytes": 46587,
-      "modified_at": "2026-09-23T01:59:14.332Z"
+      "modified_at": "2026-09-23T01:53:53.771Z"
     },
     {
       "filename": "0035_client-function-surface-enumerated.sql",
       "bytes": 20632,
-      "modified_at": "2026-09-23T01:59:14.332Z"
+      "modified_at": "2026-09-23T01:53:53.772Z"
     },
     {
       "filename": "0036_client-relation-surface-enumerated.sql",
       "bytes": 33592,
-      "modified_at": "2026-09-23T02:26:42.149Z"
+      "modified_at": "2026-09-23T02:38:11.755Z"
     }
   ],
   "server_actions": [

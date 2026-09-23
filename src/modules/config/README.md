@@ -30,8 +30,10 @@ is generated from it (`npm run env:example`; `env:check` fails CI on drift). `.e
 fixture the suite parses (05 §4.3); the CI workflow's `env:` block mirrors it.
 
 **Crons.** `crons.ts` states every 01 §4f cron in Europe/London; `npm run crons:generate` writes the `vercel.json`
-cron block, `crons:check` fails on drift (06 §4.1 C). UTC hour = London hour (fires at H GMT / H+1 BST, same London
-date).
+cron block, `crons:check` fails on drift (06 §4.1 C). A daily or weekly London time renders **both** candidate UTC
+hours (`M H-1,H * * *`) — no single UTC expression is 09:00 London all year — and `runCron`'s due-gate
+(`api/_lib/cron-is-due.ts`) discards the one that is not the declared London time, so a job fires twice in UTC and
+acts once per London day through GMT and BST alike (`4b`). 01:xx and 00:xx-weekly are refused by the renderer.
 
 **`uploads.ts` vs `security.ts`.** Both exist (01 §3.1 lists both); `UPLOADS` holds the bucket MIME lists and caps,
 `SECURITY.uploads` references it so the security controls are still reviewed as one unit (07 §7 rule 6).
