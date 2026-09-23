@@ -1,21 +1,12 @@
 // Who may amend a position, and when. `amend()` moves facts **without** a transition (03 §2.2), so it is not in
-// `POSITION_TRANSITIONS` and `allowedTransitions` cannot answer for it — this is the same two questions asked
-// where the amend happens.
+// `POSITION_TRANSITIONS` and `allowedTransitions` cannot answer for it — this asks the same two questions where
+// the amend happens.
 //
 // **The actor rule is 03 §2.5's, unchanged:** a parent acts only on her own position. `amend` had no actor check
-// at all before this unit, which meant any signed-in parent could rewrite any family's position; the check is
-// the same one `create-positions-slice.ts` applies to every P row.
+// at all before this unit, which meant any signed-in parent could rewrite any family's position the moment a
+// caller existed; the check is the same one `create-positions-slice.ts` applies to every P row.
 //
-// **The stage rule is the ruling recorded in the L-007 PROGRESS entry.** A parent edits before anyone has been
-// put in front of her — `DRAFT` and `OPEN`. `CONNECTING` is what 04 §3.1 step 14 writes immediately after the
-// introduction call, with meetings arranged on the terms she gave and no mechanism to re-tell the nanny they
-// changed; `ACTIVE` has a nanny placed, and the hours, rate and start a family renegotiates there live on the
-// **placement**, which has its own `amend`. So the line the stage model already draws is the line, and past it
-// the matchmaker makes the change — she is an `admin` actor and is not stage-gated. The parent is not stuck:
-// P-7 (close) is hers at DRAFT / OPEN / CONNECTING and P-6 (end) at ACTIVE.
-//
-// Sydney gates neither: a parent there may edit a filled position, silently, and nobody who agreed to the old
-// terms is told. That is evidence of what happens without the line, not an argument for copying it.
+// **The stage rule is `parent-amendable-stages.ts`'**, which carries the ruling and its reasons.
 import { err, ok } from "@/modules/platform";
 import type {
   Actor,
@@ -24,12 +15,7 @@ import type {
   Result,
 } from "@/modules/shared-types";
 import type { StageErrorDetails } from "../types";
-
-/** The stages at which the family herself still owns what she asked for. */
-export const PARENT_AMENDABLE_STAGES: ReadonlySet<PositionStage> = new Set([
-  "DRAFT",
-  "OPEN",
-] as const);
+import { PARENT_AMENDABLE_STAGES } from "./parent-amendable-stages";
 
 const refuse = (
   code: "FORBIDDEN" | "CONFLICT",

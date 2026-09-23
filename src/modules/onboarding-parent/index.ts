@@ -18,7 +18,10 @@ export { requestPasswordResetAction } from "./actions/request-password-reset-act
 
 // `1e` — S-P-04's one action (04 §3.3 trigger b): the in-app position flow opens the position and answers S-P-01.
 export { createPositionAction } from "./actions/create-position-action";
+// `P1-EDIT` — S-P-04's edit state (04 §6.2): the same screen, `amend` instead of P-2, and no re-fire.
+export { amendPositionAction } from "./actions/amend-position-action";
 export { PARENT_CALL_PATH } from "./lib/parent-call-path";
+export { PARENT_POSITION_PATH } from "./lib/parent-position-path";
 
 // Pure helpers other units read: where a parent lands after signup (`1d`), a safe `next=` (any route).
 export { postSignupDestination } from "./lib/post-signup-destination";

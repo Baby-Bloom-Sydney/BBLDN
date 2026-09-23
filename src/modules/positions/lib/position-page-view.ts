@@ -8,6 +8,7 @@
 // parent something the system does not know.
 import type { TransitionId } from "@/modules/shared-types";
 import type { PositionSummary } from "../types";
+import { parentMayAmend } from "./parent-may-amend";
 
 export type PositionPageView = {
   readonly area: string;
@@ -16,6 +17,12 @@ export type PositionPageView = {
   readonly days: number;
   readonly stageLine: string;
   readonly canClose: boolean;
+  /**
+   * 04 §6.2 — S-P-05 exits to "S-P-04 (edit)". The link is shown exactly when `amend` would accept her, so a
+   * parent is never shown a way into a screen that refuses her at the end of it: `DRAFT` and `OPEN`, before anyone
+   * been put in front of her (the ruling in `may-amend.ts`).
+   */
+  readonly canEdit: boolean;
 };
 
 /** `04.09` — one line per stage, in a parent's words, never the enum. */
@@ -41,5 +48,6 @@ export function positionPageView(
     ).size,
     stageLine: STAGE_LINES[record.stage] ?? "",
     canClose: allowed.includes("P-7"),
+    canEdit: parentMayAmend(record.stage),
   });
 }

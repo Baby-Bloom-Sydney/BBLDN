@@ -23,6 +23,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const ROUTE = "/parent/position";
+/** 04 §6.2 — S-P-05's "S-P-04 (edit)" exit. The same screen, in its edit state. */
+const EDIT_ROUTE = "/parent/request";
 
 export default async function ParentPositionPage() {
   const load = await loadPositionPage();
@@ -41,6 +43,11 @@ export default async function ParentPositionPage() {
   }
 
   return (
-    <PositionPage view={load.view} stage={load.stage} closeAction={close} />
+    <PositionPage
+      view={load.view}
+      stage={load.stage}
+      closeAction={close}
+      editHref={EDIT_ROUTE}
+    />
   );
 }

@@ -87,8 +87,7 @@ const invalid = (which: string) =>
   } satisfies StageErrorDetails);
 
 /** The one fact a position amend may carry (03 §2.2 for the position; the placement's three are its own). */
-export const POSITION_AMENDABLE_KEYS: ReadonlyArray<string> =
-  Object.freeze(["detail"]);
+const AMENDABLE_KEYS: ReadonlyArray<string> = Object.freeze(["detail"]);
 
 /**
  * `AmendableFields` → the typed change this module knows how to apply. A refusal is a refusal: the caller is
@@ -99,7 +98,7 @@ export function positionAmendment(
 ): Result<{ readonly detail: PositionMatchDetail }, StageErrorDetails> {
   const keys = Object.keys(fields);
   if (keys.length === 0) return invalid("empty");
-  const unknown = keys.filter((key) => !POSITION_AMENDABLE_KEYS.includes(key));
+  const unknown = keys.filter((key) => !AMENDABLE_KEYS.includes(key));
   if (unknown.length > 0) return invalid(unknown.join(","));
   const parsed = DETAIL_SCHEMA.safeParse(fields.detail);
   if (!parsed.success) return invalid("detail");

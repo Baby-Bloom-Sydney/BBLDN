@@ -13,11 +13,17 @@ import {
   WIZARD_QUESTIONS,
   Wizard,
   matching,
+  wizardAnswersOf,
 } from "@/modules/matching";
 import type { WizardAnswers } from "@/modules/matching";
-import { createPositionAction } from "@/modules/onboarding-parent";
+import {
+  amendPositionAction,
+  createPositionAction,
+} from "@/modules/onboarding-parent";
+import { parentMayAmend, positions } from "@/modules/positions";
+import type { PositionSummary } from "@/modules/positions";
 import { parseQuickMatchQuery } from "@/modules/public-site";
-import type { LeadId } from "@/modules/shared-types";
+import type { LeadId, ParentId } from "@/modules/shared-types";
 
 export const metadata: Metadata = {
   title: "Create your position",
@@ -29,6 +35,9 @@ export const dynamic = "force-dynamic";
 /** 04 §8, ratified: the one header S-P-04 and the T-1.8d landing share. */
 const HEADER = "Create your position to connect with nannies";
 const SUBMIT = "Create my position";
+/** 04 §6.2 — the screen's second state, "edit (no re-fire)": same bank, her answers already in it. */
+const EDIT_HEADER = "Change what you asked for";
+const EDIT_SUBMIT = "Save my changes";
 const ROUTE = "/parent/request";
 
 type Props = {
@@ -71,10 +80,26 @@ async function prefill(params: Props["searchParams"]): Promise<WizardAnswers> {
   };
 }
 
+/**
+ * The position this parent already holds, when `amend` would still accept a change to it — which is the one
+ * question that decides which of the screen's two states this is. A read that refuses answers `null`: the
+ * screen then asks her to create one, and P-2's own I-1 refuses a second live position rather than this page
+ * guessing. `canEdit` is `positions`' judgement (04 §6.2; `may-amend.ts`), never re-derived here.
+ */
+async function editable(userId: string): Promise<PositionSummary | null> {
+  const live = await positions.findLive(userId as ParentId);
+  if (!live.ok || live.value === null) return null;
+  return parentMayAmend(live.value.stage) ? live.value : null;
+}
+
 export default async function ParentPositionFlowPage({ searchParams }: Props) {
   const session = await auth.requireRole("parent");
   if (!session.ok) redirect(loginRedirectUrl(ROUTE));
-  const answers = await prefill(searchParams);
+  const existing = await editable(session.value.userId as string);
+  const answers =
+    existing === null
+      ? await prefill(searchParams)
+      : wizardAnswersOf(existing.detail);
   return (
     <main className="px-4 py-10">
       <Wizard
@@ -84,9 +109,9 @@ export default async function ParentPositionFlowPage({ searchParams }: Props) {
         leadId={session.value.userId}
         source={null}
         connectNannyId={null}
-        header={HEADER}
-        submitLabel={SUBMIT}
-        onComplete={createPositionAction}
+        header={existing === null ? HEADER : EDIT_HEADER}
+        submitLabel={existing === null ? SUBMIT : EDIT_SUBMIT}
+        onComplete={existing === null ? createPositionAction : amendPositionAction}
       />
     </main>
   );

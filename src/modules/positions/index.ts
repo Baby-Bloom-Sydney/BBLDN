@@ -62,5 +62,10 @@ export { positionPageView } from "./lib/position-page-view";
 export { PositionPage } from "./components/PositionPage";
 export { closePositionAction } from "./actions/close-position-action";
 
+// `P1-EDIT` — `amend()` grew an actor rule and a stage gate (04 §6.2 "S-P-04 (edit)"). The predicate is exported
+// so the screen that offers the edit and the method that performs it cannot disagree about who may.
+export { parentMayAmend } from "./lib/parent-may-amend";
+export { PARENT_AMENDABLE_STAGES } from "./lib/parent-amendable-stages";
+
 // Rows 7 and 8's facts (`1i`): declared beside the rail, handed in by the caller that may read them.
 export type { AppRailFacts } from "./lib/journey-rows-4-to-8";

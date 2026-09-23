@@ -48,7 +48,7 @@ const admin: Actor = { kind: "admin", id: "admin-1" as never };
 
 const entity: EntityRef = { kind: "position", id: POSITION };
 
-const DETAIL: PositionMatchDetail = Object.freeze({
+const DETAIL = Object.freeze({
   area: { area: "Islington", district: "N1" },
   schedule: { type: "Fixed", blocks: [{ day: 0, part: "morning" }] },
   requirements: {
@@ -62,10 +62,10 @@ const DETAIL: PositionMatchDetail = Object.freeze({
     pets: false,
     roleType: "",
   },
-});
+} as const) satisfies PositionMatchDetail;
 
 /** What a parent actually changes on S-P-04: a different district, a second child, another morning. */
-const CHANGED: PositionMatchDetail = Object.freeze({
+const CHANGED = Object.freeze({
   area: { area: "Hackney", district: "E8" },
   schedule: {
     type: "Fixed",
@@ -88,7 +88,7 @@ const CHANGED: PositionMatchDetail = Object.freeze({
     pets: false,
     roleType: "",
   },
-});
+} as const) satisfies PositionMatchDetail;
 
 let store: PositionStore;
 
