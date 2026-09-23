@@ -151,6 +151,8 @@ revoke all privileges on all tables in schema public from anon, authenticated, p
 --    months is "why can a stranger with the anon key see that", and the group heading is the answer.
 -- ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
+-- CLIENT RELATIONS — START (int.client-grants parses this block; the two must name the same relations)
+
 -- ── anon: signed out. Two tables and one view, read only. There is no anon write policy in this schema,
 --    so there is no anon write grant in this file.
 grant select on public.areas            to anon;  -- areas_anon_select (is_active) — the public area picker
@@ -200,6 +202,8 @@ grant insert, update
 grant insert, update
               on public.subscribe_invites         to authenticated;  -- subscribe_invites_nanny_insert / _nanny_update
 grant update on public.user_profiles             to authenticated;  -- user_profiles_self_update
+
+-- CLIENT RELATIONS — END
 
 -- ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 -- 3. ★ The durable half — the default privilege that mints the grant on every new table.
