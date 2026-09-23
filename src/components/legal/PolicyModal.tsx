@@ -11,6 +11,7 @@ import {
   getPolicyMarkdown,
   type LegalPolicyDocument,
 } from "@/lib/actions/legal/get-policy";
+import type { LegalDocumentId } from "@/modules/platform";
 
 /**
  * Author-frontmatter prefixes to hide from end users. These are
@@ -55,7 +56,12 @@ function stripAuthorFrontmatter(body: string): string {
  * - Small, plain typography by design (mundane, no marketing copy).
  */
 interface PolicyModalProps {
-  slug: string;
+  /**
+   * A seeded document id (02 §4.1), never a route segment. Closed on purpose (L-009 `3m`): the surface this
+   * now backs used to turn an id into a `/legal/*` path and answered 404 for five of the eleven, so an id
+   * that is not a document must be a compile error rather than a dead link beside a tick box.
+   */
+  slug: LegalDocumentId;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Optional title for the modal header. Defaults to "Terms". */
