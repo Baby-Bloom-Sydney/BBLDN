@@ -705,6 +705,10 @@ describe("int.retention-execute — the body half: no definer reaches outside th
   const KNOWN_DYNAMIC_SQL: Readonly<Record<string, string>> = {
     "select exists (select 1 from public.%I where %I = $1)":
       "purge_scrubbed_user: the rows-outstanding precondition, over the `restrict` keys to auth.users read from the catalogue (07 §6.1 step 6). Identifiers only, subject bound as $1, no call site",
+    "select 1 from public.%I where %I = $1 for update nowait":
+      "purge_scrubbed_user: B-49's release takes the row lock before nulling the reference (0034). A row lock is an UPDATE privilege and the column grant satisfies it. Identifiers only, subject bound as $1, no call site",
+    "update public.%I set %I = null where %I = $1":
+      "purge_scrubbed_user: B-49's release itself (0034) — it nulls exactly the column Postgres' own `on delete set null` action was about to null, for the same row, because that cascade runs as postgres and the append-only guard refuses it. Identifiers only, subject bound as $1, no call site",
   };
 
   it("★ every piece of dynamic SQL in a retention-owned body is enumerated — the one thing `search_path` cannot make exhaustive", () => {
