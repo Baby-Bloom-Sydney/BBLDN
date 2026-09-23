@@ -1,6 +1,7 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+import type { LegalDocumentId } from "@/modules/platform";
 
 export type LegalPolicyDocument = {
   body_md: string | null;
@@ -9,20 +10,27 @@ export type LegalPolicyDocument = {
 };
 
 /**
- * Fetch the highest-version body for a legal-document slug from
- * `legal_documents`. Server-side: uses the admin client to bypass RLS.
- * Called by `PolicyModal` on open to render the body_md inline in a
- * Dialog. Lives behind a `'use server'` boundary so `createAdminClient`
- * stays out of client chunks.
+ * Fetch the highest-version body for a legal document from `legal_documents`. Called by `PolicyModal` on open;
+ * lives behind a `'use server'` boundary so no driver client reaches a client chunk.
  *
- * Returns `null` when the slug is unknown or the read errors.
+ * **Read at the caller's own privilege, not the service role's (L-009 `3m`; `3b`'s Q-2).** This used
+ * `createAdminClient` to "bypass RLS". `0003` gives `legal_documents` an explicit `anon` SELECT policy with
+ * `qual = true` and no write policy for any client role, so every caller — signed in or not — already holds
+ * exactly the privilege this read needs; driven as `anon` against the applied set, all eleven seeded ids come
+ * back. The service role turned an RLS decision into a key-possession decision: more privilege than the read
+ * wants, and *less availability*, because the modal then stops rendering the moment that key is absent — and a
+ * consent surface that cannot show the document is a consent nobody can claim was informed.
+ *
+ * Highest version wins: the table is append-only and ratified text lands as a new version (`0026`), so
+ * "current" is `max(version)`. `null` — unknown id, no body, or a refused read — is an outage the caller
+ * renders as a refusal; no body is compiled into the bundle as a fallback.
  */
 export async function getPolicyMarkdown(
-  slug: string,
+  slug: LegalDocumentId,
 ): Promise<LegalPolicyDocument | null> {
   try {
-    const admin = createAdminClient();
-    const { data, error } = await admin
+    const supabase = createClient();
+    const { data, error } = await supabase
       .from("legal_documents")
       .select("body_md, version, effective_date")
       .eq("document_id", slug)
