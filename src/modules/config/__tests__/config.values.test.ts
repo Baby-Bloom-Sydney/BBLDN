@@ -23,10 +23,12 @@ import { ENUMS } from "@/modules/shared-types";
 
 const CONFIG_DIR = resolve(__dirname, "..");
 const BARRELS = new Set(["index.ts", "types.ts"]);
-// 01 §4f lists 24. Nineteen are scheduled: `4d` struck five off on BAI's ruling of 2026-09-23 — `proactive`,
-// `compact-daily`, `cleanup-orphan-children`, `soft-lock-stale-children`, `snapshot-pipeline` — because each
-// swept a phase that does not exist and failed every day. They stay owed in `cron-declared-vs-used.test.ts`.
-const CRON_COUNT = 19;
+// 01 §4f lists 24. Seventeen are scheduled: `4d` struck seven off on BAI's ruling of 2026-09-23 — the five
+// whose phase does not exist (`proactive`, `compact-daily`, `cleanup-orphan-children`,
+// `soft-lock-stale-children`, `snapshot-pipeline`) and then, once measured, `expire-subscribe-invites` and
+// `usage-weekly-check`, neither of which is a transition waiting to be wired. Each failed every day. They stay
+// owed, with their owners, in `cron-declared-vs-used.test.ts`.
+const CRON_COUNT = 17;
 const ADR_076 = {
   slotMinutes: 30,
   horizonDays: 14,
@@ -259,9 +261,12 @@ describe("config — values from the foundations (01 §3.1)", () => {
         expect(cron.london.minute).toBeLessThan(60);
       }
     }
+    // `usage-weekly-check` was the one weekly schedule and is no longer declared (`4d`); the weekly RENDERER
+    // is still held, against a literal spec rather than against whatever happens to be in CRONS, in
+    // `config.repo.test.ts`.
     expect(
-      universal.CRONS.find((c) => c.job === "usage-weekly-check")?.london,
-    ).toEqual({ kind: "weekly", weekday: 1, hour: 6, minute: 0 });
+      universal.CRONS.find((c) => c.job === "usage-weekly-check"),
+    ).toBeUndefined();
     expect(
       universal.CRONS.find((c) => c.job === "payment-due-sweep")?.london,
     ).toEqual({ kind: "daily", hour: 7, minute: 0 });

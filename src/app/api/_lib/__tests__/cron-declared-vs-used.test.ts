@@ -15,41 +15,22 @@ import { SYSTEM_JOB_NAMES } from "@/modules/shared-types";
 const ROUTE_DIR = "src/app/api/cron";
 
 /**
- * Crons whose shell deliberately passes no handler yet, each against the unit that owes it. Every entry is a
- * `no-handler-registered` 500 in production today, which the runbook says not to page on — this list is the
- * complete account of what that wall is made of.
+ * Crons whose shell deliberately passes no handler yet, each against the unit that owes it.
  *
- * `4d` wired six of the eight it was sent to wire and **stopped on these two**, because neither is the wiring
- * it looked like from the census: neither drives a stage transition, and for neither does the thing it would
- * sweep exist inside a module yet. Each owner string now carries what was measured, so the next unit does not
- * re-derive it. Both are still scheduled, and so both still fail daily — whether they should come off the
- * schedule the way the other five did is BAI's to rule, not a unit's to extend.
+ * **Empty, and that is the point of keeping it.** `4d` wired six of the eight it was sent to wire and the other
+ * two turned out not to be wiring at all, so they went to `NOT_SCHEDULED` below rather than sitting here failing
+ * daily. So every cron `config/crons.ts` declares today has a handler — and this list is what makes that a gate
+ * rather than a claim: the next declared cron that arrives without one fails this file until someone writes
+ * down who owes it. An empty record is a stronger statement than a populated one, not a dead one.
  */
-const AWAITING_HANDLER: Readonly<Record<string, string>> = Object.freeze({
-  // Phase 1h, ADR-059, A-22. **Not a transition.** 02 §4's writers column names this job as a direct writer of
-  // `subscribe_invites.status`, beside the nanny action and the webhook — there is no K / L / P row for it. And
-  // no module owns the table: every reference in the tree is legacy Sydney
-  // (`lib/actions/payments/createSubscribeInvite.ts`, `components/payments/SubscribeModalNanny.tsx`,
-  // `app/subscribe-for/[token]`, `app/nanny/development/[childId]/layout.tsx`), which F-d has not ported. So
-  // wiring it is either a cron writing a table directly, or building the subscribe-invite surface inside
-  // `payments` first — feature work, not wiring, and it belongs to whoever ports that surface.
-  "/api/cron/expire-subscribe-invites":
-    "Phase 1h — subscribe_invites past expires_at (ADR-059, A-22); no module owns the table, no transition exists, the surface is still legacy",
-  // Phase 2, ADR-088 G-D. **Nothing to count.** 02 §4.6 says the job counts `feed_posts` (+ `progress_history`)
-  // per linked child over the London week; `app/child-development` exposes one export, `childAppGate`, and
-  // nothing in the module tree reads either table — the only readers are the legacy chat modules over Sydney's
-  // `bapp_*` schema, which is not `0012`'s. **And the document says not yet**: 02 §9 item 31 and 04 §6 item 36
-  // both name BAI as owner with the trigger "before `usage-weekly-check` is written" (`usageLowThreshold` is a
-  // placeholder 1, `[unverified]`). `ecc-lite` rule 4 — the document wins.
-  "/api/cron/usage-weekly-check":
-    "Phase 2 — the results-guarantee usage check (ADR-088 G-D); child-development has no store, and 02 §9 item 31 / 04 §6 item 36 owe BAI a ruling first",
-});
+const AWAITING_HANDLER: Readonly<Record<string, string>> = Object.freeze({});
 
 /**
- * `4d`, on BAI's ruling of 2026-09-23 — the other half of the same account. These five sweep a phase that does
- * not exist: there is no Katie, no child-linking hygiene and no admin pipeline to sweep, so each was a
- * guaranteed `no-handler-registered` 500 **every day**, and a wall of daily failures that are all expected is
- * how the one that stops being expected goes unread.
+ * `4d`, on BAI's ruling of 2026-09-23 — the other half of the same account. Five of these sweep a phase that
+ * does not exist (there is no Katie, no child-linking hygiene and no admin pipeline to sweep); the ruling was
+ * then widened to the two above, which are not transitions waiting to be wired either. Each was a guaranteed
+ * `no-handler-registered` 500 **every day**, and a wall of daily failures that are all expected is how the one
+ * that stops being expected goes unread.
  *
  * The job stays **declared and owed**: named here against the phase that owes it, `snapshot-pipeline` keeps its
  * `SystemJobName` in 03 §2.5, and **the route shell stays on disk**. The shell is the record of an endpoint a
@@ -61,6 +42,17 @@ const AWAITING_HANDLER: Readonly<Record<string, string>> = Object.freeze({
  * and a route folder that is in neither list fails that check as well.
  */
 const NOT_SCHEDULED: Readonly<Record<string, string>> = Object.freeze({
+  // The two the ruling was widened to cover, on `4d`'s measurements. Neither is a transition waiting to be
+  // wired: **`expire-subscribe-invites`** has no module owning `subscribe_invites` at all — 02 §4's writers
+  // column names the job as a direct writer of the column, beside the nanny action and the webhook, and every
+  // reference in the tree is legacy Sydney that F-d has not ported. **`usage-weekly-check`** has nothing to
+  // count: 02 §4.6 has it reading `feed_posts` (+ `progress_history`) and `app/child-development` exports one
+  // thing, `childAppGate`, with no store behind it — and 02 §9 item 31 and 04 §6 item 36 both name BAI as owner
+  // with the same trigger, "before `usage-weekly-check` is written".
+  "/api/cron/expire-subscribe-invites":
+    "Phase 1h — subscribe_invites past expires_at (ADR-059, A-22); no module owns the table and the surface is still legacy",
+  "/api/cron/usage-weekly-check":
+    "Phase 2 — the results-guarantee usage check (ADR-088 G-D); child-development has no store, and 02 §9 item 31 / 04 §6 item 36 owe BAI a ruling first",
   "/api/cron/proactive": "Phase 5a `07.35` — Katie's proactive scheduler",
   "/api/cron/compact-daily": "Phase 5a `07.33` — Katie's daily chat compaction",
   "/api/cron/cleanup-orphan-children":
@@ -102,7 +94,7 @@ describe("every declared cron is either wired or owed to a named unit", () => {
   });
 });
 
-describe("the five BAI struck off the schedule are owed, unscheduled, and still on disk", () => {
+describe("the seven BAI struck off the schedule are owed, unscheduled, and still on disk", () => {
   it("names an owner apiece", () => {
     for (const [path, owner] of Object.entries(NOT_SCHEDULED))
       expect(owner, path).toMatch(/Phase/u);
@@ -129,7 +121,7 @@ describe("the five BAI struck off the schedule are owed, unscheduled, and still 
 });
 
 describe("no route file exists that is neither scheduled nor recorded, and nothing scheduled lacks a file", () => {
-  it("matches one-for-one against the scheduled list plus the five recorded as owed", () => {
+  it("matches one-for-one against the scheduled list plus the seven recorded as owed", () => {
     const accounted = [
       ...CRONS.map((spec) => spec.path),
       ...Object.keys(NOT_SCHEDULED),
