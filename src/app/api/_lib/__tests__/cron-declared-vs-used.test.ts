@@ -20,8 +20,6 @@ const ROUTE_DIR = "src/app/api/cron";
  * complete account of what that wall is made of.
  */
 const AWAITING_HANDLER: Readonly<Record<string, string>> = Object.freeze({
-  "/api/cron/placement-start-sweep":
-    "Phase 1g — L-1b CONFIRMED → ACTIVE + cascade K-21 (A-22)",
   "/api/cron/expire-subscribe-invites":
     "Phase 1h — subscribe_invites past expires_at (ADR-059, A-22)",
   "/api/cron/close-no-candidates":

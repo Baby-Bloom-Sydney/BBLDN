@@ -17,6 +17,13 @@ export { memoryPlacementStore } from "./lib/memory-placement-store";
 export { placementsSliceRegistration } from "./lib/register-placements-slice";
 export { PLACEMENT_TRANSITIONS } from "./lib/placement-transitions";
 
+// `4d` — `placement-start-sweep` (01 §4f): its own binding beside the reads, over the same store, driving the
+// L-1b that already exists. A cron runs under the service role on a schedule, a read under a session on a
+// request — the split `payments` makes between `payments` and `paymentsJobs`.
+export { placementsJobs } from "./lib/default-placements-jobs";
+export { configurePlacementsJobs } from "./lib/configure-placements-jobs";
+export { createPlacementsJobs } from "./lib/create-placements-jobs";
+
 // The read `positions` calls for invariant I-3 (03 §2.6).
 export { placements } from "./lib/default-placements";
 export { configurePlacements } from "./lib/configure-placements";

@@ -25,6 +25,7 @@ import type {
   NannyId,
   ParentId,
   PlacementId,
+  PlacementState,
   PositionId,
   Result,
   UnitOfWork,
@@ -101,7 +102,7 @@ const patchOf = (record: PlacementRecord) => ({
 export function dbPlacementStore(port: DataAccessPort): PlacementStore {
   const list = (
     name: string,
-    column: "position_id" | "parent_id",
+    column: "position_id" | "parent_id" | "state",
     value: string,
   ): Promise<Result<ReadonlyArray<PlacementRecord>>> =>
     port.run(
@@ -136,6 +137,9 @@ export function dbPlacementStore(port: DataAccessPort): PlacementStore {
     forPosition: (positionId: PositionId) =>
       list("forPosition", "position_id", positionId),
     forParent: (parentId: ParentId) => list("forParent", "parent_id", parentId),
+    // `4d` — `placement-start-sweep`'s cohort: one state, by the same single equality predicate as the other
+    // two reads. The set of states a sweep acts on stays in the module, never as an `IN` list here.
+    forState: (state: PlacementState) => list("forState", "state", state),
     put: async (record: PlacementRecord, uow?: UnitOfWork) =>
       port.run(
         {
