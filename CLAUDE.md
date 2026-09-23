@@ -51,6 +51,8 @@ Copied Sydney code is split to one-function-per-file and swept for literals **as
 
 ECC's full rule set is written for a funded team with a review budget. This is one person with no revenue and a hard token ceiling. What follows is the 80/20: the rules that actually caught defects across Phases 0–3, and nothing else.
 
+**How to read this.** Directions, not a compliance checklist. Broad adherence across all of them beats rigid obedience to any one — a rule followed without regard to the task at hand is how a build gets slow and expensive without getting safer. If a line conflicts with the actual goal of the work in front of you, the goal wins: say which line you set aside and why, in one sentence, and carry on. **Do not grow this section** — when something needs to hold, write a gate; when it applies to one task, it belongs in that task's brief.
+
 **Do not read `~/.claude/rules/`. Do not read `DECISIONS.md`, the review registers, or another phase's `PROGRESS.md`.** Your brief carries the decisions you need. If it does not, ask for them — do not go looking.
 
 ### The six rules
@@ -76,7 +78,7 @@ Parallelise **work**, never **opinions**. Agents building modules that share no 
 
 ### Time box
 
-A unit is **20–40 minutes**. Past an hour you are either doing three units' work or reading what you were not asked to read. Say so and stop rather than pressing on.
+A unit is **20–40 minutes**. Past an hour you are either doing three units' work or reading what you were not asked to read. Say so and stop rather than pressing on. **It is a smell, not a budget:** it never justifies skipping rule 2 — running the thing is what finds the defect, so if verification is what takes you over the hour, go over and say so.
 
 ### Review — when, and only then
 
@@ -247,7 +249,7 @@ Sydney's `website/` CLAUDE.md chain is reference only; it does not govern this r
 ---
 
 <!-- audit
-Last edited: 2026-09-23T11:15+10:00 — BB-LDN-Planner-070926
+Last edited: 2026-09-23T11:45+10:00 — BB-LDN-Planner-070926
 Notes (F9, review fix pass): preamble bootstrap moment → 08 §2.1 step 0 / gate A0; linked-vs-vendored ADR governs ALL ../ paths (foundations + OPERATIONS), default linked; §5 reduced to pointers only (01 §2.3–2.5 / §4a / §6.3; 03 §1.4 / §2.1 / §3; 05 §7), restated rules + unratified slice-registration default removed; §6 BRANCHES.md created at bootstrap, else stop + create from Sydney pattern; §9 seed build-progress / CHANGELOG from _project-template shape before first commit; §4 fallback keeps README §2 as authority.
 Previous: Notes: §3 replaced by the vital few — BAI's ruling of 2026-09-23: ECC boiled to the 80/20, no rules-directory reading, no mid-build review agents, a 20-40 minute time box, Opus for everything. Earlier: §3 checkpoint table gains the ADR-142 row (action/route units carry one security-reviewer pass; declared-and-uncalled controls fail a gate). Earlier: initial authoring (L-004 wave 4) — code-repo CLAUDE.md seed: pointers + process only; five laws as merge blocks + five-question test; ECC hard rules; pointer table mirroring README §2 with real section numbers from 00–08 + DECISIONS + build-standard; module rules (folder shape, boundary lint, service leaves, auth no-client, UnitOfWork token, slice registration default pending 03 §12 item 35 / 01 §10 O-12, scheduling importers); branch/deploy/promote condensed from 06 §3–§4 with Sydney origin; efficiency + compaction (portable half of Sydney's nanny-platform CLAUDE.md); three build ledgers; never-list; precedence. Bootstrap decisions flagged: linked vs vendored foundations; slice-registration shape.
 -->
