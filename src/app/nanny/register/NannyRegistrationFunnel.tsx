@@ -266,8 +266,7 @@ export function NannyRegistrationFunnel({
     } as const;
     for (const [day, field] of Object.entries(dayFields)) {
       const times = fd[field as keyof NannyRegistrationData] as
-        | string[]
-        | undefined;
+        string[] | undefined;
       if (times && times.length > 0) schedule[day] = times;
     }
     return schedule;

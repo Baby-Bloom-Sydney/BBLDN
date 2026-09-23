@@ -22,12 +22,7 @@ import type {
  */
 
 export type TimelineCategory =
-  | "subscription"
-  | "billing"
-  | "child"
-  | "commission"
-  | "refund"
-  | "system";
+  "subscription" | "billing" | "child" | "commission" | "refund" | "system";
 
 export interface TimelineEntry {
   id: string;

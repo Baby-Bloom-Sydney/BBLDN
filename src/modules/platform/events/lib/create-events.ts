@@ -132,9 +132,10 @@ export function createEvents(deps: EventsDeps): EventsConnector {
     defaultTimeoutMs: deps.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS,
   };
   const registry = {
-    subscriptions: (deps.sinks ?? []).map(
-      (sink): Subscription => ({ sink, names: "*" }),
-    ),
+    subscriptions: (deps.sinks ?? []).map((sink): Subscription => ({
+      sink,
+      names: "*",
+    })),
   };
   const knownNames: ReadonlySet<string> = new Set(EVENT_NAMES);
 

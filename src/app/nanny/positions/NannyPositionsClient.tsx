@@ -919,8 +919,7 @@ export function NannyPositionsClient({
                                     const rosterField = DAY_ROSTER_FIELD[day];
                                     const dayTimes =
                                       (fd[rosterField] as
-                                        | string[]
-                                        | undefined) ?? [];
+                                        string[] | undefined) ?? [];
                                     return (
                                       <tr
                                         key={day}

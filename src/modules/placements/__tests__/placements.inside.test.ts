@@ -102,22 +102,20 @@ const otherSlices = () => {
     ids: ReadonlyArray<TransitionId>,
   ) => ({
     entity,
-    handlers: ids.map(
-      (id): TransitionHandler => ({
-        id,
-        run: async (input) => {
-          fired.push(id);
-          return ok({
-            entity: input.entity,
-            stage: "ACTIVE",
-            version: 2,
-            changedAt: NOW,
-            cascaded: [],
-            events: [],
-          });
-        },
-      }),
-    ),
+    handlers: ids.map((id): TransitionHandler => ({
+      id,
+      run: async (input) => {
+        fired.push(id);
+        return ok({
+          entity: input.entity,
+          stage: "ACTIVE",
+          version: 2,
+          changedAt: NOW,
+          cascaded: [],
+          events: [],
+        });
+      },
+    })),
   });
   return {
     fired,

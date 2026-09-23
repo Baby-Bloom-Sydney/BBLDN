@@ -1571,8 +1571,8 @@ wiring.
 - **`supabase/rollbacks/0028_erasure-job.rollback.sql`** + **`int.rollback-0028`** (15) — ADR-165 (1): the six keys
   and the two evidence tables stay; what goes is the job itself, announced.
 - **`src/modules/platform/privacy/**`** (new sub-capability, the home `platform/README.md`named in Phase 1) —
-connector, port, registry (fails closed: for an erasure that means *refuses*, never "did nothing and said yes"),
-the orchestration (collect → remove → one transaction →`account.deleted`), the sweep, and `privacy.stub.ts`.
+  connector, port, registry (fails closed: for an erasure that means _refuses_, never "did nothing and said yes"),
+  the orchestration (collect → remove → one transaction →`account.deleted`), the sweep, and `privacy.stub.ts`.
 - **`src/boot/privacy-request-ops.ts` · `privacy-erasure-ops.ts` · `db-privacy-store.ts` · `emit-account-deleted.ts`
   · `erasure-request-from-row.ts` · `erasure-outcome-of.ts` · `wire-privacy.ts`** — the port over `auth.data`, with
   the retryable SQLSTATEs classified in one place so the sweep can tell contention from failure.
@@ -1580,8 +1580,8 @@ the orchestration (collect → remove → one transaction →`account.deleted`),
   `DeleteMyAccount.tsx`. The account is `auth`'s subject and the session is the only authority the road takes, so
   ADR-145 is satisfied by the signature rather than by a guard: there is no argument to put another person's id in.
 - **`src/modules/admin/erasure/**`** + **`src/app/admin/erasure/page.tsx`** — the email road, two steps. Step 1
-records the address (erases nothing, so a typo costs a row); step 2 names a **request id** and the subject is read
-off the row. MFA'd in each action, because `src/app/admin/layout.tsx` carries no guard at all.
+  records the address (erases nothing, so a typo costs a row); step 2 names a **request id** and the subject is read
+  off the row. MFA'd in each action, because `src/app/admin/layout.tsx` carries no guard at all.
 - **`src/app/api/cron/delete-account/route.ts`** — the shell gets its inside: a re-attempt sweep, since both roads
   run synchronously and what reaches the cron is what the transaction refused to commit.
 - **`/nanny/settings`** had a mailto dead end whose written justification ("it would delete a verification history

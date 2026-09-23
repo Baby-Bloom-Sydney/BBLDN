@@ -77,8 +77,7 @@ export interface CreateSubscribeInviteFailure {
 }
 
 export type CreateSubscribeInviteResult =
-  | CreateSubscribeInviteSuccess
-  | CreateSubscribeInviteFailure;
+  CreateSubscribeInviteSuccess | CreateSubscribeInviteFailure;
 
 export async function createSubscribeInvite(
   childId: string,

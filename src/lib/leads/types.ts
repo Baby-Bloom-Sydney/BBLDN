@@ -221,8 +221,7 @@ export interface LeadQueryState {
 // ── Server action envelope ──
 
 export type ActionResult<T = void> =
-  | { success: true; data: T }
-  | { success: false; error: string };
+  { success: true; data: T } | { success: false; error: string };
 
 // ── Activity timeline (composed in JS, not a Postgres view) ──
 

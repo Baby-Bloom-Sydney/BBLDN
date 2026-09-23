@@ -65,8 +65,7 @@ export function stubMatching(seed: StubMatchingSeed = {}): Matching {
         // ADR-146 (2): folded here the way `to-lead-row.ts` folds it for the real row, so a consumer's test
         // measures the same value either side of the seam. Blank is absent.
         email: ((input.email ?? "").trim().toLowerCase() || null) as
-          | string
-          | null,
+          string | null,
       });
       return ok(undefined);
     },

@@ -9,12 +9,7 @@ export type WizardQuestion = {
   readonly heading: string;
   readonly help?: string;
   readonly kind:
-    | "children"
-    | "area"
-    | "days-times"
-    | "single"
-    | "multi"
-    | "yes-no";
+    "children" | "area" | "days-times" | "single" | "multi" | "yes-no";
   readonly options?: ReadonlyArray<{
     readonly value: string;
     readonly label: string;

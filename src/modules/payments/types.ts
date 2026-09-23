@@ -36,10 +36,7 @@ export type DepositRecord = {
  * done-for-you family is never lapsed by a cron — non-payment is the admin's toggle, by hand (ADR-093 / 094).
  */
 export type LapseReason =
-  | "trial-ended"
-  | "past-due"
-  | "cancelled"
-  | "access-ended";
+  "trial-ended" | "past-due" | "cancelled" | "access-ended";
 
 /**
  * The standing a family's access is read through (03 §5.2). `accessUntil` is the youngest linked child's third
@@ -162,8 +159,7 @@ export type PaymentLink = {
 
 /** `startTrial` is not an error when the family already used its trial (03 §5.3). */
 export type TrialStart =
-  | { readonly trialEndsAt: Instant }
-  | { readonly alreadyUsed: true };
+  { readonly trialEndsAt: Instant } | { readonly alreadyUsed: true };
 
 /**
  * The app's view over the swappable provider (03 §5.2). Every method returns a `Result` (03 §1 rule 4); nothing

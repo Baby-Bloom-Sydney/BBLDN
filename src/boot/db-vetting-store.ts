@@ -42,11 +42,7 @@ type LedgerRow = {
   readonly provider_key: string;
   readonly provider_ref: string | null;
   readonly status:
-    | "pending"
-    | "processing"
-    | "needs_admin"
-    | "passed"
-    | "failed";
+    "pending" | "processing" | "needs_admin" | "passed" | "failed";
   readonly raw_response: {
     reject_reason?: string;
     guidance_key?: string;

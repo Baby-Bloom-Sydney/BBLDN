@@ -19,8 +19,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/resend";
 
 export type ReplyToContactMessageResult =
-  | { success: true; warning?: string }
-  | { success: false; error: string };
+  { success: true; warning?: string } | { success: false; error: string };
 
 export async function replyToContactMessage(input: {
   messageId: string;

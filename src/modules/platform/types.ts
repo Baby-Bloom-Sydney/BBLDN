@@ -47,8 +47,7 @@ export type ErrorEnvelope<D extends AppErrorDetails = AppErrorDetails> = {
 };
 
 export type Envelope<T, D extends AppErrorDetails = AppErrorDetails> =
-  | SuccessEnvelope<T>
-  | ErrorEnvelope<D>;
+  SuccessEnvelope<T> | ErrorEnvelope<D>;
 
 /** 01 §4c rule 1: `200` reads / updates · `201` create · `204` delete. */
 export type SuccessStatus = 200 | 201 | 204;

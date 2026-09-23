@@ -10,13 +10,10 @@
 export const MAX_CHILD_AGE_MONTHS = 36;
 
 export type DobValidationError =
-  | "invalid_date_of_birth"
-  | "date_of_birth_in_future"
-  | "child_too_old";
+  "invalid_date_of_birth" | "date_of_birth_in_future" | "child_too_old";
 
 export type DobValidationResult =
-  | { ok: true }
-  | { ok: false; error: DobValidationError };
+  { ok: true } | { ok: false; error: DobValidationError };
 
 /**
  * Whole-month age between `dob` and `now`. A child born on the same calendar

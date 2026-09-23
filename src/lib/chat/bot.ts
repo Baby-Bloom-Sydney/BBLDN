@@ -301,24 +301,18 @@ export async function getUsersWithChildren(
     Record<string, unknown>
   >) {
     const cc = (raw.child_client ?? null) as
-      | { under_three?: boolean }
-      | { under_three?: boolean }[]
-      | null;
+      { under_three?: boolean } | { under_three?: boolean }[] | null;
     const ccObj = Array.isArray(cc) ? cc[0] : cc;
     if (!ccObj?.under_three) continue;
 
     const nannies = (raw.nannies ?? null) as
-      | { user_id?: string }
-      | { user_id?: string }[]
-      | null;
+      { user_id?: string } | { user_id?: string }[] | null;
     const nannyObj = Array.isArray(nannies) ? nannies[0] : nannies;
     const nannyUid = nannyObj?.user_id;
     if (nannyUid && lookup.has(nannyUid)) result.add(nannyUid);
 
     const parents = (raw.parents ?? null) as
-      | { user_id?: string }
-      | { user_id?: string }[]
-      | null;
+      { user_id?: string } | { user_id?: string }[] | null;
     const parentObj = Array.isArray(parents) ? parents[0] : parents;
     const parentUid = parentObj?.user_id;
     if (parentUid && lookup.has(parentUid)) result.add(parentUid);

@@ -28,8 +28,7 @@ export const PREFULFILLED_SYNTHETIC_NOTE =
   "data already in your runtime context — see 'Already loaded for you' block";
 
 export type PrefulfilledOutcome =
-  | { skip: false }
-  | { skip: true; result: ToolResult };
+  { skip: false } | { skip: true; result: ToolResult };
 
 export function checkPrefulfilled(
   tool: ToolDefinition | undefined,

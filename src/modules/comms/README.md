@@ -35,7 +35,7 @@ blank body — would be worse than one that says so (01 §4a rule 2).
   rendered and recorded at `dry-run` and the provider is never called.
 
 ★ **The registry was open in one direction, and it cost two sends.** `TEMPLATE_IDS` is what `validateMessage`
-checks against, and `as const satisfies ReadonlyArray<TemplateId>` proves only that each entry *is* an id.
+checks against, and `as const satisfies ReadonlyArray<TemplateId>` proves only that each entry _is_ an id.
 ADR-168 (b) added `verification-suspension-lifted` and `admin-nanny-suspension-lifted` to `TemplateRegistry`
 and not to the list, so the seam answered `unknown-template` to both sends the lift-suspension road was built
 to make — and 4,800 green tests agreed. Both ids are listed now and the guard is a **gate**, not a note:
@@ -77,19 +77,19 @@ to enumerate user ids (07 §4). Pinned in `comms.recipient.test.ts`.
    pair (`connection-expired-*`, `placement-confirmed-*`, `hire-confirmation-*`, `verification-barred` +
    `admin-nanny-barred`, `contact-request` + `contact-request-public`). Every id the table names is in
    `TEMPLATE_IDS`; the heading's count is the defect. Foundations question for the owner of 03 §8.
-2. **`MessageStatus` and 02 §3 `message_status` disagree** — the contract adds `deduped` and spells the dry
+3. **`MessageStatus` and 02 §3 `message_status` disagree** — the contract adds `deduped` and spells the dry
    run `dry-run`; the column has neither and spells it `dry_run`. The connector follows 03; the mapping to
    the column belongs with the `email_logs` store.
-3. **Template payloads are still untyped.** `TemplateRegistry` entries are all `TemplateData` (an open record);
+4. **Template payloads are still untyped.** `TemplateRegistry` entries are all `TemplateData` (an open record);
    each narrows when its file declares its own shape. 03 §8.4's "template without a schema → `INTERNAL`" is
    therefore the missing-**file** case today, not a payload check.
-4. ~~No `email_logs` / `inbox_messages` store.~~ **Closed** — `dbCommsStore` (S5b).
-5. **`sendMany` is still sequential.** `resend-email.ts` has `sendBatch` over Resend's batch endpoint, but
+5. ~~No `email_logs` / `inbox_messages` store.~~ **Closed** — `dbCommsStore` (S5b).
+6. **`sendMany` is still sequential.** `resend-email.ts` has `sendBatch` over Resend's batch endpoint, but
    `createComms.sendMany` walks `send` for its per-row `email_logs` bookkeeping. Chunking belongs with the
    pre-check waves that need it (03 §8.1).
-6. **No log lines and no `message.*` events yet** (03 §8.4 / §11 row 7) — `ALERT_EMAIL_SEND_FAILED` and
+7. **No log lines and no `message.*` events yet** (03 §8.4 / §11 row 7) — `ALERT_EMAIL_SEND_FAILED` and
    `ALERT_PROVIDER_DOWN` included. Owed.
-7. **Nothing is proven against a live Resend account.** Every claim here is driven against `stub-email`; the
+8. **Nothing is proven against a live Resend account.** Every claim here is driven against `stub-email`; the
    key, the DNS records and the domain verification are BAI's and untested until the domain exists.
 
 <!-- audit

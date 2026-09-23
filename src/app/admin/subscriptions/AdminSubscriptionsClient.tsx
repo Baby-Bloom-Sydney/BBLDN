@@ -9,11 +9,7 @@ import { formatAuDate } from "@/lib/format/date";
 import type { AdminSubscriptionRow } from "./types";
 
 type Filter =
-  | "all"
-  | "needs_attention"
-  | "active"
-  | "trial"
-  | "cancelled_lapsed";
+  "all" | "needs_attention" | "active" | "trial" | "cancelled_lapsed";
 
 interface Props {
   rows: AdminSubscriptionRow[];

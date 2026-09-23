@@ -246,8 +246,7 @@ async function renderNannyHub(admin: any, targetUserId: string) {
         personality_traits: n.personality_traits || null,
         professional_values: n.professional_values || null,
         childcare_roles: n.childcare_roles as
-          | { role: string; duration: number }[]
-          | null,
+          { role: string; duration: number }[] | null,
         additional_photos: [n.photo_1_url, n.photo_2_url, n.photo_3_url].filter(
           Boolean,
         ) as string[],

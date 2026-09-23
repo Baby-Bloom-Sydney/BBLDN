@@ -40,10 +40,7 @@ export type IdentityEvidenceKind = EnumValue<"identity_evidence_type">;
 export type RightToWorkEvidenceKind = EnumValue<"rtw_evidence_type">;
 /** 02 §8: the four section names of the `verification-documents` prefix. */
 export type EvidenceObjectSection =
-  | "identity-document"
-  | "identity-selfie"
-  | "dbs-certificate"
-  | "rtw-document";
+  "identity-document" | "identity-selfie" | "dbs-certificate" | "rtw-document";
 
 export type SectionState = {
   readonly section: WizardSection;
@@ -290,12 +287,7 @@ export type VerificationRegistry = {
 export type WizardStep = {
   readonly index: number;
   readonly screen:
-    | "S-N-03"
-    | "S-N-04"
-    | "S-N-05"
-    | "S-N-06"
-    | "S-N-07"
-    | "S-N-08";
+    "S-N-03" | "S-N-04" | "S-N-05" | "S-N-06" | "S-N-07" | "S-N-08";
   readonly section: WizardSection | null;
   readonly heading: string;
 };

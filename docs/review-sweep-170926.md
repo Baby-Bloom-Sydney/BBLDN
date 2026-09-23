@@ -336,18 +336,18 @@ Six, in `../SPECS/00-foundations/`, each with an audit-footer bump, and nothing 
 
 Exit codes, in this sweep's own worktree, all local (B-42 — GitHub Actions was down for most of the run).
 
-| Gate                            | Result                                                                                                  |
+| Gate | Result |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------- |
-| `typecheck`                     | **0**                                                                                                   |
-| `lint`                          | **0**                                                                                                   |
-| `prettier --check .`            | **0**                                                                                                   |
-| `vitest run` (`--project unit`) | **0** — 252 files, \*\*3,540 passed                                                                     | 11 expected fail\*\* |
-| `lint:boundaries`               | **0**                                                                                                   |
-| `check:allowed-imports`         | **0**                                                                                                   |
-| `check:config-literals`         | **0**                                                                                                   |
-| `check:claude-md`               | **0**                                                                                                   |
-| `check:boot-guard`              | **0** — 6/6, **under `smoke_env`** (see §7: it needs the env, and needs `.next` from a completed build) |
-| `npm run build`                 | **0** — **under `smoke_env`**; a bare shell fails on the legacy Resend module-scope client              |
+| `typecheck` | **0** |
+| `lint` | **0** |
+| `prettier --check .` | **0** |
+| `vitest run` (`--project unit`) | **0** — 252 files, \*\*3,540 passed | 11 expected fail\*\* |
+| `lint:boundaries` | **0** |
+| `check:allowed-imports` | **0** |
+| `check:config-literals` | **0** |
+| `check:claude-md` | **0** |
+| `check:boot-guard` | **0** — 6/6, **under `smoke_env`** (see §7: it needs the env, and needs `.next` from a completed build) |
+| `npm run build` | **0** — **under `smoke_env`**; a bare shell fails on the legacy Resend module-scope client |
 
 `banned-literals` was not chased, per the brief and ADR-124.
 

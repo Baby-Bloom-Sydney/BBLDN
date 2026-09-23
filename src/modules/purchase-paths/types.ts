@@ -26,10 +26,7 @@ export type LinkKind = "deposit" | "balance-after-week-1" | "custom";
 
 /** Which `PRICES` preset supplies the amount; `custom` carries a per-family amount (03 §5.2). */
 export type PricePreset =
-  | "deposit"
-  | "balance-after-week-1"
-  | "self-serve-app"
-  | "custom";
+  "deposit" | "balance-after-week-1" | "self-serve-app" | "custom";
 
 /** A preset rendered for S-P-10 / S-P-11; `label` is a copy key, never the copy (00-glossary §6). */
 export type Price = {

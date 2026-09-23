@@ -319,11 +319,7 @@ export type NannyProfileView = {
 
 /** 04 §6.3 S-N-21's tree, in its order: Profile · Account · Linked children · Contact us · Close account. */
 export type NannySettingsSectionId =
-  | "profile"
-  | "account"
-  | "children"
-  | "help"
-  | "close";
+  "profile" | "account" | "children" | "help" | "close";
 
 export type NannySettingsSection = {
   readonly id: NannySettingsSectionId;

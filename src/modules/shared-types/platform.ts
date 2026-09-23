@@ -47,8 +47,7 @@ export type TableName<DB extends DatabaseShape> = keyof DB["Tables"] & string;
 export type ViewName<DB extends DatabaseShape> = keyof DB["Views"] & string;
 /** Every name `Query.from()` accepts: a table or a view. */
 export type ReadableName<DB extends DatabaseShape> =
-  | TableName<DB>
-  | ViewName<DB>;
+  TableName<DB> | ViewName<DB>;
 export type RpcName<DB extends DatabaseShape> = keyof DB["Functions"] & string;
 export type RpcArgs<
   DB extends DatabaseShape,

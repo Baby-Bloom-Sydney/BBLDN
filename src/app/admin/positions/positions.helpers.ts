@@ -237,12 +237,7 @@ export function formatSydneyTime(iso: string | null): string {
  * (Not derived via import to keep this change isolated to admin/positions.)
  */
 export type BadgeVariant =
-  | "active"
-  | "pending"
-  | "verified"
-  | "inactive"
-  | "failed"
-  | "info";
+  "active" | "pending" | "verified" | "inactive" | "failed" | "info";
 
 /** Connection stages held pending OCG clearance for a verification-level-3 nanny (badged "pending OCG"). */
 export const HELD_CONNECTION_STAGES: number[] = [

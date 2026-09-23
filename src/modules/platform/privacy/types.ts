@@ -149,9 +149,7 @@ export type RetentionSpec = {
   readonly class: string;
   readonly spec: {
     readonly window:
-      | { readonly months: number }
-      | { readonly days: number }
-      | null;
+      { readonly months: number } | { readonly days: number } | null;
     readonly anchors: ReadonlyArray<{
       readonly table: string;
       readonly column: string;

@@ -21,8 +21,7 @@ export function cookieJarModule() {
           : undefined,
       set: (
         nameOrCookie:
-          | string
-          | { readonly name: string; readonly value: string },
+          string | { readonly name: string; readonly value: string },
         value?: string,
       ): void => {
         if (typeof nameOrCookie === "string")
