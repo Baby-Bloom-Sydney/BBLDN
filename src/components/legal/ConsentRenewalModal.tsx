@@ -11,6 +11,8 @@ import {
   declineParentConsentAndDeleteChild,
   declineNannyConsentAndUnlink,
 } from "@/lib/legal/consent-renewal";
+import { purposeForAgreement } from "@/lib/legal/purpose-for-agreement";
+import type { AgreementId } from "@/lib/legal/types";
 
 /**
  * Pops up on the child's dev page when the user's consent is within
@@ -42,10 +44,15 @@ export function ConsentRenewalModal({
   const [view, setView] = useState<"initial" | "confirm-decline">("initial");
   const [error, setError] = useState<string | null>(null);
 
-  const agreementId =
-    role === "parent" ? "PARENT-APP-CONSENT" : "NANNY-ATTESTATION";
-  const policySlug =
-    role === "parent" ? "parent-app-consent" : "nanny-attestation";
+  const agreementId: Extract<
+    AgreementId,
+    "PARENT-APP-CONSENT" | "NANNY-ATTESTATION"
+  > = role === "parent" ? "PARENT-APP-CONSENT" : "NANNY-ATTESTATION";
+  // The document shown is derived from the agreement being recorded, never declared a second time (L-009
+  // `3m`). Two ternaries on the same condition is how a surface comes to show one document and record
+  // another, and nothing can catch it once both documents exist. `purpose-for-agreement.ts` is the one
+  // declaration; `null` means this agreement names no document, in which case there is nothing to view.
+  const policySlug = purposeForAgreement(agreementId)?.purpose ?? null;
   const daysToExpiry = Math.max(
     0,
     Math.ceil(
@@ -115,7 +122,7 @@ export function ConsentRenewalModal({
               </div>
             </div>
             <div className="space-y-3 px-5 py-4">
-              <PolicyContent slug={policySlug} />
+              {policySlug !== null && <PolicyContent slug={policySlug} />}
               <ConsentCheckbox
                 label={
                   role === "parent"

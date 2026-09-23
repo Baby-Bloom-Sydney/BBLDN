@@ -3,10 +3,12 @@
 // `08.43` the call-due / overdue sweep (`admin/call-queue`), `expire-slot-holds` (`scheduling.expireHolds`, 03
 // §3.5), the stale-`processing` sweep (I-V4) and the `08.11` reminder funnel (`verification`).
 //
-// RECORDED GAP (ADR-161): the DELIVERY of queued `email_logs` rows — `08.20` proper — is not here. `comms` has no
-// template renderer (03 §8 "no template file"; Phase 4a `08.01`), so every send fails closed with
-// `renderer-not-configured` and a delivery loop would only settle rows `failed`. Pinned `it.fails` in
-// `send-delayed-emails.route.test.ts`; owner Phase 4a.
+// RECORDED GAP (ADR-161): the DELIVERY of queued `email_logs` rows — `08.20` proper — is still not here, but the
+// reason has changed. 4a installed the provider and the template seam, so a send no longer fails closed on a
+// missing renderer; what is absent is the loop itself (select `status = queued AND send_at <= now()`, render,
+// deliver, settle, retry ≤ 3 with backoff — 03 §8.1 / §8.4). `comms` exposes no "deliver the due rows" method,
+// and inventing one here would put the queue's business inside a route shell. Pinned `it.fails` in
+// `_lib/__tests__/verification-crons.route.test.ts`; owner `08.20`.
 import { callDueSweep } from "@/modules/admin";
 import { SENDERS } from "@/modules/config/server";
 import { scheduling } from "@/modules/scheduling";
