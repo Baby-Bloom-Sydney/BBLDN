@@ -37,6 +37,8 @@ import type {
 import { journeySteps } from "./journey-steps";
 import { POSITION_TRANSITIONS } from "./position-transitions";
 import { allowedTransitions } from "./allowed-transitions";
+import { positionAmendment } from "./amend-fields";
+import { mayAmend } from "./may-amend";
 
 export type PositionsDeps = {
   readonly store: PositionStore;
@@ -111,11 +113,25 @@ export function createPositions(deps: PositionsDeps): PositionsReads {
   };
 
   const reads: PositionsReads = {
+    // 03 §2.2 — facts without a transition. Three things happen here, in order, and the first two are what this
+    // method was missing: who is allowed (`mayAmend` — a parent on her own position, before the introduction
+    // call), what the payload actually is (`positionAmendment` — an unknown field is refused, never dropped),
+    // and only then the write. The stage and the pre-check lever are untouched on purpose: 04 §6.2 gives S-P-04
+    // the state "edit (no re-fire)", and Sydney's own edit path carries the same rule ("fire-once-on-edit").
     amend: async (input) => {
       const current = await read(input.entity);
       if (!current.ok) return current;
+      const allowed = mayAmend(
+        input.actor,
+        current.value.parentId,
+        current.value.stage,
+      );
+      if (!allowed.ok) return allowed;
+      const amendment = positionAmendment(input.fields);
+      if (!amendment.ok) return amendment;
       const next: PositionRecord = {
         ...current.value,
+        detail: amendment.value.detail,
         version: current.value.version + 1,
       };
       return withUnitOfWork(async (uow) => {
