@@ -1847,3 +1847,44 @@ p_decided_by)` — `service_role`, the decider validated against `user_roles` (A
 - **`src/modules/payments/lib/create-payments-jobs.ts`** — REVIEW-4 §6.5's pin 2 flipped: ADR-160 gave
   `admin_notifications` its connector, so `payment-due-sweep` raises the operator's row through
   `comms.notifyAdmin`, **before** the event, idempotent on the one-open-per-subject index.
+
+---
+
+## Files created / modified in the current unit (`3m` — the consent surface shows the document it records; L-009 Phase 3)
+
+**No migration.** Two defects `3b` recorded as Q-1 and Q-2, plus its Q-3 answered as far as it is a fact.
+
+- **`src/components/legal/PolicyContent.tsx`** — the live defect. It mapped a **document id** onto a **page
+  route**: a two-entry table over an eleven-member domain with `` `/legal/${slug}` `` underneath as a guess.
+  Driven against `next dev` on the applied stack, the guess resolves for **four of the eleven** ids; five
+  answer **404** (`client-tos`, `professional-tos`, `cookie-policy`, `media-consent`,
+  `agr14_nanny_child_add`). So the cause is the **mapping** — not a missing seed (all eleven `0026` rows are
+  present) and not a wrong slug (all eleven are real `LegalDocumentId`s). ★ And the two entries the map _did_
+  name were **wrong pairings**: `parent-app-consent` → `/legal/client-terms` (`client-tos`) and
+  `nanny-attestation` → `/legal/professional-terms` (`professional-tos`), while `purposeForAgreement` wrote
+  the _other_ document into the consent record. The surface showed one document and recorded another.
+  It now renders `PolicyModal`, which reads the row **by its own id**: works for all eleven, no second domain
+  to keep in step, cannot 404, and shows what the record will name.
+- **`src/components/legal/PolicyModal.tsx`** — `slug` closed from `string` to `LegalDocumentId`, so a
+  non-document id is a compile error rather than a dead link beside a tick box.
+- **`src/components/legal/ConsentRenewalModal.tsx`** — two ternaries on one condition (agreement label _and_
+  document slug) replaced by one: the slug is derived from the agreement through `purposeForAgreement`. The
+  same-file twin declaration is how a surface comes to show one document and record another.
+- **`src/lib/actions/legal/get-policy.ts`** — `3b`'s Q-2. Read moved from `createAdminClient` to the server
+  **anon** client. `0003` gives `legal_documents` an explicit `anon` SELECT policy with `qual = true`, so the
+  service role bought nothing and cost availability: the modal stopped rendering the moment the key was
+  absent. Cluster swept: **three** files in `src/` name `legal_documents` — `boot/db-consent-store.ts` and
+  `modules/verification/lib/load-biometric-notice.ts` already read through `auth`'s port at session scope;
+  this was the only one at service privilege.
+- **`supabase/__tests__/legal-documents-anon-read.test.ts`** (new, 13 cases) — `getPolicyMarkdown`'s exact
+  statement run **as `anon`** against the applied set, for every one of the eleven ids, and driven the other
+  way in the same file: with the `anon` policy dropped inside a savepoint, all eleven return nothing.
+- **`src/lib/legal/legal-document-reads.test.ts`** (new, 3 cases) — two gates, both driven RED first. No
+  source file may build a `/legal/` path from a variable or keep a document-id-to-page map; no file naming
+  `legal_documents` may import the admin client. Comments are stripped first, so a header that explains a
+  defect by quoting it does not trip the gate that forbids it.
+- **`src/lib/legal/agreement-document-pairing.test.ts`** (new, 2 cases) — `3b`'s Q-3. Every file stating one
+  agreement id and at least one document id must agree with `purpose-for-agreement.ts`, the one declaration.
+  Watches four recorders today, discovered not listed. Driven RED by pointing `AGR-14` at `media-consent`.
+- **`src/components/legal/PolicyContent.test.tsx`** (new, 24 cases) — all eleven ids render no link and reach
+  the reader with their own id; the body shows; an unreadable document fails closed.
