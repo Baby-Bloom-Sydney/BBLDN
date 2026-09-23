@@ -48,28 +48,8 @@
       "schedule": "45 1,2 * * *"
     },
     {
-      "path": "/api/cron/proactive",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/compact-daily",
-      "schedule": "0 2,3 * * *"
-    },
-    {
-      "path": "/api/cron/cleanup-orphan-children",
-      "schedule": "0 2,3 * * *"
-    },
-    {
-      "path": "/api/cron/soft-lock-stale-children",
-      "schedule": "15 2,3 * * *"
-    },
-    {
       "path": "/api/cron/dfy-waves",
       "schedule": "0 8,9 * * *"
-    },
-    {
-      "path": "/api/cron/snapshot-pipeline",
-      "schedule": "5 0,23 * * *"
     },
     {
       "path": "/api/cron/expire-trials",

@@ -8,6 +8,13 @@
 // neither is 00:xx weekly (its BST candidate lands on the previous weekday) — the renderer throws on both.
 // `job` = the 03 §2.5 SystemJobName; crons that move no stage carry none. Parked, never created: release-payouts ·
 // schedule-upfront-cycles (N-2, ADR-022).
+//
+// **Struck off by `4d` on BAI's ruling of 2026-09-23** (01 §4f still lists them; they return with their phase):
+// `proactive` · `compact-daily` (Phase 5a Katie) · `cleanup-orphan-children` · `soft-lock-stale-children`
+// (Phase 5c) · `snapshot-pipeline` (Phase 6). Each swept a phase that does not exist, so each was a guaranteed
+// `no-handler-registered` 500 every day — and five daily failures that are all expected is how the one that
+// stops being expected goes unread. They stay owed, with their owners, in
+// `api/_lib/__tests__/cron-declared-vs-used.test.ts`'s `NOT_SCHEDULED`, which refuses a silent return.
 import type { CronSpec } from "./types";
 
 const every = (minutes: number): CronSpec["london"] =>
@@ -88,37 +95,10 @@ export const CRONS: ReadonlyArray<CronSpec> = Object.freeze([
       "07 §6.1 step 6, second half: 30 days after a scrub, hard-delete the auth.users row only if no money / consent / safeguarding row is still inside its window (L-009 3g)",
   }),
   cron({
-    path: "/api/cron/proactive",
-    london: every(15),
-    serves:
-      "Katie proactive; the handler gates on waking hours 07:00–22:00 read off `platform.londonWallClock`",
-  }),
-  cron({
-    path: "/api/cron/compact-daily",
-    london: daily(3, 0),
-    serves: "Katie daily compaction (yesterday in London)",
-  }),
-  cron({
-    path: "/api/cron/cleanup-orphan-children",
-    london: daily(3, 0),
-    serves: "child-linking hygiene",
-  }),
-  cron({
-    path: "/api/cron/soft-lock-stale-children",
-    london: daily(3, 15),
-    serves: "child-linking hygiene",
-  }),
-  cron({
     path: "/api/cron/dfy-waves",
     job: "dfy-waves",
     london: daily(9, 0),
     serves: "pre-check engine sweep (matching.autofire; cadence 01 §10 O-8)",
-  }),
-  cron({
-    path: "/api/cron/snapshot-pipeline",
-    job: "snapshot-pipeline",
-    london: daily(0, 5),
-    serves: "admin pipeline snapshot (snapshot_date = London date)",
   }),
   cron({
     path: "/api/cron/expire-trials",

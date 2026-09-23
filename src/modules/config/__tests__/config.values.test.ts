@@ -23,7 +23,10 @@ import { ENUMS } from "@/modules/shared-types";
 
 const CONFIG_DIR = resolve(__dirname, "..");
 const BARRELS = new Set(["index.ts", "types.ts"]);
-const CRON_COUNT = 24; // 01 §4f: 13 carried + 8 named sweeps (01 §9) + usage-weekly-check + payment-due-sweep + purge-scrubbed-users (L-009 3g)
+// 01 §4f lists 24. Nineteen are scheduled: `4d` struck five off on BAI's ruling of 2026-09-23 — `proactive`,
+// `compact-daily`, `cleanup-orphan-children`, `soft-lock-stale-children`, `snapshot-pipeline` — because each
+// swept a phase that does not exist and failed every day. They stay owed in `cron-declared-vs-used.test.ts`.
+const CRON_COUNT = 19;
 const ADR_076 = {
   slotMinutes: 30,
   horizonDays: 14,

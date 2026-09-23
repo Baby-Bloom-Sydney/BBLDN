@@ -36,6 +36,23 @@ const AWAITING_HANDLER: Readonly<Record<string, string>> = Object.freeze({
     "Phase 1e `08.25` — the matching phase shipped without wiring its own wave sweep",
   "/api/cron/usage-weekly-check":
     "Phase 2 — the results-guarantee usage check (ADR-088 G-D)",
+});
+
+/**
+ * `4d`, on BAI's ruling of 2026-09-23 — the other half of the same account. These five sweep a phase that does
+ * not exist: there is no Katie, no child-linking hygiene and no admin pipeline to sweep, so each was a
+ * guaranteed `no-handler-registered` 500 **every day**, and a wall of daily failures that are all expected is
+ * how the one that stops being expected goes unread.
+ *
+ * The job stays **owed** — named here against the phase that owes it, and `snapshot-pipeline` keeps its
+ * `SystemJobName` in 03 §2.5 — but it is not scheduled and has no route file: `runCron` refuses an undeclared
+ * path, so a route left behind would answer 500 to nothing at all, which is `ecc-lite` rule 3's own defect.
+ *
+ * The gate runs both ways here too. Putting one back into `config/crons.ts` fails the `AWAITING_HANDLER` check
+ * above unless its handler is written at the same time, and leaving a route file behind fails the one-for-one
+ * check below.
+ */
+const NOT_SCHEDULED: Readonly<Record<string, string>> = Object.freeze({
   "/api/cron/proactive": "Phase 5a `07.35` — Katie's proactive scheduler",
   "/api/cron/compact-daily": "Phase 5a `07.33` — Katie's daily chat compaction",
   "/api/cron/cleanup-orphan-children":
@@ -74,6 +91,30 @@ describe("every declared cron is either wired or owed to a named unit", () => {
       CRONS.length - Object.keys(AWAITING_HANDLER).length,
     );
     for (const path of wired) expect(AWAITING_HANDLER[path]).toBeUndefined();
+  });
+});
+
+describe("the five BAI struck off the schedule are owed, unscheduled and gone from the tree", () => {
+  it("names an owner apiece", () => {
+    for (const [path, owner] of Object.entries(NOT_SCHEDULED))
+      expect(owner, path).toMatch(/Phase/u);
+  });
+
+  it("none of them is declared — a re-added one must arrive with its handler", () => {
+    const declared = CRONS.map((spec) => spec.path);
+    for (const path of Object.keys(NOT_SCHEDULED))
+      expect(declared, path).not.toContain(path);
+  });
+
+  it("none of them leaves a route file behind", () => {
+    const folders = readdirSync(ROUTE_DIR);
+    for (const path of Object.keys(NOT_SCHEDULED))
+      expect(folders, path).not.toContain(path.split("/").pop());
+  });
+
+  it("`snapshot-pipeline` keeps its SystemJobName — struck off the schedule, not off 03 §2.5", () => {
+    const names: ReadonlyArray<string> = SYSTEM_JOB_NAMES;
+    expect(names).toContain("snapshot-pipeline");
   });
 });
 
