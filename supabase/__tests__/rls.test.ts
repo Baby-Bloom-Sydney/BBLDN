@@ -46,14 +46,18 @@ describe("int.rls — the escalation target (07 §5.4 row 3)", () => {
         [actor],
       );
       expect(insert).not.toBe("NO_ERROR");
-      const update = await asRole(
+      // Until `0036` this was RLS refusing *quietly*: with no UPDATE policy the `USING` is false, so
+      // the statement matched zero rows and raised nothing. `0036` revoked the surplus UPDATE grant —
+      // there is no UPDATE policy on this table for any client role, so the grant was never reachable —
+      // and the refusal now arrives one layer earlier and loudly. The claim is unchanged and better
+      // evidenced: `42501` is a refusal no caller can mistake for "there was nothing to change".
+      const update = await refusedAs(
         db,
         actor,
         `update public.user_roles set role = 'admin' where user_id = $1 returning user_id`,
         [actor],
       );
-      // RLS with no UPDATE policy does not raise; it matches zero rows
-      expect(update).toHaveLength(0);
+      expect(update).toBe("42501");
     }
     const { rows } = await db.query<{ role: string }>(
       "select role::text as role from public.user_roles where user_id = $1",
@@ -63,12 +67,16 @@ describe("int.rls — the escalation target (07 §5.4 row 3)", () => {
   });
 
   it("anon reaches user_roles and user_profiles not at all", async () => {
-    expect(
-      await asRole(db, null, "select 1 from public.user_roles"),
-    ).toHaveLength(0);
-    expect(
-      await asRole(db, null, "select 1 from public.user_profiles"),
-    ).toHaveLength(0);
+    // "Not at all" was evidenced by an empty result: `anon` held SELECT on both by default privilege and
+    // no policy named it. `0036` revoked every `anon` grant outside `areas`, `legal_documents` and
+    // `nanny_public`, so both reads are now refused outright. The title's claim is the stronger of the
+    // two readings and this is it.
+    expect(await refusedAs(db, null, "select 1 from public.user_roles")).toBe(
+      "42501",
+    );
+    expect(await refusedAs(db, null, "select 1 from public.user_profiles")).toBe(
+      "42501",
+    );
   });
 });
 
@@ -165,25 +173,38 @@ describe("int.rls — cross-party reads (07 §5.2)", () => {
     ).toHaveLength(0);
   });
 
+  // `0036` split this claim's evidence in two, and the split is worth asserting rather than papering
+  // over: a client role now holds a SELECT grant only where a SELECT policy names it. `nanny_leads` and
+  // `parent_leads` have no SELECT policy for any role, so the grant was surplus and the read is refused
+  // outright. `nanny_contact_state` has one for `authenticated` that matches no row here, so that read
+  // keeps its grant and still returns empty — while `anon`, which no policy names, is refused.
+  // Asserting the mechanism per pair is what keeps this a check: a blanket "refused or empty" would go
+  // on passing however the grants drifted.
   it("the whole leads cluster is unreachable by every client role (07 §5.2 last row)", async () => {
-    for (const table of [
-      "nanny_leads",
-      "parent_leads",
-      "nanny_contact_state",
-    ]) {
+    for (const table of ["nanny_leads", "parent_leads"]) {
       for (const actor of [null, f.parentA, f.nannyVisible, f.admin]) {
         expect(
-          await asRole(db, actor, `select 1 from public.${table}`),
-        ).toHaveLength(0);
+          await refusedAs(db, actor, `select 1 from public.${table}`),
+        ).toBe("42501");
       }
+    }
+    expect(
+      await refusedAs(db, null, "select 1 from public.nanny_contact_state"),
+    ).toBe("42501");
+    for (const actor of [f.parentA, f.nannyVisible, f.admin]) {
+      expect(
+        await asRole(db, actor, "select 1 from public.nanny_contact_state"),
+      ).toHaveLength(0);
     }
   });
 
+  // `events` has no SELECT policy for any role at all, so after `0036` no client role holds the grant
+  // either — including the admin, whose admin-ness is a row in `user_roles` and not a database role.
   it("events is unreachable by every client role, admin included (07 §5.2)", async () => {
     for (const actor of [null, f.parentA, f.nannyVisible, f.admin]) {
-      expect(
-        await asRole(db, actor, "select 1 from public.events"),
-      ).toHaveLength(0);
+      expect(await refusedAs(db, actor, "select 1 from public.events")).toBe(
+        "42501",
+      );
     }
   });
 });
