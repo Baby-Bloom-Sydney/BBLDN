@@ -43,9 +43,7 @@ const DETAIL_SCHEMA = z
     schedule: z
       .object({
         type: z.enum(["Fixed", "Flexible"]),
-        blocks: z
-          .array(z.object({ day, part }).strict())
-          .max(7 * 4),
+        blocks: z.array(z.object({ day, part }).strict()).max(7 * 4),
       })
       .strict()
       .nullable(),

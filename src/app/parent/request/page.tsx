@@ -111,7 +111,9 @@ export default async function ParentPositionFlowPage({ searchParams }: Props) {
         connectNannyId={null}
         header={existing === null ? HEADER : EDIT_HEADER}
         submitLabel={existing === null ? SUBMIT : EDIT_SUBMIT}
-        onComplete={existing === null ? createPositionAction : amendPositionAction}
+        onComplete={
+          existing === null ? createPositionAction : amendPositionAction
+        }
       />
     </main>
   );

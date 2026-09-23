@@ -44,7 +44,7 @@ const childrenOf = (
       .map((ageLabel) => ({ ageLabel })),
   );
 
-const uniq = <T,>(values: ReadonlyArray<T>): ReadonlyArray<T> =>
+const uniq = <T>(values: ReadonlyArray<T>): ReadonlyArray<T> =>
   Object.freeze([...new Set(values)]);
 
 export function wizardAnswersOf(detail: PositionMatchDetail): WizardAnswers {
@@ -57,12 +57,12 @@ export function wizardAnswersOf(detail: PositionMatchDetail): WizardAnswers {
     ...(blocks.length === 0
       ? {}
       : {
-          days: uniq(blocks.map((block) => block.day)) as ReadonlyArray<
-            QuickMatchDay
-          >,
-          parts: uniq(blocks.map((block) => block.part)) as ReadonlyArray<
-            QuickMatchPart
-          >,
+          days: uniq(
+            blocks.map((block) => block.day),
+          ) as ReadonlyArray<QuickMatchDay>,
+          parts: uniq(
+            blocks.map((block) => block.part),
+          ) as ReadonlyArray<QuickMatchPart>,
         }),
     ...(detail.schedule === null ? {} : { scheduleType: detail.schedule.type }),
     ...(detail.minExperienceYears === undefined
