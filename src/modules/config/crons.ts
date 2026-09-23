@@ -11,9 +11,13 @@
 //
 // **Struck off by `4d` on BAI's ruling of 2026-09-23** (01 §4f still lists them; they return with their phase):
 // `proactive` · `compact-daily` (Phase 5a Katie) · `cleanup-orphan-children` · `soft-lock-stale-children`
-// (Phase 5c) · `snapshot-pipeline` (Phase 6). Each swept a phase that does not exist, so each was a guaranteed
-// `no-handler-registered` 500 every day — and five daily failures that are all expected is how the one that
-// stops being expected goes unread. They stay owed, with their owners, in
+// (Phase 5c) · `snapshot-pipeline` (Phase 6) — each swept a phase that does not exist. The ruling was then
+// widened to the last two the same reasoning reaches: `expire-subscribe-invites` (no module owns
+// `subscribe_invites`; the surface is unported legacy) and `usage-weekly-check` (nothing reads `feed_posts`
+// yet, and 02 §9 item 31 / 04 §6 item 36 owe BAI a ruling on what it counts).
+//
+// All seven were a guaranteed `no-handler-registered` 500 every day, and a wall of daily failures that are all
+// expected is how the one that stops being expected goes unread. They stay owed, with their owners, in
 // `api/_lib/__tests__/cron-declared-vs-used.test.ts`'s `NOT_SCHEDULED`, which refuses a silent return.
 import type { CronSpec } from "./types";
 
@@ -66,12 +70,6 @@ export const CRONS: ReadonlyArray<CronSpec> = Object.freeze([
     job: "vetting-expiry",
     london: daily(4, 30),
     serves: "DBS / right-to-work / ID expiry → level re-derived (03 §4)",
-  }),
-  cron({
-    path: "/api/cron/expire-subscribe-invites",
-    job: "expire-subscribe-invites",
-    london: daily(4, 45),
-    serves: "subscribe_invites past expires_at → expired (ADR-059)",
   }),
   cron({
     path: "/api/cron/retention-sweep",
@@ -128,13 +126,6 @@ export const CRONS: ReadonlyArray<CronSpec> = Object.freeze([
     path: "/api/cron/audit-consent-expiry",
     london: daily(21, 5),
     serves: "consent audit (platform/consent)",
-  }),
-  cron({
-    path: "/api/cron/usage-weekly-check",
-    job: "usage-weekly-check",
-    london: Object.freeze({ kind: "weekly", weekday: 1, hour: 6, minute: 0 }),
-    serves:
-      "app usage per family for the results guarantee (ADR-088 G-D; ADR-099); emits usage.weekly-check",
   }),
   cron({
     path: "/api/cron/payment-due-sweep",

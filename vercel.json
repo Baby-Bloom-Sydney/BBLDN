@@ -32,10 +32,6 @@
       "schedule": "30 3,4 * * *"
     },
     {
-      "path": "/api/cron/expire-subscribe-invites",
-      "schedule": "45 3,4 * * *"
-    },
-    {
       "path": "/api/cron/retention-sweep",
       "schedule": "0 1,2 * * *"
     },
@@ -70,10 +66,6 @@
     {
       "path": "/api/cron/audit-consent-expiry",
       "schedule": "5 20,21 * * *"
-    },
-    {
-      "path": "/api/cron/usage-weekly-check",
-      "schedule": "0 5,6 * * 1"
     },
     {
       "path": "/api/cron/payment-due-sweep",

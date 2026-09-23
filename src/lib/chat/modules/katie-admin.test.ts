@@ -836,10 +836,12 @@ describe("katie-admin — read_system_inventory", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = r.data as any;
     expect(Array.isArray(data.rows)).toBe(true);
-    const proactive = data.rows.find(
-      (c: { path: string }) => c.path === "/api/cron/proactive",
-    );
-    expect(proactive).toBeDefined();
+    // Was pinned to `/api/cron/proactive`, which `4d` struck off the schedule — so the assertion broke for a
+    // reason that had nothing to do with what it was testing (that the slice comes back populated and
+    // cron-shaped). Pinned to the shape instead, which a schedule change cannot rot.
+    expect(data.rows.length).toBeGreaterThan(0);
+    for (const row of data.rows as ReadonlyArray<{ path: string }>)
+      expect(row.path.startsWith("/api/cron/")).toBe(true);
   });
 
   it("filters by match substring", async () => {

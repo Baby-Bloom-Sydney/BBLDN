@@ -104,7 +104,7 @@ describe("an undeclared path never runs", () => {
   });
 });
 
-// The route-files-versus-`config/crons.ts` census moved to `cron-declared-vs-used.test.ts` when `4d` struck five
+// The route-files-versus-`config/crons.ts` census moved to `cron-declared-vs-used.test.ts` when `4d` struck seven
 // crons off the schedule and kept their shells: the account is now three-way (scheduled · owed-but-unscheduled ·
 // nothing else), and two copies of a one-for-one assertion would drift the day one of them was widened.
 //
@@ -112,10 +112,12 @@ describe("an undeclared path never runs", () => {
 // longer declared is **refused**, so striking a cron out of the config really does stop it running even if
 // something still calls its URL.
 describe("a shell whose schedule was struck off no longer runs", () => {
-  it("refuses the five BAI struck off, with the right bearer, because they are undeclared", async () => {
+  it("refuses the seven BAI struck off, with the right bearer, because they are undeclared", async () => {
     const runCron = await withCronSecret(SECRET);
 
     for (const path of [
+      "/api/cron/expire-subscribe-invites",
+      "/api/cron/usage-weekly-check",
       "/api/cron/proactive",
       "/api/cron/compact-daily",
       "/api/cron/cleanup-orphan-children",

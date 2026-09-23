@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CRONS } from "@/modules/config";
+import type { CronSpec } from "@/modules/config";
 import { ENV_SCHEMA } from "@/modules/config/lib/env-schema";
 import { renderCronBlock } from "../../../../scripts/crons/lib/render-cron-block";
 import { renderEnvExample } from "../../../../scripts/env/lib/render-env-example";
@@ -44,13 +45,26 @@ describe("config — generated artefacts match their source", () => {
   // Was `0 6 * * 1`, which is Monday 06:00 London only through GMT and Monday 07:00 through BST — the naive
   // offset 01 §4f rules out ("the UTC expression is chosen so the London time stays inside the acceptable window
   // in both GMT and BST"). Both candidate hours are scheduled and the due-gate discards the wrong one (`4b`).
+  // Driven against a **literal** spec since `4d`, not against `CRONS.filter(kind === "weekly")`. The one weekly
+  // cron there was (`usage-weekly-check`) is no longer scheduled, and a filter over an empty set asserts
+  // nothing while still passing — which is exactly the shape of a test that quietly stops testing. The renderer
+  // is what this claim is about, so the renderer is what it is given.
   it("renders a weekly London schedule as both candidate UTC hours on the same weekday", () => {
-    const block = renderCronBlock(
-      CRONS.filter((cron) => cron.london.kind === "weekly"),
-    );
-    expect(block).toEqual([
-      { path: "/api/cron/usage-weekly-check", schedule: "0 5,6 * * 1" },
+    const weekly: ReadonlyArray<CronSpec> = [
+      {
+        path: "/api/cron/some-weekly-job",
+        london: { kind: "weekly", weekday: 1, hour: 6, minute: 0 },
+        serves: "a Monday 06:00 London schedule, for the renderer",
+      },
+    ];
+
+    expect(renderCronBlock(weekly)).toEqual([
+      { path: "/api/cron/some-weekly-job", schedule: "0 5,6 * * 1" },
     ]);
+  });
+
+  it("declares no weekly cron today — the claim above is the renderer's, not the schedule's", () => {
+    expect(CRONS.filter((cron) => cron.london.kind === "weekly")).toEqual([]);
   });
 });
 
