@@ -37,6 +37,21 @@ const day = z.union([
 const part = z.enum(["morning", "midday", "afternoon", "evening"]);
 const months = z.number().int().min(0).max(MAX_MONTHS);
 
+/**
+ * `startDate` is an `Instant` on the record and a `date` column behind it (`position-row.ts` slices the day).
+ * A bare bounded string would let any ≤80 characters through to `jsonb_populate_record`'s implicit cast inside
+ * `upsert_position`, where it raises a Postgres error the caller reads as a generic `INTERNAL` — a refusal with
+ * nothing in it she can act on. Parameterised, so never an injection; refused here, so a real message instead.
+ * An ISO day is accepted as well as a full instant, because that is the precision the column keeps anyway.
+ * (`security-reviewer`, LOW 2.)
+ */
+const isoInstant = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}([T ].*)?$/)
+  .max(MAX_TEXT)
+  .refine((value) => !Number.isNaN(Date.parse(value)));
+
 const DETAIL_SCHEMA = z
   .object({
     area: z.object({ area: text, district: text }).strict(),
@@ -71,7 +86,7 @@ const DETAIL_SCHEMA = z
         supportNeeds: z.array(text).max(MAX_LIST).optional(),
       })
       .strict(),
-    startDate: z.string().trim().max(MAX_TEXT).optional(),
+    startDate: isoInstant.optional(),
     minExperienceYears: z.number().int().min(0).max(MAX_YEARS).optional(),
     minQualificationRung: z.number().int().min(0).max(MAX_RUNG).optional(),
   })

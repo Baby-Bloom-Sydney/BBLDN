@@ -179,6 +179,29 @@ describe("amend applies the fields to the row", () => {
     expect((await stored()).version).toBe(1);
   });
 
+  // `security-reviewer`, LOW 2: an unconstrained `startDate` reached Postgres' implicit cast to `date` and came
+  // back as a generic INTERNAL. It is refused here, with a message, instead.
+  it("refuses a startDate that is not a date, and keeps one that is", async () => {
+    await seed("OPEN");
+    const bad = await positions.amend({
+      entity,
+      actor: parent,
+      fields: { detail: { ...CHANGED, startDate: "next Tuesday-ish" } },
+      idempotencyKey: "amend-date-bad",
+    });
+    expect(bad.ok).toBe(false);
+    expect((await stored()).detail.area.district).toBe("N1");
+
+    const good = await positions.amend({
+      entity,
+      actor: parent,
+      fields: { detail: { ...CHANGED, startDate: "2026-03-02" } },
+      idempotencyKey: "amend-date-good",
+    });
+    expect(good.ok).toBe(true);
+    expect((await stored()).detail.startDate).toBe("2026-03-02");
+  });
+
   it("refuses a detail that is not one — the boundary validates, it does not trust", async () => {
     await seed("OPEN");
     const result = await positions.amend({
