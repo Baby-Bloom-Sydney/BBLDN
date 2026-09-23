@@ -53,19 +53,24 @@ describe("wireScheduling", () => {
 });
 
 describe("wireComms", () => {
-  it("binds stub-email + null-sms and a send fails with the renderer's reason, not comms-not-configured", async () => {
+  // 4a moved both reasons, and both moves are the point of the unit. The renderer is installed now
+  // (`createTemplateRenderer(EMAIL_TEMPLATES)`), so a send no longer fails because there is NO renderer — it
+  // fails because `welcome-parent` has no template FILE yet, which is a different and more useful sentence.
+  // `resend` is installed too, so the old "not installed" case became "installed, and bound".
+  it("binds stub-email + null-sms; a send with no template file fails on the file, not on the seam", async () => {
     const report = wireComms("stub-email");
     expect(report.binding).toBe("stub-email + null-sms");
     const sent = await comms.send(MESSAGE);
-    expect(!sent.ok && sent.error.details?.reason).toBe(
-      "renderer-not-configured",
-    );
+    expect(!sent.ok && sent.error.details?.reason).toBe("template-schema");
   });
 
-  it("refuses a provider that is not installed and leaves the seam fail-closed", async () => {
+  it("binds resend when the environment carries a key (08.01)", async () => {
+    // vitest.setup.ts supplies RESEND_API_KEY, so this is the "key present" arm. The "no key" arm cannot be
+    // driven here — `config/env.ts` parses once at module load — and is driven directly against
+    // `emailProviderFor` in `comms.sender.test.ts`, which is where the refusal lives.
     const report = wireComms("resend");
-    expect(report.binding).toBe("unconfigured");
+    expect(report.binding).toBe("resend + null-sms");
     const sent = await comms.send(MESSAGE);
-    expect(!sent.ok && sent.error.details?.reason).toBe("comms-not-configured");
+    expect(!sent.ok && sent.error.details?.reason).toBe("template-schema");
   });
 });

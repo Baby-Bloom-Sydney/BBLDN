@@ -173,14 +173,30 @@ describe("after register() in a valid preview environment", () => {
     expect(await m.areas.areas.isInServiceArea("SW4")).toBe(true);
   });
 
-  it("comms — the provider EMAIL_PROVIDER names is bound; a send fails on the missing renderer, not on the seam", async () => {
+  // 4a: the renderer is installed, so the refusal moved from "there is no renderer" to "that template has no
+  // FILE" — `welcome-parent` is Phase 1's to write (03 §8.3). Still asserted on the REASON rather than a happy
+  // path: what must not happen is the fail-closed seam answering, which would mean nothing wired comms at all.
+  it("comms — the provider EMAIL_PROVIDER names is bound; a send fails on the template file, not on the seam", async () => {
     const sent = await m.comms.comms.send({
       channel: "email",
       templateId: "welcome-parent",
       to: { email: "someone@example.test" as Email },
       data: {},
     });
-    expect(reasonOf(sent)).toBe("renderer-not-configured");
+    expect(reasonOf(sent)).toBe("template-schema");
+  });
+
+  // …and an id that DOES have a file goes all the way through: rendered, recorded, handed to the bound
+  // provider. The seam is proven live, not merely bound (ecc-lite rule 2).
+  it("comms — an id with a template file renders and is delivered by the bound provider", async () => {
+    const sent = await m.comms.comms.send({
+      channel: "email",
+      templateId: "admin-test",
+      to: { email: "someone@example.test" as Email },
+      data: { at: "2026-09-23T10:00:00.000Z" },
+    });
+    expect(reasonOf(sent)).not.toBe("template-schema");
+    expect(reasonOf(sent)).not.toBe("comms-not-configured");
   });
 
   // `1f`: the db inside replaced the stub in every environment. Asserted on the REASON, not on a happy path —
