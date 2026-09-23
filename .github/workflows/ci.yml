@@ -6,6 +6,14 @@
 #
 # Stage → job → what runs (05 §9 numbering):
 #   1 lint            → lint            eslint · prettier --check · CLAUDE.md = CODE-CLAUDE.md (local gate, see below)
+#                                        + eslint.typed.js (P4-GATES) — the five type-aware rules the review
+#                                        record's recurring classes became: bb/no-discarded-result,
+#                                        no-floating-promises (ignoreVoid: false), no-misused-promises,
+#                                        switch-exhaustiveness-check, and `as never` / `as any`. Recorded
+#                                        offenders ratchet in eslint.typed-ratchet.json (check:typed-ratchet);
+#                                        check:gate-fixtures drives every one of them against a fixture
+#                                        reconstructing the defect it comes from, so a rule that has quietly
+#                                        stopped firing goes red instead of passing
 #   1 lint            → allowed-imports scripts/gen-boundary-rules.ts --check + eslint.boundaries.js (S6 — green;
 #                                        joins the required-check list per ADR-109 when this PR merges)
 #   1 lint            → limiter-call-sites  scripts/ci/check-limiter-call-sites.mjs — a rate-limit policy declared
@@ -123,6 +131,27 @@ jobs:
       - run: npm ci
       - name: eslint (05 §9 stage 1; §7 boundary + platform rules once S6 lands)
         run: npm run lint
+      - name: eslint (type-aware) — the review record's five recurring classes, as rules (P4-GATES)
+        # `next lint` above has no `parserOptions.project`, so every rule it runs is syntax-only. These five
+        # need the type checker: a discarded `Result` (the most-repeated finding across the three checkpoint
+        # sweeps, and the one that produced a CRITICAL), a floating promise, a promise where a void return is
+        # expected, a `default:` that hides a union instead of exhausting it, and `as never` / `as any`.
+        # Scope is the London tree, non-test. Measured at 7 s over ~500 files.
+        if: ${{ !cancelled() }}
+        run: npm run lint:typed
+      - name: check:gate-fixtures — every rule above fires on a real reconstructed defect
+        # A green gate is equally consistent with "the tree is clean" and with "the rule never ran", and this
+        # repo has shipped the second twice (`3i`, `3j`). This drives each rule the other way, against a
+        # fixture reconstructing the finding it comes from, and asserts the correct form lints clean. It is
+        # also what caught this unit's own leak: the first `as never` selector reported NOTHING against the
+        # REVIEW-3 H-3 fixture, because the shipped cast sits two levels below the call.
+        if: ${{ !cancelled() }}
+        run: npm run check:gate-fixtures
+      - name: check:typed-ratchet — the recorded offenders may only shrink
+        # eslint.typed-ratchet.json's entries must exist, carry a reason, name only live rules, and never
+        # grow. Same discipline as the 50-line list below, which REVIEW-4 M-6 measured growing 106 -> 109.
+        if: ${{ !cancelled() }}
+        run: npm run check:typed-ratchet
       - name: check:long-functions — the 50-line allow-list is a RATCHET, not a drawer (REVIEW-4 M-6 / R-8)
         # `eslint.long-functions.json` turns the 50-line rule off per file. It grew 106 -> 109 in one cycle while
         # both limiter allow-files fail on a stale entry by design. This step is the missing sibling: entries

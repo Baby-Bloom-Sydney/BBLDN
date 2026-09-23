@@ -1,0 +1,269 @@
+{
+  "//": "The recorded offenders of eslint.typed.js, per file and per RULE — finer than eslint.long-functions.json, which turns the whole rule off per file, so a recorded file is still gated on every OTHER rule. Written by P4-GATES from a measured run at the landing commit; every file NOT listed here is fully gated, and so is every new file. check:typed-ratchet refuses a stale entry, a reason-less entry, an unknown rule name, and any growth: the list may ONLY shrink. To remove an entry, fix the violation — never add one to make a red build green.",
+  "files": {
+    "src/boot/db-nanny-account-store.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (4 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/boot/db-nanny-lead-store.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (3 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/boot/db-verification-store.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (10 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/boot/db-vetting-store.ts": {
+      "rules": [
+        "@typescript-eslint/switch-exhaustiveness-check",
+        "no-restricted-syntax"
+      ],
+      "reason": "pre-gate (1 x a switch over a union that a default arm hides rather than exhausts; 5 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/boot/event-envelope-from-row.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (3 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/boot/privacy-erasure-ops.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (4 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/boot/privacy-purge-ops.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (4 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/boot/privacy-request-ops.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (4 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/boot/privacy-retention-ops.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (3 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/boot/wire-connections.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/admin-verification/actions/lift-suspension-action.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/admin-verification/actions/open-evidence-action.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/admin-verification/actions/record-update-service-action.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/admin-verification/lib/nanny-name-of-party.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/admin-verification/lib/parse-decision-form.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (2 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/admin/calendar/components/CalendarBoard.tsx": {
+      "rules": ["@typescript-eslint/no-misused-promises"],
+      "reason": "pre-gate (1 x a promise-returning function where a void return is expected) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/admin/call-queue/components/CallItemDrawer.tsx": {
+      "rules": ["@typescript-eslint/no-misused-promises"],
+      "reason": "pre-gate (4 x a promise-returning function where a void return is expected) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/admin/call-queue/lib/call-due-sweep.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/admin/erasure/components/ErasurePanel.tsx": {
+      "rules": ["@typescript-eslint/no-misused-promises"],
+      "reason": "pre-gate (1 x a promise-returning function where a void return is expected) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/app/child-linking/lib/child-methods.ts": {
+      "rules": ["bb/no-discarded-result"],
+      "reason": "pre-gate (1 x a Result answered and discarded) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/app/child-linking/lib/claim-invite-method.ts": {
+      "rules": ["bb/no-discarded-result"],
+      "reason": "pre-gate (2 x a Result answered and discarded) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/app/child-linking/lib/db-child-linking-store.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/app/child-linking/lib/invite-methods.ts": {
+      "rules": ["bb/no-discarded-result"],
+      "reason": "pre-gate (1 x a Result answered and discarded) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/auth/lib/delete-my-account.ts": {
+      "rules": ["bb/no-discarded-result"],
+      "reason": "pre-gate (1 x a Result answered and discarded) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/call-layer/components/SlotPicker.tsx": {
+      "rules": ["@typescript-eslint/no-misused-promises"],
+      "reason": "pre-gate (3 x a promise-returning function where a void return is expected) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/call-layer/lib/call-messages.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/call-layer/lib/create-call-layer-slice.ts": {
+      "rules": ["@typescript-eslint/switch-exhaustiveness-check"],
+      "reason": "pre-gate (1 x a switch over a union that a default arm hides rather than exhausts) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/call-layer/lib/create-call-layer.ts": {
+      "rules": ["bb/no-discarded-result"],
+      "reason": "pre-gate (3 x a Result answered and discarded) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/call-layer/lib/send-nanny-call-messages.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/connections/lib/send-row-messages.ts": {
+      "rules": ["bb/no-discarded-result"],
+      "reason": "pre-gate (1 x a Result answered and discarded) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/matching/components/Wizard.tsx": {
+      "rules": ["@typescript-eslint/switch-exhaustiveness-check"],
+      "reason": "pre-gate (1 x a switch over a union that a default arm hides rather than exhausts) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/matching/lib/autofire.ts": {
+      "rules": ["bb/no-discarded-result"],
+      "reason": "pre-gate (1 x a Result answered and discarded) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/matching/lib/create-matching.ts": {
+      "rules": ["bb/no-discarded-result"],
+      "reason": "pre-gate (2 x a Result answered and discarded) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/onboarding-nanny/actions/apply-from-portal-action.ts": {
+      "rules": ["bb/no-discarded-result", "no-restricted-syntax"],
+      "reason": "pre-gate (2 x a Result answered and discarded; 1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/onboarding-nanny/actions/save-nanny-application-action.ts": {
+      "rules": ["bb/no-discarded-result"],
+      "reason": "pre-gate (1 x a Result answered and discarded) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/onboarding-nanny/actions/save-nanny-profile-step-action.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/onboarding-nanny/actions/sign-up-nanny-action.ts": {
+      "rules": ["bb/no-discarded-result"],
+      "reason": "pre-gate (2 x a Result answered and discarded) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/onboarding-nanny/lib/load-commission-page.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/onboarding-nanny/lib/nanny-profile-step-schemas.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/onboarding-parent/actions/sign-up-parent-action.ts": {
+      "rules": ["bb/no-discarded-result"],
+      "reason": "pre-gate (1 x a Result answered and discarded) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/payments/lib/create-payments-jobs.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/payments/lib/dfy-methods.ts": {
+      "rules": ["bb/no-discarded-result"],
+      "reason": "pre-gate (1 x a Result answered and discarded) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/platform/privacy/privacy.stub.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/platform/unit-of-work/lib/create-unit-of-work.ts": {
+      "rules": ["bb/no-discarded-result"],
+      "reason": "pre-gate (1 x a Result answered and discarded) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/positions/lib/create-positions-slice.ts": {
+      "rules": ["@typescript-eslint/switch-exhaustiveness-check"],
+      "reason": "pre-gate (1 x a switch over a union that a default arm hides rather than exhausts) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/positions/lib/journey-rows-4-to-8.ts": {
+      "rules": ["@typescript-eslint/switch-exhaustiveness-check"],
+      "reason": "pre-gate (1 x a switch over a union that a default arm hides rather than exhausts) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/scheduling/lib/scheduling-admin-writes.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (5 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/scheduling/lib/scheduling-events.ts": {
+      "rules": [
+        "@typescript-eslint/no-floating-promises",
+        "bb/no-discarded-result"
+      ],
+      "reason": "pre-gate (5 x a promise neither awaited nor handled; 5 x a Result answered and discarded) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/verification/actions/record-biometric-consent-action.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (3 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/verification/actions/submit-dbs-action.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/verification/actions/submit-identity-action.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (4 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/verification/actions/submit-right-to-work-action.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/verification/components/VerificationWizard.tsx": {
+      "rules": ["@typescript-eslint/switch-exhaustiveness-check"],
+      "reason": "pre-gate (1 x a switch over a union that a default arm hides rather than exhausts) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/verification/components/wizard/ProcessingStep.tsx": {
+      "rules": [
+        "@typescript-eslint/no-floating-promises",
+        "@typescript-eslint/no-misused-promises"
+      ],
+      "reason": "pre-gate (1 x a promise neither awaited nor handled; 1 x a promise-returning function where a void return is expected) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/verification/lib/emit-level-events.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/verification/lib/memory-verification-store.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (5 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/verification/lib/open-evidence.ts": {
+      "rules": [
+        "@typescript-eslint/switch-exhaustiveness-check",
+        "no-restricted-syntax"
+      ],
+      "reason": "pre-gate (1 x a switch over a union that a default arm hides rather than exhausts; 1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/verification/lib/process-sections.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/verification/lib/send-suspension-lifted.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/verification/lib/send-verification-outcome.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/verification/lib/submit-evidence.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/verification/lib/sweep-reminders.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    },
+    "src/modules/vetting-providers/lib/memory-vetting-store.ts": {
+      "rules": ["no-restricted-syntax"],
+      "reason": "pre-gate (1 x `as never` / `as any`) — recorded by P4-GATES at the landing, not exempted: the owning unit clears it when the file is next touched."
+    }
+  }
+}
