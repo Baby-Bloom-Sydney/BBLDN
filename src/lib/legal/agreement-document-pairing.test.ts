@@ -31,6 +31,7 @@ import path from "node:path";
 import { CONSENT_PURPOSES } from "@/modules/platform";
 import { purposeForAgreement } from "./purpose-for-agreement";
 import type { AgreementId } from "./types";
+import { LEGAL_PAGE_DOCUMENTS } from "./legal-page-documents";
 
 const REPO = path.resolve(__dirname, "../../..");
 
@@ -132,5 +133,37 @@ describe("unit.agreement-document-pairing — shown is recorded", () => {
         .filter((row) => !row.declared.includes(row.mapped as string)),
     );
     expect(disagreements).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The same question one domain over, now that `3b`'s route map is on `main`.
+//
+// `LEGAL_PAGE_DOCUMENTS` pairs a `/legal/*` **route segment** with a document id, and `3b` recorded it as the
+// unjudgeable case: both documents exist, both say draft, so a clean swap passes. Mostly true — but **four of
+// the seven segments are themselves seeded document ids**, and there the segment is a second declaration of
+// the pairing. Mapping `/legal/privacy-policy` at anything but `privacy-policy` is a disagreement of fact, not
+// of wording, and it is the shape a swap takes. That leaves three renamed pairs for a person
+// (`client-terms`→`client-tos`, `professional-terms`→`professional-tos`, `cookies`→`cookie-policy`), and the
+// second case below pins that residue so it cannot quietly grow.
+describe("unit.agreement-document-pairing — a route that names a document reads that document", () => {
+  const selfNaming = Object.entries(LEGAL_PAGE_DOCUMENTS).filter(([segment]) =>
+    (DOCUMENT_IDS as ReadonlyArray<string>).includes(segment),
+  );
+
+  it("every segment that is itself a document id is mapped to that id", () => {
+    const disagreements = selfNaming.filter(([segment, id]) => id !== segment);
+    expect(disagreements).toEqual([]);
+  });
+
+  it("the residue a person still reviews by eye is three routes, named", () => {
+    const renamed = Object.keys(LEGAL_PAGE_DOCUMENTS).filter(
+      (segment) => !(DOCUMENT_IDS as ReadonlyArray<string>).includes(segment),
+    );
+    expect(renamed.sort()).toEqual([
+      "client-terms",
+      "cookies",
+      "professional-terms",
+    ]);
   });
 });

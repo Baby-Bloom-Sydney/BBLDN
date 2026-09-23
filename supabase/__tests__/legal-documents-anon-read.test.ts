@@ -64,18 +64,30 @@ describe("int.legal-documents-anon-read — every seeded document reads at visit
     expect(rows).toEqual([]);
   });
 
-  it("without the anon policy the same reads return nothing (the gate measures the policy)", async () => {
-    await db.query("savepoint no_anon_policy");
-    try {
-      await db.query(
-        "drop policy legal_documents_anon_select on public.legal_documents",
-      );
-      for (const id of DOCUMENT_IDS) {
-        const rows = await asRole<Row>(db, null, CURRENT_VERSION_READ, [id]);
-        expect(rows).toEqual([]);
+  // **Local stack only, and the reason is a lock, not tidiness** (security pass, LOW). `drop policy` takes
+  // `ACCESS EXCLUSIVE` on `legal_documents`, which conflicts with a plain `SELECT`. The rollback releases it
+  // immediately and no failure path can leave the policy dropped — a savepoint rollback in `finally`, an outer
+  // transaction that is only ever rolled back, and a killed connection aborting its own work. But for the
+  // eleven reads in between, any other session touching the table blocks; `db-client.ts` says this same suite
+  // can be pointed at `bb-ldn-preview` with `SUPABASE_DB_URL`, and stalling a shared environment to prove a
+  // local point is not a trade worth making. Where it does not run, the eleven cases above still run.
+  const localOnly = process.env.SUPABASE_DB_URL === undefined ? it : it.skip;
+
+  localOnly(
+    "without the anon policy the same reads return nothing (the gate measures the policy)",
+    async () => {
+      await db.query("savepoint no_anon_policy");
+      try {
+        await db.query(
+          "drop policy legal_documents_anon_select on public.legal_documents",
+        );
+        for (const id of DOCUMENT_IDS) {
+          const rows = await asRole<Row>(db, null, CURRENT_VERSION_READ, [id]);
+          expect(rows).toEqual([]);
+        }
+      } finally {
+        await db.query("rollback to savepoint no_anon_policy");
       }
-    } finally {
-      await db.query("rollback to savepoint no_anon_policy");
-    }
-  });
+    },
+  );
 });
