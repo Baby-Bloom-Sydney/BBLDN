@@ -191,14 +191,12 @@ export const PUBLIC_ROUTES: ReadonlyArray<PublicRoute> = Object.freeze([
     description: `The biometric notice for nannies verifying with ${BRAND.longName}.`,
     index: true,
   },
-  {
-    id: "S-X-25",
-    path: "/legal/biometric-notice-client",
-    group: "public",
-    title: "Biometric notice — clients",
-    description: `The biometric notice for families using ${BRAND.longName}.`,
-    index: true,
-  },
+  // `/legal/biometric-notice-client` was here and is gone (L-009 `3b`). ADR-071 makes biometric verification
+  // nanny-only: `0026` seeds one biometric notice — the professional's — and no client equivalent, which is why
+  // `purpose-for-agreement.ts` maps `AGR-03` to nothing. The page was Sydney's and it was `index: true`, so it
+  // was an indexed public promise of a document London does not have. Pointing it at the professional's notice
+  // would publish a document written for somebody else; leaving Sydney's body is what this unit exists to end.
+  // Removing the row takes it out of the robots file and the sitemap too, both generated from this table.
   {
     id: "S-X-25",
     path: legal.disclaimer,
