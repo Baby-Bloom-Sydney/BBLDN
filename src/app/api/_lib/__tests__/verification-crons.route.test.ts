@@ -2,7 +2,7 @@
 // answers their counts; `vetting-expiry` hands the run's instant to `verification.sweepExpiry`. The shells are
 // asserted on what they hand `runCron` — the Bearer rule is `run-cron.test.ts`'s. And the recorded gap is pinned:
 // the delayed-queue DELIVERY (`08.20` proper) is not in this run until a renderer exists (Phase 4a `08.01`).
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const SECRET = "a-configured-cron-secret";
 const request = (path: string) =>
@@ -47,6 +47,18 @@ const stubs = () => {
     expireHolds,
   };
 };
+
+// The clock is pinned because `runCron` now gates on the London hour (04:30 London for vetting-expiry; send-delayed-emails runs every five minutes and is never gated): `vercel.json` schedules a declared
+// London time at both candidate UTC hours and the gate discards the one that is not it (`4b`). A test that ran at
+// the wall-clock of whoever is running it would pass or skip by the hour of day.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-01-15T04:30:00.000Z"));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 afterEach(() => {
   vi.doUnmock("@/modules/config/server");

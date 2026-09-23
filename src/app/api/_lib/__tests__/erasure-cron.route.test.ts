@@ -4,7 +4,7 @@
 //
 // It is a **re-attempt**, not the product path, and the sweep's counts are what say so: `skipped` is the number
 // of people whose Art 17 request is still open after this run, which is the one number an operator needs.
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const SECRET = "a-configured-cron-secret";
 const PATH = "/api/cron/delete-account";
@@ -31,7 +31,16 @@ const stubs = () => {
   return { sweepRequests };
 };
 
+// The clock is pinned because `runCron` gates on the London hour (02:30 London): `vercel.json` schedules a declared
+// London time at both candidate UTC hours and the gate discards the one that is not it (`4b`). Left unpinned,
+// this file would pass or skip depending on what time of day it was run at.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-01-15T02:30:00.000Z"));
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   vi.doUnmock("@/modules/config/server");
   vi.doUnmock("@/modules/platform");
   vi.resetModules();

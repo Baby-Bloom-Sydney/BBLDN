@@ -100,7 +100,12 @@ export type BucketKey =
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type LocalTime = `${number}:${number}`;
 
-/** A cron's intended Europe/London time (01 §4f). */
+/**
+ * A cron's intended Europe/London time (01 §4f) — the wall-clock the job is meant to run at, not a UTC hour.
+ * `daily` and `weekly` may not be declared at hour 1 (it does not exist on the spring-forward day and occurs
+ * twice on the fall-back day), and `weekly` may not be declared at hour 0 (its BST candidate falls on the
+ * previous weekday). `scripts/crons/lib/render-cron-block.ts` throws on both rather than mis-scheduling.
+ */
 export type CronSchedule =
   | { readonly kind: "every"; readonly minutes: number }
   | { readonly kind: "daily"; readonly hour: number; readonly minute: number }

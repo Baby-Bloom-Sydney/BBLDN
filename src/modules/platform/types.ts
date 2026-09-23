@@ -2,7 +2,11 @@
 // `platform/events` · `platform/consent`) and the three that grew beside them (`rate-limit` · `upload-scan` ·
 // `unit-of-work`, ADR-127) keep their own `types.ts`; this file re-exports them plus the Result / envelope types
 // and the `Registry` slot that live at the module root. Values live in index.ts.
-import type { AppErrorDetails, ClientAppError } from "@/modules/shared-types";
+import type {
+  AppErrorDetails,
+  ClientAppError,
+  Weekday,
+} from "@/modules/shared-types";
 
 export type * from "./log/types";
 export type * from "./events/types";
@@ -11,6 +15,19 @@ export type * from "./privacy/types";
 export type * from "./rate-limit/types";
 export type * from "./upload-scan/types";
 export type * from "./unit-of-work/types";
+
+// ── The London wall clock (01 §4f) ──
+
+/**
+ * A London calendar date (`YYYY-MM-DD`) with the London hour, minute and weekday (0 = Sunday) at an instant —
+ * what "today / yesterday in London" and "is it the declared London hour" are read from (`londonWallClock`).
+ */
+export type LondonWallClock = {
+  readonly date: string;
+  readonly hour: number;
+  readonly minute: number;
+  readonly weekday: Weekday;
+};
 
 // ── Result helpers (01 §4a) ──
 

@@ -4,7 +4,7 @@
 //
 // `env` is parsed once at module load, so the unset case is reached by stubbing the one config reader and
 // re-importing the route graph — the same technique S3b used for its production wiring guard.
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const CRON_PATH = "/api/cron/expire-trials";
 const SECRET = "a-configured-cron-secret";
@@ -23,7 +23,16 @@ const request = (authorization?: string) =>
     headers: authorization === undefined ? {} : { authorization },
   });
 
+// The clock is pinned because `runCron` gates on the London hour (03:00 London for expire-trials): `vercel.json` schedules a declared
+// London time at both candidate UTC hours and the gate discards the one that is not it (`4b`). Left unpinned,
+// this file would pass or skip depending on what time of day it was run at.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-01-15T03:00:00.000Z"));
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   vi.doUnmock("@/modules/config/server");
   vi.resetModules();
 });

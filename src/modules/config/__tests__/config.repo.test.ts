@@ -41,12 +41,15 @@ describe("config — generated artefacts match their source", () => {
     expect(vercel.regions).toEqual(["lhr1"]);
   });
 
-  it("renders a weekly London schedule as a UTC expression on the same weekday", () => {
+  // Was `0 6 * * 1`, which is Monday 06:00 London only through GMT and Monday 07:00 through BST — the naive
+  // offset 01 §4f rules out ("the UTC expression is chosen so the London time stays inside the acceptable window
+  // in both GMT and BST"). Both candidate hours are scheduled and the due-gate discards the wrong one (`4b`).
+  it("renders a weekly London schedule as both candidate UTC hours on the same weekday", () => {
     const block = renderCronBlock(
       CRONS.filter((cron) => cron.london.kind === "weekly"),
     );
     expect(block).toEqual([
-      { path: "/api/cron/usage-weekly-check", schedule: "0 6 * * 1" },
+      { path: "/api/cron/usage-weekly-check", schedule: "0 5,6 * * 1" },
     ]);
   });
 });
