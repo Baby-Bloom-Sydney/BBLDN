@@ -58,8 +58,8 @@ declare
   v_total  int;
   v_public int;
 begin
-  -- 1. ★ Neither client role got the surface back. Asserted as a comparison rather than as the literal 20
-  --    and 2 — `3j`'s security LOW, which `0034` proved the cost of by turning `0032`'s twin red on a lawful
+  -- 1. ★ Neither client role got the surface back. Asserted as a comparison rather than as the literal 19
+  --    and 1 — `3j`'s security LOW, which `0034` proved the cost of by turning `0032`'s twin red on a lawful
   --    34th relation. The exact membership is `int.client-functions`'s, held against the enumeration on
   --    every run.
   select count(*) into v_total from pg_proc p join pg_namespace n on n.oid = p.pronamespace

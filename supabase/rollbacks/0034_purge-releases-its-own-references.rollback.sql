@@ -70,6 +70,7 @@ declare
     'consent',      jsonb_build_object('months', 72, 'from', 'scrub'),
     'safeguarding', jsonb_build_object('months', 12, 'from', 'scrub'));
   v_answer  jsonb;
+  v_admits  text[];
 begin
   -- 1. ★ The release is still in the one body entitled to carry it.
   if not exists (
@@ -108,10 +109,15 @@ begin
   end if;
 
   -- 4. ★ The guard is still the guard. This twin's whole premise is that `0034` did not widen it.
-  if (select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-       where n.nspname = 'public' and p.proname = 'is_retention_job')
-     not like '%''bbldn_retention'', ''supabase_admin''%' then
-    raise exception '0034 twin: is_retention_job() no longer admits exactly bbldn_retention and supabase_admin';
+  -- ⚠️ Parsed, not substring-matched — a `like` would still pass if the guard were widened to add a third
+  -- name, which is exactly the change this twin exists to notice (database pass, HIGH).
+  select array_agg(m[1] order by m[1]) into v_admits
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace,
+         lateral regexp_matches(p.prosrc, '''([a-z_]+)''', 'g') as m
+   where n.nspname = 'public' and p.proname = 'is_retention_job';
+  if v_admits is distinct from array['bbldn_retention', 'supabase_admin'] then
+    raise exception '0034 twin: is_retention_job() admits % — it must admit exactly bbldn_retention and supabase_admin', v_admits;
   end if;
 
   -- 5. ★ …and the right it restored still works, proved by exercising it and rolling the probe back.

@@ -172,8 +172,10 @@ begin
   -- tg_argv carries the column names this trigger guards, so one function serves all three tables.
   foreach v_col in array tg_argv loop
     if v_new ->> v_col is not null and (v_new ->> v_col) is distinct from (v_old ->> v_col) then
+      -- ★ `%` is plpgsql RAISE's only placeholder — `%s` is a placeholder followed by a literal "s", which is
+      -- why the first draft said "user_ids" and "applied_bys" (database pass, MEDIUM). Measured, not read.
       raise exception
-        '%.%: %s may be released to NULL but never re-pointed at another person (B-49, 07 §5.8 rule 7)',
+        '%.%: % may be released to NULL but never re-pointed at another person (B-49, 07 §5.8 rule 7)',
         tg_table_schema, tg_table_name, v_col
         using errcode = 'restrict_violation';
     end if;
@@ -187,19 +189,25 @@ comment on function public.refuse_reference_rewrite() is
 
 revoke all on function public.refuse_reference_rewrite() from public;
 
--- `drop … if exists` first, so the file re-applies — `0027`'s house style.
+-- `drop … if exists` first, so the file re-applies. `0027`'s house style, kept over PG14's
+-- `create or replace trigger` (database pass, MEDIUM) because the tree already reads one way and a second
+-- idiom for the same thing is how the two drift; the idempotency the reviewer asked for is the same either way.
 drop trigger if exists account_erasure_requests_refuse_requester_rewrite on public.account_erasure_requests;
 create trigger account_erasure_requests_refuse_requester_rewrite
   before update of requested_by on public.account_erasure_requests
   for each row execute function public.refuse_reference_rewrite('requested_by');
 
--- `drop … if exists` first, so the file re-applies — `0027`'s house style.
+-- `drop … if exists` first, so the file re-applies. `0027`'s house style, kept over PG14's
+-- `create or replace trigger` (database pass, MEDIUM) because the tree already reads one way and a second
+-- idiom for the same thing is how the two drift; the idempotency the reviewer asked for is the same either way.
 drop trigger if exists cookie_consent_records_refuse_user_rewrite on public.cookie_consent_records;
 create trigger cookie_consent_records_refuse_user_rewrite
   before update of user_id on public.cookie_consent_records
   for each row execute function public.refuse_reference_rewrite('user_id');
 
--- `drop … if exists` first, so the file re-applies — `0027`'s house style.
+-- `drop … if exists` first, so the file re-applies. `0027`'s house style, kept over PG14's
+-- `create or replace trigger` (database pass, MEDIUM) because the tree already reads one way and a second
+-- idiom for the same thing is how the two drift; the idempotency the reviewer asked for is the same either way.
 drop trigger if exists katie_prompt_edits_refuse_author_rewrite on public.katie_prompt_edits;
 create trigger katie_prompt_edits_refuse_author_rewrite
   before update of applied_by on public.katie_prompt_edits
@@ -503,6 +511,11 @@ declare
   v_cookie   uuid;
   v_katie    uuid;
   v_rewrote  boolean := false;
+  v_admits   text[];
+  v_role     text;
+  v_guard    boolean;
+  v_probes   text[][];
+  v_i        integer;
 begin
   -- 1. ★ The array in the function body is the catalogue's answer, not a typed three. A fourth guarded
   --    `set null` key added by a later migration fails here on the first apply.
@@ -527,12 +540,55 @@ begin
       v_derived, v_named;
   end if;
 
-  -- 2. ★ The guard is untouched. This file would be a hole if it were not.
-  if (select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-       where n.nspname = 'public' and p.proname = 'is_retention_job')
-     not like '%''bbldn_retention'', ''supabase_admin''%' then
-    raise exception '0034: is_retention_job() no longer admits exactly bbldn_retention and supabase_admin';
+  -- 1b. ★ **No COMPOSITE `set null` key into `auth.users` exists**, because the release loop's domain is
+  --     single-column by construction and a composite one would be skipped in silence rather than failing the
+  --     way a new single-column key does (database pass, MEDIUM). Zero today; asserted so it stays that way.
+  if exists (
+    select 1 from pg_constraint c
+      join pg_class t on t.oid = c.conrelid
+      join pg_namespace n on n.oid = t.relnamespace
+      join pg_class rt on rt.oid = c.confrelid
+      join pg_namespace rn on rn.oid = rt.relnamespace
+     where c.contype = 'f' and c.confdeltype = 'n'
+       and rn.nspname = 'auth' and rt.relname = 'users'
+       and n.nspname = 'public' and array_length(c.conkey, 1) > 1) then
+    raise exception '0034: a COMPOSITE on delete set null key into auth.users exists — the release loop would skip it in silence';
   end if;
+
+  -- 2. ★ The guard is untouched. This file would be a hole if it were not.
+  --
+  --    ⚠️ **Asserted on the parsed member list, not on a substring** (database pass, HIGH). The first draft
+  --    matched `prosrc like '%''bbldn_retention'', ''supabase_admin''%'` — which still passes if the guard is
+  --    widened to `('bbldn_retention', 'supabase_admin', 'postgres')`, i.e. it passes through **exactly** the
+  --    change this whole file exists to avoid making. A check that cannot fail on its own subject is not a
+  --    check.
+  select array_agg(m[1] order by m[1]) into v_admits
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace,
+         lateral regexp_matches(p.prosrc, '''([a-z_]+)''', 'g') as m
+   where n.nspname = 'public' and p.proname = 'is_retention_job';
+  if v_admits is distinct from array['bbldn_retention', 'supabase_admin'] then
+    raise exception '0034: is_retention_job() admits % — it must admit exactly bbldn_retention and supabase_admin', v_admits;
+  end if;
+  -- …and behaviourally, which no source parse can substitute for: every other role in the cluster answers false.
+  for v_role in select rolname from pg_roles
+                 where rolname not in ('bbldn_retention', 'supabase_admin')
+                   and pg_has_role(current_user, oid, 'MEMBER')
+  loop
+    begin
+      execute format('set local role %I', v_role);
+      select public.is_retention_job() into v_guard;
+      reset role;
+    exception
+      -- ★ A role that cannot even EXECUTE the guard certainly does not pass it, and that is the ordinary case
+      -- after `0033`: EXECUTE is the retention identity's alone. Measured — the first draft assumed every role
+      -- could call it and the apply answered `42501` on the first one it tried.
+      when insufficient_privilege then reset role; v_guard := false;
+    end;
+    if v_guard then
+      raise exception '0034: is_retention_job() is true for %, which is a widening', v_role;
+    end if;
+  end loop;
 
   -- 3. ★ The two new privileges are column-narrow, not table-wide.
   if has_table_privilege('bbldn_retention', 'public.cookie_consent_records', 'UPDATE')
@@ -566,16 +622,34 @@ begin
       (visitor_id, user_id, consent_choice, analytics_enabled, marketing_enabled, expiry_date)
     values ('rewrite-' || v_probe::text, v_probe, 'accept_all', true, true, now() + interval '1 year');
 
-    begin
-      set local role bbldn_retention;
-      update public.cookie_consent_records
-         set user_id = '00000000-0000-4000-8000-0000000000ff'::uuid
-       where visitor_id = 'rewrite-' || v_probe::text;
-      reset role;
-      v_rewrote := true;
-    exception
-      when restrict_violation then reset role;  -- the invariant fired, which is the point
-    end;
+    insert into public.katie_prompt_edits (section, applied_by)
+    values ('rewrite-' || v_probe::text, v_probe);
+    insert into public.account_erasure_requests (subject_user_id, requested_by, road, state, completed_at)
+    values (v_probe, v_probe, 'self-service', 'completed', now() - interval '31 days');
+
+    -- ★ **All three columns, driven** (database pass, MEDIUM): arm 3c counts the triggers, and a trigger with
+    -- the wrong `tg_argv` or the wrong `before update of <col>` clause would be counted and still be inert.
+    v_probes := array[
+      ['cookie_consent_records',   'user_id',      'visitor_id'],
+      ['katie_prompt_edits',       'applied_by',   'applied_by'],
+      ['account_erasure_requests', 'requested_by', 'requested_by']
+    ];
+    for v_i in 1 .. array_length(v_probes, 1) loop
+      begin
+        set local role bbldn_retention;
+        execute format('update public.%I set %I = %L where %I = %L',
+                       v_probes[v_i][1], v_probes[v_i][2],
+                       '00000000-0000-4000-8000-0000000000ff'::uuid,
+                       v_probes[v_i][3],
+                       case when v_probes[v_i][3] = 'visitor_id'
+                            then 'rewrite-' || v_probe::text else v_probe::text end);
+        reset role;
+        v_rewrote := true;
+      exception
+        when restrict_violation then reset role;  -- the invariant fired, which is the point
+      end;
+      exit when v_rewrote;
+    end loop;
 
     raise exception using errcode = 'P0001', message = '0034: rewrite probe rollback';
   exception

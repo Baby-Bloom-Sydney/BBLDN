@@ -117,8 +117,10 @@ begin;
 -- `nanny_public` (ADR-166) and by `is_active_nanny()` inside policies.
 revoke execute on function public.nanny_is_visible(uuid) from anon, authenticated;
 
--- No caller anywhere either. The family-access chain is reached through `user_has_child_access(uuid)`, which
--- stays.
+-- No caller anywhere either — not in `src/`, not in a policy, not in a body, not in a view. ⚠️ **And it has
+-- no live successor**, which the first draft's comment implied it did (database pass, MEDIUM): the policies
+-- that gate child access call `user_has_child_access(uuid)`, which is independently coded over `children` and
+-- `child_client` and does **not** call this chain at all. What is being removed here is dead, not migrated.
 revoke execute on function public.child_has_family_access(uuid) from anon, authenticated;
 
 -- Called only by `child_has_family_access()`, a `postgres`-owned definer — so the client never evaluates it.
