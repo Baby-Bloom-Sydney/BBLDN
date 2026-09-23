@@ -35,8 +35,21 @@ const TRACKERS: ReadonlyArray<{
     allowed: "src/components/legal/AnalyticsScripts.tsx",
   },
   {
+    // The Meta origin itself: `config/meta.ts` builds the loader URL from `SECURITY.csp.metaScriptOrigins`
+    // rather than naming the host again, so the host stays in the two places that are *about* the rule.
     needle: "connect.facebook.net",
     allowed: "src/components/legal/AnalyticsScripts.tsx",
+  },
+  {
+    // The vendor's loader file name — the half of the URL that is not the origin. It lives in `config/meta.ts`
+    // (L4: the pixel component reads it, never writes it), so a second copy anywhere is a second pixel.
+    needle: "fbevents",
+    allowed: "src/modules/config/meta.ts",
+  },
+  {
+    // The vendor's global. A file that can reach `fbq` can fire a conversion, so exactly one may.
+    needle: "fbq",
+    allowed: "src/components/legal/MetaPixel.tsx",
   },
   {
     needle: "googletagmanager.com",
@@ -88,6 +101,25 @@ describe("consent gate — the one allowed file is mounted behind the gate", () 
     expect(opens).toBeGreaterThan(-1);
     expect(tracker).toBeGreaterThan(opens);
     expect(closes).toBeGreaterThan(tracker);
+  });
+
+  it("★ the Meta pixel is mounted inside a marketing ConsentGate, not beside it", () => {
+    const source = layout();
+    const opens = source.indexOf('<ConsentGate category="marketing">');
+    const pixel = source.indexOf("<MetaPixel />");
+    expect(opens).toBeGreaterThan(-1);
+    expect(pixel).toBeGreaterThan(opens);
+    expect(source.indexOf("</ConsentGate>", pixel)).toBeGreaterThan(pixel);
+  });
+
+  it("★ the Meta pixel is not also mounted anywhere else", () => {
+    const mounts = sourceFiles().filter(
+      (file) =>
+        !ABOUT_THE_RULE.test(file) &&
+        file !== "src/components/legal/MetaPixel.tsx" &&
+        readFileSync(resolve(REPO_ROOT, file), "utf8").includes("<MetaPixel"),
+    );
+    expect(mounts).toEqual(["src/app/layout.tsx"]);
   });
 
   it("★ the tracker is not also mounted anywhere else", () => {
