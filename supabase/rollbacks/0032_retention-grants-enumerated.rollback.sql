@@ -66,10 +66,23 @@ commit;
 -- ---------------------------------------------------------------------------
 do $$
 declare
-  v_relations int;
+  v_relations        int;
+  v_public_relations int;
 begin
-  -- 1. ★ The blanket grant was not restored. 33 relations, which is the enumerated set and nothing else; the
-  --    state `0032` left behind was 33 and `main`'s was 69.
+  -- 1. ★ The blanket grant was not restored. `0032` left 33 relations where `main` had 69, and 29 public
+  --    tables became invisible to the role.
+  --
+  --    ⚠️ **Asserted as "nowhere near the whole schema", not as the literal 33** (`3k`, found by `0034`
+  --    turning this red on its first full run — and predicted verbatim by `3j`'s security LOW when it made
+  --    the same correction to `0033`'s twin: *"a hardcoded 12 makes this twin raise the day `0034`
+  --    legitimately enumerates a thirteenth"*). `0034` enumerates `katie_prompt_edits` for B-49's release,
+  --    with its reason and its gate entry, and a twin that answers *"a blanket grant is back"* to a lawful
+  --    34th points an operator at the wrong thing inside the one file they are reading precisely because
+  --    something has already gone wrong.
+  --
+  --    What this twin can honestly claim is that it restored nothing, and that is a **comparison**: the set
+  --    is a small fraction of the relations in `public`. The exact membership is `int.retention-grants`'s,
+  --    held against the enumeration on every run — which a literal here never did.
   select count(*) into v_relations
     from (
       select distinct c.oid
@@ -77,8 +90,12 @@ begin
        where c.relkind in ('r','p','v','m','f')
          and a.grantee = 'bbldn_retention'::regrole
     ) s;
-  if v_relations <> 33 then
-    raise exception '0032 twin: bbldn_retention holds privilege on % relations, not the enumerated 33 — a blanket grant is back', v_relations;
+  select count(*) into v_public_relations
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind in ('r','p','v','m','f');
+  if v_relations > v_public_relations / 2 then
+    raise exception '0032 twin: bbldn_retention holds privilege on % of % relations in public — a blanket grant is back',
+      v_relations, v_public_relations;
   end if;
 
   -- 2. ★ The two holes `0032` closed are still closed, named one at a time so a failure says which.
