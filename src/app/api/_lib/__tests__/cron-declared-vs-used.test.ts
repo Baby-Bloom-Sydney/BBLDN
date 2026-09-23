@@ -44,13 +44,14 @@ const AWAITING_HANDLER: Readonly<Record<string, string>> = Object.freeze({
  * guaranteed `no-handler-registered` 500 **every day**, and a wall of daily failures that are all expected is
  * how the one that stops being expected goes unread.
  *
- * The job stays **owed** — named here against the phase that owes it, and `snapshot-pipeline` keeps its
- * `SystemJobName` in 03 §2.5 — but it is not scheduled and has no route file: `runCron` refuses an undeclared
- * path, so a route left behind would answer 500 to nothing at all, which is `ecc-lite` rule 3's own defect.
+ * The job stays **declared and owed**: named here against the phase that owes it, `snapshot-pipeline` keeps its
+ * `SystemJobName` in 03 §2.5, and **the route shell stays on disk**. The shell is the record of an endpoint a
+ * later phase will fill, and it is also what `hasHandler` reads — deleting it would blind the gate above rather
+ * than satisfy it. Only the `config/crons.ts` entry goes, so Vercel stops calling it.
  *
  * The gate runs both ways here too. Putting one back into `config/crons.ts` fails the `AWAITING_HANDLER` check
- * above unless its handler is written at the same time, and leaving a route file behind fails the one-for-one
- * check below.
+ * above unless its handler is written at the same time; deleting its shell fails the one-for-one check below;
+ * and a route folder that is in neither list fails that check as well.
  */
 const NOT_SCHEDULED: Readonly<Record<string, string>> = Object.freeze({
   "/api/cron/proactive": "Phase 5a `07.35` — Katie's proactive scheduler",
@@ -94,7 +95,7 @@ describe("every declared cron is either wired or owed to a named unit", () => {
   });
 });
 
-describe("the five BAI struck off the schedule are owed, unscheduled and gone from the tree", () => {
+describe("the five BAI struck off the schedule are owed, unscheduled, and still on disk", () => {
   it("names an owner apiece", () => {
     for (const [path, owner] of Object.entries(NOT_SCHEDULED))
       expect(owner, path).toMatch(/Phase/u);
@@ -106,10 +107,12 @@ describe("the five BAI struck off the schedule are owed, unscheduled and gone fr
       expect(declared, path).not.toContain(path);
   });
 
-  it("none of them leaves a route file behind", () => {
+  it("each keeps its shell, and each shell still registers no handler", () => {
     const folders = readdirSync(ROUTE_DIR);
-    for (const path of Object.keys(NOT_SCHEDULED))
-      expect(folders, path).not.toContain(path.split("/").pop());
+    for (const path of Object.keys(NOT_SCHEDULED)) {
+      expect(folders, path).toContain(path.split("/").pop());
+      expect(hasHandler(path), path).toBe(false);
+    }
   });
 
   it("`snapshot-pipeline` keeps its SystemJobName — struck off the schedule, not off 03 §2.5", () => {
@@ -118,11 +121,16 @@ describe("the five BAI struck off the schedule are owed, unscheduled and gone fr
   });
 });
 
-describe("no route file exists that nothing schedules, and nothing scheduled lacks a file", () => {
-  it("matches one-for-one", () => {
-    const declared = CRONS.map((spec) => spec.path.split("/").pop()).sort();
+describe("no route file exists that is neither scheduled nor recorded, and nothing scheduled lacks a file", () => {
+  it("matches one-for-one against the scheduled list plus the five recorded as owed", () => {
+    const accounted = [
+      ...CRONS.map((spec) => spec.path),
+      ...Object.keys(NOT_SCHEDULED),
+    ]
+      .map((path) => path.split("/").pop())
+      .sort();
 
-    expect(readdirSync(ROUTE_DIR).sort()).toEqual(declared);
+    expect(readdirSync(ROUTE_DIR).sort()).toEqual(accounted);
   });
 });
 

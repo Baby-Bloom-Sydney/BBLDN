@@ -104,14 +104,26 @@ describe("an undeclared path never runs", () => {
   });
 });
 
-describe("every declared cron has a route file, and every route file is declared", () => {
-  it("matches config/crons.ts one-for-one", async () => {
-    const { CRONS } = await import("@/modules/config");
-    const { readdirSync } = await import("node:fs");
+// The route-files-versus-`config/crons.ts` census moved to `cron-declared-vs-used.test.ts` when `4d` struck five
+// crons off the schedule and kept their shells: the account is now three-way (scheduled · owed-but-unscheduled ·
+// nothing else), and two copies of a one-for-one assertion would drift the day one of them was widened.
+//
+// What belongs here is the runtime half of the same ruling, which no static list can show: a shell that is no
+// longer declared is **refused**, so striking a cron out of the config really does stop it running even if
+// something still calls its URL.
+describe("a shell whose schedule was struck off no longer runs", () => {
+  it("refuses the five BAI struck off, with the right bearer, because they are undeclared", async () => {
+    const runCron = await withCronSecret(SECRET);
 
-    const declared = [...CRONS.map((c) => c.path.split("/").pop())].sort();
-    const onDisk = readdirSync("src/app/api/cron").sort();
-
-    expect(onDisk).toEqual(declared);
+    for (const path of [
+      "/api/cron/proactive",
+      "/api/cron/compact-daily",
+      "/api/cron/cleanup-orphan-children",
+      "/api/cron/soft-lock-stale-children",
+      "/api/cron/snapshot-pipeline",
+    ]) {
+      const response = await runCron(request(`Bearer ${SECRET}`), path);
+      expect(response.status, path).toBe(500);
+    }
   });
 });
