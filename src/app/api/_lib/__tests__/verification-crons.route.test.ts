@@ -119,7 +119,7 @@ describe("/api/cron/send-delayed-emails — the 5-minute run (01 §4f; ADR-161)"
   });
 
   it.fails(
-    "delivers the queued email_logs rows that are due (08.20) — PINNED: no renderer exists until Phase 4a (08.01), owner Phase 4a",
+    "delivers the queued email_logs rows that are due (08.20) — PINNED: 4a removed the RENDERER blocker (resend + template files are installed); the delivery loop itself is still unbuilt, owner 08.20",
     async () => {
       vi.resetModules();
       stubs();

@@ -1201,7 +1201,82 @@ Prior: 2026-09-15T15:20+10:00 — BB-LDN-Planner-070926/S1 (S1 shipped locally).
 Prior: 2026-09-15T13:55+10:00 — BB-LDN-Planner-070926/S0 (seeded at bootstrap).
 -->
 
-## Files created / modified in the current unit (`3k` — B-49, the self-service purge; L-009 Phase 3)
+## Files created / modified in the current unit (`3l` — the client relation surface; L-009 Phase 3)
+
+**`3k`'s Q-1, taken as its own unit for ADR-185's own reason.** `0032` enumerated what the retention identity
+may touch, `0033` what it may call, `0035` what a client role may call. Nobody had enumerated what a client
+role may **touch**.
+
+- **Measured from the catalogue before anything changed**, on `0000`-`0035` applied from empty, by effective
+  privilege (`has_table_privilege` / `has_any_column_privilege`, which follow membership, `PUBLIC` and
+  ownership) rather than a direct-ACL read: `anon` held a write privilege on **58** of the 70 relations in
+  `public` and `authenticated` on **66** (all 9 views among them); **54** carried a client write grant with
+  **no write policy of any kind**. After `0036`: `anon` **0** write / **3** read, `authenticated` **12**
+  write / **65** read.
+- ★ **`0000` §4 saw this and kept it.** Its own comment says _"Supabase grants ALL on every new table in
+  `public` to `anon` and `authenticated`"_, then revokes exactly TRUNCATE, REFERENCES and TRIGGER because
+  _"RLS does not gate any of the three"_. The unstated converse is the defect: the other four were kept
+  **because** RLS gates them, which makes RLS the only control and the grant surplus.
+- ★ **And the grant is minted, not written.** `pg_default_acl` for `postgres` in `public`, object type `r`,
+  carries `{anon=arwdm, authenticated=arwdm}` — every new table is born blanket-granted with no `grant` line
+  in any migration to find. Closable here, unlike `0035`'s function default, because Postgres' world default
+  for a relation is no privilege to anyone. `0036` §3 revokes it and the gate creates a table to prove it.
+- ★ **The blast radius was established before anything changed, and it is not uniform.** All 61 tables are
+  `ENABLE` _and_ `FORCE` RLS, so a surplus table grant is belt-and-braces — driven as a signed-in parent who
+  could read her own row: `update nanny_positions` → `UPDATE 0`, `delete position_children` → `DELETE 0`,
+  `insert position_children` → RLS refusal, `update user_profiles` (the one with a policy) → `UPDATE 1`.
+  **But a view has no RLS.** All nine are owned by `postgres` — which holds **BYPASSRLS** — at
+  `security_invoker = off`, and five were auto-updatable and carried INSERT/UPDATE/DELETE to
+  `authenticated`. Proved in one transaction, at one role, against one table: a direct
+  `insert into public.events` as `authenticated` was refused with _"new row violates row-level security
+  policy"_, and the identical insert through a probe view of exactly that shape returned **`INSERT 0 1`**,
+  row confirmed in the base table.
+- ⚠️ **What stopped the five shipped views was two accidents, not a control**, which is the reason the
+  verdict is _one column away_ rather than _belt-and-braces_: `events.source` is NOT NULL with no default and
+  no view exposes it, so every insert died on the constraint rather than on a privilege; and
+  `child_client_events` — the only one of the five whose `WHERE` a non-admin can satisfy — filters
+  `name like 'child.%'`, which `events_name_check` admits no label for, so the view is empty for everyone.
+- ★ **Declared versus used, and the answer is uncomfortable.** Tracing every `.from(…).insert|update|delete`
+  made on an _anon-key_ client finds **18 call sites across 7 tables**, and only **2** of those 7
+  (`inbox_messages`, `user_profiles`) have a policy that lets the write land. The other 16 are already dead —
+  stale Sydney-era paths; `src/lib/actions/parent.ts` still writes `nanny_positions.status`, a column this
+  schema does not have. Not repaired here (a unit, not a passenger on a privilege change), but after `0036`
+  they fail `42501` instead of `UPDATE 0`.
+
+- **`supabase/migrations/0036_client-relation-surface-enumerated.sql`** (new) — the blanket revoke across
+  `public` for `anon`, `authenticated` and `PUBLIC`; the enumerated re-grant (3 relations for `anon`, SELECT
+  only; 65 read and 12 write for `authenticated`, each write limited to the commands its own policies name);
+  and the `alter default privileges … revoke all on tables` that is the durable half. Two verify blocks: one
+  over the catalogue (write/read counts, view writes, the grant-iff-policy rule, column ACLs, `PUBLIC`, grant
+  option, membership both directions, the default-ACL row, and ownership, which is what keeps
+  `supabase_admin`'s un-revokable default inert) and one **driven as the role**, because a privilege bit is
+  not a behaviour. **Applied `0000`-`0036` from empty**, verify green on the first apply; re-applies cleanly.
+  ★ **The database pass's MEDIUM is closed in the same file**: §3's first draft revoked the **table** default
+  and not the **sequence** one (`{anon=rwU, authenticated=rwU}`), so one `bigserial` or `identity` column in
+  any future migration would have handed both client roles `currval` and, through `U`, `setval` — and a
+  sequence carries no RLS and no policy, so unlike a table there is nothing behind the grant at all. Nothing
+  is affected today (every key here is a UUID; `public` holds zero sequences), which is why it was closed
+  while the reasoning was fresh rather than left as a red test for whoever first writes `serial`. Driven both
+  ways: the probe sequence went from `{anon=rwU, authenticated=rwU}` to `{postgres=rwU, service_role=rwU}`.
+  The pass's LOW is closed with it — every schema-wide scan in the migration, the gate and the twin filtered
+  `relkind in ('r','p','v')`, silently excluding materialized views and foreign tables from _"the enumerated
+  set is the whole set"_; the filters are widened, vacuously today and not tomorrow.
+- **`supabase/rollbacks/0036_client-relation-surface-enumerated.rollback.sql`** (new) + **`rollback-0036-client-relations.test.ts`**
+  (8 cases) — ADR-165 arm (1): the twin restores nothing and asserts it, including that a table created
+  _after_ the twin is still born with no client privilege.
+- **`supabase/__tests__/client-grants.test.ts`** (new, `int.client-grants`, 20 cases) — the gate. Effective
+  privilege, the grant-iff-policy rule in **both** directions (a policy with no grant is the same defect
+  facing the other way), and the roads an ACL read cannot see. **Driven the other way on nine routes** — a
+  blanket re-grant, one table write with no policy, one view write, a grant through `PUBLIC`, a grant through
+  role membership, the table default re-armed, a column-level grant, a grant option and the **sequence**
+  default re-armed — **all red**, tree restored green.
+- **`rls.test.ts`, `rpc-0018.test.ts`, `rpc-0020.test.ts`** — four assertions updated. Each claimed a
+  relation was unreachable by a client role and evidenced it with an **empty result**; the refusal now
+  arrives at the privilege check instead, so each asserts the SQLSTATE. Strictly stronger, and where the two
+  mechanisms now differ per role (`nanny_contact_state` keeps its grant because a policy names it) the
+  mechanism is asserted **per pair** rather than blurred into "refused or empty".
+
+## Files created / modified in the prior unit (`3k` — B-49, the self-service purge; L-009 Phase 3)
 
 **`3j`'s Q-1, taken as its own unit for ADR-185's own reason.** Before this unit, **every self-service erasure
 failed its 30-day purge, for ever** — a live Article 17 defect, pre-existing in `0030`, not blocking today only
@@ -1571,7 +1646,7 @@ wiring.
 - **`supabase/rollbacks/0028_erasure-job.rollback.sql`** + **`int.rollback-0028`** (15) — ADR-165 (1): the six keys
   and the two evidence tables stay; what goes is the job itself, announced.
 - **`src/modules/platform/privacy/**`** (new sub-capability, the home `platform/README.md`named in Phase 1) —
-connector, port, registry (fails closed: for an erasure that means *refuses*, never "did nothing and said yes"),
+connector, port, registry (fails closed: for an erasure that means _refuses_, never "did nothing and said yes"),
 the orchestration (collect → remove → one transaction →`account.deleted`), the sweep, and `privacy.stub.ts`.
 - **`src/boot/privacy-request-ops.ts` · `privacy-erasure-ops.ts` · `db-privacy-store.ts` · `emit-account-deleted.ts`
   · `erasure-request-from-row.ts` · `erasure-outcome-of.ts` · `wire-privacy.ts`** — the port over `auth.data`, with
@@ -1772,6 +1847,112 @@ p_decided_by)` — `service_role`, the decider validated against `user_roles` (A
 - **`src/modules/payments/lib/create-payments-jobs.ts`** — REVIEW-4 §6.5's pin 2 flipped: ADR-160 gave
   `admin_notifications` its connector, so `payment-due-sweep` raises the operator's row through
   `comms.notifyAdmin`, **before** the event, idempotent on the one-open-per-subject index.
+
+---
+
+## Files created / modified in the current unit (`3m` — the consent surface shows the document it records; L-009 Phase 3)
+
+**No migration.** Two defects `3b` recorded as Q-1 and Q-2, plus its Q-3 answered as far as it is a fact.
+
+- **`src/components/legal/PolicyContent.tsx`** — the live defect. It mapped a **document id** onto a **page
+  route**: a two-entry table over an eleven-member domain with `` `/legal/${slug}` `` underneath as a guess.
+  Driven against `next dev` on the applied stack, the guess resolves for **four of the eleven** ids; five
+  answer **404** (`client-tos`, `professional-tos`, `cookie-policy`, `media-consent`,
+  `agr14_nanny_child_add`). So the cause is the **mapping** — not a missing seed (all eleven `0026` rows are
+  present) and not a wrong slug (all eleven are real `LegalDocumentId`s). ★ And the two entries the map _did_
+  name were **wrong pairings**: `parent-app-consent` → `/legal/client-terms` (`client-tos`) and
+  `nanny-attestation` → `/legal/professional-terms` (`professional-tos`), while `purposeForAgreement` wrote
+  the _other_ document into the consent record. The surface showed one document and recorded another.
+  It now renders `PolicyModal`, which reads the row **by its own id**: works for all eleven, no second domain
+  to keep in step, cannot 404, and shows what the record will name.
+- **`src/components/legal/PolicyModal.tsx`** — `slug` closed from `string` to `LegalDocumentId`, so a
+  non-document id is a compile error rather than a dead link beside a tick box.
+- **`src/components/legal/ConsentRenewalModal.tsx`** — two ternaries on one condition (agreement label _and_
+  document slug) replaced by one: the slug is derived from the agreement through `purposeForAgreement`. The
+  same-file twin declaration is how a surface comes to show one document and record another.
+- **`src/lib/actions/legal/get-policy.ts`** — `3b`'s Q-2. Read moved from `createAdminClient` to the server
+  **anon** client. `0003` gives `legal_documents` an explicit `anon` SELECT policy with `qual = true`, so the
+  service role bought nothing and cost availability: the modal stopped rendering the moment the key was
+  absent. Cluster swept: **three** files in `src/` name `legal_documents` — `boot/db-consent-store.ts` and
+  `modules/verification/lib/load-biometric-notice.ts` already read through `auth`'s port at session scope;
+  this was the only one at service privilege.
+- **`supabase/__tests__/legal-documents-anon-read.test.ts`** (new, 13 cases) — `getPolicyMarkdown`'s exact
+  statement run **as `anon`** against the applied set, for every one of the eleven ids, and driven the other
+  way in the same file: with the `anon` policy dropped inside a savepoint, all eleven return nothing.
+- **`src/lib/legal/legal-document-reads.test.ts`** (new, 3 cases) — two gates, both driven RED first. No
+  source file may build a `/legal/` path from a variable or keep a document-id-to-page map; no file naming
+  `legal_documents` may import the admin client. Comments are stripped first, so a header that explains a
+  defect by quoting it does not trip the gate that forbids it.
+- **`src/lib/legal/agreement-document-pairing.test.ts`** (new, 2 cases) — `3b`'s Q-3. Every file stating one
+  agreement id and at least one document id must agree with `purpose-for-agreement.ts`, the one declaration.
+  Watches four recorders today, discovered not listed. Driven RED by pointing `AGR-14` at `media-consent`.
+- **`src/components/legal/PolicyContent.test.tsx`** (new, 24 cases) — all eleven ids render no link and reach
+  the reader with their own id; the body shows; an unreadable document fails closed.
+
+---
+
+## Files created / modified in the current unit (`4a` — the sender; L-010 Phase 4)
+
+**What this unit is.** Nothing in this product could send an email. The store was real, the callers were real,
+the seam was real, and the two ports that turn a `Message` into a delivered email — a provider and a renderer —
+were both fail-closed defaults. 4a installs both, and adds the dev dry run, the test-email route and a gate
+over the template registry.
+
+- **`src/modules/comms/email/resend-email.ts`** (new) — `08.01` / `11.29`. `createResendEmailProvider(apiKey,
+senders)` over the `resend` SDK (already a dependency). It reads no env name and carries no address: boot
+  hands it `RESEND_API_KEY` and `config`'s `SENDERS`, so **the London sending domain is a config value, not a
+  string in this module** — when the domain is bought, `NEXT_PUBLIC_APP_URL` changes and no code does. A
+  `SenderKey` the table does not carry answers `sender-unknown` rather than falling back to `noreply`; a
+  rejection and a network throw both answer `PROVIDER_ERROR { provider: 'resend' }` with the throw as `cause`.
+  `sendBatch` uses Resend's batch endpoint (03 §8.1 "chunked by provider").
+- **`src/modules/comms/lib/email-provider-for.ts`** — takes `{ apiKey, senders }`. `resend` with no key
+  **refuses** rather than falling back to the stub, which is the same fail-closed direction ADR-141 enforces
+  from the other side (`stub-email` refused in production).
+- **`src/modules/comms/templates/`** (new, 10 files) — 03 §8.1's template files: `{ id, channel, from,
+audience, subject(data), html(data), text(data) }`, over the three rendering helpers the contract names
+  (`formatLondonDateTime` · `appUrl` · `footer`) plus one shell (`emailLayout` — named so because the boundary
+  lint reserves a bare `layout` export for Next routes) and `escapeHtml`. **Every interpolated value is
+  escaped**: `contact-request-public` renders an anonymous POST's name, role and free text, so an unescaped
+  body is stored HTML injection aimed at the support inbox. Five files: `contact-request-public` (`08.17`),
+  `support-reply` (`08.17`), `admin-contact` (`08.18`), `admin-commission-booking` (`08.18` — the notice
+  `call-layer` already fires and could not deliver), `admin-test` (`08.19`).
+- **`src/modules/comms/lib/create-template-renderer.ts`** (new) — the `TemplateRenderer` over that registry. An
+  id with **no file** answers `INTERNAL { template-schema }` (03 §8.4's word for a template without a schema),
+  never a blank body. The caller's `message.from` wins over the template's own key (03 §8.1).
+- **`src/modules/comms/lib/deliver-message.ts`** — `08.03`, the dev dry run. `CommsDeps.dryRun` turns a `sent`
+  into a `dry-run` row: rendered, recorded, provider never called. Boot passes the `config` flag, which
+  `config` already forces false outside development, so the guard exists in one place and `comms` reads no flag
+  name of its own.
+- **`src/boot/wire-comms.ts`** — binds the real provider and the real renderer, passes the dry-run boolean, and
+  states on the boot line **how many template files are installed** so the gap is read rather than assumed
+  closed. `src/boot/unconfigured-template-renderer.ts` **deleted**: boot always installs a renderer now, and a
+  fail-closed default nothing reaches is dead code (the same declared-vs-used rule as below).
+- **`src/app/api/dev/test-email/route.ts`** (new) — `08.19`. 404 outside development, `requireRole('admin')`
+  (aal2), and **the recipient is not a parameter** — it is `SENDERS.admin`, so this cannot become "send a test
+  email to X". It reports what `comms` answered; an endpoint whose job is diagnosis must not hide a refusal.
+- ★ **`src/modules/comms/lib/template-ids.ts` + `types.ts` — a defect the both-ways check found.**
+  `TEMPLATE_IDS` is the runtime list `validateMessage` builds `KNOWN_TEMPLATES` from, and
+  `as const satisfies ReadonlyArray<TemplateId>` proves only that every entry **is** an id — never that every
+  id is **present**. ADR-168 (b) added `verification-suspension-lifted` and `admin-nanny-suspension-lifted` to
+  `TemplateRegistry` and not to the list, so the seam answered `unknown-template` to **both sends the
+  lift-suspension road was built to make**, and 4,800 green tests agreed with it. Both are listed now, and the
+  guard is a gate rather than a note: `EveryTemplateIdIsListed` fails `typecheck` and the error **names the
+  missing id** (driven: deleting an entry produces `Type '"admin-test"' does not satisfy the constraint
+'true'`).
+- **Tests** — `comms.sender.test.ts` (10, RED first): the registry both ways, the provider bound and refusing,
+  rendering, HTML escaping, the missing-file refusal, and the dry run in both directions. Three pinned
+  expectations updated **because the behaviour deliberately changed**, each with the reason in place:
+  `boot.test.ts` and `wire-seams.test.ts` moved from `renderer-not-configured` to `template-schema` (and gained
+  a case proving an id **with** a file goes all the way to the provider), and `comms.swap.test.ts`'s id count
+  moved 46 → 48. The `08.20` pin in `verification-crons.route.test.ts` still fails, with its reason corrected:
+  the renderer blocker is gone, the delivery loop is what is missing.
+
+**Owed, and named rather than hidden.** Twelve declared template ids still have no caller (`comms/README.md`
+gap 0), of which `availability-updated` has no lever to fire it at all — `admin-on-behalf` exposes no
+availability write. `08.17`'s `support-reply` and `08.18`'s `admin-contact` have files and no surface: both
+belong to the `admin/support` and `admin/users` panels, which are descriptors only. And **nothing here is
+proven against a live Resend account** — the key, the DNS records and the domain verification are BAI's, and
+every claim in this unit is driven against `stub-email`.
 
 ---
 

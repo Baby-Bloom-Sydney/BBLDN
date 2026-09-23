@@ -133,7 +133,10 @@ export function createEvents(deps: EventsDeps): EventsConnector {
   };
   const registry = {
     subscriptions: (deps.sinks ?? []).map(
-      (sink): Subscription => ({ sink, names: "*" }),
+      (sink): Subscription => ({
+        sink,
+        names: "*",
+      }),
     ),
   };
   const knownNames: ReadonlySet<string> = new Set(EVENT_NAMES);

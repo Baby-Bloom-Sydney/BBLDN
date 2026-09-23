@@ -252,17 +252,15 @@ describe("int.rpc-0020 — parent_leads.email (ADR-146 (2))", () => {
   });
 
   it("is unreadable by every client role — 07 §5.2's last row survives the new column", async () => {
-    // The lead table has no policy at all, so an authenticated parent sees nothing — not her own row, not
+    // The lead table has no policy at all, so an authenticated parent saw nothing — not her own row, not
     // anyone's. A new column carrying a contact is exactly the kind that invites a first policy.
+    // `0036` went one better: a table with no SELECT policy for any client role has no business holding
+    // a SELECT grant either, so the read is now refused outright rather than answered with an empty set.
     await insertLead("ada@example.test");
     for (const actor of [fx.parentA, fx.admin, null]) {
       expect(
-        await asRole<{ email: string | null }>(
-          db,
-          actor,
-          `select email from public.parent_leads`,
-        ),
-      ).toEqual([]);
+        await refusedAs(db, actor, `select email from public.parent_leads`),
+      ).toBe("42501");
     }
   });
 });

@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-09-23T02:19:34.151Z",
+  "generated_at": "2026-09-23T02:39:12.281Z",
   "summary": {
-    "route_count": 60,
+    "route_count": 61,
     "page_count": 89,
     "cron_count": 24,
-    "migration_count": 36,
+    "migration_count": 37,
     "server_action_file_count": 41
   },
   "routes": [
@@ -322,6 +322,13 @@
         "POST"
       ],
       "file": "src/app/api/dev/stub-purchase/route.ts"
+    },
+    {
+      "path": "/api/dev/test-email",
+      "methods": [
+        "GET"
+      ],
+      "file": "src/app/api/dev/test-email/route.ts"
     },
     {
       "path": "/api/health",
@@ -1069,6 +1076,11 @@
       "filename": "0035_client-function-surface-enumerated.sql",
       "bytes": 20632,
       "modified_at": "2026-09-23T01:53:53.772Z"
+    },
+    {
+      "filename": "0036_client-relation-surface-enumerated.sql",
+      "bytes": 33592,
+      "modified_at": "2026-09-23T02:38:11.755Z"
     }
   ],
   "server_actions": [

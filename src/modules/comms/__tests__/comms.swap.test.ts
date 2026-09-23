@@ -155,8 +155,13 @@ describe("comms — the template registry (03 §8.2)", () => {
     expect(new Set(TEMPLATE_IDS).size).toBe(TEMPLATE_IDS.length);
   });
 
-  it("carries the 46 distinct ids 03 §8.2 names (its heading says 41 — see README Gaps)", () => {
-    expect(TEMPLATE_IDS.length).toBe(46);
+  // 4a: 46 → 48. The count moved because the REGISTRY moved, not because the list was padded — ADR-168 (b)
+  // added `verification-suspension-lifted` and `admin-nanny-suspension-lifted` to `TemplateRegistry` and left
+  // this list alone, so `validate-message.ts` refused both with `unknown-template`. `EveryTemplateIdIsListed`
+  // (comms/types.ts) is now the gate; this case is the count it produces, kept because a bare typecheck assert
+  // is invisible in a test report.
+  it("carries the 48 ids TemplateRegistry declares (03 §8.2's heading says 46 — see README Gaps)", () => {
+    expect(TEMPLATE_IDS.length).toBe(48);
   });
 
   it("rejects a template id that is not in the registry", async () => {
