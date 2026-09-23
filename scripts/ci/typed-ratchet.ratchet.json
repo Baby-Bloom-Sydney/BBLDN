@@ -1,0 +1,15 @@
+{
+  "ceiling": 68,
+  "recordedBy": "BB-LDN-Planner-070926/P4-GATES",
+  "recordedAt": "2026-09-23T19:40+10:00",
+  "measuredAt": "84fe5dc",
+  "why": "The count of rule entries in eslint.typed-ratchet.json when the type-aware gate landed: 63 files, 68 rule entries, 132 violations, measured not estimated. This number is the ONE legal direction of travel — it may be lowered when a file is cleared, and it may never be raised. check-typed-ratchet.mjs refuses either drift. Counted in RULE ENTRIES rather than files because a file recorded against three rules is three exemptions, and counting files would let a recorded file quietly acquire a fourth for free — which is how eslint.long-functions.json went 106 -> 109 (REVIEW-4 M-6).",
+  "breakdown": {
+    "no-restricted-syntax (as never / as any)": "84 violations in 39 files — REVIEW-2 M-12, REVIEW-3 H-3, M-8, M-11. Zero of them are `as any`: the London tree has none, so that half of the rule is a door closed at no cost. The 84 are all `as never`, which REVIEW-2 M-12 measured at ten and judged MEDIUM on the grounds that every site was a brand crossing with no live defect; REVIEW-3 H-3 was the one that was not, and it shipped.",
+    "bb/no-discarded-result": "25 violations in 15 files — the most-repeated class in the sweep record (REVIEW-2 C-2 CRITICAL, REVIEW-2 M-13, REVIEW-4 H-1, and a dozen MEDIUM/LOW of the same shape)",
+    "@typescript-eslint/no-misused-promises": "10 violations in 5 files — all async handlers on JSX attributes and one setTimeout, REVIEW-3 L-5's shape",
+    "@typescript-eslint/switch-exhaustiveness-check": "7 violations in 7 files — REVIEW-2 M-16, L-3; REVIEW-3 L-4. Two of the seven (create-call-layer-slice, create-positions-slice) switch over the 44-member transition union and are arguably partial by design; the owning unit decides whether to exhaust or to annotate.",
+    "@typescript-eslint/no-floating-promises": "6 violations in 2 files — REVIEW-2 H-9's shape. Five are `void Events.emit(...)` in scheduling-events.ts, deliberate fire-and-forget whose handling is `scheduling`'s call; the sixth is ProcessingStep.tsx:60, which IS REVIEW-3 L-5, recorded and still open at this commit."
+  },
+  "notFixedHere": "P4-GATES recorded all 132 rather than clearing any. Three of the five classes need a decision this unit does not hold: REVIEW-3 H-3's own fix was one word on a CONNECTOR (a contract change, which REVIEW-2 H-10 settled a non-owning unit does not make), ProcessingStep's rejection arm needs user-facing copy (04's owner), and scheduling-events' five are a module's fire-and-forget policy. The gate's job is to stop the next one; clearing these is an owner-by-owner job and the ratchet is what makes it happen rather than being hoped for."
+}
