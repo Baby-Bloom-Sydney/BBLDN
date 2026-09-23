@@ -322,7 +322,7 @@ async function held(role: string): Promise<Record<string, Priv[]>> {
               case when has_table_privilege($1, c.oid, 'DELETE') then 'DELETE' end
             ], null) as privs
        from pg_class c join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'public' and c.relkind in ('r','p','v')
+      where n.nspname = 'public' and c.relkind in ('r','p','v','m','f')
       order by 1`,
     [role],
   );
@@ -390,7 +390,7 @@ describe("int.client-grants — the enumerated set is the whole set", () => {
       `select c.relname as rel, r.g as role
          from pg_class c join pg_namespace n on n.oid = c.relnamespace,
               lateral (select unnest(array['anon','authenticated']) as g) r
-        where n.nspname = 'public' and c.relkind in ('r','p')
+        where n.nspname = 'public' and c.relkind in ('r','p','f')
           and (has_table_privilege(r.g, c.oid, 'INSERT') or has_any_column_privilege(r.g, c.oid, 'INSERT')
             or has_table_privilege(r.g, c.oid, 'UPDATE') or has_any_column_privilege(r.g, c.oid, 'UPDATE')
             or has_table_privilege(r.g, c.oid, 'DELETE'))
@@ -459,7 +459,7 @@ describe("int.client-grants — the roads a direct-ACL read cannot see", () => {
       `select c.relname as rel, a.privilege_type as priv
          from pg_class c join pg_namespace n on n.oid = c.relnamespace,
               lateral aclexplode(c.relacl) a
-        where n.nspname = 'public' and c.relkind in ('r','p','v') and a.grantee = 0
+        where n.nspname = 'public' and c.relkind in ('r','p','v','m','f') and a.grantee = 0
         order by 1, 2`,
     );
     expect(rows.map((r) => `${r.rel}: ${r.priv}`)).toEqual([]);
@@ -508,11 +508,17 @@ describe("int.client-grants — the roads a direct-ACL read cannot see", () => {
     // This is the half that `0035` could not win for functions and `0036` does win for tables. Postgres'
     // world default for a relation is *no* privilege to anyone, so the `pg_default_acl` row is the whole
     // mechanism — unlike a function, where `=X` (PUBLIC) is merged in regardless and no revoke suppresses it.
+    // `'r'` covers tables, views and materialized views; `'S'` is sequences, which the first draft of
+    // `0036` missed and the database pass caught (MEDIUM): `postgres`'s sequence default is
+    // `{anon=rwU, authenticated=rwU}`, so one `bigserial` column in a future migration would hand both
+    // client roles `currval` and `setval`. A sequence carries no RLS and no policy, so its correct client
+    // privilege is zero. Nothing is affected today — every key here is a UUID — which is why it is closed
+    // now rather than left as a red test for whoever first writes `serial`.
     const { rows } = await db.query<{ role: string; acl: string }>(
       `select defaclrole::regrole::text as role, defaclacl::text as acl
          from pg_default_acl
-        where defaclobjtype = 'r' and defaclnamespace = 'public'::regnamespace
-        order by 1`,
+        where defaclobjtype in ('r','S') and defaclnamespace = 'public'::regnamespace
+        order by 1, 2`,
     );
     for (const row of rows.filter((r) => r.role !== "supabase_admin"))
       expect(row.acl, `${row.role}'s default`).not.toMatch(
@@ -527,7 +533,7 @@ describe("int.client-grants — the roads a direct-ACL read cannot see", () => {
     const { rows } = await db.query<{ rel: string; owner: string }>(
       `select c.relname as rel, c.relowner::regrole::text as owner
          from pg_class c join pg_namespace n on n.oid = c.relnamespace
-        where n.nspname = 'public' and c.relkind in ('r','p','v') and c.relowner <> 'postgres'::regrole
+        where n.nspname = 'public' and c.relkind in ('r','p','v','m','f') and c.relowner <> 'postgres'::regrole
         order by 1`,
     );
     expect(rows.map((r) => `${r.rel} owned by ${r.owner}`)).toEqual([]);
@@ -552,7 +558,7 @@ describe("int.client-grants — the roads a direct-ACL read cannot see", () => {
          from pg_class c join pg_namespace n on n.oid = c.relnamespace,
               lateral (select unnest(array['anon','authenticated']) as g) r,
               lateral (select unnest(array['TRUNCATE','REFERENCES','TRIGGER']) as priv) p
-        where n.nspname = 'public' and c.relkind in ('r','p')
+        where n.nspname = 'public' and c.relkind in ('r','p','f')
           and has_table_privilege(r.g, c.oid, p.priv)
         order by 1, 2`,
     );
@@ -561,10 +567,16 @@ describe("int.client-grants — the roads a direct-ACL read cannot see", () => {
 });
 
 describe("int.client-grants — driven, because a privilege bit is not a behaviour", () => {
-  it("★ a new table in `public` is born with no client privilege — the claim §3 of `0036` exists to make", async () => {
+  it("★ a new table in `public` — and its sequence — is born with no client privilege", async () => {
     await db.query("begin");
     try {
-      await db.query("create table public.zz_default_probe (id int)");
+      // `bigserial`, not `int`: the table half of this was green in the first draft and the **sequence**
+      // half was not — `postgres`'s sequence default granted `{anon=rwU, authenticated=rwU}`, so one
+      // `serial` column would have handed both client roles `currval` and `setval` (database pass,
+      // MEDIUM). A sequence carries no RLS and no policy, so its correct client privilege is zero.
+      await db.query(
+        "create table public.zz_default_probe (id bigserial primary key, name text)",
+      );
       const { rows } = await db.query<{ acl: string | null }>(
         `select relacl::text as acl from pg_class where oid = 'public.zz_default_probe'::regclass`,
       );
@@ -576,6 +588,14 @@ describe("int.client-grants — driven, because a privilege bit is not a behavio
           where has_table_privilege(r.g, 'public.zz_default_probe'::regclass, p.p)`,
       );
       expect(eff[0]?.n).toBe("0");
+
+      const { rows: seq } = await db.query<{ n: string }>(
+        `select count(*)::text as n
+           from (select unnest(array['anon','authenticated']) as g) r,
+                lateral (select unnest(array['USAGE','SELECT','UPDATE']) as p) p
+          where has_sequence_privilege(r.g, 'public.zz_default_probe_id_seq'::regclass, p.p)`,
+      );
+      expect(seq[0]?.n).toBe("0");
     } finally {
       await db.query("rollback");
     }

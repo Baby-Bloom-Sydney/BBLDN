@@ -18,7 +18,8 @@
 -- | Relations `anon` may **read** | **58** | **3** |
 -- | …`authenticated` may **read** | **69** | **65** |
 -- | Tables with a client write grant and **no write policy of any kind** | **54** | **0** |
--- | `pg_default_acl` rows granting a new table to a client role | **1** (`postgres`, `arwdm`) | **0** |
+-- | `pg_default_acl` rows granting a new **table** to a client role | **1** (`postgres`, `arwdm`) | **0** |
+-- | …granting a new **sequence** to a client role | **1** (`postgres`, `rwU`) | **0** |
 -- | `TO PUBLIC` grants · grant option · client-role memberships | 0 · 0 · 0 | 0 · 0 · 0, asserted |
 --
 -- ★ **`0000` §4 saw this and deliberately kept it.** Its own comment says *"Supabase grants ALL on every new
@@ -144,7 +145,8 @@ begin;
 --    ACL read cannot see. Column-level ACLs go with it (`revoke all` clears `attacl`; asserted below).
 -- ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
-revoke all privileges on all tables in schema public from anon, authenticated, public;
+revoke all privileges on all tables    in schema public from anon, authenticated, public;
+revoke all privileges on all sequences in schema public from anon, authenticated, public;
 
 -- ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 -- 2. The enumerated set. Grouped by *why this role may touch this*, because the question a reader has in six
@@ -215,6 +217,18 @@ grant update on public.user_profiles             to authenticated;  -- user_prof
 alter default privileges in schema public
   revoke all on tables from anon, authenticated;
 
+-- …and the same for **sequences**, which the first draft missed and the database pass caught (MEDIUM).
+-- `postgres`'s sequence default is `{anon=rwU, authenticated=rwU}`, so a single `bigserial` or `identity`
+-- column in any future migration would hand both client roles `currval` and — through `U` — `setval` on it.
+-- A sequence carries no RLS and can carry no policy, so by this file's own rule its correct client privilege
+-- is **zero**, and leaving the default armed would be `0016:288`'s shape surviving in one object type.
+-- Driven before the fix: `create table … (id bigserial)` produced a clean table and a sequence holding
+-- `{anon=rwU, authenticated=rwU}`. Nothing is affected today — every primary key in this schema is a UUID
+-- and `public` contains **zero** sequences — which is exactly why it is closed now, while the reasoning is
+-- here, rather than left as a red test for whoever first writes `serial`.
+alter default privileges in schema public
+  revoke all on sequences from anon, authenticated;
+
 -- ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 -- 4. Verify — the file's own claims, in both directions, by behaviour wherever a privilege read could lie.
 --    A verify block that cannot fail on its own subject is decoration (`3k`'s D-2), so every count below is
@@ -234,12 +248,14 @@ declare
   grantable     int;
   memberships   int;
   defacl        int;
+  defacl_seq    int;
+  seq_priv      int;
   foreign_owned int;
   no_policy     int;
 begin
   -- 4a. Write surface, effective privilege rather than a direct-ACL read.
   select count(*) into anon_write from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relkind in ('r','p','v')
+   where n.nspname = 'public' and c.relkind in ('r','p','v','m','f')
      and (has_table_privilege('anon', c.oid, 'INSERT') or has_any_column_privilege('anon', c.oid, 'INSERT')
        or has_table_privilege('anon', c.oid, 'UPDATE') or has_any_column_privilege('anon', c.oid, 'UPDATE')
        or has_table_privilege('anon', c.oid, 'DELETE'));
@@ -248,7 +264,7 @@ begin
   end if;
 
   select count(*) into auth_write from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relkind in ('r','p','v')
+   where n.nspname = 'public' and c.relkind in ('r','p','v','m','f')
      and (has_table_privilege('authenticated', c.oid, 'INSERT') or has_any_column_privilege('authenticated', c.oid, 'INSERT')
        or has_table_privilege('authenticated', c.oid, 'UPDATE') or has_any_column_privilege('authenticated', c.oid, 'UPDATE')
        or has_table_privilege('authenticated', c.oid, 'DELETE'));
@@ -268,14 +284,14 @@ begin
 
   -- 4c. Read surface.
   select count(*) into anon_read from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relkind in ('r','p','v')
+   where n.nspname = 'public' and c.relkind in ('r','p','v','m','f')
      and (has_table_privilege('anon', c.oid, 'SELECT') or has_any_column_privilege('anon', c.oid, 'SELECT'));
   if anon_read <> 3 then
     raise exception '0036: anon may read % relation(s); expected areas, legal_documents, nanny_public', anon_read;
   end if;
 
   select count(*) into auth_read from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relkind in ('r','p','v')
+   where n.nspname = 'public' and c.relkind in ('r','p','v','m','f')
      and (has_table_privilege('authenticated', c.oid, 'SELECT') or has_any_column_privilege('authenticated', c.oid, 'SELECT'));
   if auth_read <> 65 then
     raise exception '0036: authenticated may read % relation(s); expected 56 policy-bearing tables + 9 views', auth_read;
@@ -286,7 +302,7 @@ begin
   --     migration adds a policy, and fails when one adds a grant without one.
   select count(*) into no_policy from pg_class c join pg_namespace n on n.oid = c.relnamespace,
        lateral (select unnest(array['anon','authenticated']) as g) r
-   where n.nspname = 'public' and c.relkind in ('r','p')
+   where n.nspname = 'public' and c.relkind in ('r','p','f')
      and (has_table_privilege(r.g, c.oid, 'INSERT') or has_any_column_privilege(r.g, c.oid, 'INSERT')
        or has_table_privilege(r.g, c.oid, 'UPDATE') or has_any_column_privilege(r.g, c.oid, 'UPDATE')
        or has_table_privilege(r.g, c.oid, 'DELETE'))
@@ -311,14 +327,14 @@ begin
   -- 4f. The roads a direct-ACL read cannot see (`3i`'s db HIGH and sec HIGH, applied to the client roles).
   select count(*) into pub_grants from pg_class c join pg_namespace n on n.oid = c.relnamespace,
        lateral aclexplode(c.relacl) x
-   where n.nspname = 'public' and c.relkind in ('r','p','v') and x.grantee = 0;
+   where n.nspname = 'public' and c.relkind in ('r','p','v','m','f') and x.grantee = 0;
   if pub_grants <> 0 then
     raise exception '0036: % grant(s) TO PUBLIC survive in public; PUBLIC reaches both client roles', pub_grants;
   end if;
 
   select count(*) into grantable from pg_class c join pg_namespace n on n.oid = c.relnamespace,
        lateral aclexplode(c.relacl) x
-   where n.nspname = 'public' and c.relkind in ('r','p','v') and x.is_grantable
+   where n.nspname = 'public' and c.relkind in ('r','p','v','m','f') and x.is_grantable
      and x.grantee::regrole::text in ('anon','authenticated');
   if grantable <> 0 then
     raise exception '0036: a client role holds % privilege(s) WITH GRANT OPTION', grantable;
@@ -346,15 +362,35 @@ begin
     raise exception '0036: postgres still carries % default-privilege entr(ies) granting a new table in public to a client role', defacl;
   end if;
 
+  -- …and the same for sequences (database pass, MEDIUM). Both the standing privilege and the default.
+  select count(*) into seq_priv from pg_class c join pg_namespace n on n.oid = c.relnamespace,
+       lateral (select unnest(array['anon','authenticated']) as g) r
+   where n.nspname = 'public' and c.relkind = 'S'
+     and (has_sequence_privilege(r.g, c.oid, 'USAGE') or has_sequence_privilege(r.g, c.oid, 'SELECT')
+       or has_sequence_privilege(r.g, c.oid, 'UPDATE'));
+  if seq_priv <> 0 then
+    raise exception '0036: a client role reaches % sequence(s) in public; a sequence carries no policy, so its client privilege is zero', seq_priv;
+  end if;
+
+  select count(*) into defacl_seq from pg_default_acl d
+    left join pg_namespace n on n.oid = d.defaclnamespace,
+    lateral aclexplode(d.defaclacl) x
+   where d.defaclobjtype = 'S' and d.defaclrole = 'postgres'::regrole
+     and coalesce(n.nspname, '') = 'public'
+     and x.grantee::regrole::text in ('anon','authenticated');
+  if defacl_seq <> 0 then
+    raise exception '0036: postgres still carries % default-privilege entr(ies) granting a new sequence in public to a client role', defacl_seq;
+  end if;
+
   -- …and the limit that keeps `supabase_admin`'s un-revokable default inert: every relation is owned by
   -- `postgres`, so `supabase_admin`'s default never applies. Named in the header; asserted here.
   select count(*) into foreign_owned from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relkind in ('r','p','v') and c.relowner <> 'postgres'::regrole;
+   where n.nspname = 'public' and c.relkind in ('r','p','v','m','f') and c.relowner <> 'postgres'::regrole;
   if foreign_owned <> 0 then
     raise exception '0036: % relation(s) in public are not owned by postgres; supabase_admin''s default privileges would apply to them', foreign_owned;
   end if;
 
-  raise notice '0036 verify: anon write 0 / read 3 · authenticated write 12 / read 65 · view writes 0 · no grant without a policy · default privilege revoked';
+  raise notice '0036 verify: anon write 0 / read 3 · authenticated write 12 / read 65 · view writes 0 · no grant without a policy · table and sequence defaults revoked';
 end $$;
 
 -- 4h. Behaviour, not privilege bits. The three claims a `has_table_privilege` read could not make: the two

@@ -1251,15 +1251,25 @@ role may **touch**.
   option, membership both directions, the default-ACL row, and ownership, which is what keeps
   `supabase_admin`'s un-revokable default inert) and one **driven as the role**, because a privilege bit is
   not a behaviour. **Applied `0000`-`0036` from empty**, verify green on the first apply; re-applies cleanly.
+  ★ **The database pass's MEDIUM is closed in the same file**: §3's first draft revoked the **table** default
+  and not the **sequence** one (`{anon=rwU, authenticated=rwU}`), so one `bigserial` or `identity` column in
+  any future migration would have handed both client roles `currval` and, through `U`, `setval` — and a
+  sequence carries no RLS and no policy, so unlike a table there is nothing behind the grant at all. Nothing
+  is affected today (every key here is a UUID; `public` holds zero sequences), which is why it was closed
+  while the reasoning was fresh rather than left as a red test for whoever first writes `serial`. Driven both
+  ways: the probe sequence went from `{anon=rwU, authenticated=rwU}` to `{postgres=rwU, service_role=rwU}`.
+  The pass's LOW is closed with it — every schema-wide scan in the migration, the gate and the twin filtered
+  `relkind in ('r','p','v')`, silently excluding materialized views and foreign tables from _"the enumerated
+  set is the whole set"_; the filters are widened, vacuously today and not tomorrow.
 - **`supabase/rollbacks/0036_client-relation-surface-enumerated.rollback.sql`** (new) + **`rollback-0036-client-relations.test.ts`**
   (8 cases) — ADR-165 arm (1): the twin restores nothing and asserts it, including that a table created
   _after_ the twin is still born with no client privilege.
 - **`supabase/__tests__/client-grants.test.ts`** (new, `int.client-grants`, 20 cases) — the gate. Effective
   privilege, the grant-iff-policy rule in **both** directions (a policy with no grant is the same defect
-  facing the other way), and the roads an ACL read cannot see. **Driven the other way on eight routes** — a
+  facing the other way), and the roads an ACL read cannot see. **Driven the other way on nine routes** — a
   blanket re-grant, one table write with no policy, one view write, a grant through `PUBLIC`, a grant through
-  role membership, the default privilege re-armed, a column-level grant and a grant option — **all red**,
-  tree restored green.
+  role membership, the table default re-armed, a column-level grant, a grant option and the **sequence**
+  default re-armed — **all red**, tree restored green.
 - **`rls.test.ts`, `rpc-0018.test.ts`, `rpc-0020.test.ts`** — four assertions updated. Each claimed a
   relation was unreachable by a client role and evidenced it with an **empty result**; the refusal now
   arrives at the privilege check instead, so each asserts the SQLSTATE. Strictly stronger, and where the two

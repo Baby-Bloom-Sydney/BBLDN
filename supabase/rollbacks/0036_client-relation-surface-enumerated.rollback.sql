@@ -71,14 +71,14 @@ declare
   v_total       int;
 begin
   select count(*) into v_total from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relkind in ('r','p','v');
+   where n.nspname = 'public' and c.relkind in ('r','p','v','m','f');
 
   -- 1. ★ Neither client role got the write surface back. Asserted as a **comparison** rather than as the
   --    literals 0 and 12 — `3j`'s security LOW, whose cost `0034` proved by turning `0032`'s twin red on a
   --    lawful 34th relation. The exact membership is `int.client-grants`'s, held against the enumeration on
   --    every run; what this twin owes is the claim that the *shape* did not come back.
   select count(*) into v_anon_write from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relkind in ('r','p','v')
+   where n.nspname = 'public' and c.relkind in ('r','p','v','m','f')
      and (has_table_privilege('anon', c.oid, 'INSERT') or has_any_column_privilege('anon', c.oid, 'INSERT')
        or has_table_privilege('anon', c.oid, 'UPDATE') or has_any_column_privilege('anon', c.oid, 'UPDATE')
        or has_table_privilege('anon', c.oid, 'DELETE'));
@@ -87,7 +87,7 @@ begin
   end if;
 
   select count(*) into v_auth_write from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relkind in ('r','p','v')
+   where n.nspname = 'public' and c.relkind in ('r','p','v','m','f')
      and (has_table_privilege('authenticated', c.oid, 'INSERT') or has_any_column_privilege('authenticated', c.oid, 'INSERT')
        or has_table_privilege('authenticated', c.oid, 'UPDATE') or has_any_column_privilege('authenticated', c.oid, 'UPDATE')
        or has_table_privilege('authenticated', c.oid, 'DELETE'));
@@ -96,7 +96,7 @@ begin
   end if;
 
   select count(*) into v_anon_read from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relkind in ('r','p','v')
+   where n.nspname = 'public' and c.relkind in ('r','p','v','m','f')
      and (has_table_privilege('anon', c.oid, 'SELECT') or has_any_column_privilege('anon', c.oid, 'SELECT'));
   if v_anon_read > v_total / 2 then
     raise exception '0036 twin: anon may read % of % relations in public — the surface is back', v_anon_read, v_total;
@@ -118,7 +118,7 @@ begin
   --    survives a later migration adding a policy.
   select count(*) into v_no_policy from pg_class c join pg_namespace n on n.oid = c.relnamespace,
        lateral (select unnest(array['anon','authenticated']) as g) r
-   where n.nspname = 'public' and c.relkind in ('r','p')
+   where n.nspname = 'public' and c.relkind in ('r','p','f')
      and (has_table_privilege(r.g, c.oid, 'INSERT') or has_any_column_privilege(r.g, c.oid, 'INSERT')
        or has_table_privilege(r.g, c.oid, 'UPDATE') or has_any_column_privilege(r.g, c.oid, 'UPDATE')
        or has_table_privilege(r.g, c.oid, 'DELETE'))
@@ -133,18 +133,18 @@ begin
   -- 4. ★ The side door: a grant TO PUBLIC reaches both client roles without naming either.
   select count(*) into v_public from pg_class c join pg_namespace n on n.oid = c.relnamespace,
        lateral aclexplode(c.relacl) a
-   where n.nspname = 'public' and c.relkind in ('r','p','v') and a.grantee = 0;
+   where n.nspname = 'public' and c.relkind in ('r','p','v','m','f') and a.grantee = 0;
   if v_public <> 0 then
     raise exception '0036 twin: % grant(s) TO PUBLIC are back in public', v_public;
   end if;
 
   -- 5. ★ The durable half: the default privilege is still revoked, so the next table is still born clean.
   select count(*) into v_defacl from pg_default_acl d, lateral aclexplode(d.defaclacl) x
-   where d.defaclobjtype = 'r' and d.defaclrole = 'postgres'::regrole
+   where d.defaclobjtype in ('r','S') and d.defaclrole = 'postgres'::regrole
      and d.defaclnamespace = 'public'::regnamespace
      and x.grantee::regrole::text in ('anon','authenticated');
   if v_defacl <> 0 then
-    raise exception '0036 twin: postgres carries % default-privilege entr(ies) again — every future table is blanket-granted', v_defacl;
+    raise exception '0036 twin: postgres carries % default-privilege entr(ies) again — every future table or sequence is blanket-granted', v_defacl;
   end if;
 
   -- 6. ★ …and the app still works, which is the failure mode a twin about revocations must not have. The
