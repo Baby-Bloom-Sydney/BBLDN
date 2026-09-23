@@ -79,7 +79,7 @@ export function createConnectionsJobs(
   deps: ConnectionsJobsDeps,
 ): ConnectionsJobs {
   return Object.freeze({
-    run: async (
+    sweep: async (
       job: ConnectionJobName,
       now: Instant,
     ): Promise<ConnectionsResult<ConnectionJobRun>> => {

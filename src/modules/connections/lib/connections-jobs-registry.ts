@@ -7,7 +7,7 @@ import type { Registry } from "@/modules/platform";
 import type { ConnectionsJobs } from "../types";
 
 const unconfigured: ConnectionsJobs = Object.freeze({
-  run: async () =>
+  sweep: async () =>
     err("INTERNAL", "Connections jobs are not configured", {
       reason: "connections-not-configured" as const,
     }),

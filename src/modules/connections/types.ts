@@ -233,7 +233,13 @@ export type ConnectionJobRun = {
 };
 
 export type ConnectionsJobs = {
-  readonly run: (
+  /**
+   * Named `sweep` rather than the obvious verb, and deliberately: a method of that other name, taking an
+   * input, is the shape a locally restated `TransitionHandler` has — so ADR-119's guard
+   * (`positions/__tests__/slice-types.test.ts`) refuses one in a slice module's `types.ts`, quite rightly, and
+   * cannot tell this apart from the lookalike it is hunting. `sweep` is the better name here in any case.
+   */
+  readonly sweep: (
     job: ConnectionJobName,
     now: Instant,
   ) => Promise<ConnectionsResult<ConnectionJobRun>>;

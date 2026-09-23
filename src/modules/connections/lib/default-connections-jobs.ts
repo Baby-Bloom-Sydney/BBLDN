@@ -4,5 +4,5 @@ import type { ConnectionsJobs } from "../types";
 import { CONNECTIONS_JOBS_REGISTRY } from "./connections-jobs-registry";
 
 export const connectionsJobs: ConnectionsJobs = Object.freeze({
-  run: (job, now) => CONNECTIONS_JOBS_REGISTRY.get().run(job, now),
+  sweep: (job, now) => CONNECTIONS_JOBS_REGISTRY.get().sweep(job, now),
 });

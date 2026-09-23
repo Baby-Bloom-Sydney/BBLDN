@@ -156,14 +156,14 @@ async function bothSidesOfTheBoundary(
 ) {
   const w = world(seed);
 
-  const first = await w.jobs.run(job, NOW);
+  const first = await w.jobs.sweep(job, NOW);
   expect(first.ok && first.value).toEqual({ handled: 1, skipped: 0 });
   expect(await w.stageOf(DUE)).toBe(expected);
   expect(await w.stageOf(NOT_DUE)).toBe(stillAt);
 
   // A second fire in the same minute: the moved row is no longer at the stage the job selects on, so the
   // cohort is empty and nothing is written twice. Nothing durable records that the first run happened.
-  const second = await w.jobs.run(job, NOW);
+  const second = await w.jobs.sweep(job, NOW);
   expect(second.ok && second.value).toEqual({ handled: 0, skipped: 0 });
   expect(await w.stageOf(DUE)).toBe(expected);
   expect(await w.stageOf(NOT_DUE)).toBe(stillAt);
@@ -224,7 +224,7 @@ describe("expire-connections — K-8, a request nobody answered inside the windo
       sent(400, { connectionId: NOT_DUE, stage: "REQUEST_SENT" }),
     ]);
 
-    const run = await w.jobs.run("expire-connections", NOW);
+    const run = await w.jobs.sweep("expire-connections", NOW);
 
     expect(run.ok && run.value.handled).toBe(1);
     expect(await w.stageOf(DUE)).toBe("ACCEPTED");
@@ -256,7 +256,7 @@ describe("meeting-complete-sweep — K-12, an introduction whose time has passed
       connection({ connectionId: DUE, stage: "INTRO_SCHEDULED" }),
     ]);
 
-    const run = await w.jobs.run("meeting-complete-sweep", NOW);
+    const run = await w.jobs.sweep("meeting-complete-sweep", NOW);
 
     expect(run.ok && run.value).toEqual({ handled: 0, skipped: 0 });
     expect(await w.stageOf(DUE)).toBe("INTRO_SCHEDULED");
@@ -289,7 +289,7 @@ describe("trial-complete-sweep — K-16, a trial whose date is behind London", (
     const lateEvening = "2026-07-14T23:30:00.000Z" as Instant; // 00:30 on the 15th, London
     const w = world([arranged("2026-07-14", DUE)]);
 
-    const run = await w.jobs.run("trial-complete-sweep", lateEvening);
+    const run = await w.jobs.sweep("trial-complete-sweep", lateEvening);
 
     expect(run.ok && run.value).toEqual({ handled: 1, skipped: 0 });
     expect(await w.stageOf(DUE)).toBe("TRIAL_COMPLETE");
@@ -340,7 +340,7 @@ describe("what each sweep reads, and the one it does not", () => {
         }),
       ]);
 
-      await w.jobs.run("expire-connections", NOW);
+      await w.jobs.sweep("expire-connections", NOW);
 
       expect(await w.stageOf(DUE)).toBe("SCHEDULE_EXPIRED");
     },

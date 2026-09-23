@@ -14,6 +14,6 @@ const PATH = "/api/cron/meeting-complete-sweep";
 
 export async function GET(request: Request): Promise<Response> {
   return runCron(request, PATH, (now) =>
-    connectionsJobs.run("meeting-complete-sweep", now),
+    connectionsJobs.sweep("meeting-complete-sweep", now),
   );
 }

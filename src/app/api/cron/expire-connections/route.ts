@@ -18,6 +18,6 @@ const PATH = "/api/cron/expire-connections";
 
 export async function GET(request: Request): Promise<Response> {
   return runCron(request, PATH, (now) =>
-    connectionsJobs.run("expire-connections", now),
+    connectionsJobs.sweep("expire-connections", now),
   );
 }
