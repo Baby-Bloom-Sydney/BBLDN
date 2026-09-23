@@ -41,19 +41,29 @@ export async function deliverMessage(
   );
   if (!rendered.ok) return rendered;
 
+  // `08.03` — the development dry run. The row is written at `dry-run` (the column's `dry_run`, mapped at the
+  // store seam) and the provider is never reached, so a local run exercises validation, dedupe, recipient
+  // resolution, rendering and the `email_logs` row without anyone's inbox being involved. `config` already
+  // forces the flag false outside development (`flags.ts`), and this module is handed the boolean rather than
+  // reading it, so there is no second place the guard could be got wrong.
+  const effective: MessageStatus =
+    deps.dryRun === true && status === "sent" ? "dry-run" : status;
+
   const recorded = await deps.store.record({
     ...rendered.value,
     // the resolved address is the send's, not the renderer's — one authority, and it is what lands on the row
     to: to.value,
     templateId: message.templateId,
     channel: message.channel,
-    status,
+    status: effective,
     ...(message.sendAt === undefined ? {} : { sendAt: message.sendAt }),
     ...(message.dedupeKey === undefined
       ? {}
       : { dedupeKey: message.dedupeKey }),
   });
-  if (!recorded.ok || status === "queued") return recorded;
+  // A queued row is `schedule`'s whole job (`send-delayed-emails` delivers it later); a dry-run row is the
+  // send, recorded and stopped. Both end here, before the provider.
+  if (!recorded.ok || effective !== "sent") return recorded;
 
   const ack = await deps.email.send(rendered.value);
   const settled = await deps.store.settle(

@@ -2,7 +2,7 @@
 // module through this connector, and importing only `config`, `shared-types` and `platform` itself. Comms
 // renders and sends; it never fetches a profile, a position or a booking — the caller passes fully resolved
 // data (03 §8.1 "comms renders, it does not decide").
-import type { SenderKey } from "@/modules/config";
+import type { Sender, SenderKey } from "@/modules/config";
 import type {
   Actor,
   E164,
@@ -69,9 +69,10 @@ export type ResolvedRecipient = {
 export type TemplateData = Readonly<Record<string, unknown>>;
 
 /**
- * 03 §8.2 — the day-one registry. The section is headed "41 ids" but names **46 distinct id strings** (five
- * numbered rows carry a `parent` / `nanny` pair). Every id the table names is listed here; the count is
- * recorded as a foundations gap rather than resolved by dropping an id.
+ * 03 §8.2 — the registry. The section is headed "46 ids" (its own table names 46 distinct id strings, because
+ * five numbered rows carry a `parent` / `nanny` pair) and **48** are declared here: ADR-168 (b) added the two
+ * suspension-lifted ids after the table was written. The heading's count is the foundations gap, not the
+ * registry — recorded rather than resolved by dropping an id (README "Gaps" 1).
  */
 export interface TemplateRegistry {
   "welcome-parent": TemplateData;
@@ -127,6 +128,26 @@ export interface TemplateRegistry {
 
 /** Closed union, one entry per template (03 §8.1). */
 export type TemplateId = keyof TemplateRegistry;
+
+/**
+ * ★ **4a's gate.** `TEMPLATE_IDS` (`lib/template-ids.ts`) is the runtime list `validate-message.ts` checks a send
+ * against, and `as const satisfies ReadonlyArray<TemplateId>` proves only that every **entry is** an id — never
+ * that every id is **present**. ADR-168 (b) added two ids above and left the list alone, so the seam answered
+ * `unknown-template` to both suspension-lifted sends the lift road was built to make, and nothing failed.
+ *
+ * `Assert<T extends true>` will not compile unless `T` is `true`, and the conditional resolves to the **missing
+ * id itself** when one is missing — so the compiler error names it (`Type '"admin-test"' does not satisfy the
+ * constraint 'true'`) rather than saying `false`. `typecheck` is a required check, so the two cannot drift again.
+ * The list is reached by `typeof import(...)`, which keeps this a type-only file.
+ */
+type Assert<T extends true> = T;
+type UnlistedTemplateId = Exclude<
+  TemplateId,
+  (typeof import("./lib/template-ids").TEMPLATE_IDS)[number]
+>;
+export type EveryTemplateIdIsListed = Assert<
+  [UnlistedTemplateId] extends [never] ? true : UnlistedTemplateId
+>;
 
 export type Attachment = {
   readonly filename: string;
@@ -194,6 +215,11 @@ export type CommsReason =
   | "unknown-kind"
   | "comms-not-configured"
   | "store-not-configured"
+  /**
+   * 4a: no longer reachable — boot always installs `createTemplateRenderer`, and an id with no file answers
+   * `template-schema` (03 §8.4's own word for a template without a schema). Kept in the union because it is the
+   * honest answer if a future boot ever leaves the port open, and removing it would make that case silent.
+   */
   | "renderer-not-configured"
   /** `status(messageId)` for an id no `email_logs` row carries (S5b: the real store answers NOT_FOUND, never a made-up status) */
   | "unknown-message";
@@ -248,7 +274,20 @@ export type RenderedEmail = {
 
 export type ProviderAck = { readonly providerMessageId: string };
 
-/** 03 §8.1 `EmailProvider`. Bindings: `resend` (Phase 1) | `stub-email` (day one) — `EMAIL_PROVIDER`. */
+/**
+ * The seven mailboxes of 03 §8.1, as the provider sees them. `comms` may not carry an address literal (L4), so
+ * boot hands `config`'s `SENDERS` in and a provider resolves a `SenderKey` against this table — or refuses
+ * (`sender-unknown`) rather than quietly sending from the wrong one.
+ */
+export type SenderTable = Readonly<Record<SenderKey, Sender>>;
+
+/** What `emailProviderFor` needs to build a real provider. Absent or empty = the binding refuses (fail closed). */
+export type EmailProviderOptions = {
+  readonly apiKey?: string;
+  readonly senders?: SenderTable;
+};
+
+/** 03 §8.1 `EmailProvider`. Bindings: `resend` (`08.01`) | `stub-email` (ADR-141) — `EMAIL_PROVIDER`. */
 export type EmailProvider = {
   readonly id: string;
   send(input: RenderedEmail): Promise<Result<ProviderAck, CommsErrorDetails>>;
@@ -267,7 +306,38 @@ export type SmsProvider = {
   }): Promise<Result<ProviderAck, CommsErrorDetails>>;
 };
 
-/** The template seam. No template is written by this unit, so the default renderer fails closed. */
+/**
+ * 03 §8.1 — who a template is written for. The `parent` audience is the one the banned-words test polices
+ * (glossary §6), so it is declared on the template rather than inferred from the recipient.
+ */
+export type TemplateAudience = "parent" | "nanny" | "admin" | "support";
+
+/**
+ * 03 §8.1's template file, one per id: `{ id, channel, subject(data), html(data), text(data), from, audience }`.
+ * No brand, domain, mailbox or URL literal lives in one — those are `config`, reached through the rendering
+ * helpers (`templates/lib/`). Both bodies are always produced: a template that rendered HTML only would leave a
+ * plain-text reader with nothing.
+ */
+export type EmailTemplate<Id extends TemplateId = TemplateId> = {
+  readonly id: Id;
+  readonly channel: Channel;
+  readonly from: SenderKey;
+  readonly audience: TemplateAudience;
+  subject(data: TemplateRegistry[Id]): string;
+  html(data: TemplateRegistry[Id]): string;
+  text(data: TemplateRegistry[Id]): string;
+};
+
+/**
+ * The template files that exist. **Partial on purpose** — the id union is closed (03 §8.2) and the files land
+ * with the units that fire them (03 §8.3), so an id with no file must be a loud `INTERNAL` at render time, not
+ * a blank body in someone's inbox. `createTemplateRenderer` is what turns the gap into that refusal.
+ */
+export type EmailTemplates = Partial<
+  Readonly<Record<TemplateId, EmailTemplate>>
+>;
+
+/** The template seam. Its inside is one file per template (`templates/`), reached through the registry above. */
 export type TemplateRenderer = {
   render(
     message: ResolvedMessage,
@@ -332,6 +402,13 @@ export type CommsDeps = {
   readonly renderer: TemplateRenderer;
   /** Defaults to `platform`'s `nowInstant`. */
   readonly clock?: IsoClock;
+  /**
+   * `08.03` — the development dry run. True and the seam renders and records the row exactly as a live send
+   * does, at status `dry-run`, and **never calls the provider**. Boot passes the dry-run flag, which `config`
+   * already forces false outside development (`flags.ts`), so this module reads no flag name and no environment
+   * of its own: it is handed a boolean, the way `call-layer` is handed the admin address.
+   */
+  readonly dryRun?: boolean;
 };
 
 /** A boot-time registration slot — the module-level `comms` reads its implementation from one of these. */

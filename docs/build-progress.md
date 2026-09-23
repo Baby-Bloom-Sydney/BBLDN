@@ -1646,7 +1646,7 @@ wiring.
 - **`supabase/rollbacks/0028_erasure-job.rollback.sql`** + **`int.rollback-0028`** (15) — ADR-165 (1): the six keys
   and the two evidence tables stay; what goes is the job itself, announced.
 - **`src/modules/platform/privacy/**`** (new sub-capability, the home `platform/README.md`named in Phase 1) —
-connector, port, registry (fails closed: for an erasure that means *refuses*, never "did nothing and said yes"),
+connector, port, registry (fails closed: for an erasure that means _refuses_, never "did nothing and said yes"),
 the orchestration (collect → remove → one transaction →`account.deleted`), the sweep, and `privacy.stub.ts`.
 - **`src/boot/privacy-request-ops.ts` · `privacy-erasure-ops.ts` · `db-privacy-store.ts` · `emit-account-deleted.ts`
   · `erasure-request-from-row.ts` · `erasure-outcome-of.ts` · `wire-privacy.ts`** — the port over `auth.data`, with
@@ -1888,3 +1888,68 @@ p_decided_by)` — `service_role`, the decider validated against `user_roles` (A
   Watches four recorders today, discovered not listed. Driven RED by pointing `AGR-14` at `media-consent`.
 - **`src/components/legal/PolicyContent.test.tsx`** (new, 24 cases) — all eleven ids render no link and reach
   the reader with their own id; the body shows; an unreadable document fails closed.
+
+---
+
+## Files created / modified in the current unit (`4a` — the sender; L-010 Phase 4)
+
+**What this unit is.** Nothing in this product could send an email. The store was real, the callers were real,
+the seam was real, and the two ports that turn a `Message` into a delivered email — a provider and a renderer —
+were both fail-closed defaults. 4a installs both, and adds the dev dry run, the test-email route and a gate
+over the template registry.
+
+- **`src/modules/comms/email/resend-email.ts`** (new) — `08.01` / `11.29`. `createResendEmailProvider(apiKey,
+senders)` over the `resend` SDK (already a dependency). It reads no env name and carries no address: boot
+  hands it `RESEND_API_KEY` and `config`'s `SENDERS`, so **the London sending domain is a config value, not a
+  string in this module** — when the domain is bought, `NEXT_PUBLIC_APP_URL` changes and no code does. A
+  `SenderKey` the table does not carry answers `sender-unknown` rather than falling back to `noreply`; a
+  rejection and a network throw both answer `PROVIDER_ERROR { provider: 'resend' }` with the throw as `cause`.
+  `sendBatch` uses Resend's batch endpoint (03 §8.1 "chunked by provider").
+- **`src/modules/comms/lib/email-provider-for.ts`** — takes `{ apiKey, senders }`. `resend` with no key
+  **refuses** rather than falling back to the stub, which is the same fail-closed direction ADR-141 enforces
+  from the other side (`stub-email` refused in production).
+- **`src/modules/comms/templates/`** (new, 10 files) — 03 §8.1's template files: `{ id, channel, from,
+audience, subject(data), html(data), text(data) }`, over the three rendering helpers the contract names
+  (`formatLondonDateTime` · `appUrl` · `footer`) plus one shell (`emailLayout` — named so because the boundary
+  lint reserves a bare `layout` export for Next routes) and `escapeHtml`. **Every interpolated value is
+  escaped**: `contact-request-public` renders an anonymous POST's name, role and free text, so an unescaped
+  body is stored HTML injection aimed at the support inbox. Five files: `contact-request-public` (`08.17`),
+  `support-reply` (`08.17`), `admin-contact` (`08.18`), `admin-commission-booking` (`08.18` — the notice
+  `call-layer` already fires and could not deliver), `admin-test` (`08.19`).
+- **`src/modules/comms/lib/create-template-renderer.ts`** (new) — the `TemplateRenderer` over that registry. An
+  id with **no file** answers `INTERNAL { template-schema }` (03 §8.4's word for a template without a schema),
+  never a blank body. The caller's `message.from` wins over the template's own key (03 §8.1).
+- **`src/modules/comms/lib/deliver-message.ts`** — `08.03`, the dev dry run. `CommsDeps.dryRun` turns a `sent`
+  into a `dry-run` row: rendered, recorded, provider never called. Boot passes the `config` flag, which
+  `config` already forces false outside development, so the guard exists in one place and `comms` reads no flag
+  name of its own.
+- **`src/boot/wire-comms.ts`** — binds the real provider and the real renderer, passes the dry-run boolean, and
+  states on the boot line **how many template files are installed** so the gap is read rather than assumed
+  closed. `src/boot/unconfigured-template-renderer.ts` **deleted**: boot always installs a renderer now, and a
+  fail-closed default nothing reaches is dead code (the same declared-vs-used rule as below).
+- **`src/app/api/dev/test-email/route.ts`** (new) — `08.19`. 404 outside development, `requireRole('admin')`
+  (aal2), and **the recipient is not a parameter** — it is `SENDERS.admin`, so this cannot become "send a test
+  email to X". It reports what `comms` answered; an endpoint whose job is diagnosis must not hide a refusal.
+- ★ **`src/modules/comms/lib/template-ids.ts` + `types.ts` — a defect the both-ways check found.**
+  `TEMPLATE_IDS` is the runtime list `validateMessage` builds `KNOWN_TEMPLATES` from, and
+  `as const satisfies ReadonlyArray<TemplateId>` proves only that every entry **is** an id — never that every
+  id is **present**. ADR-168 (b) added `verification-suspension-lifted` and `admin-nanny-suspension-lifted` to
+  `TemplateRegistry` and not to the list, so the seam answered `unknown-template` to **both sends the
+  lift-suspension road was built to make**, and 4,800 green tests agreed with it. Both are listed now, and the
+  guard is a gate rather than a note: `EveryTemplateIdIsListed` fails `typecheck` and the error **names the
+  missing id** (driven: deleting an entry produces `Type '"admin-test"' does not satisfy the constraint
+'true'`).
+- **Tests** — `comms.sender.test.ts` (10, RED first): the registry both ways, the provider bound and refusing,
+  rendering, HTML escaping, the missing-file refusal, and the dry run in both directions. Three pinned
+  expectations updated **because the behaviour deliberately changed**, each with the reason in place:
+  `boot.test.ts` and `wire-seams.test.ts` moved from `renderer-not-configured` to `template-schema` (and gained
+  a case proving an id **with** a file goes all the way to the provider), and `comms.swap.test.ts`'s id count
+  moved 46 → 48. The `08.20` pin in `verification-crons.route.test.ts` still fails, with its reason corrected:
+  the renderer blocker is gone, the delivery loop is what is missing.
+
+**Owed, and named rather than hidden.** Twelve declared template ids still have no caller (`comms/README.md`
+gap 0), of which `availability-updated` has no lever to fire it at all — `admin-on-behalf` exposes no
+availability write. `08.17`'s `support-reply` and `08.18`'s `admin-contact` have files and no surface: both
+belong to the `admin/support` and `admin/users` panels, which are descriptors only. And **nothing here is
+proven against a live Resend account** — the key, the DNS records and the domain verification are BAI's, and
+every claim in this unit is driven against `stub-email`.
