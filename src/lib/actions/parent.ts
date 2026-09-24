@@ -10,7 +10,6 @@ import {
   CONNECTION_STAGE,
 } from "@/lib/position/constants";
 import { funnelLog } from "@/lib/position/logger";
-import { createInboxMessage } from "./connection-helpers";
 import { autofireMatchmaking } from "./autofire-matchmaking";
 
 export interface Position {
@@ -325,225 +324,17 @@ export async function updatePosition(
   return { success: true, error: null };
 }
 
-// ── Typeform position save ──
-
-import type { TypeformFormData } from "@/app/parent/request/questions";
-
-import {
-  AGE_RANGE_TO_MONTHS,
-  HOURS_TO_INT,
-  buildScheduleJson,
-} from "./position-utils";
-
-export async function saveTypeformPosition(
-  formData: Partial<TypeformFormData>,
-): Promise<{ success: boolean; error: string | null; positionId?: string }> {
-  const supabase = createClient();
-
-  const parentId = await getParentId();
-  if (!parentId) {
-    return { success: false, error: "Not authenticated as parent" };
-  }
-
-  // Check for existing active position
-  const { data: existing } = await supabase
-    .from("nanny_positions")
-    .select("id")
-    .eq("parent_id", parentId)
-    .in("status", ["active", "filled"])
-    .maybeSingle();
-
-  // Build position row
-  const positionRow = {
-    // Integers
-    minimum_age_requirement: formData.minimum_age
-      ? parseInt(formData.minimum_age)
-      : null,
-    years_of_experience: formData.years_of_experience
-      ? parseInt(formData.years_of_experience)
-      : null,
-    hours_per_week: formData.hours_per_week
-      ? (HOURS_TO_INT[formData.hours_per_week] ?? null)
-      : null,
-
-    // Booleans (form stores "Yes"/"No" strings)
-    drivers_license_required: formData.drivers_license_required === "Yes",
-    car_required: formData.car_required === "Yes",
-    vaccination_required: false,
-    non_smoker_required: false,
-    comfortable_with_pets_required: false,
-
-    // Text
-    language_preference: formData.language_preference ?? null,
-    language_preference_details: formData.language_preference_details ?? null,
-    suburb: formData.suburb ?? null,
-    postcode: formData.postcode ?? null,
-    schedule_type: formData.schedule_type ?? null,
-    urgency: formData.urgency ?? null,
-    start_date: formData.start_date ?? null,
-    placement_length: formData.placement_length ?? null,
-
-    // Arrays
-    days_required: formData.weekly_roster ?? [],
-    reason_for_nanny: formData.reason_for_nanny
-      ? [formData.reason_for_nanny]
-      : [],
-
-    // JSONB — descriptive fields not queried for matching + full form data for editing
-    details: {
-      has_pets_details: formData.has_pets_details ?? null,
-      child_needs: formData.child_needs_yn === "Yes",
-      child_needs_details: formData.child_needs_details ?? null,
-      dietary_restrictions: formData.dietary_restrictions_yn === "Yes",
-      dietary_restrictions_details:
-        formData.dietary_restrictions_details ?? null,
-      focus_type: formData.focus_type ?? null,
-      support_type: formData.support_type ?? null,
-      placement_duration: formData.placement_duration ?? null,
-      hours_per_week_label: formData.hours_per_week ?? null,
-      notes: formData.notes ?? null,
-      form_data: formData,
-    },
-  };
-
-  let positionId: string;
-
-  if (existing) {
-    const { error } = await supabase
-      .from("nanny_positions")
-      .update(positionRow)
-      .eq("id", existing.id)
-      .eq("parent_id", parentId);
-
-    if (error) {
-      console.error("Position update error:", error);
-      return { success: false, error: "Failed to update position" };
-    }
-    positionId = existing.id;
-  } else {
-    const { data: position, error } = await supabase
-      .from("nanny_positions")
-      .insert({
-        parent_id: parentId,
-        ...positionRow,
-        status: "active",
-        stage: POSITION_STAGE.OPEN,
-        position_status: POSITION_STATUS.OPEN,
-      })
-      .select("id")
-      .single();
-
-    if (error) {
-      console.error("Position create error:", error);
-      if (error.code === "23505") {
-        return {
-          success: false,
-          error: "You already have an active position.",
-        };
-      }
-      return { success: false, error: "Failed to create position" };
-    }
-    positionId = position.id;
-    funnelLog("saveTypeformPosition", positionId, "→ Open(1)", { parentId });
-    // T-040: Autofire Advanced matchmaking ONLY on the CREATE branch (fire-once-on-edit).
-    // The UPDATE branch above must not re-trigger the blast.
-    await autofireMatchmaking(positionId);
-  }
-
-  // Children: delete existing and recreate
-  await supabase
-    .from("position_children")
-    .delete()
-    .eq("position_id", positionId);
-
-  const numChildren = formData.num_children ?? 0;
-  if (numChildren > 0) {
-    const AGE_KEYS = ["child_a_age", "child_b_age", "child_c_age"] as const;
-    const GENDER_KEYS = [
-      "child_a_gender",
-      "child_b_gender",
-      "child_c_gender",
-    ] as const;
-
-    const childrenRows = Array.from({ length: numChildren }).map((_, i) => ({
-      position_id: positionId,
-      child_label: ["A", "B", "C"][i],
-      age_months:
-        AGE_RANGE_TO_MONTHS[
-          (formData[AGE_KEYS[i] as keyof TypeformFormData] as string) ?? ""
-        ] ?? 0,
-      gender:
-        (formData[GENDER_KEYS[i] as keyof TypeformFormData] as string) ?? null,
-      display_order: i + 1,
-    }));
-
-    const { error: childrenError } = await supabase
-      .from("position_children")
-      .insert(childrenRows);
-
-    if (childrenError) {
-      console.error("Children create error:", childrenError);
-    }
-  }
-
-  // Schedule: upsert
-  const schedule = buildScheduleJson(formData);
-  if (Object.keys(schedule).length > 0) {
-    const { error: scheduleError } = await supabase
-      .from("position_schedule")
-      .upsert(
-        { position_id: positionId, schedule },
-        { onConflict: "position_id" },
-      );
-
-    if (scheduleError) {
-      console.error("Schedule upsert error:", scheduleError);
-    }
-  }
-
-  revalidatePath("/parent");
-  revalidatePath("/parent/request");
-
-  // Notify nanny if active placement exists for this position
-  if (existing) {
-    const adminClient = createAdminClient();
-    const { data: activePlacement } = await adminClient
-      .from("nanny_placements")
-      .select("nanny_id")
-      .eq("position_id", positionId)
-      .eq("status", "active")
-      .maybeSingle();
-
-    if (activePlacement) {
-      const { data: nanny } = await adminClient
-        .from("nannies")
-        .select("user_id")
-        .eq("id", activePlacement.nanny_id)
-        .single();
-
-      if (nanny) {
-        const { data: parentProfile } = await adminClient
-          .from("user_profiles")
-          .select("first_name, last_name")
-          .eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "")
-          .single();
-
-        const familyName = parentProfile
-          ? `The ${parentProfile.last_name} family`
-          : "Your family";
-        await createInboxMessage({
-          userId: nanny.user_id,
-          type: "position_updated",
-          title: `${familyName} has updated the position details`,
-          body: "The family has made changes to the position. Review the updates on your dashboard.",
-          actionUrl: "/nanny/positions",
-        });
-      }
-    }
-  }
-
-  return { success: true, error: null, positionId };
-}
+// ── Typeform position save — REMOVED ──
+//
+// `saveTypeformPosition` was the hub card's write: a session-scope `nanny_positions` insert/update built
+// from the 42-field Sydney form. It cannot work in London and never could — the existence read filters on
+// `status`, a column this schema does not have (`42703`), and `authenticated` holds `SELECT` on the table
+// and nothing else (`42501`; `0036`, pinned by `int.client-grants`). Its only caller was
+// `PositionDetailView`, whose save road is now a caller-supplied `onSave`.
+//
+// A parent changes what she asked for through S-P-04's edit state: `onboarding-parent.amendPositionAction`
+// → `positions.amend` → `upsert_position`, which carries the actor rule, the stage gate (`DRAFT` / `OPEN`)
+// and strict field parsing. Deleted rather than left unused so the road cannot be revived by an import.
 
 export async function closePosition(
   positionId: string,

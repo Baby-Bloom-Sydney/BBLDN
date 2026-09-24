@@ -7,17 +7,27 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertTriangle,
-  Check,
   ClipboardList,
   MoreVertical,
+  Pencil,
 } from "lucide-react";
 import { PositionDetailView } from "@/app/parent/request/renderers/PositionDetailView";
 import { closePosition } from "@/lib/actions/parent";
 import type { PositionWithChildren } from "@/lib/actions/parent";
 import type { TypeformFormData } from "@/app/parent/request/questions";
 
+/** 04 §6.2 — S-P-05's "S-P-04 (edit)" exit, the one road to a change that reaches the row. */
+const EDIT_HREF = "/parent/request";
+
 interface MyChildcareTabProps {
   position: PositionWithChildren | null;
+  /**
+   * **`positions`' judgement, never this component's** — `parentMayAmend(stage)`, read in the route that
+   * serves the hub. A parent changes what she asked for at `DRAFT` and `OPEN`; past that the matchmaker
+   * does (`parent-amendable-stages.ts`). Absent ⇒ nobody asked ⇒ no edit road, because showing one that
+   * `amend` would refuse is how a family comes to believe a change landed when it did not.
+   */
+  canEdit?: boolean;
   /**
    * True when the parent has an active placement. Set by the page-
    * level fetch via `getParentPlacement`. When true, the
@@ -31,10 +41,10 @@ interface MyChildcareTabProps {
 
 export function MyChildcareTab({
   position,
+  canEdit = false,
   hasActivePlacement = false,
 }: MyChildcareTabProps) {
   const router = useRouter();
-  const [positionEditing, setPositionEditing] = useState(false);
   const [showPositionMenu, setShowPositionMenu] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -89,59 +99,54 @@ export function MyChildcareTab({
       ) : (
         // Renders for both: (a) parents with full form_data, and (b)
         // invite-link parents whose auto-position has no form_data yet.
-        // saveTypeformPosition picks up the existing 'filled' position
-        // via .in("status", ["active", "filled"]), so saving from the
-        // empty editable view updates that row in place — never creates
-        // a new public listing.
-        <PositionDetailView
-          initialData={formData}
-          editingExternal={positionEditing}
-          onEditingChange={setPositionEditing}
-          hideClosePosition
-          menuSlot={
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {positionEditing && (
-                <button
-                  onClick={() => setPositionEditing(false)}
-                  className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition-colors"
-                >
-                  <Check className="h-4 w-4" />
-                </button>
-              )}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowPositionMenu((p) => !p)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </button>
-                {showPositionMenu && (
-                  <div className="absolute right-0 mt-1 w-48 rounded-lg border border-slate-200 bg-white shadow-lg z-10">
-                    <button
-                      onClick={() => {
-                        setShowPositionMenu(false);
-                        setPositionEditing(true);
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 rounded-t-lg transition-colors"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowPositionMenu(false);
-                        setShowCloseConfirm(true);
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-b-lg transition-colors"
-                    >
-                      Close this position
-                    </button>
-                  </div>
-                )}
+        //
+        // **Read-only, and no `onSave`.** The inline editor that used to live here saved through
+        // `saveTypeformPosition` — a session-scope write to `nanny_positions` that the London schema and
+        // grants both refuse, so the change never reached the family's row. The road that reaches it is
+        // S-P-04's edit state below, gated by `canEdit` so the link and the write agree about whether she may.
+        <>
+          <PositionDetailView
+            initialData={formData}
+            hideClosePosition
+            menuSlot={
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowPositionMenu((p) => !p)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                  {showPositionMenu && (
+                    <div className="absolute right-0 mt-1 w-48 rounded-lg border border-slate-200 bg-white shadow-lg z-10">
+                      <button
+                        onClick={() => {
+                          setShowPositionMenu(false);
+                          setShowCloseConfirm(true);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        Close this position
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
+            }
+          />
+          {canEdit && (
+            <div className="mt-3 flex justify-center">
+              <Link
+                href={EDIT_HREF}
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-50 hover:text-violet-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2"
+              >
+                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                Change what you asked for
+              </Link>
             </div>
-          }
-        />
+          )}
+        </>
       )}
 
       {/* Close Position Confirmation */}
