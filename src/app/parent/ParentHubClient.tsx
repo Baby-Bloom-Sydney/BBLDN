@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PositionDetailView } from "../parent/request/renderers/PositionDetailView";
 import { PositionWithChildren, closePosition } from "@/lib/actions/parent";
 import {
   AlertTriangle,
@@ -112,6 +111,8 @@ interface PlacementData {
 
 interface ParentHubClientProps {
   position: PositionWithChildren | null;
+  /** `positions.parentMayAmend(stage)`, decided in the route. Passed straight to `MyChildcareTab`. */
+  canEditPosition?: boolean;
   placement?: PlacementData | null;
   confirmedNannies?: ConfirmedNanny[];
   showFillButton?: boolean;
@@ -260,6 +261,7 @@ function isTabId(value: unknown): value is TabId {
 
 export function ParentHubClient({
   position,
+  canEditPosition = false,
   placement,
   confirmedNannies = [],
   showFillButton = false,
@@ -1652,6 +1654,7 @@ export function ParentHubClient({
           {nannySubTab === "childcare" && (
             <MyChildcareTab
               position={position}
+              canEdit={canEditPosition}
               hasActivePlacement={!!placement}
             />
           )}

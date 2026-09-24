@@ -20,8 +20,11 @@ import { ParentJourneyRail, loadParentJourney } from "@/modules/call-layer";
 import { accessGate } from "@/modules/access-gate";
 import { ChildrenCard, loadChildrenCard } from "@/modules/app";
 import { auth } from "@/modules/auth";
+import type { UserId } from "@/modules/shared-types";
 import { appRailFacts } from "./app-rail-facts";
 import { familyRead } from "./family-read";
+// The hub card's edit road (04 §6.2 S-P-04 edit) is gated by `positions`' own rule, read here.
+import { canAmendPosition } from "./position-edit-gate";
 
 const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
@@ -68,6 +71,11 @@ export default async function ParentHubPage({
   const familyId = session.kind === "family" ? session.familyId : null;
   const gate = familyId === null ? null : await accessGate.hasAccess(familyId);
   const access = gate !== null && gate.ok ? gate.value : null;
+
+  const canEditPosition =
+    session.kind === "family"
+      ? await canAmendPosition(session.familyId as string as UserId)
+      : false;
 
   const [journey, childrenCard] = await Promise.all([
     loadParentJourney(
@@ -148,6 +156,7 @@ export default async function ParentHubPage({
       {childrenCard === null ? null : <ChildrenCard view={childrenCard} />}
       <ParentHubClient
         position={position}
+        canEditPosition={canEditPosition}
         placement={placement}
         confirmedNannies={confirmedNannies}
         showFillButton={!!showFillButton}

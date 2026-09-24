@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { SuburbAutocomplete } from "./SuburbAutocomplete";
-import { saveTypeformPosition } from "@/lib/actions/parent";
 import {
   TypeformFormData,
   MIN_AGE_OPTIONS,
@@ -49,7 +48,10 @@ interface PositionDetailViewProps {
     data: Partial<TypeformFormData>,
   ) => Promise<{ success: boolean; error: string | null }>;
   hideClosePosition?: boolean;
-  /** When provided, controls editing externally (hides internal Edit button) */
+  /**
+   * When provided, controls editing externally (hides internal Edit button).
+   * Only honoured alongside `onSave` — see the note on the component.
+   */
   editingExternal?: boolean;
   onEditingChange?: (editing: boolean) => void;
   /** Optional slot rendered inline to the right of the tab bar */
@@ -62,6 +64,18 @@ interface PositionDetailViewProps {
   compact?: boolean;
 }
 
+/**
+ * **`onSave` is the only road this card has to a row, and with none it is read-only.**
+ *
+ * It used to fall back to `saveTypeformPosition` — a session-scope write to `nanny_positions` addressing
+ * columns the London schema does not have, on a table where `authenticated` holds `SELECT` and nothing else
+ * (`int.client-grants`; measured: `42703` on the read, `42501` on the write). The family's change never reached
+ * her row. The road that does reach it is S-P-04's edit state (`amendPositionAction` → `positions.amend` →
+ * `upsert_position`), which carries the actor rule and the stage gate this card never had.
+ *
+ * So the fallback is gone and editing is gated on a caller supplying somewhere to put the change. Fail closed:
+ * no `onSave` ⇒ no edit toggle, no pencils, no Save — whatever `editingExternal` says.
+ */
 export function PositionDetailView({
   initialData,
   onClosePosition,
@@ -75,8 +89,10 @@ export function PositionDetailView({
   const [data, setData] = useState<Partial<TypeformFormData>>(initialData);
   const [activeTab, setActiveTab] = useState<TabId>("children");
   const [isEditingInternal, setIsEditingInternal] = useState(false);
+  const canSave = onSave !== undefined;
   const isEditing =
-    editingExternal !== undefined ? editingExternal : isEditingInternal;
+    canSave &&
+    (editingExternal !== undefined ? editingExternal : isEditingInternal);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -98,11 +114,10 @@ export function PositionDetailView({
   };
 
   const handleSave = async () => {
+    if (!onSave) return;
     setIsSaving(true);
     setSaveError(null);
-    const result = onSave
-      ? await onSave(data)
-      : await saveTypeformPosition(data);
+    const result = await onSave(data);
     setIsSaving(false);
     if (result.success) {
       setIsDirty(false);
@@ -261,8 +276,8 @@ export function PositionDetailView({
 
   return (
     <div className={cn("pb-0", compact && "text-sm leading-snug")}>
-      {/* Edit toggle — hidden when controlled externally */}
-      {editingExternal === undefined && (
+      {/* Edit toggle — hidden when controlled externally, and absent with no road to a row */}
+      {canSave && editingExternal === undefined && (
         <div className="flex justify-end mb-2">
           <button
             type="button"
