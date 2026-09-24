@@ -1,0 +1,1103 @@
+{
+  "//": "The legacy files that name a table, view, column, RPC or bucket the schema does not have — measured by check-schema-names.mjs at the landing commit, never written by hand. `src/modules/` and `src/boot/` are NOT ratcheted: they query through `Query<AppDatabase>`, where a wrong name is a compile error, and they were measured clean. Every file here is Sydney code carried across unported; the reason says whether a London route reaches it. The list may ONLY shrink — a new wrong name in a recorded file fails, a recorded name that is now correct fails as stale, and a recorded file that has gone fails. Fix the name against src/modules/shared-types/database.types.ts; never widen an entry to make a red build green.",
+  "src/app/(public)/position/[id]/page.tsx": {
+    "identifiers": ["connection_requests.connection_stage"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/admin/dashboard/page.tsx": {
+    "identifiers": [
+      "nannies.identity_verified",
+      "nannies.wwcc_verified",
+      "nanny_placements.status",
+      "user_profiles.profile_picture_url",
+      "verifications.verification_status"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/admin/leads/actions.ts": {
+    "identifiers": ["activity_logs", "nanny_availability"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/admin/pipeline/page.tsx": {
+    "identifiers": [
+      "connection_requests.connection_stage",
+      "connection_stats",
+      "dfy_match_notifications",
+      "nanny_leads.highest_page_reached",
+      "nanny_leads.visitor_id",
+      "nanny_positions.dfy_activated_at",
+      "nanny_positions.dfy_expires_at",
+      "nanny_positions.dfy_tier",
+      "nanny_positions.status",
+      "page_visits.referrer",
+      "user_profiles.is_test",
+      "user_stats",
+      "verifications.user_id",
+      "verifications.verification_status",
+      "verifications.wwcc_status",
+      "verifications.wwcc_status_at"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/admin/positions/actions.ts": {
+    "identifiers": [
+      "nannies.identity_verified",
+      "nannies.status",
+      "nannies.visible_in_bsr",
+      "nannies.wwcc_verified",
+      "nanny_positions.position_status",
+      "nanny_positions.status",
+      "parents.status",
+      "user_profiles.mobile_number",
+      "user_profiles.postcode",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb",
+      "verifications.user_id",
+      "verifications.verification_status"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/admin/positions/page.tsx": {
+    "identifiers": [
+      "connection_requests.confirmed_at",
+      "connection_requests.confirmed_time",
+      "connection_requests.connection_stage",
+      "connection_requests.intro_outcome_reported_at",
+      "connection_requests.responded_at",
+      "connection_requests.source",
+      "dfy_match_notifications",
+      "nanny_placements.hired_at",
+      "nanny_placements.hourly_rate",
+      "nanny_placements.status",
+      "nanny_positions.dfy_activated_at",
+      "nanny_positions.dfy_expires_at",
+      "nanny_positions.dfy_tier",
+      "nanny_positions.dfy_wave_sent",
+      "nanny_positions.family_display_name",
+      "nanny_positions.filled_at",
+      "nanny_positions.hourly_rate",
+      "nanny_positions.position_status",
+      "nanny_positions.status",
+      "nanny_positions.suburb",
+      "user_profiles.suburb"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/admin/subscriptions/page.tsx": {
+    "identifiers": [
+      "activity_logs",
+      "parent_subscriptions.paid_period_ends_at",
+      "parent_subscriptions.paid_period_starts_at",
+      "parent_subscriptions.subscription_cycle"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/admin/users/[userId]/subscription/page.tsx": {
+    "identifiers": [
+      "activity_logs",
+      "child_client.age_months_approx",
+      "child_client.date_of_birth",
+      "child_client.first_name",
+      "child_client.status",
+      "child_client_events.active_at",
+      "child_client_events.active_nanny_at",
+      "child_client_events.child_client_id",
+      "child_client_events.closed_at",
+      "child_client_events.created_auto_at",
+      "child_client_events.created_manual_at",
+      "child_client_events.setup_at",
+      "child_client_events.trial_at",
+      "child_client_events.trial_ended_at",
+      "nanny_payouts",
+      "parent_subscriptions.paid_period_ends_at",
+      "parent_subscriptions.paid_period_starts_at",
+      "parent_subscriptions.subscription_cycle",
+      "refund_requests.refund_amount_aud_cents",
+      "refund_requests.refund_processed_at"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/admin/users/page.tsx": {
+    "identifiers": [
+      "nannies.status",
+      "parents.status",
+      "user_profiles.mobile_number",
+      "user_profiles.postcode",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/admin/viewer/[id]/inbox/page.tsx": {
+    "identifiers": ["user_profiles.suburb"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/admin/viewer/[id]/layout.tsx": {
+    "identifiers": [
+      "parents.verification_level",
+      "user_profiles.profile_picture_url"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/admin/viewer/[id]/page.tsx": {
+    "identifiers": [
+      "connection_requests.confirmed_time",
+      "connection_requests.connection_stage",
+      "connection_requests.nanny_phone_shared",
+      "connection_requests.proposed_times",
+      "connection_requests.source",
+      "connection_requests.start_date",
+      "connection_requests.status",
+      "dfy_match_notifications",
+      "nannies.additional_needs_ok",
+      "nannies.ai_content",
+      "nannies.childcare_roles",
+      "nannies.drivers_license",
+      "nannies.hobbies_interests",
+      "nannies.hourly_rate_min",
+      "nannies.immediate_start_available",
+      "nannies.level_of_support_offered",
+      "nannies.max_child_age_months",
+      "nannies.max_children",
+      "nannies.min_child_age_months",
+      "nannies.motivation",
+      "nannies.nanny_experience_years",
+      "nannies.nationality",
+      "nannies.newborn_experience_years",
+      "nannies.non_smoker",
+      "nannies.personality_traits",
+      "nannies.photo_1_url",
+      "nannies.photo_2_url",
+      "nannies.photo_3_url",
+      "nannies.professional_values",
+      "nannies.role_types_preferred",
+      "nannies.skills_training",
+      "nannies.strengths_traits",
+      "nannies.total_experience_years",
+      "nannies.under_3_experience_years",
+      "nannies.vaccination_status",
+      "nannies.verification_tier",
+      "nannies.wwcc_verified",
+      "nanny_availability",
+      "nanny_credentials",
+      "nanny_placements.hired_at",
+      "nanny_placements.hourly_rate",
+      "nanny_placements.status",
+      "nanny_positions.comfortable_with_pets_required",
+      "nanny_positions.dfy_activated_at",
+      "nanny_positions.dfy_expires_at",
+      "nanny_positions.dfy_tier",
+      "nanny_positions.dfy_wave_sent",
+      "nanny_positions.drivers_license_required",
+      "nanny_positions.hourly_rate",
+      "nanny_positions.other_requirements_details",
+      "nanny_positions.status",
+      "nanny_positions.suburb",
+      "parents.verification_level",
+      "user_profiles.mobile_number",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb",
+      "verifications.address_line",
+      "verifications.city",
+      "verifications.country",
+      "verifications.cross_check_reasoning",
+      "verifications.extracted_nationality",
+      "verifications.extracted_passport_number",
+      "verifications.identification_photo_url",
+      "verifications.identity_verified",
+      "verifications.passport_country",
+      "verifications.passport_upload_url",
+      "verifications.phone_number",
+      "verifications.postcode",
+      "verifications.state",
+      "verifications.user_id",
+      "verifications.verification_status",
+      "verifications.wwcc_doc_verified",
+      "verifications.wwcc_expiry_date",
+      "verifications.wwcc_grant_email_url",
+      "verifications.wwcc_number",
+      "verifications.wwcc_rejection_reason",
+      "verifications.wwcc_service_nsw_screenshot_url",
+      "verifications.wwcc_status",
+      "verifications.wwcc_user_guidance",
+      "verifications.wwcc_verification_method",
+      "verifications.wwcc_verified"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/admin/viewer/[id]/profile/page.tsx": {
+    "identifiers": [
+      "nanny_assurances",
+      "nanny_availability",
+      "nanny_credentials",
+      "user_profiles.mobile_number",
+      "user_profiles.postcode",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/api/admin/reconcile-nannies/route.ts": {
+    "identifiers": [
+      "verifications.identity_verified",
+      "verifications.user_id",
+      "verifications.verification_status",
+      "verifications.wwcc_status",
+      "verifications.wwcc_verified"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/api/verification-status/route.ts": {
+    "identifiers": [
+      "verifications.cross_check_reasoning",
+      "verifications.extracted_nationality",
+      "verifications.extracted_passport_number",
+      "verifications.identity_verified",
+      "verifications.ocg_result_status",
+      "verifications.ocg_verified_at",
+      "verifications.user_id",
+      "verifications.verification_status",
+      "verifications.wwcc_ai_issues",
+      "verifications.wwcc_doc_verified",
+      "verifications.wwcc_expiry_date",
+      "verifications.wwcc_number",
+      "verifications.wwcc_rejection_reason",
+      "verifications.wwcc_status",
+      "verifications.wwcc_status_at",
+      "verifications.wwcc_user_guidance",
+      "verifications.wwcc_verified"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/nanny/team/page.tsx": {
+    "identifiers": [
+      "nannies.ai_content",
+      "nannies.drivers_license",
+      "nannies.hourly_rate_min",
+      "nannies.nanny_experience_years",
+      "nannies.newborn_experience_years",
+      "nannies.role_types_preferred",
+      "nannies.total_experience_years",
+      "nannies.under_3_experience_years",
+      "nannies.vaccination_status",
+      "nanny_credentials",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/parent/browse/[id]/page.tsx": {
+    "identifiers": [
+      "connection_requests.connection_stage",
+      "connection_requests.status",
+      "nanny_placements.status"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/parent/browse/page.tsx": {
+    "identifiers": [
+      "nannies.ai_content",
+      "nannies.drivers_license",
+      "nannies.hourly_rate_min",
+      "nannies.nanny_experience_years",
+      "nannies.newborn_experience_years",
+      "nannies.role_types_preferred",
+      "nannies.total_experience_years",
+      "nannies.under_3_experience_years",
+      "nannies.vaccination_status",
+      "nannies.verification_tier",
+      "nanny_credentials",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/parent/page.tsx": {
+    "identifiers": ["child_client.under_three"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/parent/settings/page.tsx": {
+    "identifiers": [
+      "user_profiles.mobile_number",
+      "user_profiles.postcode",
+      "user_profiles.suburb"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/app/subscribe-for/[token]/page.tsx": {
+    "identifiers": ["subscribe_invites.child_client_id"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/admin-positions.ts": {
+    "identifiers": [
+      "nanny_positions.comfortable_with_pets_required",
+      "nanny_positions.dfy_activated_at",
+      "nanny_positions.dfy_expires_at",
+      "nanny_positions.dfy_tier",
+      "nanny_positions.drivers_license_required",
+      "nanny_positions.family_display_name",
+      "nanny_positions.filled_at",
+      "nanny_positions.hourly_rate",
+      "nanny_positions.minimum_age_requirement",
+      "nanny_positions.position_status",
+      "nanny_positions.status",
+      "nanny_positions.suburb",
+      "nanny_positions.years_of_experience",
+      "sydney_postcodes"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/admin.ts": {
+    "identifiers": [
+      "nannies.ai_content",
+      "nannies.identity_verified",
+      "nannies.status",
+      "nannies.verification_status",
+      "nannies.wwcc_verified",
+      "nanny_credentials",
+      "parents.status",
+      "user_profiles.suburb",
+      "user_roles.updated_at",
+      "verifications.cross_check_reasoning",
+      "verifications.extracted_dob",
+      "verifications.extracted_given_names",
+      "verifications.extracted_nationality",
+      "verifications.extracted_passport_expiry",
+      "verifications.extracted_passport_number",
+      "verifications.extracted_surname",
+      "verifications.identity_verified",
+      "verifications.identity_verified_at",
+      "verifications.identity_verified_by",
+      "verifications.user_id",
+      "verifications.verification_status",
+      "verifications.wwcc_doc_verified",
+      "verifications.wwcc_ocg_submitted_at",
+      "verifications.wwcc_rejection_reason",
+      "verifications.wwcc_status",
+      "verifications.wwcc_status_at",
+      "verifications.wwcc_verified",
+      "verifications.wwcc_verified_by"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/admin/replyToContactMessage.ts": {
+    "identifiers": ["activity_logs"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/admin/test-user-flag.ts": {
+    "identifiers": ["activity_logs"],
+    "reason": "legacy — unported Sydney code no London route reaches; latent until something imports it. Fix or delete with the surface; do not widen this entry."
+  },
+  "src/lib/actions/bapp/activities-feed.ts": {
+    "identifiers": ["bapp_logs"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/bapp/activities.ts": {
+    "identifiers": [
+      "bapp_logs",
+      "bapp_milestones",
+      "child_client.date_of_birth",
+      "child_client.first_name",
+      "child_client.status",
+      "child_client_events.active_nanny_at",
+      "child_client_events.child_client_id"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/bapp/child-clients.ts": {
+    "identifiers": [
+      "activity_logs",
+      "child_client.date_of_birth",
+      "child_client.first_name",
+      "child_client.gender",
+      "child_client.onboarded",
+      "child_client.parent_lead_email",
+      "child_client.profile_picture_url",
+      "child_client.status",
+      "child_client.under_three",
+      "child_client_events.child_client_id",
+      "child_client_events.created_manual_at",
+      "child_client_events.setup_at",
+      "nannies.bonus_program_completed_at",
+      "nanny_placements.status"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/bapp/child-invites.ts": {
+    "identifiers": [
+      "activity_logs",
+      "child_client.first_name",
+      "child_invites.child_client_id",
+      "nanny_placements.status"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/bapp/child-onboarding-dispatch.ts": {
+    "identifiers": ["bapp_logs"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/bapp/diary.ts": {
+    "identifiers": [
+      "bapp_logs",
+      "child_client.status",
+      "child_client_events.active_nanny_at",
+      "child_client_events.child_client_id"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/bapp/feed.ts": {
+    "identifiers": ["bapp_logs"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/bapp/insights.ts": {
+    "identifiers": [
+      "bapp_logs",
+      "child_client.date_of_birth",
+      "child_client.first_name"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/bapp/library.ts": {
+    "identifiers": ["bapp_logs"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/bapp/logs.ts": {
+    "identifiers": ["bapp_logs"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/bapp/milestones.ts": {
+    "identifiers": ["bapp_milestones"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/bapp/observations.ts": {
+    "identifiers": [
+      "bapp_logs",
+      "bapp_milestones",
+      "child_client.first_name",
+      "child_client.status",
+      "child_client_events.active_nanny_at",
+      "child_client_events.child_client_id"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/bapp/progress.ts": {
+    "identifiers": [
+      "bapp_logs",
+      "bapp_milestones",
+      "bapp_progress_history",
+      "bapp_progress_scores"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/bapp/reports.ts": {
+    "identifiers": ["bapp_logs", "bapp_milestones"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/browse.ts": {
+    "identifiers": [
+      "nannies.ai_content",
+      "nannies.drivers_license",
+      "nannies.hourly_rate_min",
+      "nannies.nanny_experience_years",
+      "nannies.newborn_experience_years",
+      "nannies.role_types_preferred",
+      "nannies.total_experience_years",
+      "nannies.under_3_experience_years",
+      "nannies.vaccination_status",
+      "nannies.verification_tier",
+      "nanny_credentials",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/connection-helpers.ts": {
+    "identifiers": [
+      "connections_log",
+      "nanny_positions.hourly_rate",
+      "user_profiles.mobile_number",
+      "verifications.phone_number",
+      "verifications.user_id"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/connection.ts": {
+    "identifiers": [
+      "connection_requests.confirmed_at",
+      "connection_requests.confirmed_time",
+      "connection_requests.connection_stage",
+      "connection_requests.decline_reason",
+      "connection_requests.nanny_phone_shared",
+      "connection_requests.proposed_times",
+      "connection_requests.responded_at",
+      "connection_requests.source",
+      "connection_requests.status",
+      "nannies.hourly_rate_min",
+      "nanny_positions.position_status",
+      "nanny_positions.status",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/contact.ts": {
+    "identifiers": ["user_profiles.mobile_number"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/jobs.ts": {
+    "identifiers": [
+      "connection_requests.connection_stage",
+      "connection_requests.proposed_times",
+      "connection_requests.status",
+      "nanny_positions.status"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/matching.ts": {
+    "identifiers": [
+      "connection_requests.confirmed_time",
+      "connection_requests.connection_stage",
+      "connection_requests.proposed_times",
+      "connection_requests.responded_at",
+      "connection_requests.source",
+      "connection_requests.status",
+      "dfy_match_notifications",
+      "nannies.ai_content",
+      "nannies.hourly_rate_min",
+      "nannies.total_experience_years",
+      "nannies.wwcc_verified",
+      "nanny_availability",
+      "nanny_positions.comfortable_with_pets_required",
+      "nanny_positions.dfy_activated_at",
+      "nanny_positions.dfy_expires_at",
+      "nanny_positions.dfy_tier",
+      "nanny_positions.dfy_wave_sent",
+      "nanny_positions.drivers_license_required",
+      "nanny_positions.family_display_name",
+      "nanny_positions.hourly_rate",
+      "nanny_positions.minimum_age_requirement",
+      "nanny_positions.other_requirements_details",
+      "nanny_positions.position_status",
+      "nanny_positions.status",
+      "nanny_positions.suburb",
+      "nanny_positions.years_of_experience",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/nanny-leads.ts": {
+    "identifiers": [
+      "form_snapshots",
+      "nannies.additional_needs_ok",
+      "nannies.ai_bio",
+      "nannies.ai_content",
+      "nannies.childcare_roles",
+      "nannies.drivers_license",
+      "nannies.end_date_latest",
+      "nannies.hourly_rate_min",
+      "nannies.immediate_start_available",
+      "nannies.level_of_support_offered",
+      "nannies.max_child_age_months",
+      "nannies.max_children",
+      "nannies.min_child_age_months",
+      "nannies.motivation",
+      "nannies.nanny_experience_years",
+      "nannies.nationality",
+      "nannies.newborn_experience_years",
+      "nannies.non_smoker",
+      "nannies.pay_frequency",
+      "nannies.personality_traits",
+      "nannies.photo_1_url",
+      "nannies.photo_2_url",
+      "nannies.photo_3_url",
+      "nannies.placement_ongoing_preferred",
+      "nannies.professional_values",
+      "nannies.profile_picture_url",
+      "nannies.residency_status",
+      "nannies.right_to_work",
+      "nannies.role_types_preferred",
+      "nannies.start_date_earliest",
+      "nannies.status",
+      "nannies.sydney_resident",
+      "nannies.total_experience_years",
+      "nannies.under_3_experience_years",
+      "nannies.vaccination_status",
+      "nanny_availability",
+      "nanny_credentials",
+      "nanny_leads.residency",
+      "user_profiles.mobile_number",
+      "user_profiles.postcode",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb",
+      "user_progress",
+      "verifications.user_id",
+      "verifications.verification_status",
+      "verifications.wwcc_status"
+    ],
+    "reason": "legacy — unported Sydney code no London route reaches; latent until something imports it. Fix or delete with the surface; do not widen this entry."
+  },
+  "src/lib/actions/nanny.ts": {
+    "identifiers": [
+      "activity_logs",
+      "form_snapshots",
+      "nannies.ai_content",
+      "nannies.deactivated_at",
+      "nannies.hourly_rate_min",
+      "nannies.last_regenerated_at",
+      "nannies.role_types_preferred",
+      "nannies.status",
+      "nannies.total_experience_years",
+      "nanny_assurances",
+      "nanny_availability",
+      "nanny_credentials",
+      "nanny_images",
+      "user_profiles.mobile_number",
+      "user_profiles.postcode",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/parent-leads.ts": {
+    "identifiers": ["parent_leads.postcode", "parent_leads.suburb"],
+    "reason": "legacy — unported Sydney code no London route reaches; latent until something imports it. Fix or delete with the surface; do not widen this entry."
+  },
+  "src/lib/actions/parent.ts": {
+    "identifiers": [
+      "activity_logs",
+      "child_client.date_of_birth",
+      "child_client.first_name",
+      "child_client.updated_at",
+      "connection_requests.connection_stage",
+      "connection_requests.status",
+      "nanny_placements.parent_user_id",
+      "nanny_placements.status",
+      "nanny_positions.position_status",
+      "nanny_positions.status",
+      "user_profiles.profile_picture_url"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/payments/cancelSubscription.ts": {
+    "identifiers": [
+      "activity_logs",
+      "parent_subscriptions.cancellation_reason_text",
+      "parent_subscriptions.paid_period_ends_at"
+    ],
+    "reason": "legacy — unported Sydney code no London route reaches; latent until something imports it. Fix or delete with the surface; do not widen this entry."
+  },
+  "src/lib/actions/payments/checkout.ts": {
+    "identifiers": ["parent_subscriptions.subscription_cycle"],
+    "reason": "legacy — unported Sydney code no London route reaches; latent until something imports it. Fix or delete with the surface; do not widen this entry."
+  },
+  "src/lib/actions/payments/createSubscribeInvite.ts": {
+    "identifiers": [
+      "child_client.first_name",
+      "subscribe_invites.child_client_id"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/payments/customer.ts": {
+    "identifiers": ["parents.stripe_customer_id"],
+    "reason": "legacy — unported Sydney code no London route reaches; latent until something imports it. Fix or delete with the surface; do not widen this entry."
+  },
+  "src/lib/actions/payments/portal.ts": {
+    "identifiers": ["parents.stripe_customer_id"],
+    "reason": "legacy — unported Sydney code no London route reaches; latent until something imports it. Fix or delete with the surface; do not widen this entry."
+  },
+  "src/lib/actions/position-funnel.ts": {
+    "identifiers": [
+      "connection_requests.confirmed_time",
+      "connection_requests.connection_stage",
+      "connection_requests.intro_outcome_reported_at",
+      "connection_requests.nanny_phone_shared",
+      "connection_requests.proposed_times",
+      "connection_requests.source",
+      "connection_requests.start_date",
+      "connection_requests.status",
+      "dfy_match_notifications",
+      "nannies.hourly_rate_min",
+      "nannies.nanny_experience_years",
+      "nannies.total_experience_years",
+      "nannies.wwcc_verified",
+      "nanny_credentials",
+      "nanny_placements.hired_at",
+      "nanny_placements.hourly_rate",
+      "nanny_placements.interview_request_id",
+      "nanny_placements.status",
+      "nanny_positions.comfortable_with_pets_required",
+      "nanny_positions.drivers_license_required",
+      "nanny_positions.family_display_name",
+      "nanny_positions.filled_at",
+      "nanny_positions.hourly_rate",
+      "nanny_positions.other_requirements_details",
+      "nanny_positions.position_status",
+      "nanny_positions.status",
+      "nanny_positions.suburb",
+      "nanny_positions.years_of_experience",
+      "user_profiles.mobile_number",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/actions/verification.ts": {
+    "identifiers": [
+      "connection_requests.connection_stage",
+      "connection_requests.source",
+      "connection_requests.status",
+      "nannies.identity_verified",
+      "nannies.wwcc_verified",
+      "nanny_positions.status",
+      "user_profiles.postcode",
+      "user_profiles.suburb",
+      "verifications.address_line",
+      "verifications.city",
+      "verifications.country",
+      "verifications.cross_check_issues",
+      "verifications.cross_check_reasoning",
+      "verifications.extracted_nationality",
+      "verifications.extracted_passport_number",
+      "verifications.identification_photo_url",
+      "verifications.identity_verified",
+      "verifications.passport_country",
+      "verifications.passport_upload_url",
+      "verifications.phone_number",
+      "verifications.postcode",
+      "verifications.state",
+      "verifications.user_id",
+      "verifications.verification_status",
+      "verifications.wwcc_doc_verified",
+      "verifications.wwcc_expiry_date",
+      "verifications.wwcc_grant_email_url",
+      "verifications.wwcc_number",
+      "verifications.wwcc_rejection_reason",
+      "verifications.wwcc_service_nsw_screenshot_url",
+      "verifications.wwcc_status",
+      "verifications.wwcc_user_guidance",
+      "verifications.wwcc_verification_method",
+      "verifications.wwcc_verified"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/admin/getAdminUserData.ts": {
+    "identifiers": [
+      "nannies.identity_verified",
+      "nannies.status",
+      "nannies.visible_in_bsr",
+      "nannies.wwcc_verified",
+      "parents.status",
+      "user_profiles.mobile_number",
+      "user_profiles.postcode",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb",
+      "verifications.user_id",
+      "verifications.verification_status"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/ai/verification-pipeline.ts": {
+    "identifiers": [
+      "verifications.cross_check_issues",
+      "verifications.cross_check_reasoning",
+      "verifications.extracted_dob",
+      "verifications.extracted_given_names",
+      "verifications.extracted_nationality",
+      "verifications.extracted_passport_expiry",
+      "verifications.extracted_passport_number",
+      "verifications.extracted_surname",
+      "verifications.extracted_wwcc_surname",
+      "verifications.identification_photo_url",
+      "verifications.identity_verified",
+      "verifications.identity_verified_at",
+      "verifications.passport_country",
+      "verifications.passport_upload_url",
+      "verifications.user_id",
+      "verifications.verification_status",
+      "verifications.wwcc_status"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/analytics/compute-snapshot.ts": {
+    "identifiers": [
+      "connection_requests.connection_stage",
+      "dfy_match_notifications",
+      "nanny_leads.highest_page_reached",
+      "nanny_leads.visitor_id",
+      "nanny_positions.dfy_activated_at",
+      "nanny_positions.dfy_expires_at",
+      "nanny_positions.dfy_tier",
+      "nanny_positions.status",
+      "user_profiles.is_test",
+      "user_stats",
+      "verifications.user_id",
+      "verifications.wwcc_status"
+    ],
+    "reason": "legacy — unported Sydney code no London route reaches; latent until something imports it. Fix or delete with the surface; do not widen this entry."
+  },
+  "src/lib/auth/actions.ts": {
+    "identifiers": [
+      "child_invites.child_client_id",
+      "nannies.status",
+      "nannies.verification_tier",
+      "parents.status",
+      "user_profiles.mobile_number",
+      "user_progress"
+    ],
+    "reason": "legacy — unported Sydney code no London route reaches; latent until something imports it. Fix or delete with the surface; do not widen this entry."
+  },
+  "src/lib/chat/bot.ts": {
+    "identifiers": [
+      "child_client.date_of_birth",
+      "child_client.first_name",
+      "child_client.gender",
+      "child_client.under_three",
+      "nanny_placements.status"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/developmental-snapshot.ts": {
+    "identifiers": ["bapp_milestones", "bapp_progress_scores"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/memory/compaction.ts": {
+    "identifiers": ["chat_summaries.child_client_id"],
+    "reason": "legacy — unported Sydney code no London route reaches; latent until something imports it. Fix or delete with the surface; do not widen this entry."
+  },
+  "src/lib/chat/modules/activities.ts": {
+    "identifiers": ["bapp_logs", "bapp_milestones"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/modules/agent-memory.ts": {
+    "identifiers": ["agent_memory.child_client_id"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/modules/child-profile.ts": {
+    "identifiers": [
+      "child_client.first_name",
+      "child_client.gender",
+      "child_client.status",
+      "child_client.under_three",
+      "child_client.under_three_onboarded"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/modules/diary.ts": {
+    "identifiers": ["bapp_logs"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/modules/feed-writer.ts": {
+    "identifiers": ["bapp_logs"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/modules/feed.ts": {
+    "identifiers": ["bapp_logs"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/modules/job-search.ts": {
+    "identifiers": [
+      "nanny_positions.hourly_rate",
+      "nanny_positions.postcode",
+      "nanny_positions.suburb"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/modules/katie-admin.ts": {
+    "identifiers": ["katie_prompt.updated_at"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/modules/katie-scheduling.ts": {
+    "identifiers": ["proactive_schedules.child_client_id"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/modules/observations.ts": {
+    "identifiers": ["bapp_logs", "bapp_milestones"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/modules/progress.ts": {
+    "identifiers": [
+      "bapp_logs",
+      "bapp_milestones",
+      "bapp_progress_history",
+      "bapp_progress_scores"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/modules/verification.ts": {
+    "identifiers": [
+      "parent_verifications",
+      "parents.verification_level",
+      "verifications.user_id",
+      "verifications.verification_status",
+      "verifications.wwcc_rejection_reason",
+      "verifications.wwcc_status",
+      "verifications.wwcc_user_guidance"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/preload/build-always-on.ts": {
+    "identifiers": [
+      "agent_memory.child_client_id",
+      "bapp_logs",
+      "child_client.date_of_birth",
+      "child_client.first_name",
+      "child_client.gender",
+      "child_client.status",
+      "child_client.under_three"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/preload/verify.ts": {
+    "identifiers": ["interview_requests", "nanny_placements.status"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/proactive/dispatcher.ts": {
+    "identifiers": ["child_client.first_name"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/chat/proactive/seed-defaults.ts": {
+    "identifiers": ["proactive_schedules.child_client_id"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/email/feed-post-notification.ts": {
+    "identifiers": ["child_client.first_name"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/email/hire-emails.ts": {
+    "identifiers": ["verifications.user_id"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/email/resend.ts": {
+    "identifiers": ["email_logs.email_type", "email_logs.error_message"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/invite/mint.ts": {
+    "identifiers": [
+      "child_invites.bonus_program",
+      "child_invites.child_client_id"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/leads/fetch-lead-detail.ts": {
+    "identifiers": [
+      "bsr_notifications",
+      "child_client.age_months_approx",
+      "child_client.date_of_birth",
+      "child_client.first_name",
+      "child_client.status",
+      "child_invites.child_client_id",
+      "interview_requests",
+      "nanny_availability",
+      "nanny_placements.hired_at",
+      "nanny_placements.status",
+      "parent_subscriptions.paid_period_ends_at",
+      "user_profiles.address_line1",
+      "user_profiles.address_line2",
+      "user_profiles.mobile_number",
+      "user_profiles.postcode",
+      "user_profiles.profile_picture_url",
+      "user_profiles.state",
+      "user_profiles.suburb",
+      "verifications.identity_verified",
+      "verifications.identity_verified_at",
+      "verifications.ocg_recorded_at",
+      "verifications.ocg_result_status",
+      "verifications.user_id",
+      "verifications.verification_status",
+      "verifications.wwcc_expiry_date",
+      "verifications.wwcc_number",
+      "verifications.wwcc_verified",
+      "verifications.wwcc_verified_at"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/leads/fetch-leads.ts": {
+    "identifiers": [
+      "child_client.status",
+      "child_invites.bonus_program",
+      "child_invites.nanny_user_id",
+      "nannies.bonus_program_completed_at",
+      "nanny_contact_state.id",
+      "nanny_contact_state.pinned_note",
+      "user_profiles.mobile_number",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb",
+      "verifications.identity_verified",
+      "verifications.user_id",
+      "verifications.verification_status",
+      "verifications.wwcc_verified"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/leads/timeline.ts": {
+    "identifiers": [
+      "activity_logs",
+      "email_logs.email_type",
+      "nanny_payouts",
+      "nanny_placements.hired_at",
+      "nanny_placements.status",
+      "user_progress"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/legal/consent-renewal.ts": {
+    "identifiers": [
+      "activity_logs",
+      "child_client.first_name",
+      "child_client.status",
+      "nanny_placements.child_client_id",
+      "nanny_placements.nanny_user_id"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/matching/engine.ts": {
+    "identifiers": [
+      "nannies.additional_needs_ok",
+      "nannies.ai_content",
+      "nannies.drivers_license",
+      "nannies.hourly_rate_min",
+      "nannies.immediate_start_available",
+      "nannies.level_of_support_offered",
+      "nannies.max_child_age_months",
+      "nannies.max_children",
+      "nannies.min_child_age_months",
+      "nannies.nanny_experience_years",
+      "nannies.nationality",
+      "nannies.newborn_experience_years",
+      "nannies.non_smoker",
+      "nannies.role_types_preferred",
+      "nannies.total_experience_years",
+      "nannies.under_3_experience_years",
+      "nannies.vaccination_status",
+      "nanny_availability",
+      "nanny_credentials",
+      "nanny_positions.comfortable_with_pets_required",
+      "nanny_positions.drivers_license_required",
+      "nanny_positions.minimum_age_requirement",
+      "nanny_positions.postcode",
+      "nanny_positions.suburb",
+      "nanny_positions.years_of_experience",
+      "sydney_postcodes",
+      "user_profiles.postcode",
+      "user_profiles.profile_picture_url",
+      "user_profiles.suburb"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/payments/access-gate.ts": {
+    "identifiers": ["parent_subscriptions.paid_period_ends_at"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/payments/parent-banner-state.ts": {
+    "identifiers": [
+      "child_client.first_name",
+      "parent_subscriptions.paid_period_ends_at"
+    ],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  },
+  "src/lib/pdf/generate-hire-pdf.ts": {
+    "identifiers": ["bucket:hire-pdfs"],
+    "reason": "legacy — unported Sydney code a London route still reaches, so these names 42703 / 42P01 at request time. Fix or port the surface; do not widen this entry."
+  }
+}

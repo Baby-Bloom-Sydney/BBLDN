@@ -21,6 +21,10 @@
 #                                        ADR-142 (2)); a recorded gap carries its reason in limiter-call-sites.allow.json
 #                                        + scripts/ci/check-action-limits.mjs — the inverse (REVIEW-3 R-3 / M-1): a
 #                                        server action that reaches no limiter fails; same job, same allow file
+#   1 lint            → config-gates    scripts/ci/check-schema-names.mjs — a table / view / column / RPC / bucket
+#                                        name the code uses that the generated types do not have (L-009 SCHEMA-1);
+#                                        `src/modules/` + `src/boot/` must be clean, the legacy tree is ratcheted
+#                                        in scripts/ci/schema-names.ratchet.json and may only shrink.
 #   1 lint            → config-gates    scripts/ci/check-config-literals.mjs (including ADR-172's `safeguarding`
 #                                        rule) · env:check (.env.example) · crons:check (vercel.json) ·
 #                                        process.env grep outside config · check:retention-classes (ADR-179 —
@@ -240,6 +244,9 @@ jobs:
       - name: the erasure job, the purge and LEGAL.erasureRetains name the same retention classes — each with a window and an anchor (ADR-179; 07 §6.2; L-009 3g)
         if: ${{ !cancelled() }}
         run: npm run check:retention-classes
+      - name: every table / view / column / RPC / bucket the code names exists in the generated types (L-009 SCHEMA-1) — owned tree clean, legacy ratcheted in scripts/ci/schema-names.ratchet.json
+        if: ${{ !cancelled() }}
+        run: npm run check:schema-names
 
   # ── The one step that is allowed to be red, alone in its own job so that it says nothing about the others ──
   banned-literals:
