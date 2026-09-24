@@ -5,7 +5,7 @@
 // an alias, a cast, a json path, an embedded relation, a storage bucket. Each of these, read wrongly, makes the
 // gate quietly narrower rather than red, which is the failure mode a green gate hides best.
 import { describe, expect, it } from "vitest";
-// @ts-expect-error — a .mjs CI helper with no declaration file; the gate is JavaScript on purpose.
+// A .mjs CI helper — the gate is JavaScript on purpose, so it runs with no build step.
 import { schemaReferences } from "./lib/schema-references.mjs";
 
 type Reference = {
